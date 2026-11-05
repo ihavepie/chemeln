@@ -5765,19 +5765,20 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .stack-top::after {
   content: '';
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 48px;          /* 只画顶上这一截，卡片右边不会拖出一条竖线 */
+  /* 贴住卡片底边、只往右错：上下边都齐，也不会糊到展开的组员行上 */
+  inset: auto 0 0 0;
+  height: 44px;
   border-radius: var(--r);
   pointer-events: none;
 }
 .stack-top::before {
   background: #faf8f1;
-  transform: translate(8px, -8px);
+  transform: translateX(8px);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .stack-top::after {
   background: #fdfcf7;
-  transform: translate(4px, -4px);
+  transform: translateX(4px);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
@@ -6125,8 +6126,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .grid-stack::after {
   content: '';
   position: absolute;
-  /* 只在**底下**露一截：卡片顶边就还是齐的，不会让人觉得这一摞被顶上去了 */
-  inset: auto 0 -11px 0;
+  /* 贴住卡片**底边**、只往右错：上下边都和同排卡片齐平，
+     只在右下角露一小截当「这摞不止一张」的提示 */
+  inset: auto 0 0 0;
   height: 64px;
   border-radius: var(--r);
   pointer-events: none;
@@ -6136,12 +6138,12 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    错开量别太大（11 / 5.5），再大就成一摞砖了。 */
 .grid-stack::before {
   background: #faf8f1;
-  transform: translate(11px, 0);
+  transform: translateX(13px);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .grid-stack::after {
   background: #fdfcf7;
-  transform: translate(5.5px, 0);
+  transform: translateX(6.5px);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
