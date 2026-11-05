@@ -121,16 +121,27 @@ const baseline = ref('');
    （只淡不动的观感就是「闪一下」）。系统开了「减少动态效果」就不动。
    注意纸外那排平行书签是按 sheet 的 rect 算位置的，位移期间会差几像素，
    所以动画结束要再量一次（updateRail）。 */
+let switchDir = 1;   // +1 = 新记录在列表里更靠下（从下方上来），-1 = 从上方下来
+
+/** 切换方向跟着列表走：往下翻就从下面上来，往上翻就从上面下来（比无方向淡入更有「在翻记录」的感觉） */
+function dirBetween(prevId, nextId) {
+  const items = store.items;
+  const a = items.findIndex((x) => x.id === Number(prevId));
+  const b = items.findIndex((x) => x.id === Number(nextId));
+  if (a < 0 || b < 0 || a === b) return 1;
+  return b > a ? 1 : -1;
+}
+
 function fadeInPaper() {
   const el = innerEl.value;
   if (!el || typeof el.animate !== 'function') return;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   const anim = el.animate(
     [
-      { opacity: 0.6, transform: 'translateY(8px)' },
+      { opacity: 0.82, transform: `translateY(${switchDir * 8}px)` },
       { opacity: 1, transform: 'none' },
     ],
-    { duration: 260, easing: 'cubic-bezier(.16, 1, .3, 1)' }
+    { duration: 170, easing: 'cubic-bezier(.16, 1, .3, 1)' }
   );
   // 纸面在动，纸外那排书签是按 rect 定位的：跟着它每帧重算一次，不然动画期间会错开、结束才跳回来
   const follow = () => {
@@ -168,6 +179,7 @@ watch(
     moreMenu.value = false;
     statusMenu.value = false;
     page.value = String(route.query.p) === '2' ? 2 : 1;
+    switchDir = dirBetween(old, id);
     await load();
     // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
     await nextTick();
