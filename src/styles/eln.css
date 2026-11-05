@@ -373,30 +373,43 @@ body {
   align-items: start;
 }
 
+/* 卡片墙的卡片走「亚克力」那一路：**不描边**，用一层柔和的投影跟画布分开，
+   顶上再压一道 1px 内高光，像压在玻璃里的纸。 */
 .grid-card {
   display: flex;
   flex-direction: column;
+  /* button 的浏览器默认 align-items 是 flex-start，会让缩略图 / 文字栏缩成内容宽
+     （缩略图的底色就只铺到一半），这里显式撑满 */
+  align-items: stretch;
   padding: 0;
   text-align: left;
   background: var(--paper);
-  border: 1px solid var(--line-2);
+  border: none;
   border-radius: var(--r);
+  box-shadow:
+    0 1px 2px rgba(20, 18, 14, 0.04),
+    0 8px 20px -8px rgba(20, 18, 14, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   cursor: pointer;
   font-family: inherit;
   color: inherit;
-  transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease), transform 140ms var(--ease);
+  transition: box-shadow 140ms var(--ease), transform 140ms var(--ease);
 }
 
 .grid-card:hover {
-  border-color: var(--ink-4);
-  box-shadow: 0 8px 20px rgba(20, 18, 14, 0.07);
+  box-shadow:
+    0 2px 4px rgba(20, 18, 14, 0.05),
+    0 14px 30px -10px rgba(20, 18, 14, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .grid-card:active { transform: scale(0.995); }
 
+/* 当前这条：不描边，靠一圈强调色的光晕（只在记录页开着那条时才会出现） */
 .grid-card[aria-current="true"] {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow:
+    0 0 0 1.5px var(--accent),
+    0 10px 24px -8px rgba(20, 18, 14, 0.18);
 }
 
 .grid-thumb {
@@ -408,8 +421,7 @@ body {
      宽反应式在框里居中，上下留白也比卡片矮一截好看 */
   height: 130px;
   padding: 8px 10px;
-  background: #fcfcfb;
-  border-bottom: 1px solid #f1efe8;
+  background: #fbfaf7;
   border-radius: var(--r) var(--r) 0 0;
   overflow: hidden;
 }
@@ -418,7 +430,7 @@ body {
 .grid-thumb.is-structure {
   height: 148px;
   padding: 12px 14px;
-  background: #fefefd;
+  background: #fbfaf7;
 }
 
 /* 关键：宽度吃满、高度按图片比例走，不做裁切也不留大片空框 */
@@ -6048,20 +6060,29 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   flex-direction: column;
 }
 
-/* 后面那两层纸边：只露 3.5px 和 7px，跟左栏卡片堆一个手感 */
+/* 底下压着两张纸：不描边，靠「比顶张窄一点 + 抬起来一点 + 各自的淡投影」叠出来，
+   看起来是一摞纸，而不是两条描边的空框 */
 .grid-stack::before,
 .grid-stack::after {
   content: '';
   position: absolute;
-  height: 44px;
-  background: #f7f5f1;
-  border: 1px solid var(--line-2);
+  height: 40px;
   border-radius: var(--r);
   pointer-events: none;
 }
-.grid-stack::before { top: -7px; left: 7px; right: 7px; opacity: 0.75; }
-.grid-stack::after { top: -3.5px; left: 3.5px; right: 3.5px; opacity: 0.9; }
+.grid-stack::before { top: -11px; left: 16px; right: 16px; background: #fbfaf6; box-shadow: 0 -3px 7px -3px rgba(20, 18, 14, 0.22); }
+.grid-stack::after { top: -5.5px; left: 8px; right: 8px; background: #fffefb; box-shadow: 0 -3px 7px -3px rgba(20, 18, 14, 0.16); }
 
-/* 卡片本身撑满这一格（.card-grid.is-even 让同一行的卡片等高） */
-.grid-stack .grid-card { flex: 1 1 auto; position: relative; z-index: 1; }
+/* 卡片本身撑满这一格（.card-grid.is-even 让同一行的卡片等高）；
+   上面那张要在自己上方也落一点影子，压着的两张纸才有「叠起来」的层次 */
+.grid-stack .grid-card {
+  flex: 1 1 auto;
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 -2px 5px -2px rgba(20, 18, 14, 0.1),
+    0 1px 2px rgba(20, 18, 14, 0.04),
+    0 8px 20px -8px rgba(20, 18, 14, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
 .grid-stack.is-dragging { opacity: 0.45; }
