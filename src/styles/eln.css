@@ -6125,8 +6125,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .grid-stack::after {
   content: '';
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 52px;          /* 同上：只在顶上露一截 */
+  /* 只在**底下**露一截：卡片顶边就还是齐的，不会让人觉得这一摞被顶上去了 */
+  inset: auto 0 -11px 0;
+  height: 64px;
   border-radius: var(--r);
   pointer-events: none;
 }
@@ -6135,12 +6136,12 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    错开量别太大（11 / 5.5），再大就成一摞砖了。 */
 .grid-stack::before {
   background: #faf8f1;
-  transform: translate(11px, -11px);
+  transform: translate(11px, 0);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .grid-stack::after {
   background: #fdfcf7;
-  transform: translate(5.5px, -5.5px);
+  transform: translate(5.5px, 0);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
@@ -6151,9 +6152,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   position: relative;
   z-index: 1;
   box-shadow:
-    0 -2px 5px -2px rgba(20, 18, 14, 0.1),
+    0 2px 5px -2px rgba(20, 18, 14, 0.12),
     0 1px 2px rgba(20, 18, 14, 0.04),
-    0 8px 20px -8px rgba(20, 18, 14, 0.14),
+    0 10px 22px -8px rgba(20, 18, 14, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 .grid-stack.is-dragging { opacity: 0.45; }
