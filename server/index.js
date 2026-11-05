@@ -295,9 +295,16 @@ function getExperiment(id) {
     .all(id)
     .map(parseScreening);
   // 平行组（重复 / 控制变量）：同一条记录旁边那几个「书签」。空组号 = 就这一条
+  // 书签上只要编号和产率，但鼠标悬停时要能瞥一眼这条是什么——顺手把条件也带上
   exp.siblings = exp.group_id
     ? db
-        .prepare('SELECT id, code, title, status, yield_pct FROM experiments WHERE group_id = ? ORDER BY id')
+        .prepare(
+          `SELECT e.id, e.code, e.title, e.date, e.status, e.yield_pct, e.solvent, e.temperature, e.duration,
+                  e.base_mmol, e.product_name,
+                  (SELECT group_concat(r.name, ' + ') FROM reagents r
+                    WHERE r.exp_id = e.id AND r.role = '底物' AND r.name <> '') AS substrates
+             FROM experiments e WHERE e.group_id = ? ORDER BY e.id`
+        )
         .all(exp.group_id)
     : [];
   return exp;

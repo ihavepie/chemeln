@@ -614,7 +614,8 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
       <div class="editor-inner">
         <!-- ============ 第 1 页 ============ -->
         <article class="sheet sheet-p1" :class="{ 'is-hidden': page !== 1 }">
-          <!-- 平行组书签：贴在纸面左边距里的一排小标签（重复实验 / 控制变量实验），点一下换过去 -->
+          <!-- 平行组书签：从纸面左边凸出去的一排纸签（重复实验 / 控制变量实验）。
+               悬停先看一眼，点下去才切记录。 -->
           <nav v-if="siblings.length > 1" class="pgroup noprint" aria-label="平行实验">
             <span class="pgroup-cap">平行</span>
             <button
@@ -623,10 +624,21 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
               type="button"
               class="pgroup-tab"
               :class="{ 'is-on': String(s.id) === String(exp.id) }"
-              :title="`${s.code}${s.title ? ` · ${s.title}` : ''}`"
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
             >
-              <span class="pgroup-txt">{{ s.code }}<template v-if="sibMeta(s)"> · {{ sibMeta(s) }}</template></span>
+              <span class="pgroup-row">
+                <span class="pgroup-code">{{ s.code }}</span>
+                <span class="pgroup-meta">{{ sibMeta(s) }}</span>
+              </span>
+              <span class="pgroup-peek">
+                <span class="pgroup-peek-title">{{ s.title || '（未命名实验）' }}</span>
+                <span class="pgroup-peek-line">{{ s.date }} · {{ s.status }}<template v-if="s.yield_pct != null"> · 产率 {{ s.yield_pct }}%</template></span>
+                <span v-if="s.substrates" class="pgroup-peek-line">底物：{{ s.substrates }}</span>
+                <span v-if="[s.solvent, s.temperature, s.duration].filter(Boolean).length" class="pgroup-peek-line">
+                  {{ [s.solvent, s.temperature, s.duration].filter(Boolean).join(' · ') }}<template v-if="s.base_mmol"> ｜ {{ s.base_mmol }} mmol</template>
+                </span>
+                <span class="pgroup-peek-hint">点一下切到这条</span>
+              </span>
             </button>
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
           </nav>
