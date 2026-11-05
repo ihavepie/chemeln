@@ -143,7 +143,13 @@ watch(
     moreMenu.value = false;
     statusMenu.value = false;
     page.value = String(route.query.p) === '2' ? 2 : 1;
+    const prevGroup = exp.value?.group_id || '';
     await load();
+    // 在同一个平行组里来回切（书签上翻、组员行上点）：把这一组展开，
+    // 这样中栏那个选中虚线框能落到具体那条组员行上。从别处进来不自动展开，
+    // 免得手动收起过的组一进页面又被撑开。
+    const gid = exp.value?.group_id || '';
+    if (gid && gid === prevGroup) store.openStacks[gid] = true;
     // 切完弹一个气泡通知（只在这条记录是从别处切过来时提示，第一次打开不提示）
     if (exp.value?.code) toast(`已切换到 ${exp.value.code}`, 'info', 1800);
     // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
