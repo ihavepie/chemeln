@@ -6173,3 +6173,17 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .sk-line.sk-h { height: 15px; background: #ebeae4; }
 .sk-line + .sk-line { margin-top: 10px; }
+
+/* ================================================================
+   切记录 / 切化合物之后的一句提示（工具栏左侧，跟在编号后面）。
+   只在切换时出现 1.4 秒，纸面本身不做任何动效。
+   EditorView 与 CompoundDetail 共用。
+   ================================================================ */
+.switch-note {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}

@@ -23,7 +23,6 @@ const router = useRouter();
 const route = useRoute();
 
 const c = ref(null);
-const innerEl = ref(null);   // 档案纸的容器，换化合物时拿它做淡入
 const editorEl = ref(null);  // 滚动容器
 const error = ref('');
 const hovered = ref('');
@@ -68,25 +67,20 @@ function fill(data) {
   markLoaded();
 }
 
-/* 换一个化合物时新的一页「落」下来（跟实验页一个做法：上浮一点点 + 淡入）。
-   系统开了「减少动态效果」就不动。 */
-function fadeInPaper() {
-  const el = innerEl.value;
-  if (!el || typeof el.animate !== 'function') return;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  el.animate(
-    [
-      { opacity: 0.6, transform: 'translateY(10px)' },
-      { opacity: 1, transform: 'none' },
-    ],
-    { duration: 260, easing: 'cubic-bezier(.16, 1, .3, 1)' }
-  );
+/* 换了化合物之后给一句文字提示（不动效）：工具栏左侧短暂写「已切换到 TEST-04」 */
+const switchNote = ref('');
+let noteTimer = 0;
+function noteSwitch(name) {
+  if (!name) return;
+  switchNote.value = `已切换到 ${name}`;
+  clearTimeout(noteTimer);
+  noteTimer = window.setTimeout(() => { switchNote.value = ''; }, 1400);
 }
+onBeforeUnmount(() => clearTimeout(noteTimer));
 
 async function load() {
   try {
     fill(await api.compound(props.compoundId));
-    nextTick(fadeInPaper);
   } catch (e) {
     error.value = e.message;
   }
@@ -107,6 +101,7 @@ watch(
     stdModal.value = false;
     moreMenu.value = false;
     await load();
+    noteSwitch(c.value?.code || c.value?.name);
     // 换了化合物就当翻到新的一页：滚回顶部
     await nextTick();
     editorEl.value?.scrollTo({ top: 0 });
@@ -459,6 +454,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
     <div v-else ref="editorEl" class="editor">
     <div class="editor-bar">
       <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">化合物</span>
+      <span v-if="switchNote" class="switch-note">{{ switchNote }}</span>
       <CatPick
         class="toolbar-cat"
         :value="form.category_id == null || form.category_id === '' ? '' : String(form.category_id)"
@@ -487,7 +483,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
       </div>
     </div>
 
-    <div ref="innerEl" class="editor-inner">
+    <div class="editor-inner">
       <article class="sheet cmp-sheet">
         <div class="sheet-runner"><span>化合物档案</span><span>{{ c.code }}</span></div>
 

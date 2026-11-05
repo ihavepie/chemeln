@@ -28,7 +28,6 @@ const route = useRoute();
 const router = useRouter();
 
 const exp = ref(null);
-const innerEl = ref(null);   // 两页纸的容器，切记录时拿它做淡入
 const error = ref('');
 const page = ref(1);
 const hovered = ref('');
@@ -117,39 +116,18 @@ function fill(e) {
 /** 打开这条记录时的内容快照，用来「重置」 */
 const baseline = ref('');
 
-/* 切记录时新的一页「落」下来：一点点上浮 + 淡入，比单纯淡入更像换了一页
-   （只淡不动的观感就是「闪一下」）。系统开了「减少动态效果」就不动。
-   注意纸外那排平行书签是按 sheet 的 rect 算位置的，位移期间会差几像素，
-   所以动画结束要再量一次（updateRail）。 */
-let switchDir = 1;   // +1 = 新记录在列表里更靠下（从下方上来），-1 = 从上方下来
-
-/** 切换方向跟着列表走：往下翻就从下面上来，往上翻就从上面下来（比无方向淡入更有「在翻记录」的感觉） */
-function dirBetween(prevId, nextId) {
-  const items = store.items;
-  const a = items.findIndex((x) => x.id === Number(prevId));
-  const b = items.findIndex((x) => x.id === Number(nextId));
-  if (a < 0 || b < 0 || a === b) return 1;
-  return b > a ? 1 : -1;
+/* 切记录之后给一句文字提示：不搞动效，纸面直接换，
+   工具栏左侧短暂写一行「已切换到 EXP-0082」，一秒多后自己消失。 */
+const switchNote = ref('');
+let noteTimer = 0;
+function noteSwitch(code) {
+  // 编号就在这行左边，别写成「EXP-0052 已切换到 EXP-0052」
+  if (!code) return;
+  switchNote.value = '已切换';
+  clearTimeout(noteTimer);
+  noteTimer = window.setTimeout(() => { switchNote.value = ''; }, 1400);
 }
-
-function fadeInPaper() {
-  const el = innerEl.value;
-  if (!el || typeof el.animate !== 'function') return;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  const anim = el.animate(
-    [
-      { opacity: 0.82, transform: `translateY(${switchDir * 8}px)` },
-      { opacity: 1, transform: 'none' },
-    ],
-    { duration: 170, easing: 'cubic-bezier(.16, 1, .3, 1)' }
-  );
-  // 纸面在动，纸外那排书签是按 rect 定位的：跟着它每帧重算一次，不然动画期间会错开、结束才跳回来
-  const follow = () => {
-    updateRail();
-    if (anim.playState !== 'finished') requestAnimationFrame(follow);
-  };
-  requestAnimationFrame(follow);
-}
+onBeforeUnmount(() => clearTimeout(noteTimer));
 
 async function load() {
   error.value = '';
@@ -160,7 +138,6 @@ async function load() {
     if (route.params.id !== id) return;
     fill(e);
     baseline.value = JSON.stringify(payload());
-    nextTick(fadeInPaper);          // 等这一帧把新内容贴上再淡入
   } catch (e) {
     error.value = e.message;
   }
@@ -179,8 +156,8 @@ watch(
     moreMenu.value = false;
     statusMenu.value = false;
     page.value = String(route.query.p) === '2' ? 2 : 1;
-    switchDir = dirBetween(old, id);
     await load();
+    noteSwitch(exp.value?.code);      // 切完给一句提示（换记录才提示，第一次打开不提示）
     // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
     await nextTick();
     editorEl.value?.scrollTo({ top: 0 });
@@ -703,6 +680,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
 
       <div v-if="exp" class="editor-bar">
         <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">{{ exp.code }}</span>
+        <span v-if="switchNote" class="switch-note">{{ switchNote }}</span>
         <div class="page-tabs noprint" role="tablist">
           <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" @click="page = 1">第 1 页 · 主记录</button>
           <button class="ptab" :aria-selected="page === 2 ? 'true' : 'false'" @click="page = 2">第 2 页 · 续页</button>
@@ -745,7 +723,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
         </div>
       </div>
 
-      <div v-if="exp" ref="innerEl" class="editor-inner">
+      <div v-if="exp" class="editor-inner">
         <!-- ============ 第 1 页 ============ -->
         <article class="sheet sheet-p1" ref="sheetEl" :class="{ 'is-hidden': page !== 1 }">
           <div class="sheet-runner">
