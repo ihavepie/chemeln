@@ -6185,3 +6185,18 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .sk-line.sk-h { height: 15px; background: #ebeae4; }
 .sk-line + .sk-line { margin-top: 10px; }
 
+
+/* ================================================================
+   工作台的全局搜索（一次搜实验 + 化合物，分两组列出来）
+   输入框直接复用中栏那个 .searchbox；结果复用 .recent-list / .recent-row
+   ================================================================ */
+.dash-search { margin-bottom: 22px; }
+.dash-search .searchbox input { padding-top: 8px; padding-bottom: 8px; }
+.dash-group { margin-top: 14px; }
+.dash-sub {
+  margin: 0 0 7px;
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
+.dash-sub .mono { color: var(--ink-4); margin-left: 3px; }
