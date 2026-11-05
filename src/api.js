@@ -81,6 +81,8 @@ export const api = {
   deleteExperiment: (id) => request(`/api/experiments/${id}`, { method: 'DELETE' }),
   lock: (id, locked) => request(`/api/experiments/${id}/lock`, { method: 'POST', body: { locked } }).then((d) => d.experiment),
   duplicate: (id) => request(`/api/experiments/${id}/duplicate`, { method: 'POST' }).then((d) => d.experiment),
+  /* 平行实验：同一条实验再做一次 / 只换一个变量，进同一个平行组 */
+  parallel: (id) => request(`/api/experiments/${id}/parallel`, { method: 'POST', body: {} }).then((d) => d.experiment),
   moveExperiment: (id, body) => request(`/api/experiments/${id}/move`, { method: 'POST', body }).then((d) => d.experiment),
 
   upload: (id, formData) => request(`/api/experiments/${id}/attachments`, { method: 'POST', body: formData }),

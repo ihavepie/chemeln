@@ -188,6 +188,9 @@ ensureColumn('reagents', 'step', 'step INTEGER NOT NULL DEFAULT 1');
 // 投料行可以指向化合物库里的化合物；实验产物也可以
 ensureColumn('reagents', 'compound_id', 'compound_id INTEGER');
 ensureColumn('experiments', 'product_compound_id', 'product_compound_id INTEGER');
+// 平行组：重复 / 控制变量实验共用同一个 group_id，纸面左侧的书签就是它；
+// 空串 = 没有平行实验（单条记录）
+ensureColumn('experiments', 'group_id', "group_id TEXT NOT NULL DEFAULT ''");
 // 化合物的「标准实验」：当初在哪条实验里做出来的
 ensureColumn('compounds', 'standard_exp_id', 'standard_exp_id INTEGER');
 // 记录可以归到一个分类里（没归就是未分类）

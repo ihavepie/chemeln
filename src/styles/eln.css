@@ -5540,3 +5540,68 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 /* 化合物表第一列是结构图，比实验表窄一点 */
 .cmp-table .c-structure img { max-width: 64px; max-height: 36px; }
 .cmp-table .c-name .sub-line { gap: 0; }
+
+/* ================================================================
+   平行组书签（编辑页）：贴在纸面左边距里的一排竖书签
+   —— 重复实验 / 控制变量实验共用一条 group_id，用书签把它们并排放在一起，
+      点一下切过去；只有 ≥2 条时出现，单条记录完全看不出这层。
+   ================================================================ */
+.sheet { position: relative; }
+
+.pgroup {
+  position: absolute;
+  left: 4px;
+  top: 44px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 24px;
+}
+
+.pgroup-cap {
+  writing-mode: vertical-rl;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: var(--ink-4);
+  padding-bottom: 1px;
+  user-select: none;
+}
+
+.pgroup-tab,
+.pgroup-add {
+  writing-mode: vertical-rl;
+  display: block;
+  width: 22px;
+  padding: 9px 0;
+  text-align: center;
+  border: 1px solid var(--line-2);
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  background: #f7f4ec;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  transition: background 0.12s, color 0.12s;
+}
+
+.pgroup-tab:hover { background: #f0ebdd; color: var(--ink-2); }
+
+/* 当前这条：跟纸同色、看起来像被抽出来的那枚书签 */
+.pgroup-tab.is-on {
+  background: var(--paper);
+  color: var(--accent-ink);
+  box-shadow: 1px 0 0 var(--paper);
+}
+
+.pgroup-add {
+  font-size: 11px;
+  padding: 6px 0;
+  color: var(--ink-4);
+}
+.pgroup-add:hover { background: #f0ebdd; color: var(--accent-ink); }

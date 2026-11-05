@@ -134,7 +134,7 @@ const EXP_COLUMNS = [
   'product_name', 'appearance', 'yield_pct', 'dr_ee', 'characterization', 'notes', 'conclusion',
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
-  'steps_json', 'product_compound_id', 'category_id',
+  'steps_json', 'product_compound_id', 'category_id', 'group_id',
 ];
 
 const NUMERIC_COLUMNS = new Set([
@@ -294,6 +294,12 @@ function getExperiment(id) {
     .prepare('SELECT * FROM screenings WHERE exp_id = ? ORDER BY id')
     .all(id)
     .map(parseScreening);
+  // 平行组（重复 / 控制变量）：同一条记录旁边那几个「书签」。空组号 = 就这一条
+  exp.siblings = exp.group_id
+    ? db
+        .prepare('SELECT id, code, title, status, yield_pct FROM experiments WHERE group_id = ? ORDER BY id')
+        .all(exp.group_id)
+    : [];
   return exp;
 }
 
@@ -1921,6 +1927,97 @@ route('POST', '/api/experiments/:id/duplicate', async (req, res, params) => {
   const id = Number(row.lastInsertRowid);
   insertReagents(id, src.reagents);
   logEvent('experiment', id, 'duplicate', { detail: `复制自 ${src.code}` });
+  ok(res, { experiment: getExperiment(id) });
+});
+
+/**
+ * 新建一条「平行实验」：同一条实验再做一次（重复实验），或者只换一个变量（控制变量实验）。
+ * 条件 / 投料 / 操作步骤 / 反应式图片带过来，上一条的结果全清空——但标题不加「（重复）」，
+ * 因为平行实验本来就是同一轮；新记录跟源记录进同一个平行组（group_id），
+ * 纸面左侧那排书签显示的就是这一组。
+ */
+route('POST', '/api/experiments/:id/parallel', async (req, res, params) => {
+  const src = getExperiment(Number(params.id));
+  if (!src) return fail(res, 404, '实验不存在');
+  if (src.locked) return fail(res, 423, '实验已锁定');
+  const body = await readJson(req);
+  const prefix = settingsFor(str(src.project)).code_prefix || 'EXP';
+  const ts = nowISO();
+
+  const data = {};
+  for (const key of EXP_COLUMNS) if (key !== 'code' && key !== 'group_id') data[key] = src[key];
+  Object.assign(data, {
+    date: new Date().toISOString().slice(0, 10),
+    status: '进行中',
+    yield_pct: null,
+    product_mass: null,
+    appearance: '',
+    dr_ee: '',
+    ee_pct: null,
+    sel_method: '',
+    sel_condition: '',
+    sel_rt: '',
+    characterization: '',
+    notes: '',
+    conclusion: '',
+    tlc_note: '',
+  });
+
+  // 源记录还没有组号时，这一条顺手把源记录也拉进同一个组（第一次点「＋」的那一刻成组）
+  const groupId = src.group_id || `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+  db.exec('BEGIN');
+  let id;
+  try {
+    const row = db
+      .prepare(
+        `INSERT INTO experiments(${EXP_COLUMNS.join(',')}, locked, created_at, updated_at)
+         VALUES (${EXP_COLUMNS.map(() => '?').join(',')}, 0, ?, ?)`
+      )
+      .run(
+        nextCode(prefix),
+        data.title,
+        data.date,
+        data.status,
+        ...EXP_COLUMNS.slice(4).map((k) => (k === 'group_id' ? groupId : data[k] ?? null)),
+        ts,
+        ts
+      );
+    id = Number(row.lastInsertRowid);
+    insertReagents(id, src.reagents);
+    if (!src.group_id) db.prepare('UPDATE experiments SET group_id = ? WHERE id = ?').run(groupId, src.id);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+
+  // 反应式（结构图）带过来：平行实验是同一个反应，纸上不该缺图。TLC / 谱图不抄（每次都不一样）
+  if (body.copy_scheme !== false) {
+    const dir = path.join(ATTACH_DIR, String(id));
+    fs.mkdirSync(dir, { recursive: true });
+    const ins = db.prepare(
+      `INSERT INTO attachments(exp_id, category, filename, original_name, size, mime, is_dir, note, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`
+    );
+    for (const a of src.attachments.filter((x) => x.category === 'scheme')) {
+      const r = ins.run(id, a.category, a.filename, a.original_name, a.size, a.mime, a.is_dir, a.note, ts);
+      const fileId = Number(r.lastInsertRowid);
+      // original_name 可能本身就带 `行号__` 前缀（从路径导入的那种），别叠两层
+      const baseName = String(a.original_name || a.filename).replace(/^\d+__/, '');
+      const target = uniquePath(dir, `${fileId}__${baseName}`);
+      try {
+        const srcPath = attachmentPath(a);
+        if (a.is_dir) fs.cpSync(srcPath, target, { recursive: true });
+        else fs.copyFileSync(srcPath, target);
+        db.prepare('UPDATE attachments SET filename = ? WHERE id = ?').run(path.basename(target), fileId);
+      } catch {
+        db.prepare('DELETE FROM attachments WHERE id = ?').run(fileId);
+      }
+    }
+  }
+
+  logEvent('experiment', id, 'parallel', { detail: `平行实验，源自 ${src.code}` });
   ok(res, { experiment: getExperiment(id) });
 });
 

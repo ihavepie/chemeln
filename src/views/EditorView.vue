@@ -459,6 +459,32 @@ function duplicate() {
     .catch((err) => toast(err.message, 'err'));
 }
 
+/** 平行组：同一轮实验的重复 / 控制变量实验，纸面左侧那排书签 */
+const siblings = computed(() => exp.value?.siblings || []);
+
+/**
+ * 从当前记录再生成一条平行实验（带条件、投料表、反应式；结果清空），
+ * 然后切过去。先把当前的改动存掉，不然带过去的是旧内容。
+ */
+async function newParallel() {
+  moreMenu.value = false;
+  try {
+    if (dirty.value) await flush();
+    const e = await api.parallel(exp.value.id);
+    await loadList();
+    router.push(`/e/${e.id}`);
+    toast('已按这条实验新建一条平行实验；结果留空，改掉要变的那个变量就行');
+  } catch (err) {
+    toast(err.message || '建不了平行实验', 'err');
+  }
+}
+
+/** 书签上那一行小字：产率有就写产率，没有就写状态 */
+function sibMeta(s) {
+  const y = num(s.yield_pct);
+  return y !== null ? `${round(y, 1)}%` : s.status || '';
+}
+
 async function removeExperiment() {
   const ok = await confirm({
     title: `将 ${exp.value.code} 移入回收站？`,
@@ -575,6 +601,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
             <button @click="exportOne(); moreMenu = false"><Icon name="download" :size="13" /> 导出本条实验</button>
             <button @click="exportAll(); moreMenu = false"><Icon name="download" :size="13" /> 导出整本记录</button>
             <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制这条实验</button>
+            <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验（重复 / 改一个变量）</button>
             <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存入化合物库</button>
             <div class="menu-sep" />
             <button class="menu-danger" @click="removeExperiment(); moreMenu = false">
@@ -587,6 +614,22 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
       <div class="editor-inner">
         <!-- ============ 第 1 页 ============ -->
         <article class="sheet sheet-p1" :class="{ 'is-hidden': page !== 1 }">
+          <!-- 平行组书签：贴在纸面左边距里的一排小标签（重复实验 / 控制变量实验），点一下换过去 -->
+          <nav v-if="siblings.length > 1" class="pgroup noprint" aria-label="平行实验">
+            <span class="pgroup-cap">平行</span>
+            <button
+              v-for="s in siblings"
+              :key="s.id"
+              type="button"
+              class="pgroup-tab"
+              :class="{ 'is-on': String(s.id) === String(exp.id) }"
+              :title="`${s.code}${s.title ? ` · ${s.title}` : ''}`"
+              @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
+            >
+              <span class="pgroup-txt">{{ s.code }}<template v-if="sibMeta(s)"> · {{ sibMeta(s) }}</template></span>
+            </button>
+            <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
+          </nav>
           <div class="sheet-runner">
             <span>{{ store.boot?.settings?.lab_heading || '方法学实验记录' }}</span>
             <span>{{ exp.code }}</span>
