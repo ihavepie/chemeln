@@ -501,17 +501,32 @@ async function newParallel() {
   }
 }
 
-/** 悬停预览卡：跟着鼠标所在的那枚书签定位，永远放在书签**左边**（不压纸张） */
+/** 悬停预览卡：跟着鼠标所在的那枚书签定位，永远放在书签**左边**（不压纸张），
+ *  卡上带一个小箭头指回正在悬停的那枚书签。 */
 const peek = ref(null);
 const peekPos = ref({});
+const peekEl = ref(null);
 function showPeek(s, ev) {
   const r = ev.currentTarget.getBoundingClientRect();
   const width = 300;
-  // 卡片右边贴在书签左边；左边不够就尽量靠左，别出屏幕
-  const left = Math.max(8, r.left - width - 10);
+  // 卡片右边贴在书签左边（留 9px 给箭头尖）；左边不够就尽量靠左，别出屏幕
+  const left = Math.max(8, r.left - width - 9);
   const top = Math.max(8, Math.min(window.innerHeight - 152, r.top - 6));
   peekPos.value = { left: `${left}px`, top: `${top}px`, width: `${width}px` };
   peek.value = s;
+  // 卡片高度要等渲染出来才知道：把卡片竖直居中在书签上，箭头对准书签中线
+  nextTick(() => {
+    const h = peekEl.value ? peekEl.value.offsetHeight : 160;
+    const cy = r.top + r.height / 2;
+    const t = Math.max(10, Math.min(window.innerHeight - h - 10, cy - h / 2));
+    const arrow = Math.max(14, Math.min(h - 14, cy - t));
+    peekPos.value = {
+      left: `${left}px`,
+      top: `${Math.round(t)}px`,
+      width: `${width}px`,
+      '--arrow-y': `${Math.round(arrow)}px`,
+    };
+  });
 }
 function hidePeek() {
   peek.value = null;
@@ -795,7 +810,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
           </nav>
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
           <Teleport to="body">
-            <div v-if="peek" class="pgroup-peek-float" :style="peekPos">
+            <div v-if="peek" ref="peekEl" class="pgroup-peek-float" :style="peekPos">
               <div class="peek-head">
                 <span class="peek-title">{{ peek.title || '（未命名实验）' }}</span>
                 <span class="tag" :class="STATUS_TONE[peek.status]" style="font-size: 10px; padding: 1px 7px">{{ peek.status }}</span>

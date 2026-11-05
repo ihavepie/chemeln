@@ -5574,31 +5574,46 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   font-size: 8px;
   letter-spacing: 0.16em;
   color: var(--ink-4);
-  padding-right: 4px;
+  padding-right: 5px;
   user-select: none;
 }
 
-/* 一枚书签：右边贴着纸（无边框、直角），左边露在外面（圆角 + 一点投影） */
+/* 一枚书签：右边贴着纸（无边框、直角），左边露在外面（圆角 + 一点投影）。
+   左边缘一道细折边，像纸签被折出来的一条；当前这条折边换成强调色。 */
 .pgroup-tab,
 .pgroup-add {
   position: relative;
   display: block;
-  width: 116px;
-  padding: 5px 9px 5px 9px;
+  width: 118px;
+  padding: 6px 10px;
   text-align: left;
   background: #f8f5ec;
-  border: 1px solid #e3ded1;
+  border: 1px solid #e5e0d2;
   border-right: none;
-  border-radius: 6px 0 0 6px;
-  box-shadow: -1px 1px 2px rgba(20, 18, 14, 0.05);
+  border-radius: 7px 0 0 7px;
+  box-shadow: none;
   color: var(--ink-3);
   cursor: pointer;
   font-family: var(--mono);
-  transition: background 0.12s, color 0.12s, width 0.12s, box-shadow 0.12s;
+  transition: background 0.12s, color 0.12s, width 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+
+/* 纸签的折边（用伪元素，不占 padding，内容不会跟着挪 1px） */
+.pgroup-tab::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  border-radius: 2px 0 0 2px;
+  background: #e6dfcd;
+  transition: background 0.12s;
 }
 
 .pgroup-tab:hover {
   background: #fffdf6;
+  border-color: #dcd6c5;
   color: var(--ink-2);
 }
 
@@ -5608,23 +5623,24 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  font-size: 9.5px;
-  line-height: 1.35;
+  font-size: 10px;
+  line-height: 1.4;
   letter-spacing: 0.02em;
 }
 
 .pgroup-code { color: inherit; white-space: nowrap; }
-.pgroup-meta { font-size: 9px; color: var(--ink-4); white-space: nowrap; }
+.pgroup-meta { font-size: 9.5px; color: var(--ink-4); white-space: nowrap; }
 
-/* 当前这条：像被抽出来的一枚，纸白、更宽、投影深一点 */
+/* 当前这条：像被抽出来的一枚，纸白、更宽、折边变强调色 */
 .pgroup-tab.is-on {
-  width: 124px;
+  width: 126px;
   background: var(--paper);
   border-color: var(--line-2);
   color: var(--accent-ink);
-  box-shadow: -1px 1px 3px rgba(20, 18, 14, 0.09);
+  box-shadow: -2px 1px 5px rgba(20, 18, 14, 0.07);
 }
-.pgroup-tab.is-on .pgroup-meta { color: var(--accent-ink); }
+.pgroup-tab.is-on::before { background: var(--accent); top: 4px; bottom: 4px; }
+.pgroup-tab.is-on .pgroup-meta { color: var(--accent-ink); opacity: 0.85; }
 
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
 .pgroup-peek-float {
@@ -5634,11 +5650,26 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   padding: 10px 12px;
   background: var(--paper);
   border: 1px solid var(--line-2);
-  border-radius: 4px;
+  border-radius: 5px;
   box-shadow: 0 8px 22px rgba(20, 18, 14, 0.12);
   color: var(--ink-2);
   font-family: var(--sans, system-ui, sans-serif);
   text-align: left;
+}
+
+/* 卡片右边缘的小箭头：指向正在悬停的那枚书签（--arrow-y 由 JS 按书签中线写） */
+.pgroup-peek-float::after {
+  content: '';
+  position: absolute;
+  right: -5.5px;
+  top: var(--arrow-y, 22px);
+  width: 10px;
+  height: 10px;
+  background: var(--paper);
+  border-top: 1px solid var(--line-2);
+  border-right: 1px solid var(--line-2);
+  border-radius: 1px;
+  transform: translateY(-50%) rotate(45deg);
 }
 
 .pgroup-peek-title {
