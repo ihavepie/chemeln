@@ -400,10 +400,13 @@ body {
 }
 
 .grid-thumb {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 92px;
+  /* 反应式/结构缩略图都定高：两面墙的卡片高度一致（实验 ≈ 化合物），
+     宽反应式在框里居中，上下留白也比卡片矮一截好看 */
+  height: 130px;
   padding: 8px 10px;
   background: #fcfcfb;
   border-bottom: 1px solid #f1efe8;
@@ -447,6 +450,12 @@ body {
   align-items: baseline;
   gap: 6px;
   margin-bottom: 1px;
+}
+
+/* 日期不许被挤扁、也不许溢出卡片右边缘 */
+.grid-body .top .exp-date {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .grid-body .exp-title {
@@ -5706,6 +5715,20 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   background: #f8f0e9;
   border-radius: 999px;
   padding: 1px 6px;
+  /* 千万别让它被 flex 挤成竖排（「平 / 行 / ×3」三行那种） */
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* 卡片墙上的「平行 ×N」：钉在缩略图右上角，不占下面那行 */
+.grid-thumb .stack-badge.is-corner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 5px;
+  font-size: 8px;
+  line-height: 1.6;
+  background: rgba(248, 240, 233, 0.92);
 }
 
 /* 组员小签：一条一句编号 + 产率，点了直接跳那条 */
