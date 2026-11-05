@@ -52,18 +52,33 @@ export function setView(kind, mode) {
   } catch {}
 }
 
+/**
+ * 每次拉取领一个序号：连点两个课题、或者搜索框连续输入时，
+ * 先发出去的请求可能后回来，不认序号就会把新数据盖成旧的
+ * （表现为：侧栏写着课题 B，卡片墙却是 A 的内容）。
+ */
+let bootSeq = 0;
+let listSeq = 0;
+let cmpSeq = 0;
+
 export async function loadBoot() {
-  store.boot = await api.bootstrap(store.project);
+  const seq = ++bootSeq;
+  const boot = await api.bootstrap(store.project);
+  if (seq !== bootSeq) return store.boot;          // 期间又拉过一次，这份作废
+  store.boot = boot;
   // 课题被删了/改了名：清单里已经没有它，就退回「全部课题」，别卡在一个空空间里
   if (store.project && !(store.boot.projects || []).some((p) => p.name === store.project)) {
     store.project = '';
     saveProject('');
-    store.boot = await api.bootstrap('');
+    const again = await api.bootstrap('');
+    if (seq !== bootSeq) return store.boot;
+    store.boot = again;
   }
   return store.boot;
 }
 
 export async function loadList() {
+  const seq = ++listSeq;
   const page = await api.experimentsPage({
     q: store.filters.q.trim(),
     status: store.filters.status,
@@ -71,6 +86,7 @@ export async function loadList() {
     sort: store.filters.sort,
     project: store.project,
   });
+  if (seq !== listSeq) return store.items;
   store.items = page.items;
   store.listTotal = page.total;
   return store.items;
@@ -125,12 +141,14 @@ export async function createCompound(categoryId = undefined) {
 }
 
 export async function loadCompounds() {
+  const seq = ++cmpSeq;
   const page = await api.compoundsPage({
     q: store.compoundFilters.q.trim(),
     kind: store.compoundFilters.kind,
     category: store.compoundFilters.category,
     project: store.project,
   });
+  if (seq !== cmpSeq) return store.compounds;
   store.compounds = page.items;
   store.compoundTotal = page.total;
   return store.compounds;
@@ -167,3 +185,14 @@ export const recordCategories = (scope) =>
 /** 分类清单（两种 scope 混在一起，设置页用） */
 export const allCategories = () =>
   (store.boot?.recordCategories || []).filter((g) => !store.project || g.project === store.project);
+
+/**
+ * 给记录「归类」时用的分类清单：只列这条记录自己那个课题的分类。
+ * 记录页在「全部课题」下也编辑记录，若照 recordCategories 那样全给，
+ * 就会选到别的课题的分类 —— 记录留在共用课题、分类却在别的课题里，
+ * 卡片墙上它一个组都落不进去（服务端现在也会把这种 category_id 当悬空引用丢掉）。
+ */
+export const categoriesOfProject = (scope, project) =>
+  (store.boot?.recordCategories || []).filter(
+    (g) => g.scope === scope && (g.project || '') === (project || '')
+  );

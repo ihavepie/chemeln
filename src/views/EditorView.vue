@@ -16,7 +16,7 @@ import HistoryModal from '../components/HistoryModal.vue';
 import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
-import { loadBoot, loadList, store, recordCategories, addCategory } from '../store.js';
+import { loadBoot, loadList, store, categoriesOfProject, addCategory } from '../store.js';
 import { STATUSES, STATUS_TONE, todayISO } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -178,6 +178,16 @@ function onShortcut(ev) {
 /** 把这条记录归到某个分类（'' = 未分类） */
 function setCategory(v) {
   fields.category_id = v ? Number(v) : null;
+  notify();
+}
+
+/** 换课题：原来挂的分类属于别的课题就一起清掉，不然保存时会被当悬空引用丢掉 */
+function onProjectChange(v) {
+  fields.project = v || '';
+  const cat = fields.category_id;
+  if (cat != null && !categoriesOfProject('experiment', fields.project).some((g) => Number(g.id) === Number(cat))) {
+    fields.category_id = null;
+  }
   notify();
 }
 
@@ -402,13 +412,20 @@ async function applyRecipe() {
   const list = (full.steps || []).map((s) => ({ label: s.label || '', condition: s.condition || '', workup: s.workup || '' }));
   while (!list.length) list.push({ label: '', condition: '', workup: '' });
   reagent.steps = list;
-  reagent.rows = (full.reagents || []).map((r) => ({
-    ...toRow(r),
-    mmol: null,
-    mass_mg: null,
-    volume_ul: null,
-    amountText: '',
-  }));
+  // 套用配方 = 把这套投料方案按「当前反应规模」重新算一遍（弹窗上就是这么写的）。
+  // 以前只把 mmol/用量清空，表里剩下一个个空格，得逐行重填。
+  const scale = num(reagent.base);
+  reagent.rows = (full.reagents || []).map((r) => {
+    const row = { ...toRow(r), mmol: null, mass_mg: null, volume_ul: null, amountText: '' };
+    if (scale && row.role !== '溶剂' && num(row.eq) !== null) {
+      row.mmol = round(scale * num(row.eq), 4);
+      const d = derive({ ...row });
+      row.mass_mg = d.mass_mg ?? null;
+      row.volume_ul = d.volume_ul ?? null;
+      row.amountText = amountText(d);
+    }
+    return row;
+  });
   notify();
 }
 
@@ -533,7 +550,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
         <CatPick
           class="toolbar-cat"
           :value="fields.category_id == null || fields.category_id === '' ? '' : String(fields.category_id)"
-          :categories="recordCategories('experiment')"
+          :categories="categoriesOfProject('experiment', fields.project)"
           count-key="exp_count"
           :show-all="false"
           @change="setCategory"
@@ -600,7 +617,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
                 <th>实验人</th>
                 <td><input v-model="fields.operator" placeholder="记录人" :disabled="exp.locked" /></td>
                 <th>课题</th>
-                <td class="proj-cell"><ProjPick v-model="fields.project" :projects="projectList" :disabled="exp.locked" /></td>
+                <td class="proj-cell"><ProjPick :model-value="fields.project" :projects="projectList" :disabled="exp.locked" @update:model-value="onProjectChange" /></td>
                 <th>类型</th>
                 <td><input v-model="fields.rxn_type" placeholder="C–H 活化" :disabled="exp.locked" /></td>
                 <th>状态</th>

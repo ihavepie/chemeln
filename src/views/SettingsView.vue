@@ -20,6 +20,9 @@ const ph = computed(() => ({
   label_base_url: globalSettings.value.label_base_url || store.boot?.lanUrl || '',
 }));
 
+/** fill() 之后表单长什么样：用来判断现在有没有还没点「保存」的改动 */
+let filledSig = '';
+
 /**
  * 在某个课题里就编辑这个课题自己的覆盖值（空 = 跟着全局），
  * 「全部课题」时编辑的就是全局那份。
@@ -41,7 +44,11 @@ function fill() {
     form.group_name = g.group_name || '';
     form.label_base_url = g.label_base_url || '';
   }
+  filledSig = JSON.stringify(form);
 }
+
+/** 01 卡有没有没保存的改动 */
+const formDirty = () => JSON.stringify(form) !== filledSig;
 
 onMounted(async () => {
   if (!store.boot) await loadBoot();
@@ -115,8 +122,12 @@ const catCount = (g) => (g.scope === 'compound' ? `${g.cmp_count || 0} 个` : `$
 
 
 
-// 侧栏切了课题（或 boot 重新拉过），这块要跟着换成那个课题的值
-watch([() => store.project, () => store.boot], () => fill());
+// 侧栏切了课题（或 boot 重新拉过），这块要跟着换成那个课题的值。
+// 但 03 卡的新建分类 / 改名 / 删课题都会触发 loadBoot（boot 换新对象），
+// 这时候如果 01 卡有没保存的输入，重填会把它悄悄冲掉 —— 换课题才重填，其余情况有改动就不动。
+watch([() => store.project, () => store.boot], ([newProject], [oldProject]) => {
+  if (newProject !== oldProject || !formDirty()) fill();
+});
 
 async function save() {
   saving.value = true;

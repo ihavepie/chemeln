@@ -9,7 +9,7 @@ import CompoundMobile from '../components/CompoundMobile.vue';
 import AppModal from '../components/AppModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import { api } from '../api.js';
-import { loadBoot, store, recordCategories, addCategory } from '../store.js';
+import { loadBoot, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
 import { CMP_CAT_LABEL, CMP_CAT_ORDER, COMPOUND_KINDS, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
@@ -220,7 +220,18 @@ function onRf(ev) {
 }
 
 async function reload() {
+  // 下面要拿服务端数据整段覆盖表单，所以先把还没落盘的输入存掉（粘贴结构式/拖谱图会走到这里）
+  if (dirty.value) await flush().catch(() => {});
   fill(await api.compound(c.value.id));
+}
+
+/** 换课题：原来挂的分类属于别的课题就一起清掉，不然保存时会被当悬空引用丢掉 */
+function onProjectChange(v) {
+  form.project = v || '';
+  const cat = form.category_id;
+  if (cat !== '' && cat != null && !categoriesOfProject('compound', form.project).some((g) => Number(g.id) === Number(cat))) {
+    form.category_id = null;
+  }
 }
 
 function openFile(f) {
@@ -430,7 +441,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
       <CatPick
         class="toolbar-cat"
         :value="form.category_id == null || form.category_id === '' ? '' : String(form.category_id)"
-        :categories="recordCategories('compound')"
+        :categories="categoriesOfProject('compound', form.project)"
         count-key="cmp_count"
         :show-all="false"
         @change="(v) => { form.category_id = v ? Number(v) : null; }"
@@ -486,7 +497,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             </label>
             <label class="c-field">
               <span>课题</span>
-              <ProjPick v-model="form.project" :projects="projectList" />
+              <ProjPick :model-value="form.project" :projects="projectList" @update:model-value="onProjectChange" />
             </label>
             <label class="c-field"><span>分子式</span><input v-model="form.formula" placeholder="C8H8O" /></label>
             <label class="c-field"><span>MW</span><input class="n" type="number" step="any" v-model="form.mw" placeholder="120.15" /></label>

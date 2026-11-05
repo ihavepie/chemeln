@@ -16,7 +16,9 @@ const { experimentToMarkdown, screeningToMarkdown, screeningToCsv, CELL_CATEGORY
 const { db, DATA_DIR, ATTACH_DIR, COMPOUND_DIR, allSettings, getSetting, setSetting, nextCode, logEvent, logEdit, historyFor } = store;
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-const PORT = Number(process.env.PORT || 4780);
+// 端口占用了会自动往后找（见 listen()），所以这里的 PORT 要能被改；
+// 二维码 base 和 PDF 渲染地址都读它，不同步就会出现「码指 4780、服务其实在 4781」。
+let PORT = Number(process.env.PORT || 4780);
 const HOST = process.env.HOST || '127.0.0.1';
 const MAX_BODY = 320 * 1024 * 1024;
 
@@ -174,15 +176,21 @@ function normalizeExperiment(input) {
   }
   // 产物关联的化合物已经删掉时，别让旧页面把这条悬空 id 又写回去
   if ('product_compound_id' in out) out.product_compound_id = liveCompoundId(out.product_compound_id);
-  if ('category_id' in out) out.category_id = liveCategoryId(out.category_id);
+  if ('category_id' in out) out.category_id = liveCategoryId(out.category_id, 'experiment', 'project' in out ? out.project : undefined);
   return out;
 }
 
-/** 分类还在不在；不在就返回 null */
-function liveCategoryId(value) {
+/** 分类还在不在（scope 对不上当 null）；给了 project 还要求它属于这个课题或是共用分类 */
+function liveCategoryId(value, scope, project) {
   const id = numOrNull(value);
   if (id === null) return null;
-  return db.prepare('SELECT 1 AS x FROM categories WHERE id = ?').get(id) ? id : null;
+  const row = db.prepare('SELECT scope, project FROM categories WHERE id = ?').get(id);
+  if (!row) return null;
+  if (scope && row.scope !== scope) return null;
+  // 共用分类（project ''）什么课题的记录都能装；别的课题的分类不能挂过来，
+  // 否则会出现「分类在 A、记录在 B」——B 里筛不到，卡片墙上也一个组都落不进
+  if (project !== undefined && row.project && row.project !== project) return null;
+  return id;
 }
 
 /** 化合物还在不在；已经删掉的引用一律当 null 处理 */
@@ -778,7 +786,20 @@ async function streamStored(res, url, target, att) {
     'content-disposition': `${download ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(att.original_name || att.filename)}`,
     'cache-control': 'private, max-age=60',
   });
-  fs.createReadStream(target).pipe(res);
+  pipeFile(res, target);
+}
+
+/**
+ * 发文件（附件 / 静态资源）。盘的读流不加 error 兜底的话，
+ * 外置盘掉线或文件在 stat 之后被删，未捕获的 'error' 会把整个服务进程带走。
+ */
+function pipeFile(res, file) {
+  const stream = fs.createReadStream(file);
+  stream.on('error', () => {
+    if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end();
+  });
+  stream.pipe(res);
 }
 
 
@@ -796,7 +817,13 @@ function normalizeCompound(input) {
     if (!(key in input)) continue;
     out[key] = key === 'mw' || key === 'standard_exp_id' ? numOrNull(input[key]) : str(input[key]);
   }
-  if ('category_id' in out) out.category_id = liveCategoryId(input.category_id);
+  if ('category_id' in out) {
+    out.category_id = liveCategoryId(
+      input.category_id,
+      'compound',
+      'project' in input ? str(input.project) : undefined
+    );
+  }
   return out;
 }
 
@@ -1229,7 +1256,17 @@ route('PUT', '/api/projects/:name', async (req, res, params) => {
 route('DELETE', '/api/projects/:name', async (req, res, params) => {
   const name = decodeURIComponent(params.name);
   const n = db.prepare('SELECT COUNT(*) AS n FROM experiments WHERE project = ?').get(name).n;
-  if (n) return fail(res, 409, `还有 ${n} 条记录在这个课题里，先把它们改到别的课题`);
+  const cmp = db.prepare('SELECT COUNT(*) AS n FROM compounds WHERE project = ?').get(name).n;
+  const cats = db.prepare('SELECT COUNT(*) AS n FROM categories WHERE project = ?').get(name).n;
+  // 化合物和分类也要数：只数实验的话，删掉一个只有化合物/分类的课题，
+  // 它们就变成「有 project 值但课题清单里没有」的孤儿，只能在「全部课题」里看到
+  if (n || cmp || cats) {
+    const bits = [];
+    if (n) bits.push(`${n} 条记录`);
+    if (cmp) bits.push(`${cmp} 个化合物`);
+    if (cats) bits.push(`${cats} 个分类`);
+    return fail(res, 409, `还有 ${bits.join('、')}在这个课题里，先处理掉再删`);
+  }
   setSetting('projects_json', JSON.stringify(knownProjectNames().filter((x) => x !== name)));
   // 课题自己的前缀和覆盖设置一起清掉，免得同名重建时又冒出来
   db.prepare('DELETE FROM settings WHERE key = ? OR key LIKE ?').run(`prefix:${name}`, `proj:${name}:%`);
@@ -1431,12 +1468,20 @@ route('PUT', '/api/categories/:id', async (req, res, params) => {
 
 route('DELETE', '/api/categories/:id', async (req, res, params) => {
   const id = Number(params.id);
-  if (!db.prepare('SELECT 1 AS x FROM categories WHERE id = ?').get(id)) return fail(res, 404, '分类不存在');
-  // 分类删掉，记录本身不动，只是变回「未分类」
-  db.prepare('UPDATE experiments SET category_id = NULL WHERE category_id = ?').run(id);
-  db.prepare('UPDATE compounds SET category_id = NULL WHERE category_id = ?').run(id);
   const gone = db.prepare('SELECT scope, project FROM categories WHERE id = ?').get(id);
-  db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+  if (!gone) return fail(res, 404, '分类不存在');
+  // 三次写要一起成：解绑实验、解绑化合物、删分类，中途失败不能留下半截
+  db.exec('BEGIN');
+  try {
+    // 分类删掉，记录本身不动，只是变回「未分类」
+    db.prepare('UPDATE experiments SET category_id = NULL WHERE category_id = ?').run(id);
+    db.prepare('UPDATE compounds SET category_id = NULL WHERE category_id = ?').run(id);
+    db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
   ok(res, { items: listCategories(gone.scope, gone.project) });
 });
 
@@ -1497,7 +1542,7 @@ route('POST', '/api/compounds/:id/move', async (req, res, params) => {
   const row = db.prepare('SELECT id FROM compounds WHERE id = ?').get(id);
   if (!row) return fail(res, 404, '化合物不存在');
   const body = await readJson(req);
-  const categoryId = liveCategoryId(body.category_id);
+  const categoryId = liveCategoryId(body.category_id, 'compound');
   const beforeId = numOrNull(body.before_id);
   const sib = db
     .prepare(
@@ -1718,7 +1763,7 @@ route('POST', '/api/experiments/:id/move', async (req, res, params) => {
   const row = db.prepare('SELECT id FROM experiments WHERE id = ?').get(id);
   if (!row) return fail(res, 404, '实验不存在');
   const body = await readJson(req);
-  const categoryId = liveCategoryId(body.category_id);
+  const categoryId = liveCategoryId(body.category_id, 'experiment');
   const beforeId = numOrNull(body.before_id);
   const sib = db
     .prepare(
@@ -1776,21 +1821,29 @@ route('PUT', '/api/experiments/:id', async (req, res, params) => {
 
   sets.push('updated_at = ?');
   values.push(nowISO());
-  db.prepare(`UPDATE experiments SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
+  // 记录本身和投料表要一起成/败：投料表是「全删再重建」，中途出错会把表清空
+  db.exec('BEGIN');
+  try {
+    db.prepare(`UPDATE experiments SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
 
-  if (Array.isArray(body.reagents)) {
-    const before = JSON.stringify(
-      db.prepare('SELECT role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, step FROM reagents WHERE exp_id = ? ORDER BY position').all(id)
-    );
-    db.prepare('DELETE FROM reagents WHERE exp_id = ?').run(id);
-    insertReagents(id, normalizeReagents(body.reagents));
-    const after = JSON.stringify(
-      db.prepare('SELECT role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, step FROM reagents WHERE exp_id = ? ORDER BY position').all(id)
-    );
-    if (before !== after) {
-      const n = (s) => JSON.parse(s).length;
-      changed.push({ f: 'reagents', o: `${n(before)} 行`, n: `${n(after)} 行` });
+    if (Array.isArray(body.reagents)) {
+      const before = JSON.stringify(
+        db.prepare('SELECT role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, step FROM reagents WHERE exp_id = ? ORDER BY position').all(id)
+      );
+      db.prepare('DELETE FROM reagents WHERE exp_id = ?').run(id);
+      insertReagents(id, normalizeReagents(body.reagents));
+      const after = JSON.stringify(
+        db.prepare('SELECT role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, step FROM reagents WHERE exp_id = ? ORDER BY position').all(id)
+      );
+      if (before !== after) {
+        const n = (s) => JSON.parse(s).length;
+        changed.push({ f: 'reagents', o: `${n(before)} 行`, n: `${n(after)} 行` });
+      }
     }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
   }
   logEdit('experiment', id, changed);
   ok(res, { experiment: getExperiment(id) });
@@ -2284,7 +2337,7 @@ function serveStatic(req, res, url) {
       'content-length': st.size,
       'cache-control': 'no-store',
     });
-    fs.createReadStream(full).pipe(res);
+    pipeFile(res, full);
   });
 }
 
@@ -2535,6 +2588,8 @@ function listen(port, attempt = 0) {
     }
   });
   server.listen(port, HOST, () => {
+    // 真起在哪个端口就记哪个：二维码 base 和 PDF 渲染地址都读 PORT
+    PORT = port;
     const url = `http://${HOST}:${port}`;
     console.log('');
     console.log('  方法学实验记录  →  ' + url);
