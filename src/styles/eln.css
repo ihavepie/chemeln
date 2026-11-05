@@ -6147,3 +6147,21 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 .grid-stack.is-dragging { opacity: 0.45; }
+
+/* ================================================================
+   打开记录时的「读取中」骨架（EditorView 首屏）。
+   只在这张纸的位置放一张空白纸 + 几道浅条：接口回来前版面不塌，
+   点开记录不会再整片空白闪一下。高度按 A4 比例给，内容出现时不跳。
+   ================================================================ */
+.sheet-loading {
+  pointer-events: none;
+  aspect-ratio: 210 / 297;
+}
+.sk-line {
+  display: block;
+  height: 9px;
+  border-radius: 2px;
+  background: #f0efea;
+}
+.sk-line.sk-h { height: 15px; background: #ebeae4; }
+.sk-line + .sk-line { margin-top: 10px; }

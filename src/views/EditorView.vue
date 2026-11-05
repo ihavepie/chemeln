@@ -636,13 +636,32 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
 
   <div v-else-if="error" class="single"><div class="empty-note" style="padding: 80px">{{ error }}</div></div>
 
-  <div v-else-if="!exp" class="single"><div class="empty-note" style="padding: 80px">读取中…</div></div>
-
   <div v-else class="panes">
-    <!-- 左：实验列表 -->
+    <!-- 左：实验列表。读取中就一直挂着——从列表/卡片墙点进来时，这栏以前会跟着
+         整棵 v-if 分支一起卸载重建，看着就是闪一下 -->
     <ExpListPane />
     <div class="editor" ref="editorEl" @scroll="updateRail">
-      <div class="editor-bar">
+      <!-- 读取中：左边列表原地不动，只把右边这张纸换成空白骨架，
+           不然点开记录是一整片白闪一下再长出内容 -->
+      <template v-if="!exp">
+        <div class="editor-bar">
+          <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">读取中…</span>
+        </div>
+        <div class="editor-inner">
+          <article class="sheet sheet-loading" aria-hidden="true">
+            <div class="sheet-runner">
+              <span class="sk-line" style="width: 132px" /><span class="sk-line" style="width: 64px" />
+            </div>
+            <div class="sk-line sk-h" style="width: 46%" />
+            <div class="sk-line" style="width: 88%; margin-top: 20px" />
+            <div class="sk-line" style="width: 71%" />
+            <div class="sk-line" style="width: 79%" />
+            <div class="sk-line" style="width: 52%" />
+          </article>
+        </div>
+      </template>
+
+      <div v-if="exp" class="editor-bar">
         <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">{{ exp.code }}</span>
         <div class="page-tabs noprint" role="tablist">
           <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" @click="page = 1">第 1 页 · 主记录</button>
@@ -686,7 +705,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
         </div>
       </div>
 
-      <div class="editor-inner">
+      <div v-if="exp" class="editor-inner">
         <!-- ============ 第 1 页 ============ -->
         <article class="sheet sheet-p1" ref="sheetEl" :class="{ 'is-hidden': page !== 1 }">
           <div class="sheet-runner">
