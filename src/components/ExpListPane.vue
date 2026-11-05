@@ -190,6 +190,50 @@ function listDiff(base, m) {
   return diffs;
 }
 
+/* 组员段展开 / 收起：高度 + 上边距一起过渡，下面那些卡片跟着被推下去，
+   不是「啪」地多出一块。每堆内容高度不一样，所以现场量 scrollHeight；
+   动画收尾把内联样式清掉、高度交回内容自己算（内容变了也不会卡在某个定值）。 */
+const MEMBERS_MS = 220;
+const membersMs = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : MEMBERS_MS;
+
+function membersEnter(el, done) {
+  const ms = membersMs();
+  const gap = getComputedStyle(el).marginTop;   // 常态上距（CSS 里的那个值），过渡到它而不是写死
+  el.style.overflow = 'hidden';
+  el.style.height = '0px';
+  el.style.marginTop = '0px';
+  void el.offsetHeight;                         // 先让「0 高」落进布局，才有得过渡
+  const h = el.scrollHeight;
+  el.style.transition = `height ${ms}ms var(--ease), margin-top ${ms}ms var(--ease)`;
+  el.style.height = `${h}px`;
+  el.style.marginTop = gap;
+  window.setTimeout(() => { membersSettled(el); done(); }, ms + 20);
+}
+
+function membersLeave(el, done) {
+  const ms = membersMs();
+  const gap = getComputedStyle(el).marginTop;
+  // 连点两下（展开还没完就收起）时从「当前高度」接着收，别先弹回满高
+  const cur = el.getBoundingClientRect().height || el.scrollHeight;
+  el.style.overflow = 'hidden';
+  el.style.height = `${cur}px`;
+  el.style.marginTop = gap;
+  void el.offsetHeight;
+  el.style.transition = `height ${ms}ms var(--ease), margin-top ${ms}ms var(--ease)`;
+  el.style.height = '0px';
+  el.style.marginTop = '0px';
+  window.setTimeout(() => { membersSettled(el); done(); }, ms + 20);
+}
+
+/** 动画结束：清掉内联样式，高度交回内容 */
+function membersSettled(el) {
+  el.style.height = '';
+  el.style.marginTop = '';
+  el.style.overflow = '';
+  el.style.transition = '';
+}
+
 /** 组里任意一条正在看，就把卡片堆标成选中 */
 function isGroupActive(row) {
   return row.members.some((m) => m.id === activeId());
@@ -290,25 +334,27 @@ function isGroupActive(row) {
               </div>
             </div>
           </div>
-          <div v-if="isGroupOpen(row.gid)" class="stack-members">
-            <button
-              v-for="m in row.members"
-              :key="m.id"
-              class="exp-card is-member"
-              :aria-current="m.id === activeId() ? 'true' : 'false'"
-              @click="router.push(`/e/${m.id}`)"
-            >
-              <div class="top">
-                <span class="exp-code">{{ m.code }}</span>
-                <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
-                <span class="stack-variant" :title="m.diffs && m.diffs.length ? m.diffs.join('、') : '与基准条件相同'">{{ m.variant }}</span>
-                <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
-                <span class="exp-date">{{ m.date }}</span>
-                <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
-              </div>
-              <div class="exp-title">{{ m.title || '（未命名实验）' }}</div>
-            </button>
-          </div>
+          <Transition @enter="membersEnter" @leave="membersLeave" @after-enter="membersSettled" @after-leave="membersSettled">
+            <div v-if="isGroupOpen(row.gid)" class="stack-members">
+              <button
+                v-for="m in row.members"
+                :key="m.id"
+                class="exp-card is-member"
+                :aria-current="m.id === activeId() ? 'true' : 'false'"
+                @click="router.push(`/e/${m.id}`)"
+              >
+                <div class="top">
+                  <span class="exp-code">{{ m.code }}</span>
+                  <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
+                  <span class="stack-variant" :title="m.diffs && m.diffs.length ? m.diffs.join('、') : '与基准条件相同'">{{ m.variant }}</span>
+                  <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
+                  <span class="exp-date">{{ m.date }}</span>
+                  <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
+                </div>
+                <div class="exp-title">{{ m.title || '（未命名实验）' }}</div>
+              </button>
+            </div>
+          </Transition>
         </div>
       </template>
 
