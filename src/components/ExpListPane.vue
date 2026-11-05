@@ -121,7 +121,10 @@ const LIST_VARS = [
 ];
 function listDiff(base, m) {
   const diffs = [];
+  // 规模变了，浓度多半是被动跟着变的（放大时溶剂不一定等比加）——不算改条件
+  const scaleChanged = String(base.base_mmol ?? '') !== String(m.base_mmol ?? '');
   for (const [k, label] of LIST_VARS) {
+    if (k === 'concentration' && scaleChanged) continue;
     if (String(base[k] ?? '') !== String(m[k] ?? '')) diffs.push(label);
   }
   if (String(base.substrates || '') !== String(m.substrates || '')) diffs.push('底物');

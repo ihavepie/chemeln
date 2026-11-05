@@ -292,10 +292,16 @@ const GROUP_VARS = [
   ['rxn_type', '类型'],
 ];
 
-/** 这一条相对基准（组里最早那条）改了哪些东西 */
+/**
+ * 这一条相对基准（组里最早那条）改了哪些东西。
+ * 规模一变，浓度多半是被动跟着变的（放大时溶剂常常不是等比加），
+ * 这种「顺带变了的浓度」不算改条件，否则纯放大也会被标成控制变量实验。
+ */
 function groupDiff(base, other) {
   const diffs = [];
+  const scaleChanged = String(base.base_mmol ?? '') !== String(other.base_mmol ?? '');
   for (const [k, label] of GROUP_VARS) {
+    if (k === 'concentration' && scaleChanged) continue;
     if (String(base[k] ?? '') !== String(other[k] ?? '')) diffs.push(label);
   }
   const key = (r) => `${r.role}|${r.name}`;
