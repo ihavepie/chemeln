@@ -5752,15 +5752,6 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .stack-more:hover { color: var(--accent-ink); border-color: var(--line-2); }
 
 /* 展开后的组员行：比普通卡片矮一档，左边缩进一点，看得出从属于上面那堆 */
-.stack-members {
-  margin-top: 4px;
-  padding-left: 10px;
-  border-left: 2px solid var(--line-2);
-  margin-left: 4px;
-}
-.exp-card.is-member { padding: 6px 8px; }
-.exp-card.is-member .exp-meta { margin-top: 1px; }
-
 /* 平行组：卡片堆上的「重复 ×N / N 种条件」，组员行上的「改：溶剂」 */
 .stack-kind { color: var(--ink-4); font-size: 9px; }
 .stack-variant {
@@ -5831,22 +5822,24 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .pgroup-peek-scale b { font-weight: 600; color: var(--ink); }
 
-/* 平行组展开后的组员行：行距松开、标题单独一行，别全挤在 meta 那一条里 */
+/* 平行组展开后的组员行：只靠留白分行，不加框线；标题单独一行 */
 .stack-members {
-  margin-top: 7px;
-  padding-left: 9px;
+  margin-top: 6px;
+  margin-left: 3px;
+  padding-left: 8px;
   border-left: 2px solid #eceae2;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 9px;
 }
 .exp-card.is-member {
-  padding: 8px 10px;
-  background: #fcfbf8;
-  border: 1px solid #f0eee7;
-  border-radius: 5px;
+  padding: 2px 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
 }
-.exp-card.is-member:hover { background: #f7f5f0; }
+.exp-card.is-member:hover { background: #f4f2ee; }
+.exp-card.is-member[aria-current="true"] { background: #f7f5f0; }
 .exp-card.is-member .top { gap: 6px; margin-bottom: 2px; }
 .exp-card.is-member .exp-title {
   font-size: 12px;
