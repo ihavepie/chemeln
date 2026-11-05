@@ -47,6 +47,8 @@ function App() {
     <Editor
       staticResourcesUrl=""
       structServiceProvider={structServiceProvider}
+      /* 只用「分子」编辑器：不要大分子 / 序列那一套（monomer 库、RNA/DNA 按钮），
+         那些按钮在画小分子时只会添乱 */
       disableMacromoleculesEditor
       onInit={(ketcher) => {
         window.ketcher = ketcher
