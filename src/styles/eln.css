@@ -278,8 +278,9 @@ body {
 .listpane-body {
   overflow-y: auto;
   flex: 1;
-  /* 右边多留：卡片堆的两张纸会往右上方错出去 11px，不留够会拱出横向滚动条 */
-  padding: 8px 16px 10px 8px;
+  /* 左右一致：卡片堆的两张纸只在顶上露一截（见 .stack-top::before/after），
+     往右错出去 10px 也还在内边距里，不会拱出横向滚动条 */
+  padding: 12px 14px 14px 12px;
 }
 
 /* 中栏列表的卡片：跟卡片墙一样走「亚克力」——不描边，纸白 + 柔和投影分层
@@ -5764,18 +5765,19 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .stack-top::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto 0;
+  height: 54px;          /* 只画顶上这一截，卡片右边不会拖出一条竖线 */
   border-radius: var(--r);
   pointer-events: none;
 }
 .stack-top::before {
   background: #faf8f1;
-  transform: translate(11px, -11px);
+  transform: translate(10px, -10px);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .stack-top::after {
   background: #fdfcf7;
-  transform: translate(5.5px, -5.5px);
+  transform: translate(5px, -5px);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
@@ -6123,7 +6125,8 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .grid-stack::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto 0;
+  height: 58px;          /* 同上：只在顶上露一截 */
   border-radius: var(--r);
   pointer-events: none;
 }
