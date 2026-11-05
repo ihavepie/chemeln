@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>画结构式 · Ketcher</title>
+    <style>
+      html, body, #root { margin: 0; height: 100%; background: #faf9f6; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- ketcher-core 里有一句 require("raphael")（老 UMD 写法），浏览器没有 require，
+         所以先把 Raphael 的 UMD 版本用普通 script 灌成 window.Raphael，
+         打包产物里的空壳 require 会从这儿取（见 vite.config.js 的 banner）。 -->
+    <script src="./raphael.min.js"></script>
+    <script type="module" src="./main.jsx"></script>
+  </body>
+</html>
