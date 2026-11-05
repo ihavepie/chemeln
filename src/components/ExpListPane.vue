@@ -237,6 +237,15 @@ function isGroupActive(row) {
               <span class="stack-badge">平行 ×{{ row.members.length }}</span>
               <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
               <span class="exp-date">{{ row.face.date }}</span>
+              <button
+                type="button"
+                class="stack-more"
+                :title="isGroupOpen(row.gid) ? '收起组员' : '展开组员'"
+                :aria-expanded="isGroupOpen(row.gid) ? 'true' : 'false'"
+                @click.stop="toggleGroup(row.gid)"
+              >
+                {{ isGroupOpen(row.gid) ? '收起 ▴' : '展开 ▾' }}
+              </button>
             </div>
             <div class="exp-title">{{ row.face.title || '（未命名实验）' }}</div>
             <div class="exp-meta">
@@ -256,9 +265,6 @@ function isGroupActive(row) {
                 @click.stop="router.push(`/e/${m.id}`)"
               >
                 <i class="stack-dot" :class="`tone-${STATUS_TONE[m.status] || 'plain'}`" /><span class="chip-code">{{ m.code }}</span><span class="chip-status">{{ STATUS_SHORT[m.status] || m.status }}</span><span v-if="m.yield_pct != null" class="chip-yield">{{ m.yield_pct }}%</span>
-              </button>
-              <button type="button" class="stack-more" @click.stop="toggleGroup(row.gid)">
-                {{ isGroupOpen(row.gid) ? '收起' : '展开' }}
               </button>
             </div>
           </div>

@@ -5735,12 +5735,21 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .stack-chip:hover { background: #ece9e2; color: var(--ink-2); }
 .stack-chip.is-on { background: var(--paper); border-color: var(--ink-4); color: var(--accent-ink); }
 
+/* 展开/收起：放卡片右上角日期后面，小签那一行只留小签 */
 .stack-more {
-  margin-left: auto;
+  margin-left: 6px;
   background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.4;
   color: var(--ink-4);
+  cursor: pointer;
+  white-space: nowrap;
 }
-.stack-more:hover { color: var(--accent-ink); }
+.stack-more:hover { color: var(--accent-ink); border-color: var(--line-2); }
 
 /* 展开后的组员行：比普通卡片矮一档，左边缩进一点，看得出从属于上面那堆 */
 .stack-members {
