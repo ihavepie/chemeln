@@ -1,10 +1,11 @@
 import { ElMessageBox, ElNotification } from 'element-plus';
 
-/** 右下角的小 toast（轻提示，几秒后自己消失） */
+/** 右下角的小 toast（轻提示，几秒后自己消失）。
+    kind：'ok' 成功 / 'err' 出错 / 'warn' 提醒 / 'info' 中性（像「已切换到 EXP-0082」这种纯通知） */
 export function toast(message, kind = 'ok', duration = 2600) {
   return ElNotification({
     message,
-    type: kind === 'err' ? 'error' : kind === 'warn' ? 'warning' : 'success',
+    type: kind === 'err' ? 'error' : kind === 'warn' ? 'warning' : kind === 'info' ? 'info' : 'success',
     duration,
     position: 'bottom-right',
     offset: 18,

@@ -67,17 +67,6 @@ function fill(data) {
   markLoaded();
 }
 
-/* 换了化合物之后给一句文字提示（不动效）：工具栏左侧短暂写「已切换到 TEST-04」 */
-const switchNote = ref('');
-let noteTimer = 0;
-function noteSwitch(name) {
-  if (!name) return;
-  switchNote.value = `已切换到 ${name}`;
-  clearTimeout(noteTimer);
-  noteTimer = window.setTimeout(() => { switchNote.value = ''; }, 1400);
-}
-onBeforeUnmount(() => clearTimeout(noteTimer));
-
 async function load() {
   try {
     fill(await api.compound(props.compoundId));
@@ -101,7 +90,8 @@ watch(
     stdModal.value = false;
     moreMenu.value = false;
     await load();
-    noteSwitch(c.value?.code || c.value?.name);
+    const label = c.value?.code || c.value?.name;
+    if (label) toast(`已切换到 ${label}`, 'info', 1800);
     // 换了化合物就当翻到新的一页：滚回顶部
     await nextTick();
     editorEl.value?.scrollTo({ top: 0 });
@@ -454,7 +444,6 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
     <div v-else ref="editorEl" class="editor">
     <div class="editor-bar">
       <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">化合物</span>
-      <span v-if="switchNote" class="switch-note">{{ switchNote }}</span>
       <CatPick
         class="toolbar-cat"
         :value="form.category_id == null || form.category_id === '' ? '' : String(form.category_id)"

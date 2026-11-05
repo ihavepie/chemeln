@@ -116,19 +116,6 @@ function fill(e) {
 /** 打开这条记录时的内容快照，用来「重置」 */
 const baseline = ref('');
 
-/* 切记录之后给一句文字提示：不搞动效，纸面直接换，
-   工具栏左侧短暂写一行「已切换到 EXP-0082」，一秒多后自己消失。 */
-const switchNote = ref('');
-let noteTimer = 0;
-function noteSwitch(code) {
-  // 编号就在这行左边，别写成「EXP-0052 已切换到 EXP-0052」
-  if (!code) return;
-  switchNote.value = '已切换';
-  clearTimeout(noteTimer);
-  noteTimer = window.setTimeout(() => { switchNote.value = ''; }, 1400);
-}
-onBeforeUnmount(() => clearTimeout(noteTimer));
-
 async function load() {
   error.value = '';
   const id = route.params.id;
@@ -157,7 +144,8 @@ watch(
     statusMenu.value = false;
     page.value = String(route.query.p) === '2' ? 2 : 1;
     await load();
-    noteSwitch(exp.value?.code);      // 切完给一句提示（换记录才提示，第一次打开不提示）
+    // 切完弹一个气泡通知（只在这条记录是从别处切过来时提示，第一次打开不提示）
+    if (exp.value?.code) toast(`已切换到 ${exp.value.code}`, 'info', 1800);
     // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
     await nextTick();
     editorEl.value?.scrollTo({ top: 0 });
@@ -680,7 +668,6 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
 
       <div v-if="exp" class="editor-bar">
         <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">{{ exp.code }}</span>
-        <span v-if="switchNote" class="switch-note">{{ switchNote }}</span>
         <div class="page-tabs noprint" role="tablist">
           <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" @click="page = 1">第 1 页 · 主记录</button>
           <button class="ptab" :aria-selected="page === 2 ? 'true' : 'false'" @click="page = 2">第 2 页 · 续页</button>
