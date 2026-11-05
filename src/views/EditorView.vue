@@ -506,7 +506,7 @@ const peek = ref(null);
 const peekPos = ref({});
 function showPeek(s, ev) {
   const r = ev.currentTarget.getBoundingClientRect();
-  const width = 272;
+  const width = 300;
   // 卡片右边贴在书签左边；左边不够就尽量靠左，别出屏幕
   const left = Math.max(8, r.left - width - 10);
   const top = Math.max(8, Math.min(window.innerHeight - 152, r.top - 6));
@@ -798,14 +798,14 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
             <div v-if="peek" class="pgroup-peek-float" :style="peekPos">
               <div class="peek-head">
                 <span class="peek-title">{{ peek.title || '（未命名实验）' }}</span>
-                <span class="tag" :class="STATUS_TONE[peek.status]" style="font-size: 9px; padding: 1px 6px">{{ peek.status }}</span>
+                <span class="tag" :class="STATUS_TONE[peek.status]" style="font-size: 10px; padding: 1px 7px">{{ peek.status }}</span>
               </div>
 
-              <div v-if="peek.variant === '基准'" class="peek-flag is-base">本组基准（最早这条）</div>
+              <div v-if="peek.variant === '基准'" class="peek-flag is-base">基准</div>
               <div v-else-if="peek.variant === '重复'" class="peek-flag is-same">
-                与基准条件相同<template v-if="peek.scaleNote"> · 规模 {{ peek.scaleNote }}</template>
+                条件相同<template v-if="peek.scaleNote"> · 规模 {{ peek.scaleNote }}</template>
               </div>
-              <div v-else-if="peek.diffs && peek.diffs.length" class="peek-flag is-diff">与基准相比：{{ peek.diffs.join('、') }}</div>
+              <div v-else-if="peek.diffs && peek.diffs.length" class="peek-flag is-diff">差异：{{ peek.diffs.join('、') }}</div>
 
               <div v-if="peekMetrics.length" class="peek-metrics">
                 <span v-for="m in peekMetrics" :key="m.k" class="peek-k" :class="{ 'is-ok': m.ok }">
@@ -827,7 +827,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
                 <span class="peek-label">备注</span><span class="peek-val">{{ peek.notes }}</span>
               </div>
 
-              <div class="peek-foot">{{ peek.code }} · {{ peek.date }} · 点一下切到这条</div>
+              <div class="peek-foot">{{ peek.code }} · {{ peek.date }}</div>
             </div>
           </Teleport>
         </Teleport>

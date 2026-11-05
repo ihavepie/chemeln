@@ -5870,7 +5870,7 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup-peek-float .peek-title {
   flex: 1 1 auto;
   font-family: var(--serif);
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.3;
   color: var(--ink);
   overflow: hidden;
@@ -5879,11 +5879,11 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   -webkit-box-orient: vertical;
 }
 .pgroup-peek-float .peek-flag {
-  margin: 0 0 7px;
-  padding: 4px 8px;
+  margin: 0 0 8px;
+  padding: 5px 9px;
   border-radius: 3px;
-  font-size: 10px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 .pgroup-peek-float .peek-flag.is-diff {
   background: #fbf1e9;
@@ -5895,9 +5895,14 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   border-left: 2px solid var(--ok);
   color: #40573c;
 }
+/* 「基准」只有一个词，做成小胶囊，不要整条横幅占一行 */
 .pgroup-peek-float .peek-flag.is-base {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
   background: #f5f4f1;
-  border-left: 2px solid var(--line-2);
+  border-left: none;
   color: var(--ink-3);
 }
 
@@ -5913,19 +5918,19 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .pgroup-peek-float .peek-k {
   font-family: var(--mono);
-  font-size: 10.5px;
-  color: var(--ink-2);
+  font-size: 11.5px;
+  color: var(--ink-1, var(--ink));
   white-space: nowrap;
 }
 .pgroup-peek-float .peek-k em {
   font-style: normal;
-  font-size: 9px;
-  color: var(--ink-4);
-  margin-right: 3px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-right: 4px;
 }
 .pgroup-peek-float .peek-k b {
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--ink);
 }
 .pgroup-peek-float .peek-k.is-ok b { color: var(--ok); }
@@ -5933,28 +5938,28 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 /* 条件 / 底物：标签固定宽度，值自然折行 */
 .pgroup-peek-float .peek-row {
   display: flex;
-  gap: 7px;
-  font-size: 10.5px;
-  line-height: 1.55;
-  color: var(--ink-2);
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
 }
 .pgroup-peek-float .peek-label {
   flex: none;
-  width: 26px;
-  color: var(--ink-4);
-  font-size: 9.5px;
+  width: 30px;
+  color: var(--ink-3);
+  font-size: 11px;
   padding-top: 1px;
 }
 .pgroup-peek-float .peek-val { flex: 1 1 auto; }
 .pgroup-peek-float .peek-note {
   display: flex;
-  gap: 7px;
-  margin-top: 5px;
-  padding: 5px 7px;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
   background: #f8f7f3;
   border-radius: 3px;
-  font-size: 10.5px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.6;
   color: var(--ink-2);
 }
 .pgroup-peek-float .peek-note .peek-val {
@@ -5964,11 +5969,11 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   -webkit-box-orient: vertical;
 }
 .pgroup-peek-float .peek-foot {
-  margin-top: 7px;
-  padding-top: 6px;
+  margin-top: 8px;
+  padding-top: 7px;
   border-top: 1px dotted var(--line-2);
   font-family: var(--mono);
-  font-size: 9px;
-  color: var(--ink-4);
+  font-size: 10px;
+  color: var(--ink-3);
   letter-spacing: 0.02em;
 }
