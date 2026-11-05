@@ -224,48 +224,51 @@ function isGroupActive(row) {
 
         <!-- 平行组：叠成一张卡片，后面露出两层纸边；展开后组员一条一行 -->
         <div v-else class="exp-stack" :class="{ 'is-active': isGroupActive(row) }">
-          <div
-            class="exp-card is-stack"
-            :aria-current="isGroupActive(row) ? 'true' : 'false'"
-            role="button"
-            tabindex="0"
-            @click="router.push(`/e/${row.face.id}`)"
-            @keydown.enter="router.push(`/e/${row.face.id}`)"
-          >
-            <div class="top">
-              <span class="exp-code">{{ row.face.code }}</span>
-              <span class="stack-badge">平行 ×{{ row.members.length }}</span>
-              <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
-              <span class="exp-date">{{ row.face.date }}</span>
-              <button
-                type="button"
-                class="stack-more"
-                :title="isGroupOpen(row.gid) ? '收起组员' : '展开组员'"
-                :aria-expanded="isGroupOpen(row.gid) ? 'true' : 'false'"
-                @click.stop="toggleGroup(row.gid)"
-              >
-                {{ isGroupOpen(row.gid) ? '收起 ▴' : '展开 ▾' }}
-              </button>
-            </div>
-            <div class="exp-title">{{ row.face.title || '（未命名实验）' }}</div>
-            <div class="exp-meta">
-              <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
-              <span v-if="row.face.project">{{ row.face.project }}</span>
-              <span class="sep">·</span><span class="stack-kind">{{ row.kindLabel }}</span>
-              <template v-if="row.mean != null"><span class="sep">·</span><span style="color: var(--ok)">均值 {{ row.mean }}%</span></template>
-            </div>
-            <div class="stack-codes">
-              <button
-                v-for="m in row.members"
-                :key="m.id"
-                type="button"
-                class="stack-chip"
-                :class="{ 'is-on': m.id === activeId() }"
-                :title="`${m.code} · ${m.status}${m.yield_pct != null ? ` · ${m.yield_pct}%` : ''}`"
-                @click.stop="router.push(`/e/${m.id}`)"
-              >
-                <i class="stack-dot" :class="`tone-${STATUS_TONE[m.status] || 'plain'}`" /><span class="chip-code">{{ m.code }}</span><span class="chip-status">{{ STATUS_SHORT[m.status] || m.status }}</span><span v-if="m.yield_pct != null" class="chip-yield">{{ m.yield_pct }}%</span>
-              </button>
+          <!-- 两张垫纸挂在 stack-top 上，只跟着面子那张卡片，不跟着展开出来的组员行 -->
+          <div class="stack-top">
+            <div
+              class="exp-card is-stack"
+              :aria-current="isGroupActive(row) ? 'true' : 'false'"
+              role="button"
+              tabindex="0"
+              @click="router.push(`/e/${row.face.id}`)"
+              @keydown.enter="router.push(`/e/${row.face.id}`)"
+            >
+              <div class="top">
+                <span class="exp-code">{{ row.face.code }}</span>
+                <span class="stack-badge">平行 ×{{ row.members.length }}</span>
+                <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
+                <span class="exp-date">{{ row.face.date }}</span>
+                <button
+                  type="button"
+                  class="stack-more"
+                  :title="isGroupOpen(row.gid) ? '收起组员' : '展开组员'"
+                  :aria-expanded="isGroupOpen(row.gid) ? 'true' : 'false'"
+                  @click.stop="toggleGroup(row.gid)"
+                >
+                  {{ isGroupOpen(row.gid) ? '收起 ▴' : '展开 ▾' }}
+                </button>
+              </div>
+              <div class="exp-title">{{ row.face.title || '（未命名实验）' }}</div>
+              <div class="exp-meta">
+                <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
+                <span v-if="row.face.project">{{ row.face.project }}</span>
+                <span class="sep">·</span><span class="stack-kind">{{ row.kindLabel }}</span>
+                <template v-if="row.mean != null"><span class="sep">·</span><span style="color: var(--ok)">均值 {{ row.mean }}%</span></template>
+              </div>
+              <div class="stack-codes">
+                <button
+                  v-for="m in row.members"
+                  :key="m.id"
+                  type="button"
+                  class="stack-chip"
+                  :class="{ 'is-on': m.id === activeId() }"
+                  :title="`${m.code} · ${m.status}${m.yield_pct != null ? ` · ${m.yield_pct}%` : ''}`"
+                  @click.stop="router.push(`/e/${m.id}`)"
+                >
+                  <i class="stack-dot" :class="`tone-${STATUS_TONE[m.status] || 'plain'}`" /><span class="chip-code">{{ m.code }}</span><span class="chip-status">{{ STATUS_SHORT[m.status] || m.status }}</span><span v-if="m.yield_pct != null" class="chip-yield">{{ m.yield_pct }}%</span>
+                </button>
+              </div>
             </div>
           </div>
           <div v-if="isGroupOpen(row.gid)" class="stack-members">
