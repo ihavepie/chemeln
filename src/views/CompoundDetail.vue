@@ -8,6 +8,7 @@ import CmpListPane from '../components/CmpListPane.vue';
 import CompoundMobile from '../components/CompoundMobile.vue';
 import AppModal from '../components/AppModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
+import SketcherModal from '../components/SketcherModal.vue';
 import { api } from '../api.js';
 import { loadBoot, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
@@ -100,6 +101,7 @@ watch(
 
 const moreMenu = ref(false);
 const preview = ref(null);   // 附件 / 谱图就地预览（不再甩到新标签页）
+const sketcherOpen = ref(false);   // 画结构式（JSME 画板）
 const historyOpen = ref(false);
 
 function closeMenus(e) {
@@ -173,6 +175,38 @@ const { state: saveState, dirty, flush, markLoaded } = useAutosave(payload, save
 });
 
 /** 填了 SMILES：算分子式 / MW（空着的才填），并在没有结构图时画一张存进去 */
+/** 画板交回来的结构：重画结构式图（有旧的会先确认再删），再填 SMILES / 分子式 / MW */
+async function applySketched({ smiles }) {
+  if (!c.value || !smiles) return;
+  const info = await analyzeStructureText(smiles);
+  if (!info) return toast('这个结构读不出来，换个画法试试', 'err');
+
+  if (struct.value) {
+    const ok = await confirm({
+      title: '替换现有的结构式图？',
+      body: '会用画板里的这个结构重画一张结构式图，现在那张（' + (struct.value.original_name || struct.value.filename) + '）会被删掉。',
+    });
+    if (!ok) return;
+    try {
+      await api.deleteCompoundFile(struct.value.id);
+    } catch {
+      /* 删不掉也没关系，先传新的 */
+    }
+  }
+
+  const fd = new FormData();
+  fd.append('file', svgToFile(info.svg), '结构式.svg');
+  fd.append('category', 'structure');
+  await api.uploadCompoundFile(c.value.id, fd);
+  await reload();
+
+  // reload 会用服务端数据覆盖表单，所以这几格必须放在它后面填
+  form.smiles = smiles;
+  form.formula = info.formula;
+  form.mw = String(info.mw);
+  toast(`已用画板的结构：${info.formula} · MW ${info.mw}`);
+}
+
 async function useSmiles(text, { quiet = false } = {}) {
   const isMol = looksLikeMolfile(text);
   const info = await analyzeStructureText(text);
@@ -493,6 +527,13 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             </div>
           </div>
 
+          <!-- 懒得起 ChemDraw 时，直接在这儿画一个 -->
+          <div class="cmp-structure-tools noprint">
+            <button class="btn btn-sm btn-ghost" title="打开画板画结构式" @click.stop="sketcherOpen = true">
+              <Icon name="molecule" :size="13" /> 画结构式
+            </button>
+          </div>
+
           <div class="cmp-fields">
             <label class="c-field"><span>编号</span><input class="mono" v-model="form.code" placeholder="1a" /></label>
             <label class="c-field wide"><span>名称</span><input v-model="form.name" placeholder="4-甲基苯甲醛" /></label>
@@ -687,6 +728,13 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
     </AppModal>
 
     <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
+
+    <SketcherModal
+      v-if="sketcherOpen"
+      :initial="form.smiles || ''"
+      @close="sketcherOpen = false"
+      @pick="applySketched"
+    />
 
     </div>
   </div>

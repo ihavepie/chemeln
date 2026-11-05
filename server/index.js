@@ -16,6 +16,8 @@ const { experimentToMarkdown, screeningToMarkdown, screeningToCsv, CELL_CATEGORY
 const { db, DATA_DIR, ATTACH_DIR, COMPOUND_DIR, allSettings, getSetting, setSetting, nextCode, logEvent, logEdit, historyFor } = store;
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+// 第三方静态资源（Ketcher 结构画板等）：不放进 public/，因为每次 build 都会清空它
+const VENDOR_DIR = path.join(__dirname, '..', 'vendor');
 // 端口占用了会自动往后找（见 listen()），所以这里的 PORT 要能被改；
 // 二维码 base 和 PDF 渲染地址都读它，不同步就会出现「码指 4780、服务其实在 4781」。
 let PORT = Number(process.env.PORT || 4780);
@@ -869,6 +871,11 @@ const MIME = {
   '.zip': 'application/zip',
   '.dx': 'application/octet-stream',
   '.jdx': 'chemical/x-jcamp-dx',
+  '.wasm': 'application/wasm',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.map': 'application/json; charset=utf-8',
 };
 
 function attachmentPath(att) {
@@ -2546,6 +2553,25 @@ function sendText(res, code, text, type, disposition) {
   res.end(buf);
 }
 
+/** /vendor/* → vendor/*（第三方静态资源：结构画板 JSME 等；目录没有就 404，
+    前端会提示去跑 scripts/fetch-sketcher.sh） */
+function serveVendor(req, res, url) {
+  const rel = decodeURIComponent(url.pathname).replace(/^\/vendor\//, '');
+  const root = VENDOR_DIR;
+  const full = path.join(root, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
+  if (!full.startsWith(root)) return fail(res, 403, 'forbidden');
+  fs.stat(full, (err, st) => {
+    if (err || !st.isFile()) return fail(res, 404, '画板资源没找到（跑一次 sh scripts/fetch-sketcher.sh）');
+    const ext = path.extname(full).toLowerCase();
+    res.writeHead(200, {
+      'content-type': MIME[ext] || 'application/octet-stream',
+      'content-length': st.size,
+      'cache-control': 'no-cache',
+    });
+    pipeFile(res, full);
+  });
+}
+
 function serveStatic(req, res, url) {
   let rel = decodeURIComponent(url.pathname);
   if (rel === '/' || rel === '') rel = '/index.html';
@@ -2691,6 +2717,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (!url.pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res, 405, 'method not allowed');
+      if (url.pathname.startsWith('/vendor/')) return serveVendor(req, res, url);
       return serveStatic(req, res, url);
     }
     for (const r of routes) {
