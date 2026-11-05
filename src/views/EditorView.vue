@@ -5,6 +5,7 @@ import AppModal from '../components/AppModal.vue';
 import ExperimentMobile from '../components/ExperimentMobile.vue';
 import ExpListPane from '../components/ExpListPane.vue';
 import AttachmentsBlock from '../components/AttachmentsBlock.vue';
+import FilePreview from '../components/FilePreview.vue';
 import CondRow from '../components/CondRow.vue';
 import ReagentTable from '../components/ReagentTable.vue';
 import ResultBlock from '../components/ResultBlock.vue';
@@ -639,7 +640,13 @@ const exportAll = () => {
   const p = store.project ? `?project=${encodeURIComponent(store.project)}` : '';
   window.open(`/api/export/notebook.md${p}`, '_blank');
 };
-const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
+/** 点 TLC 图 / 反应式看大图：走弹窗预览（要下载再在弹窗里下） */
+const preview = ref(null);
+const openAttachment = (id) => {
+  const a = (exp.value?.attachments || []).find((x) => x.id === id);
+  if (!a) return;
+  preview.value = { src: `/api/files/${id}`, name: a.original_name || a.filename || '附件' };
+};
 </script>
 
 <template>
@@ -786,6 +793,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
             :hovered="hovered"
             :on-hover="onHover"
             :on-pick="pickFile"
+            :on-open="openAttachment"
           />
 
           <ReagentTable :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
@@ -954,6 +962,8 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
         <p class="hint">手机端为只读精简版：反应式、投料、条件与结果。</p>
       </div>
     </AppModal>
+
+    <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
 
     <PrintPanel
       v-if="printPanel"

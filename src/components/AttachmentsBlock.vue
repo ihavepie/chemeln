@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import Icon from './Icon.vue';
 import AppModal from './AppModal.vue';
+import FilePreview from './FilePreview.vue';
 import { api } from '../api.js';
 import { toast } from '../lib/feedback.js';
 import { CATEGORY_LABEL, CATEGORY_ORDER, fmtSize, guessCategory, isImageName } from '../lib/ui.js';
@@ -99,7 +100,11 @@ async function remove(a) {
   }
 }
 
-const openFile = (a) => window.open(`/api/files/${a.id}`, '_blank');
+/** 点附件就在弹窗里看，不再甩到新标签页（要看大图 / 下载都在弹窗底下） */
+const preview = ref(null);
+const openFile = (a) => {
+  preview.value = { src: `/api/files/${a.id}`, name: a.original_name || a.filename || '附件' };
+};
 </script>
 
 <template>
@@ -138,7 +143,15 @@ const openFile = (a) => window.open(`/api/files/${a.id}`, '_blank');
         </div>
         <div class="att-list">
           <div v-for="a in g.list" :key="a.id" class="att-item">
-            <img v-if="isImageName(a.original_name || a.filename)" class="att-thumb" :src="`/api/files/${a.id}`" alt="" loading="lazy" />
+            <img
+              v-if="isImageName(a.original_name || a.filename)"
+              class="att-thumb"
+              :src="`/api/files/${a.id}`"
+              alt=""
+              loading="lazy"
+              style="cursor: zoom-in"
+              @click="openFile(a)"
+            />
             <div v-else class="att-ico"><Icon :name="a.is_dir ? 'folder' : 'file'" :size="14" /></div>
             <span class="att-name" :title="a.original_name" @click="openFile(a)">{{ a.original_name || a.filename }}</span>
             <span v-if="a.note" class="tag plain" style="font-size: 9px">{{ a.note }}</span>
@@ -171,5 +184,7 @@ const openFile = (a) => window.open(`/api/files/${a.id}`, '_blank');
         </button>
       </div>
     </AppModal>
+
+    <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
   </section>
 </template>

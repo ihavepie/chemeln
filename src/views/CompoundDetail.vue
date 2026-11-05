@@ -99,6 +99,7 @@ watch(
 );
 
 const moreMenu = ref(false);
+const preview = ref(null);   // 附件 / 谱图就地预览（不再甩到新标签页）
 const historyOpen = ref(false);
 
 function closeMenus(e) {
@@ -241,7 +242,7 @@ function onProjectChange(v) {
 }
 
 function openFile(f) {
-  window.open(`/api/compound-files/${f.id}`, '_blank');
+  preview.value = { src: `/api/compound-files/${f.id}`, name: f.original_name || f.filename || '文件' };
 }
 
 function pickFile(category) {
@@ -684,6 +685,8 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
       粘贴本机绝对路径（文件或文件夹）。Bruker 原始数据一般是 <span class="mono">…/样品/10</span> 这种目录。
       <input v-model="pathValue" class="input" placeholder="/Users/you/NMR/…/10" style="font-family: var(--mono); font-size: 12px; margin-top: 10px" />
     </AppModal>
+
+    <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
 
     </div>
   </div>
