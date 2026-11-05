@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppModal from '../components/AppModal.vue';
 import ExperimentMobile from '../components/ExperimentMobile.vue';
@@ -154,14 +154,18 @@ function onResize() {
 
 onMounted(async () => {
   window.addEventListener('resize', onResize);
+  window.addEventListener('resize', updateRail);
   page.value = String(route.query.p) === '2' ? 2 : 1;
   if (!isPhone.value) await load();
   document.addEventListener('paste', onPaste);
   document.addEventListener('click', closeMenus);
   document.addEventListener('keydown', onShortcut);
+  // 等这一帧渲染完再量纸面位置
+  requestAnimationFrame(updateRail);
 });
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize);
+  window.removeEventListener('resize', updateRail);
   document.removeEventListener('paste', onPaste);
   document.removeEventListener('click', closeMenus);
   document.removeEventListener('keydown', onShortcut);
@@ -463,6 +467,23 @@ function duplicate() {
 const siblings = computed(() => exp.value?.siblings || []);
 
 /**
+ * 书签是浮层（挂在 body 上）：位置按第 1 张纸的左上角算，
+ * 因为 .editor 是滚动容器，书签留在里面会被裁掉伸出去的那一半。
+ */
+const sheetEl = ref(null);
+const editorEl = ref(null);
+const railStyle = ref({});
+function updateRail() {
+  const el = sheetEl.value;
+  if (!el || page.value !== 1) return;
+  const r = el.getBoundingClientRect();
+  railStyle.value = { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top + 42)}px` };
+}
+watch([() => exp.value?.id, () => page.value, () => siblings.value.length], () => {
+  nextTick(updateRail);
+});
+
+/**
  * 从当前记录再生成一条平行实验（带条件、投料表、反应式；结果清空），
  * 然后切过去。先把当前的改动存掉，不然带过去的是旧内容。
  */
@@ -477,6 +498,22 @@ async function newParallel() {
   } catch (err) {
     toast(err.message || '建不了平行实验', 'err');
   }
+}
+
+/** 悬停预览卡：跟着鼠标所在的那枚书签定位，永远放在书签**左边**（不压纸张） */
+const peek = ref(null);
+const peekPos = ref({});
+function showPeek(s, ev) {
+  const r = ev.currentTarget.getBoundingClientRect();
+  const width = 232;
+  // 卡片右边贴在书签左边；左边不够就尽量靠左，别出屏幕
+  const left = Math.max(8, r.left - width - 10);
+  const top = Math.max(8, Math.min(window.innerHeight - 152, r.top - 6));
+  peekPos.value = { left: `${left}px`, top: `${top}px`, width: `${width}px` };
+  peek.value = s;
+}
+function hidePeek() {
+  peek.value = null;
 }
 
 /** 书签上那一行小字：产率有就写产率，没有就写状态 */
@@ -566,7 +603,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
   <div v-else class="panes">
     <!-- 左：实验列表 -->
     <ExpListPane />
-    <div class="editor">
+    <div class="editor" ref="editorEl" @scroll="updateRail">
       <div class="editor-bar">
         <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">{{ exp.code }}</span>
         <div class="page-tabs noprint" role="tablist">
@@ -613,35 +650,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
 
       <div class="editor-inner">
         <!-- ============ 第 1 页 ============ -->
-        <article class="sheet sheet-p1" :class="{ 'is-hidden': page !== 1 }">
-          <!-- 平行组书签：从纸面左边凸出去的一排纸签（重复实验 / 控制变量实验）。
-               悬停先看一眼，点下去才切记录。 -->
-          <nav v-if="siblings.length > 1" class="pgroup noprint" aria-label="平行实验">
-            <span class="pgroup-cap">平行</span>
-            <button
-              v-for="s in siblings"
-              :key="s.id"
-              type="button"
-              class="pgroup-tab"
-              :class="{ 'is-on': String(s.id) === String(exp.id) }"
-              @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
-            >
-              <span class="pgroup-row">
-                <span class="pgroup-code">{{ s.code }}</span>
-                <span class="pgroup-meta">{{ sibMeta(s) }}</span>
-              </span>
-              <span class="pgroup-peek">
-                <span class="pgroup-peek-title">{{ s.title || '（未命名实验）' }}</span>
-                <span class="pgroup-peek-line">{{ s.date }} · {{ s.status }}<template v-if="s.yield_pct != null"> · 产率 {{ s.yield_pct }}%</template></span>
-                <span v-if="s.substrates" class="pgroup-peek-line">底物：{{ s.substrates }}</span>
-                <span v-if="[s.solvent, s.temperature, s.duration].filter(Boolean).length" class="pgroup-peek-line">
-                  {{ [s.solvent, s.temperature, s.duration].filter(Boolean).join(' · ') }}<template v-if="s.base_mmol"> ｜ {{ s.base_mmol }} mmol</template>
-                </span>
-                <span class="pgroup-peek-hint">点一下切到这条</span>
-              </span>
-            </button>
-            <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
-          </nav>
+        <article class="sheet sheet-p1" ref="sheetEl" :class="{ 'is-hidden': page !== 1 }">
           <div class="sheet-runner">
             <span>{{ store.boot?.settings?.lab_heading || '方法学实验记录' }}</span>
             <span>{{ exp.code }}</span>
@@ -735,6 +744,43 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
             />
           </section>
         </article>
+
+        <!-- 平行书签是浮层：挂在 body 上、按纸面位置钉住，滚动容器裁不到它 -->
+        <Teleport to="body">
+          <!-- 平行组书签：从纸面左边凸出去的一排纸签（重复实验 / 控制变量实验）。
+               悬停先看一眼，点下去才切记录。 -->
+          <nav v-if="siblings.length > 1 && page === 1" class="pgroup pgroup--float noprint" :style="railStyle" aria-label="平行实验">
+            <span class="pgroup-cap">平行</span>
+            <button
+              v-for="s in siblings"
+              :key="s.id"
+              type="button"
+              class="pgroup-tab"
+              :class="{ 'is-on': String(s.id) === String(exp.id) }"
+              @mouseenter="showPeek(s, $event)"
+              @mouseleave="hidePeek()"
+              @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
+            >
+              <span class="pgroup-row">
+                <span class="pgroup-code">{{ s.code }}</span>
+                <span class="pgroup-meta">{{ sibMeta(s) }}</span>
+              </span>
+            </button>
+            <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
+          </nav>
+          <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
+          <Teleport to="body">
+            <div v-if="peek" class="pgroup-peek-float" :style="peekPos">
+              <div class="pgroup-peek-title">{{ peek.title || '（未命名实验）' }}</div>
+              <div class="pgroup-peek-line">{{ peek.date }} · {{ peek.status }}<template v-if="peek.yield_pct != null"> · 产率 {{ peek.yield_pct }}%</template></div>
+              <div v-if="peek.substrates" class="pgroup-peek-line">底物：{{ peek.substrates }}</div>
+              <div v-if="[peek.solvent, peek.temperature, peek.duration].filter(Boolean).length" class="pgroup-peek-line">
+                {{ [peek.solvent, peek.temperature, peek.duration].filter(Boolean).join(' · ') }}<template v-if="peek.base_mmol"> ｜ {{ peek.base_mmol }} mmol</template>
+              </div>
+              <div class="pgroup-peek-line">{{ peek.code }} · 点一下切到这条</div>
+            </div>
+          </Teleport>
+        </Teleport>
 
         <!-- ============ 第 2 页 ============ -->
         <article class="sheet sheet-p2" :class="{ 'is-hidden': page !== 2 }">
