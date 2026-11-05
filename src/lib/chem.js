@@ -1,0 +1,89 @@
+/**
+ * 化学结构的解析与绘制 —— 用 openchemlib（本地跑，不联网）。
+ * 只在真正需要的时候才动态加载，所以首屏不变慢。
+ */
+
+let cached = null;
+
+async function lib() {
+  if (!cached) cached = await import('openchemlib');
+  return cached;
+}
+
+/** 看起来像 SMILES 吗（用来判断剪贴板里的纯文本要不要当结构式处理） */
+export function looksLikeSmiles(text) {
+  const s = String(text || '').trim();
+  if (!s || s.length > 400) return false;
+  if (/[\u4e00-\u9fa5\s]/.test(s)) return false; // 有中文或空白就不是
+  if (!/[A-Za-z]/.test(s)) return false;
+  return /^[A-Za-z0-9@+()[\]{}=#$:/\\.\-*%]+$/.test(s);
+}
+
+/** 看起来像 molfile 吗（ChemDraw 的 Copy As → MOL/SDF） */
+export function looksLikeMolfile(text) {
+  const s = String(text || '');
+  if (s.length < 40) return false;
+  return /V2000|V3000/.test(s) && /M\s+END/.test(s);
+}
+
+/** molfile → { formula, mw, svg } */
+export async function analyzeMolfile(molfile) {
+  const s = String(molfile || '');
+  if (!looksLikeMolfile(s)) return null;
+  let chem;
+  try {
+    chem = await lib();
+  } catch {
+    return null;
+  }
+  try {
+    const mol = chem.Molecule.fromMolfile(s);
+    const f = mol.getMolecularFormula();
+    return {
+      formula: f.formula,
+      mw: Math.round(f.relativeWeight * 100) / 100,
+      svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 文本（SMILES 或 molfile）→ { formula, mw, svg } */
+export async function analyzeStructureText(text) {
+  const raw = String(text || '');
+  if (!raw.trim()) return null;
+  // molfile 的前几行是标题 / 程序 / 注释，开头那个空行不能 trim 掉，否则整段错位
+  if (looksLikeMolfile(raw)) return analyzeMolfile(raw);
+  const s = raw.trim();
+  if (looksLikeSmiles(s)) return analyzeSmiles(s);
+  return null;
+}
+
+/** SMILES → { formula, mw, svg }；解析不了返回 null */
+export async function analyzeSmiles(smiles) {
+  const s = String(smiles || '').trim();
+  if (!s) return null;
+  let chem;
+  try {
+    chem = await lib();
+  } catch {
+    return null;
+  }
+  try {
+    const mol = chem.Molecule.fromSmiles(s);
+    const f = mol.getMolecularFormula();
+    return {
+      formula: f.formula,
+      mw: Math.round(f.relativeWeight * 100) / 100,
+      svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 把 SVG 字符串包装成可以直接上传的 File */
+export function svgToFile(svg, name = '结构式.svg') {
+  return new File([svg], name, { type: 'image/svg+xml' });
+}

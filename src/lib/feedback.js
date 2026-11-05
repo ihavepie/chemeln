@@ -1,0 +1,50 @@
+import { ElMessageBox, ElNotification } from 'element-plus';
+
+/** 右下角的小 toast（轻提示，几秒后自己消失） */
+export function toast(message, kind = 'ok', duration = 2600) {
+  return ElNotification({
+    message,
+    type: kind === 'err' ? 'error' : kind === 'warn' ? 'warning' : 'success',
+    duration,
+    position: 'bottom-right',
+    offset: 18,
+    showClose: false,
+    customClass: 'eln-toast',
+  });
+}
+
+/** 确认框，返回 true / false（替代 v1 的 modal({danger:true}) 那条路） */
+export async function confirm({ title, body = '', confirmText = '确定', cancelText = '取消', danger = false } = {}) {
+  try {
+    await ElMessageBox.confirm(body, title, {
+      confirmButtonText: confirmText,
+      cancelButtonText: cancelText,
+      showClose: false,
+      closeOnClickModal: true,
+      closeOnPressEscape: true,
+      confirmButtonClass: danger ? 'eln-confirm-danger' : '',
+      customClass: 'eln-messagebox',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 单行输入框，返回输入内容（取消返回 null）；allowEmpty 时空输入返回 ''，用来清空某格 */
+export async function prompt({ title, placeholder = '', value = '', confirmText = '确定', allowEmpty = false } = {}) {
+  try {
+    const r = await ElMessageBox.prompt('', title, {
+      confirmButtonText: confirmText,
+      cancelButtonText: '取消',
+      showClose: false,
+      inputPlaceholder: placeholder,
+      inputValue: value,
+      customClass: 'eln-messagebox',
+    });
+    const v = String(r.value || '').trim();
+    return v || (allowEmpty ? '' : null);
+  } catch {
+    return null;
+  }
+}

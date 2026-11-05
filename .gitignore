@@ -1,0 +1,22 @@
+# 实验数据永远不进仓库：eln.db + 谱图/结构图原文件，丢了补不回来
+data/
+
+# 手工备份（代码 tar + data 快照）
+.backup/
+
+# 依赖与缓存
+node_modules/
+.npm-cache/
+.cache/
+
+# macOS
+.DS_Store
+
+# 日志
+*.log
+
+# public/ 是构建产物，但要跟代码一起进仓库：
+# 4780 发的就是它，回退代码时不重新 build 也要能回到对应版本。
+
+# 数据快照（scripts/backup.js 写的，里面是 eln.db + 谱图，同样不进仓库）
+.backups/

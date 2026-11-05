@@ -1,0 +1,155 @@
+# ELN 项目交接（动手前必读）
+
+> 当前版本：**1.0**（`package.json` 1.0.0；设置页最底下有版本行）
+
+## 1. 这是什么
+- 个人电子实验记录本（ELN），给一位有机化学研究生单人使用，全本机运行，无后端服务、无账号、无联网需求。
+- 记录对象：方法学实验记录（反应式、投料表、条件、结果、TLC、谱图）+ 化合物档案（结构式、核磁图、TLC、二维码瓶签）。
+- 位置：`<本机路径>/Software/ELN`（外置盘，别假设它在系统盘）。
+
+## 2. 现在只有一套前端（v2），v1 已退役
+- **4780 = 正式运行的那套**：`public/` 里是 `vite build` 产物（`index.html` + `assets/`），由 `start.command` 起的服务直接发出去。
+- **5173 = 开发预览**：`preview.command` / `npm run dev` 起的 Vite，直接读 `src/`，改完热更新。**所有改动先在这里看效果**，确认后 `npm run build` 就会重新写进 `public/`。
+- `vite.config.js` 的 `build.outDir` 已经是 **`public`**（不再有 `dist/`）。**改完源码记得 build 一次**，否则 4780 上还是旧构建。
+- v1（原生 JS 那套）备份在 `.backup/public-v1-<时间>/`，要回退：把那份拷回 `public/`、`outDir` 改回去再 build。
+
+## 3. 技术栈 / 启动 / 数据
+- 前端：Vue 3.5 `<script setup>`、vue-router 4（hash 模式）、Element Plus 2.8（zh-CN）、Vite 6，无 TypeScript、无状态管理库（一个 reactive store）。
+- 化学计算：`openchemlib` 9.25.1，**动态 import**（约 1.1 MB chunk），负责 SMILES/MOL → 分子式、MW、结构 SVG。
+- 服务端：零依赖 Node CommonJS（`server/index.js` 单文件，约 35+ 条 REST 路由），数据库用内置 `node:sqlite`，端口 4780。
+- 启动：`preview.command`（4780 已在跑就复用 + `npx vite --port 5173`）、`npm run dev`、`npm run serve`。
+- 数据：全部在 `data/` —— `data/eln.db`（SQLite）+ `data/attachments/`（谱图等原始文件）+ `data/compounds/`（化合物文件）。备份 = 整个 `data/` 拷走。
+- **数据备份用 `node scripts/backup.js`**：`VACUUM INTO` 把（含 WAL 的）真数据写成一个自包含单文件，再连 `attachments/`、`compounds/` 一起拷到 `.backups/<日期>/`，默认留 7 份（`--list` 看已有、`--keep N` 改份数）。**别用 `cp data/eln.db` 当备份**——真数据在 `-wal` 里，拷出来是空壳。目前**没有排定时任务**，要手动跑；`.backups/` 不进 git。
+- **绝对不能删**：`data/`（用户全部实验记录）、`server/package.json`（内容是 `{"type":"commonjs"}`，删了服务端起不来）、`src/styles/eln.css` 里从 v1 原样搬来的大段规则、`public/`（**现在就是 v2 构建产物，删了 4780 打不开**；旧 v1 在 `.backup/public-v1-*/`）。
+- **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。常用：`git diff` 看改了啥、`git checkout -- <文件>` 撤销未提交改动、`git log --oneline` 看历史。**git 只保代码，不保数据**：`data/` 得自己拷走。
+
+## 4. 目录结构（一句话一个）
+- `src/main.js` — 入口：挂 router / Element Plus / 全局指令。
+- `src/App.vue` — 外壳：桌面是「导轨 + 内容」；**手机（≤820px）不渲染导轨**，且只放行 `compound` 路由，其他路由显示一行提示（不给入口、不能跳转）。
+- `src/router.js` — 路由表：`/` 工作台、`/list` 实验记录（卡片 / 表格）、`/e/:id` 实验页、`/compounds` 化合物库（卡片 / 表格）、`/c/:id` 化合物页、`/screenings`、`/s/:id`、`/trash` 回收站、`/settings`。
+- `src/store.js` — 全局 reactive 状态 + `loadBoot/loadList/loadCompounds` + **当前课题 `store.project`**（`setProject/addProject`，存 localStorage）+ `recordCategories(scope)` / `addCategory(name, scope)` + **视图模式 `views: {exp, cmp}`**（`viewOf(kind)` / `setView(kind, mode)`，存 localStorage `eln:view`）+ 新建记录的两个入口 `createExperiment(categoryId?)` / `createCompound(categoryId?)`（不传就落当前分类筛选，传 `null` = 明确未分类）。注意 `api.saveSettings` 返回整个响应（含 `renamedTo`），不是 `settings`。
+- `src/api.js` — 所有 REST 调用封装（路径与 v1 完全一致）。
+- `src/components/AppRail.vue` — 最左固定导航条；顶部有**课题切换器**（含新建课题）。导航项：工作台 / 实验记录 / 化合物库 / 条件筛选 / **回收站**（带 `boot.trashCount`）/ 设置。
+- `src/components/AppModal.vue` — 通用弹窗（`title/confirmText/danger/showFooter/showConfirm/width/closeOnBackdrop`）。
+- `src/components/CatPick.vue` — 分类下拉（自绘菜单；`show-all` 决定是「筛选」还是「给记录归类」）。传 `kinds` 时菜单里会多一节「类型」（两列排、`.cat-menu-kinds`），选中的值形如 `kind:底物`，由调用方区分。菜单有 `max-height: 56vh` + 滚动，分类多了不会把屏幕顶下去。
+- `src/components/ProjPick.vue` — 记录页「课题」格子的下拉（能打字，也能从已有课题里点一个）。小箭头**贴在输入框右侧内部、无边框**（不要做成带框的小方块，用户明确讨厌那种“空白的框”）；菜单贴着输入框下方弹出、宽度同输入框，下面放不下就往上翻。
+- `src/components/PrintPanel.vue` — 打印面板：克隆真实两页 DOM 缩成 A4 缩略图 + 选项（范围/附件/页眉/黑白）；可以走系统打印（`body` 挂 `print-*` 类，`afterprint` 时摘掉），也可以「存成 PDF」走后端 WebKit 渲染；`window.print()` 前关掉自动保存。
+- `src/components/LabelBatchPanel.vue` — 批量打印化合物标签：勾选当前列表里的化合物 + 四档排版（大 100×46 / 中 65×30 / 小 50×23 / 迷你 34×14mm，分别 12 / 27 / 48 / 95 张一页），自己拼 A4 页（页边距 3mm）；整版 `justify-content: flex-end` **靠右对齐**，一次生成多页 PDF。大/中/小是原版式整体缩放，迷你走 `labelMarkupMini`（精简版式：结构式 9.5mm + 编号/名称/MW·Rf + 二维码 8mm）。
+- `src/lib/print.js` — 打印导出共用：`collectCss()`（把 `@media print` 规则提到最后）、`A4_CSS`（`body{zoom:0.7498}` + `.pdf-page` 210×297mm）、`downloadBlob()`。
+- `src/lib/label.js` — `labelMarkup(c)` 吐完整标签的 HTML（单张打印 + 批量大/中/小共用）；`labelMarkupMini(c)` 是 34×14mm 精简版（结构式 + 编号/名称/MW·Rf + 二维码，没有厚边距和大气泡）；`printCompoundLabel()` 负责单张走系统打印。
+- `src/components/ExpListPane.vue` / `CmpListPane.vue` — 中栏列表。两边都是「**搜索框 + 一个筛选下拉**」并排一行（`.searchrow`，触发器宽度跟名字走、高度和输入框对齐 31px、菜单右对齐弹出）：实验那边下拉里是「状态 + 分类」，化合物那边是「类型 + 分类」，**都没有单独的 chips 行和 ＋新建分类按钮**（新建分类在菜单最底下那条）。选中值形如 `status:进行中` / `kind:底物` / 分类 id，状态/类型与分类**互斥**（选一个清另一个）。
+- `src/components/ExpGrid.vue` / `CmpGrid.vue` — 卡片墙（分类分组、缩略图、拖拽换分类、拖到具体位置、落位虚线格）。**0 条的分类只占组头那一行**（右边一个小「＋」就地往这个分类里新建，`.grid-group-add`；拖动时那一行变虚线落点 `.grid-drop-line`），不再撑一整格虚线「新建」；只有一组的场景（刚建库 / 正按分类筛）才用大块 `.grid-new`。**「全部课题」下每个分组标题后面标出这个分类所属的课题**（`.grid-group-proj`：暖色**胶囊**小标签，`border-radius: 999px` + `#f7f0ea` 底 + `--accent-ink` 字，别做回方块；不然两个同名「321」分不清）。两个墙组件都**只有 `.grid-page` 这一层**，外面的滚动容器 `.editor` 和右上角 `.grid-tools` 那一行按钮已经提到容器页（`EmptyEditor` / `CompoundsView`），因为切到表格视图时墙会卸载，工具栏得留在上面。
+- `src/views/EmptyEditor.vue` — `/list` 的容器：中栏列表 + `.editor`（里面是 `.grid-tools` 工具行 + `ExpTable` 或 `ExpGrid`）。工具行两个按钮：**表格视图 / 卡片视图**（`setView('exp', …)`）和 **新建实验**。
+- `src/views/CompoundsView.vue` — `/compounds` 的容器：跟实验页同构，工具行是 **表格视图 / 卡片视图 · 批量标签 · 新建化合物**，`LabelBatchPanel` 也挂在这里（`batchOpen`）。
+- `src/views/EditorView.vue` — 实验编辑器：两页 A4 版式、自动保存；工具栏只剩 已保存 / 保存 / 重置 / **⋯ 菜单**，**二维码、打印、锁定·解锁、导出、复制、产物存库、删除**都在菜单里（删除是红色项，删前先 `gone = true` 停自动保存）。**手机上（≤820px）直接渲染 `ExperimentMobile`** 并跳过 `load()`。二维码弹窗里的「打印这张码」打的是独立纸片 `.exp-qr-sheet`（40mm 码 + 编号），**没有动记录本身的版式**——别往 `.sheet-runner` 里塞码，会破坏「打印恒 2 页」。
+- `src/components/ReagentTable.vue` — 投料表（最复杂的组件：组分/角色菜单、试剂名自动带库、当量 mmol 用量联动、结构卡与解绑、多步）。
+- `src/components/CondRow.vue` — 条件行（溶剂/浓度/温度/时间节点/气氛）。
+- `src/components/ResultBlock.vue` — 结果块（产物、MW、质量、收率、dr/ee、产物挂库）。
+- `src/components/SchemeBlock.vue` — 反应式上传位。
+- `src/components/TlcStrip.vue` — TLC 板图片条。
+- `src/components/AttachmentsBlock.vue` — 谱图/其它附件分组。
+- `src/views/CompoundDetail.vue` — 化合物档案（结构式、三栏核磁图、TLC、纯化、瓶签）；工具栏跟实验页一个排法：已保存 / 保存 / 重置 / **⋯ 菜单（打印瓶子标签 / ── / 删除这个化合物）**，恒定有「课题」格（清空 = 共用课题）。
+- `src/components/ExpTable.vue` — **实验记录的表格视图**（`/list` 右边切过去）：一行一条记录（勾选 / 结构缩略图 / 底物 → 产物 / 条件 / 产率 / 选择性 / 日期），点列头排序（空值永远沉底），底部是「N 条 · 有产率条数与平均产率 + 导出表格(MD) / 导出 CSV」。**数据直接用 `store.items`**（中栏列表搜什么筛什么它就跟着变，不另发请求）；底物名来自 `/api/experiments` 的 `substrates`（投料表里 role=底物 的名字），结构图是产物挂库后的那张结构式。原来的独立页 `/table`「底物拓展」（`ScopeTableView.vue`）已经删掉，只剩这个视图。
+- `src/components/CmpTable.vue` — **化合物库的表格视图**（`/compounds` 右边切过去）：结构 / 编号 / 名称 / 类型 / 分子式 / MW / Rf / 分类 / 引用，排序同上，导出 CSV / Markdown。数据用 `store.compounds`。
+- `src/views/TrashView.vue` — **回收站页**（`/trash`）：列出删掉的实验 / 化合物（类型 · 名称 · 删除时间），逐条「恢复」/「彻底删除」，右上「清空回收站」。恢复后编号、投料表、附件都回来（编号被占自动加后缀）；彻底删除才真删磁盘文件。数据来自 `/api/trash`。
+- `src/views/DashboardView.vue` — 工作台（统计 + 近期记录）。
+- `src/views/ScreeningsView.vue` / `ScreeningView.vue` — 条件筛选（**仍是旧版样式，未做卡片墙**）。
+- `src/views/SettingsView.vue` — 设置（**四张卡**，回收站已挪到侧栏独立页）：01 记录本信息（**按课题可覆盖**；课题里「标题」就是课题名，改了会改名。课题清单**不在这一卡了**，搬到了 03）、02 数据与备份、03 **课题与分类**（**没有开关了**：一棵树，先「**共用课题**」组，再每个课题一组；组头 = 课题名 + 编号前缀 + `N 条 · M 个` + 改名/编号前缀/删除课题，共用课题那组只显示 `N 条 · M 个`；组内是该课题的分类行「类型标签（**纯标签，点了不会改类型**）· 名称 · 计数 ·（右对齐）图标动作 ⠿ 拖动 / 改名 / 删除」，组内最后还有一行**「未分类」**（`.cat-item.is-uncat`，固定桶、没有动作，只在该课题有没归分类的记录时出现，显示 `N 条 · M 个`）；底部两个「新建实验分类 / 新建化合物分类」建在**新建目标**下）、04 快捷键。03 卡右上角是**三个新建按钮**（＋课题 / ＋实验分类 / ＋化合物分类），左边跟着一个「新建到 XXX」的目标提示；**点某个课题组的标题（或「共用课题」标题）就把它设成新建目标**，建出来的分类落到它下面（`catTarget` 状态，null = 跟着侧栏当前课题），选中的组头有个橙色「新建到此」小标。
+- `src/lib/chem.js` — SMILES / molfile → 分子式、MW、SVG；粘贴内容判定。
+- `src/lib/reagent.js` — 角色表 `ROLES/ROLE_EN/ROLE_TONE`、`derive`（mmol→质量/体积）、`totals`、收率计算。
+- `src/lib/numinput.js` — 数字输入清洗（全角转半角、单点、光标保持）。
+- `src/lib/autosave.js` — `useAutosave(payload, save, opts)`：JSON 快照监听 + 防抖；**卸载时会补一次 `flush()`**（最后不到 1 秒的输入不丢），`lastSaved` 记的是「请求发出那一刻」的快照。
+- `src/lib/autogrow.js` — 文本域跟着内容长（`v-autogrow` 用的 `growTextarea` / `growAll`）；`flattenTextareas(root)` 把文本域换成 div，**打印 / 存 PDF 前必须调**（textarea 只印得出自己那几行高，长表征会被截断，实测 12 行只出 5 行）。
+- `src/components/HistoryModal.vue` — 改动历史弹窗（`entity` = experiment / compound + `id`），读 `/api/history/...`；实验页和化合物页的 ⋯ 菜单里都有入口。
+- `src/lib/feedback.js` — `toast` / `confirm` / `prompt`（Element Plus 封装）。
+- `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量、瓶子标签、内联 SVG 图标。
+- `src/styles/eln.css` — 全站样式（v1 规则在前，v2 新增追加在文件末尾并写注释）。
+- `server/index.js` — HTTP 服务 + 全部路由。
+- `server/print.swift` — 自己生成 PDF 的渲染器（CLI：`print <out.pdf> <w> <h> <page1.html> …`）：用系统 WebKit 每页 `createPDF` 出 A4，再用 PDFKit 合并；`.cache/print-render` 是编译产物，服务启动时预热编译。
+- `.cache/` — swift 编译产物 + clang module cache（由 `server/print.swift` 生成，不是数据）。
+- `server/db.js` — 建表 + `ensureColumn` 形式的增量迁移（新字段都走这里）。
+- `server/export.js` / `server/qr.js` — Markdown 导出 / 二维码。
+- `scripts/backup.js` — 数据备份：`VACUUM INTO` 出单文件库 + 拷 `attachments/`、`compounds/` 到 `.backups/<日期>/`，默认留 7 份（`--list` / `--keep N`）。
+- `public/` — **v2 的构建产物**（`npm run build` 写这里，4780 发的就是它）。`start.command`（起服务）/ `preview.command`（起服务 + Vite 5173）— 双击启动脚本。部署见 `CLOUD-DEPLOY.md`。
+
+## 5. 我们的约定
+- **界面语言**：全中文，术语按化学系口语（「投料表」「组分」「当量」「展开剂」「收率」）。不要出现英文按钮。
+- **配色与质感**：纸白 `#fff` 卡片、画布 `#f5f4f1`、极淡描边 `#eaeaea/#dcdcd7`、强调色 `#a8471f`；不加阴影堆叠、不加渐变。标题用 serif（Iowan Old Style），数字/编号用 mono。
+- **版式克制**：块与块之间尽量少分割线；表格不要行 hover；聚焦格用 `#f8f7f2` 淡底、不要下划线；不搞「太敏感」的悬停弹层。
+- **代码风格**：Vue `<script setup>`；不引入 TypeScript；注释用中文、一两句话说明「为什么」；组件逻辑就地写，别为复用而过度抽象。
+- **样式放哪**：新规则追加到 `src/styles/eln.css` 末尾并加一行注释说明作用域；改完用 grep 确认规则没插错位置（踩过坑）。
+- **新功能往哪写**：交互在组件内、纯逻辑进 `src/lib/*`、数据字段走 `server/db.js` 的 `ensureColumn` 迁移 + `server/index.js` 路由 + `api.js` + `store.js`。
+- **交互底线**：弹窗点背景可关、点内容绝不可关；输入框不要触发文字拖选（全局已禁用，输入框单独放开）；破坏性操作先弹确认并写清后果。
+- **v1 已经退役**：不要再往 `public/` 里写 v1 的文件，也不再新增原生 JS 页面；`public/` 现在只由 `npm run build` 覆盖。
+
+## 6. 当前进度
+- **本轮（修 5 个严重 bug）**：①**回收站恢复**：快照里没有的列（老记录缺后来加的 `sel_method` 之类）不再写 NULL，改成「快照里有的列才写、缺的交给建表默认值」——之前撞 `NOT NULL` 必 500、那条永远恢复不了；②**课题改名**时 `renameProject()` 补上了 `categories.project` 的搬迁（不搬的话该课题的分类按新名筛不到，挂在上面的记录在卡片墙里一个组都落不进 = 看不见）；③**产率不再只算第一次按键**：`ResultBlock` 加了 `yieldTyped` 标记，产率格没被手填过就跟质量联动刷新（清空产率格 = 退回自动），手填过就永不覆盖；④**自动保存**在组件卸载时补一次 `flush()`（敲完字就点走不再丢最后 0.9 秒）、`lastSaved` 改成记「请求发出那一刻」的快照（存的过程中又改就不能算已保存）；⑤**编辑页异步响应要校验 id**：`load()` / `saveNow()` / `refreshAttachments()` 回来时如果 `route.params.id` / `exp.id` 已经不是发请求时那一条，直接丢弃——不然切记录后旧记录的附件会显示到新记录上、点 × 删的是别人记录的文件。服务端两处拿临时数据实例（`ELN_DATA_DIR=/tmp/… PORT=4781`）验证过：恢复返 200、改名后分类跟着走；前端两处在浏览器里实测（临时记录，验完已彻底删除）。
+- **上一轮（列表截断可见 + 产率统计去异常值）**：①`/api/experiments`、`/api/compounds` 现在返回 `{items, total}`（`total` 是符合筛选的总数，`items` 仍受 `LIMIT 400 / 500` 截断）——`api.experimentsPage / compoundsPage` 拿它，`store.listTotal / compoundTotal` 存着；卡片墙底部和表格页脚会写「只显示了前 400 条（共 407 条）」/「显示 400 / 共 407 条」，**不再静默截断**。②产率统计改成**只算 0–100%**、再加一个**中位数**：bootstrap 多返回 `yieldMedian / yieldSuspect`，工作台那格改成「中位产率」并提示「另有 N 条产率不在 0–100% 内，没算进去」，侧栏那行也换成中位产率，表格页脚同样剔除异常值。**踩过的坑**：`listExperiments` / `listCompounds` 的返回类型从数组变成 `{items,total}`，服务端只有那两个 GET 路由在用，前端只有 `loadList / loadCompounds` 用 `*Page` 版本，别在别处再当成数组。
+- **上一轮（底物拓展改成「表格视图」+ 化合物库同构）**：①`/table` 这个独立页删掉了（`ScopeTableView.vue` 删除、路由和侧栏「底物拓展」入口删除），它的表变成**实验记录页的第二种看法**：右上角一个「表格视图 / 卡片视图」按钮（`store.views` + `viewOf/setView`，存 localStorage），表格读 `store.items`（跟中栏列表同一份数据，跟着搜索筛选变），不再自己请求；②化合物库**同构**：同样的按钮 + `CmpTable.vue`（结构 / 编号 / 名称 / 类型 / 分子式 / MW / Rf / 分类 / 引用）；③右上角工具栏（`.grid-tools`）从两个卡片墙里**提到容器页**（`EmptyEditor` / `CompoundsView`），因为切到表格视图时墙会卸载；`LabelBatchPanel` 也跟着搬到 `CompoundsView`；④新建记录统一走 `store.createExperiment()` / `createCompound()`，卡片墙的「＋」和工具栏按钮共用一套。
+- **上一轮（去掉共用开关 / 空分类收成一行 / 共用课题显示条数与个数）**：①设置页 03 卡顶部那个「分类与化合物跨课题共用」开关**删掉**（`shared_mode`、`compound_shared` 两个键从 `DEFAULT_SETTINGS`、迁移、`PUT /api/settings`、`sharedMode()`、`store.sharedMode()`、`compoundsShared()` 全线删除，库里那两行也删了）；②语义改成「**共用课题** = `project = ''` 这个课题本身」：在「全部课题」下新建实验 / 化合物 / 分类都落进它，设置页树里它跟别的课题组并排、组头显示 `N 条 · M 个`（bootstrap 新返回 `sharedCounts: {exp, cmp}`）；③卡片墙里**0 条的分类不再占一整格虚线「新建」**，只留组头一行 + 一个小「＋」，点它就往这个分类里新建（`.grid-group-add` / `.grid-drop-line`）；④**分类的课题归属现在会跟着记录走**：`POST /api/experiments`、`POST /api/compounds` 带 `category_id` 时以分类的 project 为准（新加的 `projectOfCategory()`），拖拽换分类的 `POST .../move` 也会把记录的 project 改成分类所在的课题——不然在「全部课题」里点某个课题的空分类新建，会造出「记录在共用课题、分类却属于别的课题」的隐形错位。
+- **上一轮（课题头动作常显）**：课题组头那三个图标（改名 / 编号前缀 / 删除课题）改成**一直显示**（用户要求：课题级操作常用，藏起来难找），只有**分类行**的动作还是 hover / 键盘聚焦 / 触摸设备才出现。CSS 里把 `.tree-head .icon-act` 从隐藏选择器里去掉即可。
+- **上一轮（动作悬停才显形）**：分类行 / 课题组头的图标动作默认 `opacity: 0` + `pointer-events: none`，鼠标进这一行（`:hover`）、键盘 Tab 到（`:focus-within`）或触摸设备（`@media (hover: none)`）才现形；拖动手柄 `⠿` 保持淡显（0.5 → hover 1），因为它是拖拽的提示。**注意**：隐藏状态要同时关掉 `pointer-events`，否则会在看不见的地方被点到。
+- **上一轮（去线 + 图标放大 + 整组当落点）**：①分类行和课题组之间的 `border-bottom` / `border-top` 全去掉，只靠留白分隔；②图标动作放大成 27×27 命中区、图标 15–16px、颜色提到 `--ink-2`；③拖放的**落点从「组头一行」扩大到整个 `.tree-group`（组头 + 下面所有分类行）**，拖动时整块描虚线、悬上去整块变强调色实线 + 淡底，落 `dragstart/dragover/drop` 都挂在这个容器上（`is-drop-live` / `is-drop-self` 也跟着搬到 `.tree-group`）。
+- **上一轮（拖动反馈加强）**：拖着分类时 —— ①被拖那一行 `is-dragging`（opacity .4 + 淡底，手柄变 grabbing）；②所有能接的组头描虚线；③鼠标正悬着的落点 `is-drop-live`（1.5px 强调色实线 + `#fbf4ee` 淡底 + 课题名变强调色）；④它现在待着的那个组 `is-drop-self`（点线 + `cursor: no-drop`）；⑤`setDragImage` 用整行当拖动影像（默认那个半透明小图太淡）。落点靠 `dropTarget` + `onHeadDragOver/Leave`（`dragleave` 里判 `relatedTarget` 是否还在组头内，避免子元素间移动时闪）。
+- **上一轮（右边改成小图标按钮）**：分类行/课题组头的文字动作（改名 / 编号前缀 / 删除）换成**图标按钮** `.icon-act`（22×22 的透明方块、`--ink-3`、hover 淡底变深、`.is-danger` 悬停转红），配 `title` 说明；用了图标 `edit`（新加）、`hash`（新加）、`trash`。右边不再堆文字。
+- **上一轮（拖动手柄 + 组头动作靠右）**：「移到…」那个弹窗在我删回收站卡片时被连带删掉了（点了没反应），改成**拖动手柄** `⠿`：拖到任意课题组标题（或共用分类标题）上就移过去，拖动时组头描虚线、落点要带记录会弹确认；实测拖动改的是真的 `categories.project`（并已复原）。另外补上漏掉的 `.tree-head .spacer { flex: 1 }`，课题组头的三个动作现在跟分类行一样靠右对齐。
+- **上一轮（新建分类按「选中课题」落位）**：三个新建入口（＋课题 / ＋实验分类 / ＋化合物分类）收到 03 卡右上角；卡片里点组头可选「新建目标」（橙色「新建到此」标），`newCategory` 用 `catTarget ?? store.project` 建分类，`store.addCategory(name, scope, project)` 支持显式指定；共用模式下目标恒为 ''（分类不分课题），选择 UI 隐藏。真机验证过：选中「这个是测试课题」后新建的分类 `project = 这个是测试课题`。
+- **上一轮（类型标签不可点）**：分类行开头的「实验 / 化合物」徽标从 `<button>` 改成 `<span>`（纯标签、无 hover、`user-select: none`），点它不再切类型；`moveCategory` / `catUsed` 一并删掉，服务端按空分类才允许改类型的 409 保留。
+- **上一轮（这一栏去噪）**：分类行右侧那一堆带框小按钮改成**文字动作**（新类 `.row-act`，11.5px 淡灰、hover 变深、`.is-danger` 悬停转红），课题组头的「改名/编号前缀/删除课题」同样处理；类型徽标从「描边小方块」改成「淡底小标签」（`#f4f3ef`），和课题标签（暖色 `#f8f3ee` + `--accent-ink` 字）形状统一、只靠颜色区分；共用模式下每个课题组重复那句解释去掉了（卡顶已经说过）。
+- **上一轮（分类行的按钮归位 + 课题标记更醒目）**：分类行右侧统一成「移到… / 改名 / 删除」三个动作（原来「移到…」夹在名称和计数中间）；共用模式下名称后面那个课题标记改成**淡强调色小标签**（`--accent-ink` 文字 + `#f8f3ee` 底），一眼能看出这个分类属于哪个课题；共用模式下课题组的灰字也改成说明「分类都列在上面那个「全部分类」里」。
+- **上一轮（共用开关的说明 + 分类前标课题）**：共用模式下那条分类列表里，每个分类前面多一个淡灰的**课题标记**（`321 / 手性配体`），明确「它当初建在哪个课题下」；卡片里的说明也改准了 —— **这个开关只影响查询与显示，不搬数据**，关掉就回到原来的归属。真会搬数据的是「移到…」。
+- **上一轮（回收站搬到侧栏）**：新增 `/trash` 独立页（`src/views/TrashView.vue`）+ 侧栏「回收站」入口（带条数，`boot.trashCount`）；设置页那张 05 回收站卡片删掉，四张卡重新编号成 01/02/03/04。
+- **上一轮（共用开关并进分类卡 + 扩成「全部课题」）**：设置页把「跨课题共用」从 04 化合物库（该卡已删）搬进 03 卡顶部，**语义从「只关化合物」扩成「分类与化合物都不分课题」**（等于「全部课题」）：开关打开时 `listCategories` 不按课题筛、新建分类/化合物不落课题、树收成「全部分类」一组；关掉才按课题分开。设置键从 `compound_shared` 升级成 **`shared_mode`**（两边同步写，读的时候兜底老键）。**踩过的坑**：迁移必须放在 `initSettings()` **之前**，否则 DEFAULT_SETTINGS 会先把 `shared_mode` 写成 `'1'`，把老库的 `'0'` 盖掉。
+- **上一轮（课题与分类合成一棵树）**：设置页把 01 里那份「课题清单」和原来的「03 分类」合并成一张卡 **03 课题与分类**：共用分类一组、每个课题一组（组头带编号前缀 / 条数 / 改名 / 编号前缀 / 删除课题），分类行挂在自己课题下面。分类清单一律取**全量**（`api.categories()` 不带 project），所以「所有课题下有什么分类」一眼可见；列表里的计数在共用组是跨课题总数、在课题组就是该课题的数。
+- **再上一轮（分类的移动语义）**：设置页每个分类的「归属」变成可点按钮（共用 / 各课题），`PUT /api/categories/:id` 带 `project` 就是**换课题**：分类搬走，**里面的实验（隔离模式下的化合物）一起改 project**，响应返回 `moved:{experiments, compounds, fromProjects}`；搬到「共用」只改分类、记录不动（共用分类可以装任何课题的记录）。**「改为实验 / 改为化合物」只准空分类用**（有记录时 409），否则会出现「分类在化合物那边、实验却还挂着它」的隐形错位。列表接口多返回 `exp_projects`（这分类里的记录现在分属哪些课题），确认框据此提醒「分属 N 个课题」。
+- **再上一轮（分类挂在课题下 + 设置页合并一栏）**：`categories` 加 `project` 列（`''` = 共用，每个课题都看得到；否则只在该课题出现，**老数据全部变成共用**）；`listCategories(scope, project)` 按课题过滤、**计数也只数该课题里的记录**（在 A 课题看到共用分类写着整本的数字会误导）；`POST /api/categories` 收 `project`（`store.addCategory` 自动带当前课题）；前端 `recordCategories(scope)` / 新加的 `allCategories()` 都按课题筛，「全部课题」只看共用分类；设置页 03 从两栏改成一行一条的合并列表。
+- **再上一轮（历史看改前改后）**：`events` 多一列 `changes`（`[{f,o,n}]`，值超 80 字截断），`logEdit` 合并时**保留最初的改前值、只刷新改后值**（71→78→80 显示成 71→80，跨 5 分钟窗口才另起一条）；`/api/history/:entity/:id` 每行返回中文标签 + 改前/改后；`HistoryModal` 的行可点开（有改动的行右边有 `+ / −`，第一条自动展开），旧值划掉、新值用强调色。
+- **再上一轮（表征字段结构化）**：实验结果块多了「选择性测定」一行（`ee_pct` 数值 + `sel_method` 方式 + `sel_condition` 手性柱/流动相 + `sel_rt` 保留时间，打印在结果表格下面一行）；化合物档案多了 HRMS / IR / 旋光三格（`hrms` / `ir` / `rotation`，版式用新加的 `.c-field.full` 占整行，不然挤在 84px 小格里看不见）；**新建化合物不填编号会自动分配一个库里没用过的纯数字号**，从实验「产物存库」时编号撞了会加 `-2/-3`；单条 Markdown 导出会带「选择性测定」；复制实验时 ee / 测定方式 / 手性条件 / tR 跟产率表征一起清空。
+- **再上一轮（曾经有过一个独立页）**：`/table`「底物拓展」页面 → 现在已经并进实验记录的表格视图（见本轮），`ScopeTableView.vue` 已删。它当初给 `/api/experiments` 加的 `substrates` / `product_structure_id` / 条件字段保留着，`ExpTable` 还在用。
+- **再上一轮（记录可信 / 打印完整）**：**改动留痕**（`events` 扩了 `entity / entity_id / fields`，`logEvent` 换了签名，新增 `logEdit` 比对字段、5 分钟窗口内的连续编辑合并成一条；实验页 / 化合物页 ⋯ → 修改历史）；**回收站**（删除 = 软删除：整条记录连投料表 / 附件清单 / 被断开的引用拍成 JSON 快照进 `trash` 表，**附件文件留在盘上**，「彻底删除」才真删；恢复按原 id 写回，编号被占自动加 `-恢复N`）；**复制实验不再继承上一条的产率 / 表征**；**化合物编号唯一**（部分唯一索引 + 写入查重，空编号豁免）；**长文本不再被截**（`v-autogrow` + 打印前 flatten；PrintPanel 预览 iframe 量 `scrollHeight`，超 A4 时提示并把按钮改成「存成 PDF（会缺内容）」）。
+- **已完成**：**v2 已构建进 `public/`、4780 跑的就是 v2**（手机适配、实验二维码在正式端口上也能用）；手机/窄屏（≤820px）基础适配（扫码看化合物档案：收起侧栏导轨和中栏列表，纸面铺满、工具栏横向滚、表格可横滑）；两页 A4 记录版式、打印（恒为 2 页）、瓶子标签 QR、投料表（组分英文缩写、从化合物库带 MW、当量/mmol/用量联动、结构卡与「移除」解绑、多步折叠）、条件行、结果块、TLC、附件上传、化合物档案（结构式 + 三栏核磁图 + TLC + 瓶签）、实验与化合物的卡片墙（缩略图优先反应式、没有则退回产物/主要底物结构式）、分类（实验与化合物**两套独立**、可拖拽换分类与换位置、落位虚线格）、ChemDraw 粘贴（SMILES/MOL → 分子式/MW + 结构图）、自动保存 + 保存/重置、锁定、搜索与筛选、**课题（侧栏切换的「空间」：列表/卡片墙/工作台统计/导出都按课题走，可给每个课题单独设编号前缀；分类与化合物都严格按课题归属）**。
+- **半成品 / 待确认**：条件筛选页仍是旧样式；「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
+- **明确不做**：多人协作、账号权限、云同步、富文本编辑。移动端只做「扫码看化合物档案」这一档（≤820px 的样式在 `eln.css` 末尾那段），不做手机上编辑记录。
+
+## 7. 踩过的坑与硬限制
+- **「未分类」是固定桶，不建真分类**：`category_id = NULL`，卡片墙那一组、筛选菜单那一项、记录页分类下拉留空、设置页树里那一行都指向它。**别再自动建一个叫「未分类」的分类**——那样每个地方都会出现两个「未分类」，而且它能被改名/删掉，一删记录又退回桶里。设置页树里的「未分类」行只是把它显示出来（`uncatLabel()`，数据来自 `listProjects()` 的 `uncat_exp/uncat_cmp` 和 bootstrap 的 `sharedCounts.uncatExp/uncatCmp`）。
+- **没有「共用模式」开关了**（`shared_mode` / `compound_shared` 两个键已从代码和库里删掉）。现在的规矩只有一条：**分类和化合物都严格归属一个课题**，`project = ''` 就是「**共用课题**」这个课题本身。侧栏的「全部课题」仍然是**看不筛**（实验、化合物、分类都全给），而且在「全部课题」下新建的东西 `project` 就是空串 → 落进共用课题的未分类。**别再把它当成「共用视图 = 全部课题」的开关**——两者不是一回事，用户明确说过加了也没区别、不要。
+- **分类移动的两条规矩**：换课题 = 记录跟着走（不跟着就会出现「分类在 A、记录在 B」，B 里筛不到、也看不出问题）；改类型 = 只准空分类（改类型不改 `category_id`，记录会挂到不存在的那一类下）。**界面上已经没有「改类型」入口了**（用户明确要求徽标只做标签、点击不能切类型），只剩服务端 `PUT /api/categories/:id {scope}` 这条能力 + 空分类才放行的 409；真要改类型时再加一个显式动作。
+- **分类跟着课题走（严格的，不再有「到处可见」的共用分类）**：`listCategories(scope, project)` 传了 project 就 `g.project = ?` 精确匹配，不传（=「全部课题」）才全给——卡片墙在「全部课题」下必须全给，否则别的课题的分类不在列表里，那些卡片会掉进不了任何一组、直接看不见。前端 `recordCategories/allCategories` 同理（`store.project` 为空就不筛）。**分类的计数是按课题算的**（传了 project 才只数该课题）。
+- **删除是软删除**：`DELETE /api/experiments/:id`（和化合物同构）只把快照塞进 `trash`、再把行删掉，**附件 / 化合物目录的文件不动**；只有 `DELETE /api/trash/:id`（彻底删除）才 `rm` 文件。清理测试数据时别忘了「彻底删除」那一步。
+- **恢复的边界**：按原 `id` 写回，`id` 被占报 409；`experiments.code` 是 UNIQUE，原号被占会自动改成 `<code>-恢复N`（响应里带真正用的 code）。附件行按原 id 写回，所以 `{文件行id}__文件名` 这套命名不用动。**恢复的列只能取快照里有的**（`cols.filter((k) => k in e)`）：新字段都走 `ensureColumn`，老快照缺 `sel_method` 这类 `NOT NULL DEFAULT ''` 的列，写显式 NULL 会撞 NOT NULL → 500，那条就永远恢复不了（曾经踩过：回收站里唯一一条一直恢复失败）。
+- **编辑页的异步响应必须校验 id**：`load()` / `saveNow()` / `refreshAttachments()` 都是「发请求 → 等回来 → 写进 `exp`」，等待期间用户可能已经切到别的记录。回来时先比 `route.params.id` / `exp.id` 还是不是发请求时那一条，不是就整份丢弃——否则旧记录的附件会显示到新记录上，此时点 TLC 的 × 删的是那条旧记录的附件行和磁盘文件。**savedLabel / autosave 也是对同一个坑**：`flush()` 里 `lastSaved` 要记「请求发出那一刻」的快照，不能用返回时的（返回时可能已经又改了）。
+- **历史合并的语义**：`fields` 是「改到的字段名」（摘要用），`changes` 是「字段 + 改前 + 改后」（展开用）。同一个 5 分钟窗口里对同一字段的连续改动，**改前保留最早那次、改后取最新**——所以看到的是净变化，中间过程看不到。想让每次保存都独立留痕，就调小 `db.js` 里的 `EDIT_MERGE_MS`，但那样历史会很长。
+- **记录页第 1 页现在多了一行**：结果表格下面是 `.res-sel`（选择性测定），在 `.sec-tight` 里跟着结果块一起打印。加别的行之前先想想页面还有多少余量——第 1 页本来就塞满了（反应式 + 投料表 + 条件 + 结果 + TLC）。
+- **化合物编号**：新建时留空会由服务端 `nextCompoundCode()` 自动给号（库里最大的纯数字 + 1）；`POST /api/compounds` 带显式编号撞号仍然报 409（别改成自动加后缀，用户填的就该报错）；只有「产物存库」走 `uniqueCompoundCode()` 自动加 `-2`。**曾经踩过**：产物存库直接用实验编号当化合物编号，加了唯一索引后会撞号 500。
+- **`events` 是所有留痕的唯一来源**：新签名 `logEvent(entity, entityId, kind, { detail, fields, changes })`，老签名 `logEvent(expId, kind, detail)` 已废弃；`kind='edit'` 一定走 `logEdit(changes)`（`[{f,o,n}]`，服务端 5 分钟内合并，界面用 `fields` + `EXP_FIELD_LABELS/CMP_FIELD_LABELS` 拼中文、用 `changes` 展开改前改后）。**加新字段记得往这两个 label 表里补**，否则历史里显示英文字段名。
+- **打印 / 存的文本域**：`.sheet-text` 是固定 rows 的 textarea，纸上只印自己那几行；屏幕还比纸面宽，按屏幕高度算照样截。两条路都要 `flattenTextareas()`（系统打印在 `runPrint`、PDF 在 `PrintPanel.buildPages`），改完仍要 `--print-to-pdf` 数页数：内容长现在会自然排到 3 页，那是「不丢内容」的代价，别再拿「恒 2 页」当硬指标。
+- `node:sqlite` 需要 Node ≥ 22 且是实验特性，启动带 `NODE_OPTIONS=--disable-warning=ExperimentalWarning`。
+- 服务端 `listen` 失败会自动换下一个端口 → 见到多余 node 进程先用 `lsof -nP -iTCP:4780 -sTCP:LISTEN` 查，别乱杀。
+- **「课题」和「分类」不是一回事**：课题是 `experiments.project` 文本字段，决定了**全站空间**（侧栏切换，统计/列表/导出跟着走），课题表本身不存在——清单来自 `GROUP BY project` 加 settings 里的 `projects_json`（用来记还没写记录的课题），每个课题的编号前缀存 `prefix:<课题>`。分类是卡片墙里的分组，仍按分类走，两者叠加。
+- **化合物库的课题归属**：`compounds.project` 一直写值，过滤是**严格 `project = 当前课题`**；「全部课题」不筛，所以没归课题的化合物（`project = ''`，即共用课题的）只在「全部课题」里看得到。化合物库列表头会提示「另有 N 个在共用课题」（bootstrap 的 `sharedCounts.cmp` / `compoundUnassigned`），化合物页**现在恒定有「课题」格**（`ProjPick`，清空 = 共用课题）可以补归属。
+- **课题级设置覆盖**：01 记录本信息里，**课题名就是「标题」**——在课题里改标题等于改名（会走 `renameProject` 把记录一起搬），标题不再单独存覆盖值；编号前缀/记录人/课题组/二维码地址可以每个课题覆盖。存法：`prefix:<课题>`（编号前缀）+ `proj:<课题>:<字段>`（其余三项），空值就不落盘（= 跟着全局）。服务端 `settingsFor(project)` 做合并，bootstrap 同时返回 `settings`（已合并）、`settingsGlobal`（占位符用）、`projectOverrides`（表单编辑用）；`PUT /api/settings` 带 `project` 才写课题级（共用开关已经不存在了）。删课题时会把这两个前缀的键一起清掉。
+- **课题改名必须一次搬干净**（`renameProject()`，在一个事务里）：`experiments.project`、`compounds.project`、**`categories.project`**、`projects_json`、`prefix:<旧>`、`proj:<旧>:*`。少搬一样就会凭空多出一个同名空课题。**`categories.project` 漏搬的后果最阴**：分类按新课题名筛不到，挂在这些分类下的记录在卡片墙里一个组都落不进（中栏列表还看得见），看着像丢了。两个入口：`PUT /api/projects/:name`，和 `PUT /api/settings` 带 `project` + 不同的 `lab_heading`（响应里的 `renamedTo` 告诉前端切到新名字）。启动时有个一次性迁移，把老的 `proj:<p>:lab_heading` 覆盖值当作新课题名搬过去。已知边角：改名时如果正好有一条实验开着编辑，那条的自动保存会把旧课题名写回去，需要把那页重开一下。
+- **`.spacer` 只在几个容器里有 `flex: 1`**（`.cat-item` / `.editor-bar` / `.card-head` / `.trash-head` / `.scope-head` / `.scope-foot`）。新写一个 flex 容器想让后半段靠右，必须自己补一条 `<容器> .spacer { flex: 1 }` —— **踩过一次**：`.tree-head` 漏了，课题组头的「改名/编号前缀/删除课题」粘在元信息后面而不是贴右边。
+- **`position: fixed` 的下拉必须加 `.cat-menu--fixed`**（侧栏课题切换器、记录页课题格 `ProjPick`）：`.cat-menu` 自带 `min-width: 100%`，在 fixed 下会按整屏算，菜单会变得巨长（踩过两次：AppRail 和 ProjPick）。这个 class 把它按掉，宽度交给 JS 量触发器后内联写。absolute 的下拉（`CatPick` 在列表/工具栏里）不用处理，`min-width: 100%` 正是想要的「跟触发器同宽」。侧栏课题切换器**触发器本身是满宽的**（跟「新建实验」按钮对齐），要窄的只有菜单。
+- **瓶子标签的尺寸**：`.label` 按 100×46mm 设计；单张打印靠 `@media print` 里 `body.printing-label .label-sheet .label { transform: scale(.7) }` 整体缩到约 70×32mm（改这个数就是改大小）。批量四档：大 100×46（scale 1）、中 65×29.9（.65）、小 50×23（.5，= 原来的 1/4 面积）、迷你 34×14（`labelMarkupMini`：结构式 9.5mm + 编号 6pt + 名称 4.4pt + MW·Rf 3.8pt + 二维码 8mm）。四档都带结构式/二维码/分子量；再小就打印不出来了。
+- **二维码**：化合物 `/api/compounds/:id/qr.svg` → `/#/c/<id>`；实验 `/api/experiments/:id/qr.svg` → `/#/e/<id>`。base 的优先级：URL 参数 > **`ELN_LABEL_BASE_URL` 环境变量** > 设置页「瓶子标签的二维码地址」> `lanUrl()`。服务器上靠环境变量指定（数据同步会冲掉设置页里的值），详见 `CLOUD-DEPLOY.md`。
+- **主从关系**：**本机 `data/` 是主库**，服务器 `/var/lib/eln` 是同步上去的副本，**只允许 本机 → 服务器 单向覆盖**；服务器上的改动下次同步会被冲掉。
+- **手机适配**：`eln.css` 末尾有 `@media (max-width: 820px)` 一段（现在主要是兜底，手机上真正的入口是 `App.vue` 的路由放行 + `CompoundMobile`）：`.app/.workspace/.panes` 改成 `display:block`、`.rail` 与 `.listpane` 直接 `display:none`、`.sheet` 去边距铺满、`.editor-bar` 横向滚动、`#rtable`/`.res-table` 给 `min-width` 让 `.sheet` 自己横向滚。所以手机上**没有导航**，只有当前内容页——扫码场景够用，别指望在手机上切页面。
+- **自己生成 PDF 这条链路**：`POST /api/print/pdf` 收 `{pages: [html片段…], css, filename}`，把每页写成临时 html 放在 `os.tmpdir()/eln-print-<token>/`，再用 `/api/print/page/<token>/<n>` 以 **http 同源** 喂给 WebKit（用 file:// 的话 `/api/files/…` 这些图片取不到），跑 `swiftc` 编好的 `server/print.swift` 渲染，最后返回 PDF 并删临时目录。前端 `PrintPanel` 负责两件事：① 克隆 `.sheet` 并把 `input/textarea` 的当前值搬进去（Vue 改的是 property，`cloneNode` 只带 attribute）；② 收集 `document.styleSheets`，把 `@media print` 里的规则**提到最后**再一起发过去（`createPDF` 用的是 screen media，不提上来打印版式就不生效），并补 `body{zoom:0.7498}` + `.pdf-page{width:210mm;height:297mm;padding:16mm 15mm}` 让 794px 的版心正好落在 A4 上。依赖 macOS 的 `swiftc`（Command Line Tools），没有时接口返回 500、前端提示改用系统打印。
+- **不要在用户正编辑时用 API 改他的记录**（他页面里的自动保存会把改动覆盖回去）；验证只用临时记录，验完删掉。
+- 打开实验页本身会触发保存（`fill()` 会补算 mmol、补起始行）→ 「只看不动」的验证要用临时记录，或在该页拦掉非 GET 请求。
+- SQLite 子查询的 `ORDER BY` 里引用不到外层表的列 → 拆成「主查询 + 一条补数据查询」。
+- molfile 解析**不能 trim**（首行空行是格式的一部分），SMILES 才 trim。
+- Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
+- 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
+- Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
+- **本机没有 Chromium / 无头 Edge**（只有 Safari），别再照旧笔记去调 headless 打印。要看版式/核对页面文字，用 `swiftc` 编一个 WKWebView 小程序：加载 URL（hash 路由可用，如 `/#/table`）→ `takeSnapshot` 存 PNG → 看图；要读页面上的值就 `evaluateJavaScript`。注意 swiftc 必须带 `-module-cache-path .cache/clang`（否则沙箱里 ModuleCache 写不进去）。页面文字在输入框里时 `innerText` 是空的，要读 `.value`。
+- 依赖版本别升：Vue 3.5 / Vite 6 / Element Plus 2.8 / openchemlib 9.25 是验证过的组合。
+
+## 8. 用户怎么干活
+- 提需求通常是一张裁剪截图 + 一句很短的中文（圈出位置），常常只有一个词或半句话。
+- 期望**直接改到看得见的效果**，然后他自己在 5173 上点、再发下一张截图验收；不喜欢解释性长文和反复确认。
+- 有明显歧义时给出 2–3 个选项让他选，他会用一两句话回，并且常在这时补充新要求。
+- 审美偏好：极简、少文字提示、少线条、少 hover 花活、讨厌系统原生控件（下拉框、原生 select、蓝底菜单）。
+- 汇报要短：改了什么 / 在哪个文件 / 验证到什么程度 / 有什么坑；不要罗列没做的事。

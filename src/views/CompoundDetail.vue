@@ -1,0 +1,673 @@
+<script setup>
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import Icon from '../components/Icon.vue';
+import CatPick from '../components/CatPick.vue';
+import ProjPick from '../components/ProjPick.vue';
+import CmpListPane from '../components/CmpListPane.vue';
+import CompoundMobile from '../components/CompoundMobile.vue';
+import AppModal from '../components/AppModal.vue';
+import HistoryModal from '../components/HistoryModal.vue';
+import { api } from '../api.js';
+import { loadBoot, store, recordCategories, addCategory } from '../store.js';
+import { printCompoundLabel } from '../lib/label.js';
+import { CMP_CAT_LABEL, CMP_CAT_ORDER, COMPOUND_KINDS, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
+import { useAutosave } from '../lib/autosave.js';
+import { applyNumeric } from '../lib/numinput.js';
+import { analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
+import { confirm, prompt, toast } from '../lib/feedback.js';
+import { round } from '../lib/reagent.js';
+
+const props = defineProps({ compoundId: { type: [String, Number], required: true } });
+const router = useRouter();
+const route = useRoute();
+
+const c = ref(null);
+const error = ref('');
+const hovered = ref('');
+const stdModal = ref(false);
+const stdList = ref([]);
+const stdPick = ref(null);
+const recat = ref(null);
+const pathModal = ref(false);
+const pathValue = ref('');
+const cat = ref('auto');
+
+const form = reactive({
+  code: '', name: '', kind: '底物', category_id: '', project: '', formula: '', mw: '', appearance: '', mp: '', smiles: '',
+  hrms: '', ir: '', rotation: '',
+  tlc_solvent: '', tlc_rf: '', procedure: '', notes: '',
+});
+
+/** 核磁改成贴截图：三类谱图各一排 */
+const NMR_DEFS = [
+  { key: 'h1', label: '¹H' },
+  { key: 'c13', label: '¹³C' },
+  { key: 'nmr_other', label: '其他' },
+];
+
+const spectra = (kind) =>
+  (c.value?.files || []).filter((f) => f.category === kind && isImageName(f.original_name || f.filename));
+
+const files = computed(() => c.value?.files || []);
+const struct = computed(() => files.value.find((f) => f.category === 'structure' && isImageName(f.original_name || f.filename)));
+const tlcShots = computed(() => files.value.filter((f) => f.category === 'tlc' && isImageName(f.original_name || f.filename)));
+const used = computed(() => c.value?.usedIn || []);
+/** 化合物跟分类一样挂课题：这里可以给它换一个（「共用课题」= 留空） */
+const projectList = computed(() => store.boot?.projects || []);
+const std = computed(() => c.value?.standardExp || null);
+
+const baseline = ref('');
+
+function fill(data) {
+  c.value = data;
+  for (const k of Object.keys(form)) form[k] = data[k] ?? '';
+  baseline.value = JSON.stringify({ ...form });
+  markLoaded();
+}
+
+async function load() {
+  try {
+    fill(await api.compound(props.compoundId));
+  } catch (e) {
+    error.value = e.message;
+  }
+}
+
+/** 库里换一个化合物：组件会被复用，自己重新读一次 */
+watch(
+  () => props.compoundId,
+  async (id, old) => {
+    if (!id || id === old) return;
+    try {
+      if (dirty.value) await flush();
+    } catch {
+      /* 状态栏已有提示 */
+    }
+    recat.value = null;
+    pathModal.value = false;
+    stdModal.value = false;
+    moreMenu.value = false;
+    await load();
+  }
+);
+
+const moreMenu = ref(false);
+const historyOpen = ref(false);
+
+function closeMenus(e) {
+  if (!e.target.closest?.('.menu-wrap')) moreMenu.value = false;
+}
+
+/** 窄屏（手机）走只读精简页，桌面版式完全不渲染 */
+const isPhone = ref(typeof window !== 'undefined' && window.innerWidth <= 820);
+function onResize() {
+  isPhone.value = window.innerWidth <= 820;
+}
+
+onMounted(async () => {
+  window.addEventListener('resize', onResize);
+  if (!isPhone.value) await load();
+  document.addEventListener('paste', onPaste);
+  document.addEventListener('click', closeMenus);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize);
+  document.removeEventListener('paste', onPaste);
+  document.removeEventListener('click', closeMenus);
+});
+
+const payload = () => ({ ...form });
+
+async function save() {
+  c.value = await api.saveCompound(c.value.id, payload());
+  await loadBoot();
+}
+
+/** 立刻存一次 / 丢掉这次改动（跟实验页那两个按钮一个意思） */
+async function saveNow() {
+  if (!c.value) return;
+  try {
+    await flush();
+  } catch {
+    /* 保存状态栏已经提示了 */
+  }
+}
+
+async function resetForm() {
+  if (!c.value || !baseline.value) return;
+  const snap = baseline.value;
+  if (JSON.stringify(payload()) === snap) {
+    toast('没有要撤销的改动');
+    return;
+  }
+  const ok = await confirm({
+    title: '重置到打开时的状态？',
+    body: '将撤销打开本档案之后的全部修改。',
+    confirmText: '重置',
+    danger: true,
+  });
+  if (!ok) return;
+  Object.assign(form, JSON.parse(snap));
+  baseline.value = snap;
+  markLoaded();
+  try {
+    await flush();
+    toast('已重置');
+  } catch {
+    /* 错误显示在保存状态里 */
+  }
+}
+
+const { state: saveState, dirty, flush, markLoaded } = useAutosave(payload, save, {
+  delay: 700,
+  enabled: () => !!c.value,
+  onError: (e) => toast(e.message, 'err'),
+});
+
+/** 填了 SMILES：算分子式 / MW（空着的才填），并在没有结构图时画一张存进去 */
+async function useSmiles(text, { quiet = false } = {}) {
+  const isMol = looksLikeMolfile(text);
+  const info = await analyzeStructureText(text);
+  if (!info) {
+    if (!quiet) toast('这段 SMILES 读不出来', 'err');
+    return false;
+  }
+  const fillFormula = !String(form.formula || '').trim();
+  const fillMw = !String(form.mw || '').trim();
+
+  // 先处理结构图（reload 会用服务端数据覆盖表单，所以必须排在赋值前面）
+  if (!struct.value) {
+    const fd = new FormData();
+    fd.append('file', svgToFile(info.svg), '结构式.svg');
+    fd.append('category', 'structure');
+    try {
+      await api.uploadCompoundFile(c.value.id, fd);
+      await reload();
+    } catch (e) {
+      toast(e.message, 'err');
+    }
+  }
+
+  // SMILES 存进 SMILES 栏；MOL 是整段文件内容，只用来算和画，不塞进这一格
+  if (!isMol) form.smiles = String(text).trim();
+  if (fillFormula) form.formula = info.formula;
+  if (fillMw) form.mw = String(info.mw);
+  if (!quiet) toast(`已识别：${info.formula} · MW ${info.mw}`);
+  return true;
+}
+
+/** 在 SMILES 格子里直接粘贴：把 SMILES 之后的其它文本也一并收下 */
+function onSmilesFieldPaste(ev) {
+  const text = ev.clipboardData?.getData('text/plain') || '';
+  if (!looksLikeSmiles(text) && !looksLikeMolfile(text)) return;
+  ev.preventDefault();
+  void useSmiles(text);
+}
+
+/** 手输完离开这个格子：只补空着的分子式 / MW */
+async function onSmilesFieldChange() {
+  const v = String(form.smiles || '').trim();
+  if (!looksLikeSmiles(v) && !looksLikeMolfile(v)) return;
+  if (String(form.formula || '').trim() && String(form.mw || '').trim() && struct.value) return;
+  await useSmiles(v, { quiet: true });
+}
+
+/** Rf 只收数字（顺带把全角数字转成半角） */
+function onRf(ev) {
+  applyNumeric(ev.target, '');
+  form.tlc_rf = ev.target.value;
+}
+
+async function reload() {
+  fill(await api.compound(c.value.id));
+}
+
+function openFile(f) {
+  window.open(`/api/compound-files/${f.id}`, '_blank');
+}
+
+function pickFile(category) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.onchange = async () => {
+    const list = Array.from(input.files || []);
+    if (!list.length) return;
+    const fd = new FormData();
+    for (const f of list) fd.append('file', f, f.name);
+    fd.append('category', category || 'auto');
+    try {
+      await api.uploadCompoundFile(c.value.id, fd);
+      await reload();
+      toast(list.length > 1 ? `已添加 ${list.length} 个文件` : '已添加 1 个文件');
+    } catch (e) {
+      toast(e.message, 'err');
+    }
+  };
+  input.click();
+}
+
+async function onPaste(ev) {
+  if (route.name !== 'compound' || !c.value) return;
+  const items = Array.from(ev.clipboardData?.items || []).filter((i) => i.kind === 'file' && String(i.type).startsWith('image/'));
+
+  // 剪贴板里如果有结构文本（SMILES / MOL）就先按它算，图片照旧存下来。
+  // 除了 text/plain，也看看 text/html（有的软件会把 molfile / SMILES 塞在 HTML 里）
+  const data = ev.clipboardData;
+  const candidates = [data?.getData('text/plain') || '', stripHtml(data?.getData('text/html') || '')];
+  for (const text of candidates) {
+    if (looksLikeSmiles(text) || looksLikeMolfile(text)) {
+      ev.preventDefault();
+      await useSmiles(text);
+      return;
+    }
+  }
+
+  if (!items.length) return;
+  ev.preventDefault();
+  const filesOut = items.map((it, i) => {
+    const f = it.getAsFile();
+    return f ? new File([f], `粘贴-${Date.now()}-${i + 1}.png`, { type: f.type }) : null;
+  }).filter(Boolean);
+  const fd = new FormData();
+  for (const f of filesOut) fd.append('file', f, f.name);
+  fd.append('category', hovered.value || (struct.value ? 'photo' : 'structure'));
+  await api.uploadCompoundFile(c.value.id, fd);
+  await reload();
+
+  if (!String(form.formula || '').trim() || !String(form.mw || '').trim()) {
+    const kinds = Array.from(data?.types || []);
+    const onlyImage = kinds.length > 0 && kinds.every((t) => t.startsWith('image/'));
+    toast(
+      onlyImage
+        ? '这张图里只有像素，读不出结构。要用 ChemDraw 的 Edit → Copy As → SMILES（或 MOL）再粘一次'
+        : `剪贴板格式：${kinds.join(' / ') || '未知'} —— 没有可解析的结构文本`,
+      'warn',
+      5600
+    );
+  }
+}
+
+/** text/html 里取纯文本（有的程序把结构文本包在 HTML 里） */
+function stripHtml(html) {
+  if (!html) return '';
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || '';
+}
+
+async function uploadTo(cat2, list) {
+  const fd = new FormData();
+  for (const f of list) fd.append('file', f, f.name);
+  fd.append('category', cat2);
+  try {
+    await api.uploadCompoundFile(c.value.id, fd);
+    await reload();
+    toast(list.length > 1 ? `已添加 ${list.length} 个文件` : '已添加 1 个文件');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function dropTo(category, e) {
+  const list = Array.from(e.dataTransfer?.files || []);
+  if (list.length) await uploadTo(category, list);
+}
+
+function onDrop(e) {
+  const list = Array.from(e.dataTransfer?.files || []);
+  if (list.length) void uploadTo(cat.value === 'auto' ? guessCmpCategory(list[0].name) : cat.value, list);
+}
+
+async function importPath() {
+  const p = pathValue.value.trim();
+  pathModal.value = false;
+  if (!p) return;
+  try {
+    await api.uploadCompoundPath(c.value.id, { path: p, category: cat.value === 'auto' ? 'nmr_raw' : cat.value });
+    pathValue.value = '';
+    await reload();
+    toast('已从路径导入');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function setCategory(f, category) {
+  await api.updateCompoundFile(f.id, { category });
+  recat.value = null;
+  await reload();
+  toast(`已归到「${CMP_CAT_LABEL[category] || category}」`);
+}
+
+async function removeFile(f) {
+  try {
+    await api.deleteCompoundFile(f.id);
+    await reload();
+    toast('已删除这个文件');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function openStandardPicker() {
+  stdList.value = await api.experiments({ sort: 'newest' });
+  stdPick.value = c.value.standard_exp_id || stdList.value[0]?.id || null;
+  stdModal.value = true;
+}
+
+async function applyStandard() {
+  stdModal.value = false;
+  if (!stdPick.value) return;
+  await api.saveCompound(c.value.id, { standard_exp_id: stdPick.value });
+  await reload();
+  toast('已设为标准实验');
+}
+
+async function clearStandard() {
+  await api.saveCompound(c.value.id, { standard_exp_id: null });
+  await reload();
+  toast('已解除关联');
+}
+
+async function newCategory() {
+  const name = await prompt({ title: '新建分类', placeholder: '比如：手性配体库、中间体', confirmText: '建' });
+  if (!name) return;
+  try {
+    await addCategory(name, 'compound');
+    toast(`建好了「${name}」，在分类里选它`);
+  } catch (e) {
+    toast(e.message || '建不了这个分类', 'err');
+  }
+}
+
+async function removeCompound() {
+  // 删之前先看谁在引用它：像删文件那样，把「哪些实验在用」摆出来再决定
+  const refs = used.value.map((e) => `${e.code || `#${e.id}`}${e.roles?.length ? `（${e.roles.join('+')}）` : ''}`);
+  const fileCount = files.value.length;
+  const head = fileCount ? `该档案及其名下 ${fileCount} 个文件将一并移入回收站（文件仍保留在磁盘上）。` : '';
+  const body = refs.length
+    ? `${head}另有 ${refs.length} 条实验引用该化合物：${refs.join('、')}。移入回收站后这些记录中的关联将解除（结构式与分子量一并清除），实验记录本身不变。`
+    : `${head}目前没有实验引用该化合物。如需彻底清除，请到「设置 → 回收站」中再删除一次。`;
+  const ok = await confirm({
+    title: `将化合物 ${c.value.code || c.value.name || ''} 移入回收站？`,
+    body,
+    confirmText: '移入回收站',
+    danger: true,
+  });
+  if (!ok) return;
+  await api.deleteCompound(c.value.id);
+  await loadBoot();
+  router.push('/compounds');
+  toast(refs.length ? `已移入回收站，${refs.length} 条实验的关联已解除` : '已移入回收站');
+}
+
+const groups = computed(() => {
+  const map = new Map();
+  for (const f of files.value) {
+    const k = CMP_CAT_ORDER.includes(f.category) ? f.category : 'other';
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(f);
+  }
+  return CMP_CAT_ORDER.filter((k) => map.has(k)).map((k) => ({ key: k, label: CMP_CAT_LABEL[k], list: map.get(k) }));
+});
+
+const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.owner_name });
+</script>
+
+<template>
+  <CompoundMobile v-if="isPhone" :id="compoundId" />
+
+  <div v-else class="panes">
+    <CmpListPane />
+    <div v-if="error" class="editor"><div class="empty-note" style="padding: 80px">{{ error }}</div></div>
+    <div v-else-if="!c" class="editor"><div class="empty-note" style="padding: 80px">读取中…</div></div>
+
+    <div v-else class="editor">
+    <div class="editor-bar">
+      <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">化合物</span>
+      <CatPick
+        class="toolbar-cat"
+        :value="form.category_id == null || form.category_id === '' ? '' : String(form.category_id)"
+        :categories="recordCategories('compound')"
+        count-key="cmp_count"
+        :show-all="false"
+        @change="(v) => { form.category_id = v ? Number(v) : null; }"
+        @create="newCategory"
+      />
+      <span class="spacer" />
+      <span class="save-state" :class="{ 'is-dirty': dirty }">{{ saveState }}</span>
+      <button class="btn btn-sm" title="立刻保存一次" @click="saveNow">保存</button>
+      <button class="btn btn-sm btn-ghost" title="放弃本次修改，恢复到打开时的内容" @click="resetForm">重置</button>
+      <div class="menu-wrap">
+        <button class="btn btn-sm btn-ghost" title="更多" @click.stop="moreMenu = !moreMenu">
+          <Icon name="dots" :size="15" />
+        </button>
+        <div v-if="moreMenu" class="menu">
+          <button @click="label(); moreMenu = false"><Icon name="qr" :size="13" /> 打印瓶子标签</button>
+          <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 修改历史</button>
+          <div class="menu-sep" />
+          <button class="menu-danger" @click="removeCompound(); moreMenu = false">
+            <Icon name="trash" :size="13" /> 移入回收站
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="editor-inner">
+      <article class="sheet cmp-sheet">
+        <div class="sheet-runner"><span>化合物档案</span><span>{{ c.code }}</span></div>
+
+        <div class="cmp-top">
+          <div
+            class="cmp-structure"
+            title="点击选择文件，也可直接 ⌘V 粘贴截图"
+            @mouseenter="hovered = 'structure'"
+            @mouseleave="hovered = ''"
+            @click="pickFile('structure')"
+          >
+            <img v-if="struct" :src="`/api/compound-files/${struct.id}`" alt="结构式" />
+            <div v-else class="cmp-structure-empty">
+              <Icon name="image" :size="20" />
+              <span>结构式</span>
+              <span class="hint">粘贴 / 选择</span>
+            </div>
+          </div>
+
+          <div class="cmp-fields">
+            <label class="c-field"><span>编号</span><input class="mono" v-model="form.code" placeholder="1a" /></label>
+            <label class="c-field wide"><span>名称</span><input v-model="form.name" placeholder="4-甲基苯甲醛" /></label>
+            <label class="c-field">
+              <span>类型</span>
+              <select v-model="form.kind">
+                <option v-for="k in COMPOUND_KINDS" :key="k">{{ k }}</option>
+              </select>
+            </label>
+            <label class="c-field">
+              <span>课题</span>
+              <ProjPick v-model="form.project" :projects="projectList" />
+            </label>
+            <label class="c-field"><span>分子式</span><input v-model="form.formula" placeholder="C8H8O" /></label>
+            <label class="c-field"><span>MW</span><input class="n" type="number" step="any" v-model="form.mw" placeholder="120.15" /></label>
+            <label class="c-field"><span>性状</span><input v-model="form.appearance" placeholder="无色液体" /></label>
+            <label class="c-field"><span>熔点</span><input v-model="form.mp" placeholder="−26 ℃" /></label>
+            <label class="c-field full"><span>HRMS</span><input v-model="form.hrms" placeholder="calcd for C8H9O [M+H]+ 121.0648, found 121.0651" /></label>
+            <label class="c-field full"><span>IR</span><input v-model="form.ir" placeholder="ν/cm⁻¹ 2928, 1712, 1612" /></label>
+            <label class="c-field full"><span>旋光</span><input v-model="form.rotation" placeholder="[α]D²⁰ = +12.4 (c 1.0, CHCl₃)" /></label>
+            <label class="c-field wide">
+              <span>SMILES</span>
+              <input
+                class="mono"
+                v-model="form.smiles"
+                placeholder="可从 ChemDraw 直接粘贴结构"
+                title="可以直接从 ChemDraw 复制结构黏贴，会自动算分子式 / MW 并画结构式"
+                @paste="onSmilesFieldPaste"
+                @change="onSmilesFieldChange"
+              />
+            </label>
+          </div>
+        </div>
+
+        <section class="sec sec-tight">
+          <div class="block-head"><span class="lbl">核磁</span><span class="spacer" /><span class="hint noprint">可拖入或 ⌘V 粘贴谱图截图</span></div>
+          <div class="nmr-grid">
+            <div v-for="n in NMR_DEFS" :key="n.key" class="nmr-col">
+              <span class="nmr-tag">{{ n.label }}</span>
+              <div
+                class="nmr-strip"
+                @mouseenter="hovered = n.key"
+                @mouseleave="hovered = ''"
+                @dragover.prevent
+                @drop.prevent="dropTo(n.key, $event)"
+              >
+                <figure v-for="f in spectra(n.key)" :key="f.id" class="spec-shot">
+                  <img :src="`/api/compound-files/${f.id}`" alt="" title="看大图" @click="openFile(f)" />
+                  <button class="tlc-x" title="删除" @click.stop="removeFile(f)"><Icon name="x" :size="11" /></button>
+                </figure>
+                <div
+                  v-if="!spectra(n.key).length"
+                  class="spec-empty"
+                  :title="`粘贴 / 选择 ${n.label} 谱图`"
+                  @click="pickFile(n.key)"
+                >
+                  <span class="plus">+</span>
+                  <span class="cap">谱图</span>
+                </div>
+                <button v-else type="button" class="spec-add" @click="pickFile(n.key)">+ 再加一张</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec sec-tight">
+          <div class="block-head">
+            <span class="lbl">TLC</span>
+            <input class="tlc-note" v-model="form.tlc_solvent" placeholder="展开剂，如 PE:EA = 10:1" />
+            <span class="rf-wrap">Rf <input class="rf-input" :value="form.tlc_rf" placeholder="0.45" @input="onRf($event)" /></span>
+          </div>
+          <div
+            class="tlc-strip"
+            @mouseenter="hovered = 'tlc'"
+            @mouseleave="hovered = ''"
+            @dragover.prevent
+            @drop.prevent="dropTo('tlc', $event)"
+          >
+            <figure v-for="s in tlcShots" :key="s.id" class="tlc-shot">
+              <img :src="`/api/compound-files/${s.id}`" alt="" title="看大图" @click="openFile(s)" />
+              <button class="tlc-x" title="删除" @click.stop="removeFile(s)"><Icon name="x" :size="11" /></button>
+            </figure>
+            <div class="tlc-empty" title="粘贴 / 选择 TLC 板照片" @click="pickFile('tlc')">
+              <span class="plus">+</span>
+              <span class="cap">粘贴 / 选择</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec">
+          <h2 class="sec-title">合成与纯化</h2>
+          <textarea class="sheet-text" rows="3" v-autogrow v-model="form.procedure" placeholder="合成步骤、后处理、柱层析配比、重结晶溶剂" />
+        </section>
+
+        <section class="sec">
+          <h2 class="sec-title">说明</h2>
+          <textarea class="sheet-text" rows="2" v-autogrow v-model="form.notes" placeholder="储存条件、危险性、别名" />
+        </section>
+
+        <section class="sec sec-att">
+          <h2 class="sec-title">文件<span class="hint">{{ files.length }} 个</span></h2>
+          <div class="att-tools noprint">
+            <select v-model="cat" class="select">
+              <option value="auto">自动识别（按文件名）</option>
+              <option v-for="k in CMP_CAT_ORDER" :key="k" :value="k">{{ CMP_CAT_LABEL[k] }}</option>
+            </select>
+            <button class="btn btn-sm" @click="pickFile(cat === 'auto' ? 'auto' : cat)"><Icon name="upload" :size="13" /> 选择文件</button>
+            <button class="btn btn-sm" @click="pathModal = true"><Icon name="folder" :size="13" /> 从路径导入</button>
+          </div>
+          <div class="dropzone noprint" @click="pickFile(cat === 'auto' ? 'auto' : cat)" @dragover.prevent @drop.prevent="onDrop">
+            <div class="big">拖文件到这里，或者直接 ⌘V 粘贴</div>
+          </div>
+          <div>
+            <div v-for="g in groups" :key="g.key" class="att-group">
+              <div class="att-group-head"><span class="t">{{ g.label }}</span><span class="rule" /><span class="t">{{ g.list.length }}</span></div>
+              <div class="att-list">
+                <div v-for="f in g.list" :key="f.id" class="att-item">
+                  <img v-if="isImageName(f.original_name || f.filename)" class="att-thumb" :src="`/api/compound-files/${f.id}`" alt="" loading="lazy" />
+                  <div v-else class="att-ico"><Icon :name="f.is_dir ? 'folder' : 'file'" :size="14" /></div>
+                  <span class="att-name" title="打开 / 预览" @click="openFile(f)">{{ f.original_name || f.filename }}</span>
+                  <span class="att-sub">{{ f.is_dir ? '文件夹' : fmtSize(f.size) }}</span>
+                  <button class="att-del" title="改分类" @click="recat = f"><Icon name="dots" :size="12" /></button>
+                  <button class="att-del" title="删除" @click="removeFile(f)"><Icon name="trash" :size="13" /></button>
+                </div>
+              </div>
+            </div>
+            <div v-if="!files.length" class="hint noprint" style="padding: 8px 0">暂无文件。谱图、原始数据与 TLC 照片均可置于此处。</div>
+          </div>
+        </section>
+
+        <section class="sec sec-tight">
+          <div class="block-head"><span class="lbl">标准实验</span></div>
+          <div class="linked">
+            <template v-if="std">
+              <span class="linkish" @click="router.push(`/e/${std.id}`)">{{ std.code }}</span>
+              <span class="hint">{{ std.title || '（未命名实验）' }}{{ std.date ? ` · ${std.date}` : '' }}</span>
+              <button class="btn btn-sm" @click="openStandardPicker">换</button>
+              <button class="mini" title="解除关联" @click="clearStandard"><Icon name="x" :size="10" /></button>
+            </template>
+            <template v-else>
+              <span class="hint">未指定；可关联当初合成该化合物的实验记录</span>
+              <button class="btn btn-sm" @click="openStandardPicker"><Icon name="file" :size="13" /> 选一条实验</button>
+            </template>
+          </div>
+          <div class="block-head" style="margin-top: 18px"><span class="lbl">用在哪些实验</span></div>
+          <div class="linked">
+            <span v-for="e in used" :key="e.id" class="linkish" @click="router.push(`/e/${e.id}`)">
+              {{ e.code }}{{ e.roles?.length ? ` · ${e.roles.join(' / ')}` : '' }}{{ Number(e.id) === Number(c.standard_exp_id) ? ' · 标准' : '' }}
+            </span>
+            <span v-if="!used.length" class="hint">尚未在任何实验中使用</span>
+          </div>
+        </section>
+      </article>
+    </div>
+
+    <HistoryModal v-if="historyOpen" entity="compound" :id="c.id" @close="historyOpen = false" />
+
+    <AppModal v-if="stdModal" title="把哪条实验设成标准实验" confirm-text="设为标准实验" @close="stdModal = false" @confirm="applyStandard">
+      <div class="recipe-list">
+        <button
+          v-for="it in stdList"
+          :key="it.id"
+          type="button"
+          class="recipe-opt"
+          :class="{ 'is-on': stdPick === it.id }"
+          @click="stdPick = it.id"
+        >
+          <span class="recipe-code mono">{{ it.code }}</span>
+          <span class="recipe-title">{{ it.title || '（未命名实验）' }}</span>
+          <span class="recipe-meta">{{ it.date }}</span>
+        </button>
+      </div>
+    </AppModal>
+
+    <AppModal v-if="recat" title="这个文件算什么" :show-confirm="false" @close="recat = null">
+      <div class="cat-picker">
+        <button
+          v-for="k in CMP_CAT_ORDER"
+          :key="k"
+          class="cat-opt"
+          :aria-selected="k === recat.category ? 'true' : 'false'"
+          @click="setCategory(recat, k)"
+        >
+          {{ CMP_CAT_LABEL[k] }}
+        </button>
+      </div>
+    </AppModal>
+
+    <AppModal v-if="pathModal" title="从路径导入" confirm-text="导入" @close="pathModal = false" @confirm="importPath">
+      粘贴本机绝对路径（文件或文件夹）。Bruker 原始数据一般是 <span class="mono">…/样品/10</span> 这种目录。
+      <input v-model="pathValue" class="input" placeholder="/Users/you/NMR/…/10" style="font-family: var(--mono); font-size: 12px; margin-top: 10px" />
+    </AppModal>
+
+    </div>
+  </div>
+</template>
