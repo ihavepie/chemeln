@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import CatPick from './CatPick.vue';
 import { store, loadList, loadBoot, recordCategories, addCategory } from '../store.js';
-import { STATUSES, STATUS_TONE } from '../lib/ui.js';
+import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
 import { prompt, toast } from '../lib/feedback.js';
 
@@ -241,10 +241,10 @@ function isGroupActive(row) {
                 type="button"
                 class="stack-chip"
                 :class="{ 'is-on': m.id === activeId() }"
-                :title="`${m.code}${m.yield_pct != null ? ` · ${m.yield_pct}%` : ''}`"
+                :title="`${m.code} · ${m.status}${m.yield_pct != null ? ` · ${m.yield_pct}%` : ''}`"
                 @click.stop="router.push(`/e/${m.id}`)"
               >
-                {{ m.yield_pct != null ? `${m.code} ${m.yield_pct}%` : m.code }}
+                <i class="stack-dot" :class="`tone-${STATUS_TONE[m.status] || 'plain'}`" /><span class="chip-code">{{ m.code }}</span><span class="chip-status">{{ STATUS_SHORT[m.status] || m.status }}</span><span v-if="m.yield_pct != null" class="chip-yield">{{ m.yield_pct }}%</span>
               </button>
               <button type="button" class="stack-more" @click.stop="toggleGroup(row.gid)">
                 {{ isGroupOpen(row.gid) ? '收起' : '展开' }}

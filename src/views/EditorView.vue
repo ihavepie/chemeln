@@ -763,6 +763,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
             >
               <span class="pgroup-row">
+                <i class="pgroup-dot" :class="`tone-${STATUS_TONE[s.status] || 'plain'}`" />
                 <span class="pgroup-code">{{ s.code }}</span>
                 <span class="pgroup-meta">{{ sibMeta(s) }}</span>
               </span>

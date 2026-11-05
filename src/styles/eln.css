@@ -5765,3 +5765,31 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 
 /* 平行组：只差规模的组员，标一句「1 → 5 mmol」（不算改条件） */
 .stack-scale { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
+
+/* 平行组：小签 / 书签上的状态点（颜色跟状态标签同一套 tone） */
+.stack-dot,
+.pgroup-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: 1px;
+  background: var(--ink-4);
+}
+/* 颜色直接取全局的 tone 变量，跟状态标签、下拉里的小圆点保持一套 */
+.stack-dot.tone-warn, .pgroup-dot.tone-warn { background: var(--warn); }
+.stack-dot.tone-ok, .pgroup-dot.tone-ok { background: var(--ok); }
+.stack-dot.tone-info, .pgroup-dot.tone-info { background: var(--info); }
+.stack-dot.tone-bad, .pgroup-dot.tone-bad { background: var(--bad); }
+.stack-dot.tone-accent, .pgroup-dot.tone-accent { background: var(--accent); }
+
+/* 书签那一行：号码 + 状态点 + 产率，三点对齐 */
+.pgroup-row { align-items: center; }
+.pgroup-dot { flex: 0 0 auto; margin-right: 0; }
+
+/* 小签里的三段（编号 / 状态 / 产率）用间距隔开，不靠空格，免得被模板吃掉 */
+.stack-chip .chip-code { margin-left: 2px; }
+.stack-chip .chip-status { margin-left: 5px; color: var(--ink-4); }
+.stack-chip .chip-yield { margin-left: 5px; }
+.stack-chip.is-on .chip-status { color: var(--accent-ink); opacity: 0.8; }

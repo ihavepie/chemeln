@@ -37,11 +37,11 @@
 - `src/components/LabelBatchPanel.vue` — 批量打印化合物标签：勾选当前列表里的化合物 + 四档排版（大 100×46 / 中 65×30 / 小 50×23 / 迷你 34×14mm，分别 12 / 27 / 48 / 95 张一页），自己拼 A4 页（页边距 3mm）；整版 `justify-content: flex-end` **靠右对齐**，一次生成多页 PDF。大/中/小是原版式整体缩放，迷你走 `labelMarkupMini`（精简版式：结构式 9.5mm + 编号/名称/MW·Rf + 二维码 8mm）。
 - `src/lib/print.js` — 打印导出共用：`collectCss()`（把 `@media print` 规则提到最后）、`A4_CSS`（`body{zoom:0.7498}` + `.pdf-page` 210×297mm）、`downloadBlob()`。
 - `src/lib/label.js` — `labelMarkup(c)` 吐完整标签的 HTML（单张打印 + 批量大/中/小共用）；`labelMarkupMini(c)` 是 34×14mm 精简版（结构式 + 编号/名称/MW·Rf + 二维码，没有厚边距和大气泡）；`printCompoundLabel()` 负责单张走系统打印。
-- `src/components/ExpListPane.vue` / `CmpListPane.vue` — 中栏列表。两边都是「**搜索框 + 一个筛选下拉**」并排一行（`.searchrow`，触发器宽度跟名字走、高度和输入框对齐 31px、菜单右对齐弹出）：实验那边下拉里是「状态 + 分类」，化合物那边是「类型 + 分类」，**都没有单独的 chips 行和 ＋新建分类按钮**（新建分类在菜单最底下那条）。选中值形如 `status:进行中` / `kind:底物` / 分类 id，状态/类型与分类**互斥**（选一个清另一个）。**列表里同一个平行组**（同 `group_id`，`group_size > 1`）**收成一张「卡片堆」**：面子是最早那条（正在看的成员会翻到前面）、角上一个「平行 ×N」、下面一排组员小签（点一下直接跳那条）、右边「展开/收起」在下面列出组员行；组员少于 2 条（比如搜索只命中一条）就当普通卡片。
+- `src/components/ExpListPane.vue` / `CmpListPane.vue` — 中栏列表。两边都是「**搜索框 + 一个筛选下拉**」并排一行（`.searchrow`，触发器宽度跟名字走、高度和输入框对齐 31px、菜单右对齐弹出）：实验那边下拉里是「状态 + 分类」，化合物那边是「类型 + 分类」，**都没有单独的 chips 行和 ＋新建分类按钮**（新建分类在菜单最底下那条）。选中值形如 `status:进行中` / `kind:底物` / 分类 id，状态/类型与分类**互斥**（选一个清另一个）。**列表里同一个平行组**（同 `group_id`，`group_size > 1`）**收成一张「卡片堆」**：面子是最早那条（正在看的成员会翻到前面）、角上一个「平行 ×N」、下面一排组员小签（状态点 + 编号 + **状态简称** + 产率；点一下直接跳那条）、右边「展开/收起」在下面列出组员行；组员少于 2 条（比如搜索只命中一条）就当普通卡片。
 - `src/components/ExpGrid.vue` / `CmpGrid.vue` — 卡片墙（分类分组、缩略图、拖拽换分类、拖到具体位置、落位虚线格；实验卡片上带「平行 ×N」小徽标，点进去左栏那个组就是卡片堆）。**0 条的分类只占组头那一行**（右边一个小「＋」就地往这个分类里新建，`.grid-group-add`；拖动时那一行变虚线落点 `.grid-drop-line`），不再撑一整格虚线「新建」；只有一组的场景（刚建库 / 正按分类筛）才用大块 `.grid-new`。**「全部课题」下每个分组标题后面标出这个分类所属的课题**（`.grid-group-proj`：暖色**胶囊**小标签，`border-radius: 999px` + `#f7f0ea` 底 + `--accent-ink` 字，别做回方块；不然两个同名「321」分不清）。两个墙组件都**只有 `.grid-page` 这一层**，外面的滚动容器 `.editor` 和右上角 `.grid-tools` 那一行按钮已经提到容器页（`EmptyEditor` / `CompoundsView`），因为切到表格视图时墙会卸载，工具栏得留在上面。
 - `src/views/EmptyEditor.vue` — `/list` 的容器：中栏列表 + `.editor`（里面是 `.grid-tools` 工具行 + `ExpTable` 或 `ExpGrid`）。工具行两个按钮：**表格视图 / 卡片视图**（`setView('exp', …)`）和 **新建实验**。
 - `src/views/CompoundsView.vue` — `/compounds` 的容器：跟实验页同构，工具行是 **表格视图 / 卡片视图 · 批量标签 · 新建化合物**，`LabelBatchPanel` 也挂在这里（`batchOpen`）。
-- `src/views/EditorView.vue` — 实验编辑器：两页 A4 版式、自动保存；**第 1 页纸外左侧有一排平行实验书签**（`.pgroup--float`：`Teleport to="body"` 的固定浮层，钉在纸面左边缘、整条在纸外，同 `group_id` 的重复 / 控制变量实验显示「编号 · 产率」，悬停出预览卡、点了才切记录，末尾「＋」从当前这条再建一条）；工具栏只剩 已保存 / 保存 / 重置 / **⋯ 菜单**，**二维码、打印、锁定·解锁、导出、复制、产物存库、删除**都在菜单里（删除是红色项，删前先 `gone = true` 停自动保存）。**手机上（≤820px）直接渲染 `ExperimentMobile`** 并跳过 `load()`。二维码弹窗里的「打印这张码」打的是独立纸片 `.exp-qr-sheet`（40mm 码 + 编号），**没有动记录本身的版式**——别往 `.sheet-runner` 里塞码，会破坏「打印恒 2 页」。
+- `src/views/EditorView.vue` — 实验编辑器：两页 A4 版式、自动保存；**第 1 页纸外左侧有一排平行实验书签**（`.pgroup--float`：`Teleport to="body"` 的固定浮层，钉在纸面左边缘、整条在纸外，同 `group_id` 的重复 / 控制变量实验显示「状态点 + 编号 · 产率或状态」，悬停出预览卡、点了才切记录，末尾「＋」从当前这条再建一条）；工具栏只剩 已保存 / 保存 / 重置 / **⋯ 菜单**，**二维码、打印、锁定·解锁、导出、复制、产物存库、删除**都在菜单里（删除是红色项，删前先 `gone = true` 停自动保存）。**手机上（≤820px）直接渲染 `ExperimentMobile`** 并跳过 `load()`。二维码弹窗里的「打印这张码」打的是独立纸片 `.exp-qr-sheet`（40mm 码 + 编号），**没有动记录本身的版式**——别往 `.sheet-runner` 里塞码，会破坏「打印恒 2 页」。
 - `src/components/ReagentTable.vue` — 投料表（最复杂的组件：组分/角色菜单、试剂名自动带库、当量 mmol 用量联动、结构卡与解绑、多步）。
 - `src/components/CondRow.vue` — 条件行（溶剂/浓度/温度/时间节点/气氛）。
 - `src/components/ResultBlock.vue` — 结果块（产物、MW、质量、收率、dr/ee、产物挂库）。
@@ -62,7 +62,7 @@
 - `src/lib/autogrow.js` — 文本域跟着内容长（`v-autogrow` 用的 `growTextarea` / `growAll`）；`flattenTextareas(root)` 把文本域换成 div，**打印 / 存 PDF 前必须调**（textarea 只印得出自己那几行高，长表征会被截断，实测 12 行只出 5 行）。
 - `src/components/HistoryModal.vue` — 改动历史弹窗（`entity` = experiment / compound + `id`），读 `/api/history/...`；实验页和化合物页的 ⋯ 菜单里都有入口。
 - `src/lib/feedback.js` — `toast` / `confirm` / `prompt`（Element Plus 封装）。
-- `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量、瓶子标签、内联 SVG 图标。
+- `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量（`STATUSES` / `STATUS_TONE` / 窄地方用的 `STATUS_SHORT`）、瓶子标签、内联 SVG 图标。
 - `src/styles/eln.css` — 全站样式（v1 规则在前，v2 新增追加在文件末尾并写注释）。
 - `server/index.js` — HTTP 服务 + 全部路由。
 - `server/print.swift` — 自己生成 PDF 的渲染器（CLI：`print <out.pdf> <w> <h> <page1.html> …`）：用系统 WebKit 每页 `createPDF` 出 A4，再用 PDFKit 合并；`.cache/print-render` 是编译产物，服务启动时预热编译。

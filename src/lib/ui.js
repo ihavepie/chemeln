@@ -2,6 +2,15 @@
 
 export const STATUSES = ['进行中', '已完成', '部分完成', '失败', '重复'];
 
+/** 小签 / 书签这种窄地方用的状态简称 */
+export const STATUS_SHORT = {
+  进行中: '进行',
+  已完成: '完成',
+  部分完成: '部分',
+  失败: '失败',
+  重复: '重复',
+};
+
 export const STATUS_TONE = {
   进行中: 'warn',
   已完成: 'ok',
