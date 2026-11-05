@@ -2,6 +2,9 @@
 import { ElDialog } from 'element-plus';
 
 const props = defineProps({
+  /** 显示与否。想「关了但别销毁里面东西」（iframe 之类）时，自己拿一个 ref 控制它，
+      组件常挂着、`v-model` 置 false —— Element Plus 关掉只是隐藏，内容还在 */
+  modelValue: { type: Boolean, default: true },
   title: { type: String, default: '' },
   confirmText: { type: String, default: '确定' },
   cancelText: { type: String, default: '取消' },
@@ -19,7 +22,7 @@ const emit = defineEmits(['close', 'confirm']);
 <template>
   <!-- 遮罩、焦点锁、Esc、滚动锁都交给 Element Plus；里面继续用 v1 的 .modal-* 排版 -->
   <el-dialog
-    :model-value="true"
+    :model-value="modelValue"
     :show-close="false"
     :width="width"
     align-center

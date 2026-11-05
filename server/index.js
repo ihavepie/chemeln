@@ -2563,10 +2563,13 @@ function serveVendor(req, res, url) {
   fs.stat(full, (err, st) => {
     if (err || !st.isFile()) return fail(res, 404, '画板资源没找到（跑一次 sh scripts/fetch-sketcher.sh）');
     const ext = path.extname(full).toLowerCase();
+    // 带哈希名的产物（assets/xxx-<hash>.js、wasm/indigo-*.wasm）内容不会再变，
+    // 让浏览器一直缓存——Ketcher 那个包 29 MB + 11 MB WASM，每次重下太慢。
+    const hashed = /\/assets\/|\/wasm\//.test(`/${rel}`);
     res.writeHead(200, {
       'content-type': MIME[ext] || 'application/octet-stream',
       'content-length': st.size,
-      'cache-control': 'no-cache',
+      'cache-control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
     });
     pipeFile(res, full);
   });

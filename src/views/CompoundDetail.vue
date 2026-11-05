@@ -101,7 +101,7 @@ watch(
 
 const moreMenu = ref(false);
 const preview = ref(null);   // 附件 / 谱图就地预览（不再甩到新标签页）
-const sketcherOpen = ref(false);   // 画结构式（JSME 画板）
+const sketcherOpen = ref(false);   // 画结构式（Ketcher 画板）
 const historyOpen = ref(false);
 
 function closeMenus(e) {
@@ -729,8 +729,9 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
 
     <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
 
+    <!-- 常挂着、只切 open：Ketcher 那个包 29 MB，销毁了每次都要重下一遍 -->
     <SketcherModal
-      v-if="sketcherOpen"
+      :open="sketcherOpen"
       :initial="form.smiles || ''"
       @close="sketcherOpen = false"
       @pick="applySketched"
