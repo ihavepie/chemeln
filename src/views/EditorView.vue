@@ -28,6 +28,7 @@ const route = useRoute();
 const router = useRouter();
 
 const exp = ref(null);
+const innerEl = ref(null);   // 两页纸的容器，切记录时拿它做淡入
 const error = ref('');
 const page = ref(1);
 const hovered = ref('');
@@ -116,6 +117,16 @@ function fill(e) {
 /** 打开这条记录时的内容快照，用来「重置」 */
 const baseline = ref('');
 
+/* 切记录时纸面淡进来一下，别「瞬间换页」。
+   只用 opacity、不加位移——纸外那排平行书签是按 sheet 的 rect 算位置的，
+   位移会让它跟着抖。系统开了「减少动态效果」就不动。 */
+function fadeInPaper() {
+  const el = innerEl.value;
+  if (!el || typeof el.animate !== 'function') return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  el.animate([{ opacity: 0.3 }, { opacity: 1 }], { duration: 200, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+}
+
 async function load() {
   error.value = '';
   const id = route.params.id;
@@ -125,6 +136,7 @@ async function load() {
     if (route.params.id !== id) return;
     fill(e);
     baseline.value = JSON.stringify(payload());
+    nextTick(fadeInPaper);          // 等这一帧把新内容贴上再淡入
   } catch (e) {
     error.value = e.message;
   }
@@ -144,6 +156,9 @@ watch(
     statusMenu.value = false;
     page.value = String(route.query.p) === '2' ? 2 : 1;
     await load();
+    // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
+    await nextTick();
+    editorEl.value?.scrollTo({ top: 0 });
   }
 );
 
@@ -705,7 +720,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
         </div>
       </div>
 
-      <div v-if="exp" class="editor-inner">
+      <div v-if="exp" ref="innerEl" class="editor-inner">
         <!-- ============ 第 1 页 ============ -->
         <article class="sheet sheet-p1" ref="sheetEl" :class="{ 'is-hidden': page !== 1 }">
           <div class="sheet-runner">

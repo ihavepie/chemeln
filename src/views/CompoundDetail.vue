@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import CatPick from '../components/CatPick.vue';
@@ -23,6 +23,8 @@ const router = useRouter();
 const route = useRoute();
 
 const c = ref(null);
+const innerEl = ref(null);   // 档案纸的容器，换化合物时拿它做淡入
+const editorEl = ref(null);  // 滚动容器
 const error = ref('');
 const hovered = ref('');
 const stdModal = ref(false);
@@ -66,9 +68,19 @@ function fill(data) {
   markLoaded();
 }
 
+/* 换一个化合物时纸面淡进来一下（跟实验页一个做法）。
+   只用 opacity、不加位移，系统开了「减少动态效果」就不动。 */
+function fadeInPaper() {
+  const el = innerEl.value;
+  if (!el || typeof el.animate !== 'function') return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  el.animate([{ opacity: 0.3 }, { opacity: 1 }], { duration: 200, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+}
+
 async function load() {
   try {
     fill(await api.compound(props.compoundId));
+    nextTick(fadeInPaper);
   } catch (e) {
     error.value = e.message;
   }
@@ -89,6 +101,9 @@ watch(
     stdModal.value = false;
     moreMenu.value = false;
     await load();
+    // 换了化合物就当翻到新的一页：滚回顶部
+    await nextTick();
+    editorEl.value?.scrollTo({ top: 0 });
   }
 );
 
@@ -435,7 +450,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
     <div v-if="error" class="editor"><div class="empty-note" style="padding: 80px">{{ error }}</div></div>
     <div v-else-if="!c" class="editor"><div class="empty-note" style="padding: 80px">读取中…</div></div>
 
-    <div v-else class="editor">
+    <div v-else ref="editorEl" class="editor">
     <div class="editor-bar">
       <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">化合物</span>
       <CatPick
@@ -466,7 +481,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
       </div>
     </div>
 
-    <div class="editor-inner">
+    <div ref="innerEl" class="editor-inner">
       <article class="sheet cmp-sheet">
         <div class="sheet-runner"><span>化合物档案</span><span>{{ c.code }}</span></div>
 
