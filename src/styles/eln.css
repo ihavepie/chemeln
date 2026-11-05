@@ -5766,18 +5766,18 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
-  height: 54px;          /* 只画顶上这一截，卡片右边不会拖出一条竖线 */
+  height: 48px;          /* 只画顶上这一截，卡片右边不会拖出一条竖线 */
   border-radius: var(--r);
   pointer-events: none;
 }
 .stack-top::before {
   background: #faf8f1;
-  transform: translate(10px, -10px);
+  transform: translate(8px, -8px);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .stack-top::after {
   background: #fdfcf7;
-  transform: translate(5px, -5px);
+  transform: translate(4px, -4px);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
@@ -6126,20 +6126,21 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
-  height: 58px;          /* 同上：只在顶上露一截 */
+  height: 52px;          /* 同上：只在顶上露一截 */
   border-radius: var(--r);
   pointer-events: none;
 }
 /* 白纸才看得出「斜着叠」：画布是 #f5f4f1，纸色差太小就只剩一道灰影。
-   两张纸各自带一道影子 + 顶张上方再落一道，三层才数得清。 */
+   两张纸各自带一道影子 + 顶张上方再落一道，三层才数得清；
+   错开量别太大（11 / 5.5），再大就成一摞砖了。 */
 .grid-stack::before {
   background: #faf8f1;
-  transform: translate(15px, -15px);
+  transform: translate(11px, -11px);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .grid-stack::after {
   background: #fdfcf7;
-  transform: translate(7.5px, -7.5px);
+  transform: translate(5.5px, -5.5px);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
