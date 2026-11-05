@@ -29,6 +29,34 @@ const thumbOf = (it) =>
 
 const cats = computed(() => recordCategories('experiment'));
 
+/** 同一 group_id 的实验在墙上收成一摞：面子是正在看的那条（没有就看最早那条），
+ *  后面露两层纸边，垫一个「平行 ×N」。点开的是面子那条，其余的在左栏卡片堆 / 书签里切。 */
+function stackOf(items) {
+  const out = [];
+  const byGid = new Map();
+  for (const it of items) {
+    const gid = it.group_id || '';
+    if (!gid || !(it.group_size > 1)) {
+      out.push({ key: `i${it.id}`, it, members: [it] });
+      continue;
+    }
+    const found = byGid.get(gid);
+    if (found) {
+      found.members.push(it);
+      continue;
+    }
+    const card = { key: `g${gid}`, it, members: [it] };
+    byGid.set(gid, card);
+    out.push(card);
+  }
+  for (const c of out) {
+    if (c.members.length < 2) continue;
+    c.members.sort((a, b) => a.id - b.id);
+    c.it = c.members.find((m) => m.id === activeId()) || c.members[0];
+  }
+  return out;
+}
+
 /** 每个分类都占一格（空的也显示），筛了某类就只留那一组；未分类放最后 */
 const groups = computed(() => {
   const all = store.items;
@@ -42,10 +70,12 @@ const groups = computed(() => {
       name: g.name,
       project: g.project || '',
       items: all.filter((it) => Number(it.category_id) === g.id),
+      cards: stackOf(all.filter((it) => Number(it.category_id) === g.id)),
     });
   }
   if (!filter || filter === 'none') {
-    out.push({ key: 'none', id: null, name: '未分类', project: '', items: all.filter((it) => !it.category_id) });
+    const rest = all.filter((it) => !it.category_id);
+    out.push({ key: 'none', id: null, name: '未分类', project: '', items: rest, cards: stackOf(rest) });
   }
   return out;
 });
@@ -55,18 +85,21 @@ const showHeads = computed(() => !store.filters.category && groups.value.length 
 
 /* ---- 拖卡片换分类 / 换位置 ---- */
 const dragId = ref(null);
+const dragIds = ref([]);      // 拖一摞时整组一起动，不然同一个平行组会散在两个分类里
 const dropKey = ref('');
 const gapAt = ref(-1);        // 落在该组第几张卡片前面（等于数量 = 放到最后）
 
-function onDragStart(ev, it) {
+function onDragStart(ev, card) {
   if (!cats.value.length) return;         // 一个分类都没有就不用拖
-  dragId.value = it.id;
+  dragId.value = card.it.id;
+  dragIds.value = card.members.map((m) => m.id);
   ev.dataTransfer.effectAllowed = 'move';
-  ev.dataTransfer.setData('text/plain', String(it.id));
+  ev.dataTransfer.setData('text/plain', String(card.it.id));
 }
 
 function onDragEnd() {
   dragId.value = null;
+  dragIds.value = [];
   dropKey.value = '';
   gapAt.value = -1;
 }
@@ -92,29 +125,37 @@ function onCardDragOver(ev, g, idx) {
 
 async function onDrop(ev, g) {
   ev.preventDefault();
-  const id = Number(ev.dataTransfer.getData('text/plain') || dragId.value);
+  const ids = dragIds.value.length ? [...dragIds.value] : [Number(ev.dataTransfer.getData('text/plain') || dragId.value)].filter(Boolean);
   const at = gapAt.value;
   dragId.value = null;
+  dragIds.value = [];
   dropKey.value = '';
   gapAt.value = -1;
-  if (!id) return;
-  const it = store.items.find((x) => x.id === id);
+  if (!ids.length) return;
+  const it = store.items.find((x) => x.id === ids[0]);
   if (!it) return;
 
-  // 组内除自己之外的顺序里，这个落点原本是哪一条 → 插到它前面（没有就是最后）
-  const rest = g.items.filter((x) => x.id !== id);
+  // 组内除自己这一摞之外的顺序里，这个落点原本是哪一张 → 插到它前面（没有就是最后）
+  const rest = g.cards.filter((c) => !c.members.some((m) => ids.includes(m.id)));
   let pos = 0;
-  for (let i = 0; i < at && i < g.items.length; i += 1) if (g.items[i].id !== id) pos += 1;
-  const before = rest[pos]?.id ?? null;
+  for (let i = 0; i < at && i < g.cards.length; i += 1) {
+    if (!g.cards[i].members.some((m) => ids.includes(m.id))) pos += 1;
+  }
+  const before = rest[pos]?.it.id ?? null;
 
   const target = g.id;
-  if ((it.category_id ?? null) === target && pos === rest.indexOf(it)) return;   // 原地没动
+  const sameCat = (it.category_id ?? null) === target;
+  const curIdx = g.cards.findIndex((c) => c.members.some((m) => ids.includes(m.id)));
+  // 原地没动（本来就在这个分类里，落点还是它现在的位置那一格）就不发请求
+  if (sameCat && curIdx >= 0 && (at === curIdx || at === curIdx + 1)) return;
 
   try {
-    await api.moveExperiment(id, { category_id: target, before_id: before });
+    // 一摞就整组按顺序挪过去，别让平行实验拆到两个分类
+    for (const id of ids) await api.moveExperiment(id, { category_id: target, before_id: before });
     await loadList();
     await loadBoot();
-    toast(target ? `「${it.code}」已移到「${g.name}」` : `「${it.code}」已移到未分类`);
+    const what = ids.length > 1 ? `${ids.length} 条平行实验` : `「${it.code}」`;
+    toast(target ? `已把${what}移到「${g.name}」` : `已把${what}移到未分类`);
   } catch (e) {
     toast(e.message || '移动不了', 'err');
   }
@@ -129,7 +170,7 @@ async function onDrop(ev, g) {
         :key="g.key"
         class="grid-group"
         :class="{ 'is-drop': dropKey === g.key }"
-        @dragover="onDragOver($event, g.key, g.items.length)"
+        @dragover="onDragOver($event, g.key, g.cards.length)"
         @dragleave="(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget) && dropKey === g.key) { dropKey = ''; gapAt = -1; } }"
         @drop="onDrop($event, g)"
       >
@@ -154,43 +195,77 @@ async function onDrop(ev, g) {
             <span>{{ dragId && dropKey === g.key ? '松手就放到这里' : '新建实验' }}</span>
           </button>
 
-          <template v-for="(it, ci) in g.items" :key="it.id">
+          <template v-for="(card, ci) in g.cards" :key="card.key">
             <div v-if="dropKey === g.key && gapAt === ci" class="drop-gap" />
+            <!-- 平行组：一摞纸（后面两层纸边），点开是面子那条 -->
+            <div v-if="card.members.length > 1" class="grid-stack" :class="{ 'is-dragging': card.members.some((m) => m.id === dragId) }">
+              <button
+                class="grid-card"
+                :aria-current="card.members.some((m) => m.id === activeId()) ? 'true' : 'false'"
+                :draggable="cats.length > 0"
+                @dragover="onCardDragOver($event, g, ci)"
+                @dragstart="onDragStart($event, card)"
+                @dragend="onDragEnd"
+                @click="router.push(`/e/${card.it.id}`)"
+              >
+                <div class="grid-thumb">
+                  <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
+                  <Icon v-else name="flask" :size="20" class="i-empty" />
+                  <span class="stack-badge is-corner" :title="card.members.map((m) => `${m.code} ${m.status}`).join(' / ')">平行 ×{{ card.members.length }}</span>
+                </div>
+                <div class="grid-body">
+                  <div class="top">
+                    <span class="exp-code">{{ card.it.code }}</span>
+                    <span class="tag" :class="STATUS_TONE[card.it.status]" style="font-size: 9px; padding: 1px 6px">{{ card.it.status }}</span>
+                    <span class="exp-date">{{ card.it.date }}</span>
+                  </div>
+                  <div class="exp-title">{{ card.it.title || '（未命名实验）' }}</div>
+                  <div class="exp-meta">
+                    <span v-if="card.it.category_name" class="cat-tag">{{ card.it.category_name }}</span>
+                    <span v-if="card.it.project">{{ card.it.project }}</span>
+                    <template v-if="card.it.rxn_type"><span v-if="card.it.project" class="sep">·</span><span>{{ card.it.rxn_type }}</span></template>
+                    <template v-if="card.it.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ card.it.yield_pct }}%</span></template>
+                    <template v-if="card.it.reagent_count"><span class="sep">·</span><span>{{ card.it.reagent_count }} 投料</span></template>
+                  </div>
+                </div>
+              </button>
+            </div>
             <button
+              v-else
               class="grid-card"
-              :class="{ 'is-dragging': dragId === it.id }"
-              :aria-current="it.id === activeId() ? 'true' : 'false'"
+              :class="{ 'is-dragging': dragId === card.it.id }"
+              :aria-current="card.it.id === activeId() ? 'true' : 'false'"
               :draggable="cats.length > 0"
               @dragover="onCardDragOver($event, g, ci)"
-              @dragstart="onDragStart($event, it)"
+              @dragstart="onDragStart($event, card)"
               @dragend="onDragEnd"
-              @click="router.push(`/e/${it.id}`)"
+              @click="router.push(`/e/${card.it.id}`)"
             >
               <div class="grid-thumb">
-                <img v-if="thumbOf(it)" :src="thumbOf(it)" alt="" loading="lazy" draggable="false" />
+                <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
                 <Icon v-else name="flask" :size="20" class="i-empty" />
                 <!-- 平行组标记钉在缩略图角上：塞进下面那行会把编号/日期挤出去 -->
-                <span v-if="it.group_size > 1" class="stack-badge is-corner" title="属于一个平行组（重复 / 控制变量实验）">平行 ×{{ it.group_size }}</span>
+                <span v-if="card.it.group_size > 1" class="stack-badge is-corner" :title="`属于一个平行组（共 ${card.it.group_size} 条，筛出来的只有这一条）`">平行 ×{{ card.it.group_size }}</span>
               </div>
               <div class="grid-body">
                 <div class="top">
-                  <span class="exp-code">{{ it.code }}</span>
-                  <span class="tag" :class="STATUS_TONE[it.status]" style="font-size: 9px; padding: 1px 6px">{{ it.status }}</span>
-                  <span class="exp-date">{{ it.date }}</span>
+                  <span class="exp-code">{{ card.it.code }}</span>
+                  <span class="tag" :class="STATUS_TONE[card.it.status]" style="font-size: 9px; padding: 1px 6px">{{ card.it.status }}</span>
+                  <span class="exp-date">{{ card.it.date }}</span>
                 </div>
-                <div class="exp-title">{{ it.title || '（未命名实验）' }}</div>
+                <div class="exp-title">{{ card.it.title || '（未命名实验）' }}</div>
                 <div class="exp-meta">
-                  <span v-if="it.category_name" class="cat-tag">{{ it.category_name }}</span>
-                  <span v-if="it.project">{{ it.project }}</span>
-                  <template v-if="it.rxn_type"><span v-if="it.project" class="sep">·</span><span>{{ it.rxn_type }}</span></template>
-                  <template v-if="it.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ it.yield_pct }}%</span></template>
-                  <template v-if="it.reagent_count"><span class="sep">·</span><span>{{ it.reagent_count }} 投料</span></template>
+                  <span v-if="card.it.category_name" class="cat-tag">{{ card.it.category_name }}</span>
+                  <span v-if="card.it.project">{{ card.it.project }}</span>
+                  <template v-if="card.it.rxn_type"><span v-if="card.it.project" class="sep">·</span><span>{{ card.it.rxn_type }}</span></template>
+                  <template v-if="card.it.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ card.it.yield_pct }}%</span></template>
+                  <template v-if="card.it.reagent_count"><span class="sep">·</span><span>{{ card.it.reagent_count }} 投料</span></template>
                 </div>
               </div>
             </button>
           </template>
 
-          <div v-if="dropKey === g.key && gapAt === g.items.length" class="drop-gap" />
+          <div v-if="dropKey === g.key && gapAt === g.cards.length" class="drop-gap" />
         </div>
       </section>
 
