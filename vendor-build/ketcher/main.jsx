@@ -47,6 +47,7 @@ function App() {
     <Editor
       staticResourcesUrl=""
       structServiceProvider={structServiceProvider}
+      disableMacromoleculesEditor
       onInit={(ketcher) => {
         window.ketcher = ketcher
         window.__ketcherReady = true
