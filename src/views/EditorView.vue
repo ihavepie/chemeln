@@ -778,7 +778,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
               <div v-if="[peek.solvent, peek.temperature, peek.duration].filter(Boolean).length" class="pgroup-peek-line">
                 {{ [peek.solvent, peek.temperature, peek.duration].filter(Boolean).join(' · ') }}<template v-if="peek.base_mmol"> ｜ {{ peek.base_mmol }} mmol</template>
               </div>
-              <div v-if="peek.variant === '重复'" class="pgroup-peek-line">与基准完全相同（重复实验）</div>
+              <div v-if="peek.variant === '重复'" class="pgroup-peek-line">与基准条件相同（重复实验）<template v-if="peek.scaleNote">，规模 {{ peek.scaleNote }}</template></div>
               <div v-else-if="peek.diffs && peek.diffs.length" class="pgroup-peek-line">与基准相比：{{ peek.diffs.join('、') }}</div>
               <div class="pgroup-peek-line">{{ peek.code }} · 点一下切到这条</div>
             </div>

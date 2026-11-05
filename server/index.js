@@ -290,7 +290,6 @@ const GROUP_VARS = [
   ['duration', '时长'],
   ['atmosphere', '气氛'],
   ['rxn_type', '类型'],
-  ['base_mmol', '规模'],
 ];
 
 /** 这一条相对基准（组里最早那条）改了哪些东西 */
@@ -329,6 +328,11 @@ function groupMembers(groupId) {
     const reagents = m.id === base.id ? baseReagents : reagentsOf(m.id);
     const diffs = m.id === base.id ? [] : groupDiff({ ...base, reagents: baseReagents }, { ...m, reagents });
     const variant = m.id === base.id ? '基准' : diffs.length === 0 ? '重复' : diffs.length === 1 ? `改：${diffs[0]}` : `改 ${diffs.length} 项`;
+    // 规模不算「控制变量」：条件一样、只是放大 / 缩小，仍然是重复实验。单独记一句提示
+    const scaleNote =
+      String(base.base_mmol ?? '') !== String(m.base_mmol ?? '') && m.base_mmol != null
+        ? `${base.base_mmol ?? '—'} → ${m.base_mmol} mmol`
+        : '';
     return {
       id: m.id,
       code: m.code,
@@ -348,6 +352,7 @@ function groupMembers(groupId) {
         .join(' + '),
       diffs,
       variant,
+      scaleNote,
     };
   });
 }

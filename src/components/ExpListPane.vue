@@ -84,10 +84,18 @@ const rows = computed(() => {
     const withVariant = ordered.map((m) => {
       const diffs = m.id === base.id ? [] : listDiff(base, m);
       const variant = m.id === base.id ? '基准' : diffs.length === 0 ? '重复' : diffs.length === 1 ? `改：${diffs[0]}` : `改 ${diffs.length} 项`;
-      return { ...m, diffs, variant };
+      // 规模不同不算改条件（重复实验放大 / 缩小很正常），单独提示
+      const scaleNote =
+        String(base.base_mmol ?? '') !== String(m.base_mmol ?? '') && m.base_mmol != null
+          ? `${base.base_mmol ?? '—'} → ${m.base_mmol} mmol`
+          : '';
+      return { ...m, diffs, variant, scaleNote };
     });
     const allRepeat = withVariant.every((m) => m.variant === '基准' || m.variant === '重复');
-    const kinds = new Set(withVariant.filter((m) => m.variant !== '基准').map((m) => m.variant));
+    // 「重复」跟基准是同一套条件，不算多出来的一种；只有真改了变量的才算
+    const kinds = new Set(
+      withVariant.filter((m) => m.variant !== '基准' && m.variant !== '重复').map((m) => m.variant)
+    );
     const active = withVariant.find((m) => m.id === activeId());
     const yields = withVariant.map((m) => m.yield_pct).filter((y) => y != null && y >= 0 && y <= 100);
     out.push({
@@ -110,7 +118,6 @@ const LIST_VARS = [
   ['duration', '时长'],
   ['atmosphere', '气氛'],
   ['rxn_type', '类型'],
-  ['base_mmol', '规模'],
 ];
 function listDiff(base, m) {
   const diffs = [];
@@ -259,6 +266,7 @@ function isGroupActive(row) {
               </div>
               <div class="exp-meta">
                 <span class="stack-variant" :title="m.diffs && m.diffs.length ? m.diffs.join('、') : '与基准条件相同'">{{ m.variant }}</span>
+                <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
                 <span class="sep">·</span>
                 <template v-if="m.yield_pct != null"><span style="color: var(--ok)">{{ m.yield_pct }}%</span><span class="sep">·</span></template>
                 <span>{{ m.title || '（未命名实验）' }}</span>

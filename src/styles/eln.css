@@ -5762,3 +5762,6 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   border-radius: 999px;
   padding: 0 5px;
 }
+
+/* 平行组：只差规模的组员，标一句「1 → 5 mmol」（不算改条件） */
+.stack-scale { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
