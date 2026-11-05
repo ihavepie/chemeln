@@ -314,8 +314,8 @@ body {
    改成卡片里面套一圈**强调色虚线**（用户点名要的「虚线」），加编号变强调色、投影深一点。
    虚线用伪元素画：不吃布局，还能跟着卡片自己的圆角走 */
 .exp-card[aria-current="true"] {
-  /* 虚线里面稍微带一点暖色（比原来那个 #fffcf1 淡，不至于像便签） */
-  background: #fffdf5;
+  /* 虚线里面带一点极淡的强调色调（跟虚线同族；用户不要黄色，所以不用暖黄那种） */
+  background: #fcf7f4;
   box-shadow:
     0 2px 6px rgba(20, 18, 14, 0.06),
     0 14px 28px -10px rgba(20, 18, 14, 0.26);
@@ -440,7 +440,7 @@ body {
 /* 当前这条：纸白 + 编号变强调色 + 里面套一圈强调色虚线（同中栏列表） */
 .grid-card[aria-current="true"] {
   position: relative;
-  background: #fffdf5;
+  background: #fcf7f4;
   box-shadow:
     0 2px 4px rgba(20, 18, 14, 0.05),
     0 12px 26px -10px rgba(20, 18, 14, 0.22),
@@ -5811,7 +5811,7 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
     0 10px 20px -10px rgba(20, 18, 14, 0.22);
 }
 .exp-stack.is-active .exp-card.is-stack {
-  background: #fffdf5;
+  background: #fcf7f4;
   box-shadow:
     0 -2px 6px -3px rgba(20, 18, 14, 0.1),
     0 10px 22px -10px rgba(20, 18, 14, 0.22);
