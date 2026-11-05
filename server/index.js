@@ -282,6 +282,76 @@ function insertReagents(expId, reagents) {
   }
 }
 
+/** 组里比哪些字段：条件 + 规模（投料表单独按「角色+名字」比） */
+const GROUP_VARS = [
+  ['solvent', '溶剂'],
+  ['concentration', '浓度'],
+  ['temperature', '温度'],
+  ['duration', '时长'],
+  ['atmosphere', '气氛'],
+  ['rxn_type', '类型'],
+  ['base_mmol', '规模'],
+];
+
+/** 这一条相对基准（组里最早那条）改了哪些东西 */
+function groupDiff(base, other) {
+  const diffs = [];
+  for (const [k, label] of GROUP_VARS) {
+    if (String(base[k] ?? '') !== String(other[k] ?? '')) diffs.push(label);
+  }
+  const key = (r) => `${r.role}|${r.name}`;
+  const a = new Map((base.reagents || []).map((r) => [key(r), r]));
+  const b = new Map((other.reagents || []).map((r) => [key(r), r]));
+  const notes = [];
+  for (const [k, r] of b) if (!a.has(k)) notes.push(`加 ${r.name || '（未命名）'}`);
+  for (const [k, r] of a) if (!b.has(k)) notes.push(`去 ${r.name || '（未命名）'}`);
+  for (const [k, rb] of b) {
+    const ra = a.get(k);
+    if (ra && String(ra.eq ?? '') !== String(rb.eq ?? '')) notes.push(`${rb.name || '（未命名）'} 当量`);
+  }
+  if (notes.length) diffs.push(`投料（${notes.slice(0, 3).join('，')}${notes.length > 3 ? ' 等' : ''}）`);
+  return diffs;
+}
+
+/**
+ * 一个平行组里的成员（含基准那条）。每条多带 `diffs`（跟基准比改了哪几项）和 `variant`：
+ * 一点没改 = 「重复」，改一项 = 「改：溶剂」这种，改多项 = 「改 N 项」。
+ * 书签、悬停预览、中栏卡片堆都靠这两个字段说明「它跟别人差在哪」。
+ */
+function groupMembers(groupId) {
+  const rows = db.prepare('SELECT * FROM experiments WHERE group_id = ? ORDER BY id').all(groupId);
+  if (!rows.length) return [];
+  const reagentsOf = (expId) =>
+    db.prepare('SELECT role, name, eq, mmol FROM reagents WHERE exp_id = ? ORDER BY position, id').all(expId);
+  const base = rows[0];
+  const baseReagents = reagentsOf(base.id);
+  return rows.map((m) => {
+    const reagents = m.id === base.id ? baseReagents : reagentsOf(m.id);
+    const diffs = m.id === base.id ? [] : groupDiff({ ...base, reagents: baseReagents }, { ...m, reagents });
+    const variant = m.id === base.id ? '基准' : diffs.length === 0 ? '重复' : diffs.length === 1 ? `改：${diffs[0]}` : `改 ${diffs.length} 项`;
+    return {
+      id: m.id,
+      code: m.code,
+      title: m.title,
+      date: m.date,
+      status: m.status,
+      yield_pct: m.yield_pct,
+      solvent: m.solvent,
+      temperature: m.temperature,
+      duration: m.duration,
+      atmosphere: m.atmosphere,
+      base_mmol: m.base_mmol,
+      product_name: m.product_name,
+      substrates: reagents
+        .filter((r) => r.role === '底物' && r.name)
+        .map((r) => r.name)
+        .join(' + '),
+      diffs,
+      variant,
+    };
+  });
+}
+
 function getExperiment(id) {
   const exp = db.prepare('SELECT * FROM experiments WHERE id = ?').get(id);
   if (!exp) return null;
@@ -294,19 +364,8 @@ function getExperiment(id) {
     .prepare('SELECT * FROM screenings WHERE exp_id = ? ORDER BY id')
     .all(id)
     .map(parseScreening);
-  // 平行组（重复 / 控制变量）：同一条记录旁边那几个「书签」。空组号 = 就这一条
-  // 书签上只要编号和产率，但鼠标悬停时要能瞥一眼这条是什么——顺手把条件也带上
-  exp.siblings = exp.group_id
-    ? db
-        .prepare(
-          `SELECT e.id, e.code, e.title, e.date, e.status, e.yield_pct, e.solvent, e.temperature, e.duration,
-                  e.base_mmol, e.product_name,
-                  (SELECT group_concat(r.name, ' + ') FROM reagents r
-                    WHERE r.exp_id = e.id AND r.role = '底物' AND r.name <> '') AS substrates
-             FROM experiments e WHERE e.group_id = ? ORDER BY e.id`
-        )
-        .all(exp.group_id)
-    : [];
+  // 平行组（重复 / 控制变量）：同一条记录旁边那几个「书签」，顺带算出每条相对基准差在哪
+  exp.siblings = exp.group_id ? groupMembers(exp.group_id) : [];
   return exp;
 }
 
@@ -394,9 +453,13 @@ function listExperiments(query) {
            (SELECT f.id FROM compound_files f
              WHERE f.compound_id = e.product_compound_id AND f.category = 'structure'
              ORDER BY f.id LIMIT 1) AS product_structure_id,
-           -- 平行组：中栏列表要把同组的几条叠成一张卡片
+           -- 平行组：中栏列表要把同组的几条叠成一张卡片；
+           -- reagent_sig 是「角色:名字:当量」串起来的签名，列表靠它判断这条是不是真重复
            e.group_id,
            (SELECT COUNT(*) FROM experiments g WHERE g.group_id = e.group_id AND e.group_id <> '') AS group_size,
+           (SELECT group_concat(x.sig, '|') FROM (
+              SELECT r.role || ':' || r.name || ':' || IFNULL(r.eq, '') AS sig
+                FROM reagents r WHERE r.exp_id = e.id ORDER BY r.position, r.id) x) AS reagent_sig,
            -- 卡片墙上的缩略图：优先反应式，其次顺手挑一张图片附件
            (SELECT a.id FROM attachments a
              WHERE a.exp_id = e.id
@@ -1841,6 +1904,22 @@ route('PUT', '/api/experiments/:id', async (req, res, params) => {
   db.exec('BEGIN');
   try {
     db.prepare(`UPDATE experiments SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
+
+    // 「课题」是平行组的属性：同一轮实验改一条就整组跟着走，
+    // 否则组里的重复 / 控制变量会散在两个课题下，统计和汇总表都对不上
+    if (data.project !== undefined && exp.group_id && data.project !== exp.project) {
+      db.prepare('UPDATE experiments SET project = ?, updated_at = ? WHERE group_id = ?').run(
+        data.project,
+        nowISO(),
+        exp.group_id
+      );
+      // 分类也是挂在课题下的：换课题后原来那个分类不再合法，顺手清掉（别留悬空引用）
+      db.prepare(
+        `UPDATE experiments SET category_id = NULL
+          WHERE group_id = ? AND category_id IS NOT NULL
+            AND category_id IN (SELECT id FROM categories WHERE project <> '' AND project <> ?)`
+      ).run(exp.group_id, data.project);
+    }
 
     if (Array.isArray(body.reagents)) {
       const before = JSON.stringify(

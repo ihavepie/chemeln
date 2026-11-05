@@ -79,18 +79,70 @@ const rows = computed(() => {
       continue;
     }
     const ordered = [...members].sort((a, b) => a.id - b.id);   // 最早那条当「面子」
-    const active = ordered.find((m) => m.id === activeId());
-    const yields = ordered.map((m) => m.yield_pct).filter((y) => y != null && y >= 0 && y <= 100);
+    const base = ordered[0];
+    // 列表接口没带 variant（那是编辑页用完整投料表算的），这里用列表里有的条件字段自己比
+    const withVariant = ordered.map((m) => {
+      const diffs = m.id === base.id ? [] : listDiff(base, m);
+      const variant = m.id === base.id ? '基准' : diffs.length === 0 ? '重复' : diffs.length === 1 ? `改：${diffs[0]}` : `改 ${diffs.length} 项`;
+      return { ...m, diffs, variant };
+    });
+    const allRepeat = withVariant.every((m) => m.variant === '基准' || m.variant === '重复');
+    const kinds = new Set(withVariant.filter((m) => m.variant !== '基准').map((m) => m.variant));
+    const active = withVariant.find((m) => m.id === activeId());
+    const yields = withVariant.map((m) => m.yield_pct).filter((y) => y != null && y >= 0 && y <= 100);
     out.push({
       key: `g${gid}`,
       gid,
-      members: ordered,
-      face: active || ordered[0],
+      members: withVariant,
+      kindLabel: allRepeat ? `重复 ×${withVariant.length}` : `${kinds.size + 1} 种条件`,
+      face: active || withVariant[0],
       mean: yields.length ? Math.round((yields.reduce((a, b) => a + Number(b), 0) / yields.length) * 10) / 10 : null,
     });
   }
   return out;
 });
+
+/** 列表里能拿到的条件字段：跟基准比一下，看这条是重复还是改了变量 */
+const LIST_VARS = [
+  ['solvent', '溶剂'],
+  ['concentration', '浓度'],
+  ['temperature', '温度'],
+  ['duration', '时长'],
+  ['atmosphere', '气氛'],
+  ['rxn_type', '类型'],
+  ['base_mmol', '规模'],
+];
+function listDiff(base, m) {
+  const diffs = [];
+  for (const [k, label] of LIST_VARS) {
+    if (String(base[k] ?? '') !== String(m[k] ?? '')) diffs.push(label);
+  }
+  if (String(base.substrates || '') !== String(m.substrates || '')) diffs.push('底物');
+  // 投料表：签名一样就跳过；不一样就点出「加 / 去 / 当量」哪种变化
+  if (String(base.reagent_sig || '') !== String(m.reagent_sig || '')) {
+    const parse = (sig) =>
+      Object.fromEntries(
+        String(sig || '')
+          .split('|')
+          .filter(Boolean)
+          .map((one) => {
+            const [role, name, eq] = one.split(':');
+            return [`${role}:${name}`, { role, name, eq }];
+          })
+      );
+    const a = parse(base.reagent_sig);
+    const b = parse(m.reagent_sig);
+    const notes = [];
+    for (const [k, r] of Object.entries(b)) if (!a[k]) notes.push(`加 ${r.name || '（未命名）'}`);
+    for (const [k, r] of Object.entries(a)) if (!b[k]) notes.push(`去 ${r.name || '（未命名）'}`);
+    for (const [k, rb] of Object.entries(b)) {
+      const ra = a[k];
+      if (ra && String(ra.eq ?? '') !== String(rb.eq ?? '')) notes.push(`${rb.name || '（未命名）'} 当量`);
+    }
+    if (notes.length) diffs.push(`投料（${notes.slice(0, 3).join('，')}${notes.length > 3 ? ' 等' : ''}）`);
+  }
+  return diffs;
+}
 
 function toggleGroup(gid) {
   const next = new Set(openGroups.value);
@@ -172,6 +224,7 @@ function isGroupActive(row) {
             <div class="exp-meta">
               <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
               <span v-if="row.face.project">{{ row.face.project }}</span>
+              <span class="sep">·</span><span class="stack-kind">{{ row.kindLabel }}</span>
               <template v-if="row.mean != null"><span class="sep">·</span><span style="color: var(--ok)">均值 {{ row.mean }}%</span></template>
             </div>
             <div class="stack-codes">
@@ -205,6 +258,8 @@ function isGroupActive(row) {
                 <span class="exp-date">{{ m.date }}</span>
               </div>
               <div class="exp-meta">
+                <span class="stack-variant" :title="m.diffs && m.diffs.length ? m.diffs.join('、') : '与基准条件相同'">{{ m.variant }}</span>
+                <span class="sep">·</span>
                 <template v-if="m.yield_pct != null"><span style="color: var(--ok)">{{ m.yield_pct }}%</span><span class="sep">·</span></template>
                 <span>{{ m.title || '（未命名实验）' }}</span>
               </div>

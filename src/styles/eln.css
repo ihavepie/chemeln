@@ -5751,3 +5751,14 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .exp-card.is-member { padding: 6px 8px; }
 .exp-card.is-member .exp-meta { margin-top: 1px; }
+
+/* 平行组：卡片堆上的「重复 ×N / N 种条件」，组员行上的「改：溶剂」 */
+.stack-kind { color: var(--ink-4); font-size: 9px; }
+.stack-variant {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--accent-ink);
+  background: #f8f0e9;
+  border-radius: 999px;
+  padding: 0 5px;
+}

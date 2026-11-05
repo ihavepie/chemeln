@@ -757,6 +757,7 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
               type="button"
               class="pgroup-tab"
               :class="{ 'is-on': String(s.id) === String(exp.id) }"
+              :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
               @mouseenter="showPeek(s, $event)"
               @mouseleave="hidePeek()"
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
@@ -777,6 +778,8 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
               <div v-if="[peek.solvent, peek.temperature, peek.duration].filter(Boolean).length" class="pgroup-peek-line">
                 {{ [peek.solvent, peek.temperature, peek.duration].filter(Boolean).join(' · ') }}<template v-if="peek.base_mmol"> ｜ {{ peek.base_mmol }} mmol</template>
               </div>
+              <div v-if="peek.variant === '重复'" class="pgroup-peek-line">与基准完全相同（重复实验）</div>
+              <div v-else-if="peek.diffs && peek.diffs.length" class="pgroup-peek-line">与基准相比：{{ peek.diffs.join('、') }}</div>
               <div class="pgroup-peek-line">{{ peek.code }} · 点一下切到这条</div>
             </div>
           </Teleport>
