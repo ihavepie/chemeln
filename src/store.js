@@ -40,6 +40,11 @@ export const store = reactive({
   listTotal: 0,       // 符合筛选的全部条数（items 可能被服务端 LIMIT 截断）
   compoundTotal: 0,
   views: readViews(),   // { exp: 'card' | 'table', cmp: ... }
+  /* 中栏列表「正在怎么看」的状态：哪些卡片堆展开着、滚到哪儿了。
+     放全局而不是组件里——/list 和 /e/:id 是两个页面，点一条记录 ExpListPane 会整个重建，
+     组件内的 ref 一重建就归零，表现出来就是「点一下组员或卡片，卡片堆自己收起了」。 */
+  openStacks: {},       // { [groupId]: true }
+  listScroll: 0,
 });
 
 /** 当前用哪种视图看列表：'card' 卡片墙 / 'table' 表格（都读同一份 store.items / store.compounds） */

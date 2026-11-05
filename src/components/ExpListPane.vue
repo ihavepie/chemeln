@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import CatPick from './CatPick.vue';
@@ -59,7 +59,31 @@ const activeId = () => (route.name === 'editor' ? Number(route.params.id) : null
  * 中栏列表的行：同一个平行组（重复 / 控制变量实验）收成一张卡片堆，
  * 其余还是一行一条。组里第一条当「面子」，正在看的是组里哪一条就把哪条翻到前面。
  */
-const openGroups = ref(new Set());
+/* 展开着哪些组存在 store 里（不是组件内）：/list 和 /e/:id 是两个页面，
+   点进记录时这个组件会被重建，存在组件里的状态一重建就没了 → 卡片堆会自己收起 */
+function toggleGroup(gid) {
+  if (store.openStacks[gid]) delete store.openStacks[gid];
+  else store.openStacks[gid] = true;
+}
+function isGroupOpen(gid) {
+  return !!store.openStacks[gid];
+}
+
+/* 滚动位置也一样跟着走：点开一条记录再回来，别跳回顶部 */
+const bodyEl = ref(null);
+let scrollRestored = false;
+function saveScroll(e) {
+  store.listScroll = Math.round(e.currentTarget.scrollTop);
+}
+function restoreScroll() {
+  if (scrollRestored) return;
+  const el = bodyEl.value;
+  if (!el || !store.items.length) return;      // 还没数据就先等 watch 再来一次
+  scrollRestored = true;
+  if (store.listScroll > 0) el.scrollTop = store.listScroll;
+}
+onMounted(() => nextTick(restoreScroll));
+watch(() => store.items.length, () => nextTick(restoreScroll));
 
 const rows = computed(() => {
   const out = [];
@@ -166,15 +190,6 @@ function listDiff(base, m) {
   return diffs;
 }
 
-function toggleGroup(gid) {
-  const next = new Set(openGroups.value);
-  if (next.has(gid)) next.delete(gid);
-  else next.add(gid);
-  openGroups.value = next;
-}
-function isGroupOpen(gid) {
-  return openGroups.value.has(gid);
-}
 /** 组里任意一条正在看，就把卡片堆标成选中 */
 function isGroupActive(row) {
   return row.members.some((m) => m.id === activeId());
@@ -201,7 +216,7 @@ function isGroupActive(row) {
       </div>
     </div>
 
-    <div class="listpane-body">
+    <div class="listpane-body" ref="bodyEl" @scroll="saveScroll">
       <template v-for="row in rows" :key="row.key">
         <!-- 普通记录 -->
         <button
