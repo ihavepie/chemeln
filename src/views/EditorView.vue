@@ -126,6 +126,9 @@ async function load() {
     if (route.params.id !== id) return;
     fill(e);
     baseline.value = JSON.stringify(payload());
+    // 进到属于某个平行组的记录时，把中栏那一组自动展开：
+    // 这样那条「当前」虚线框能落在具体的组员行上（不管是从书签切、从列表点还是直接开链接）
+    if (e.group_id) store.openStacks[e.group_id] = true;
   } catch (e) {
     error.value = e.message;
   }
@@ -144,13 +147,7 @@ watch(
     moreMenu.value = false;
     statusMenu.value = false;
     page.value = String(route.query.p) === '2' ? 2 : 1;
-    const prevGroup = exp.value?.group_id || '';
     await load();
-    // 在同一个平行组里来回切（书签上翻、组员行上点）：把这一组展开，
-    // 这样中栏那个选中虚线框能落到具体那条组员行上。从别处进来不自动展开，
-    // 免得手动收起过的组一进页面又被撑开。
-    const gid = exp.value?.group_id || '';
-    if (gid && gid === prevGroup) store.openStacks[gid] = true;
     // 切完弹一个气泡通知（只在这条记录是从别处切过来时提示，第一次打开不提示）
     if (exp.value?.code) toast(`已切换到 ${exp.value.code}`, 'info', 1800);
     // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
