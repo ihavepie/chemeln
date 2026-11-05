@@ -5614,7 +5614,7 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   z-index: 45;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   align-items: flex-end;
   transform: translateX(-100%);
 }
@@ -5629,41 +5629,30 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 
 /* 一枚书签：右边贴着纸（无边框、直角），左边露在外面（圆角 + 一点投影）。
-   左边缘一道细折边，像纸签被折出来的一条；当前这条折边换成强调色。 */
+   以前左边缘还有一道 2px 的「折边」，当前这条是强调色的红条——用户说不要红色条，
+   整道折边都去掉了，只靠底色 / 宽度 / 投影 / 编号颜色区分「抽出来的这条」。 */
 .pgroup-tab,
 .pgroup-add {
   position: relative;
   display: block;
-  width: 118px;
-  padding: 6px 10px;
+  width: 116px;
+  padding: 7px 11px;
   text-align: left;
-  background: #f8f5ec;
-  border: 1px solid #e5e0d2;
+  background: #f9f7f0;
+  border: 1px solid #e9e4d7;
   border-right: none;
-  border-radius: 7px 0 0 7px;
-  box-shadow: none;
+  border-radius: 8px 0 0 8px;
+  /* 右边缘一道很淡的内阴影：书签像被「塞进」纸里，而不是浮在旁边 */
+  box-shadow: inset -8px 0 10px -10px rgba(20, 18, 14, 0.16);
   color: var(--ink-3);
   cursor: pointer;
   font-family: var(--mono);
   transition: background 0.12s, color 0.12s, width 0.12s, box-shadow 0.12s, border-color 0.12s;
 }
 
-/* 纸签的折边（用伪元素，不占 padding，内容不会跟着挪 1px） */
-.pgroup-tab::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 5px;
-  bottom: 5px;
-  width: 2px;
-  border-radius: 2px 0 0 2px;
-  background: #e6dfcd;
-  transition: background 0.12s;
-}
-
 .pgroup-tab:hover {
-  background: #fffdf6;
-  border-color: #dcd6c5;
+  background: #fffef9;
+  border-color: #ded7c6;
   color: var(--ink-2);
 }
 
@@ -5681,16 +5670,17 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup-code { color: inherit; white-space: nowrap; }
 .pgroup-meta { font-size: 9.5px; color: var(--ink-4); white-space: nowrap; }
 
-/* 当前这条：像被抽出来的一枚，纸白、更宽、折边变强调色 */
+/* 当前这条：像被抽出来的一枚——纸白、宽一点、投影深一档、编号和右侧数值都用强调色 */
 .pgroup-tab.is-on {
-  width: 126px;
+  width: 124px;
   background: var(--paper);
   border-color: var(--line-2);
   color: var(--accent-ink);
-  box-shadow: -2px 1px 5px rgba(20, 18, 14, 0.07);
+  box-shadow:
+    inset -8px 0 10px -10px rgba(20, 18, 14, 0.14),
+    -3px 2px 8px rgba(20, 18, 14, 0.09);
 }
-.pgroup-tab.is-on::before { background: var(--accent); top: 4px; bottom: 4px; }
-.pgroup-tab.is-on .pgroup-meta { color: var(--accent-ink); opacity: 0.85; }
+.pgroup-tab.is-on .pgroup-meta { color: var(--accent-ink); opacity: 0.8; }
 
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
 .pgroup-peek-float {
@@ -5736,12 +5726,12 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 
 .pgroup-add {
-  width: 34px;
-  padding: 3px 0;
+  width: 30px;
+  padding: 4px 0;
   text-align: center;
   font-size: 11px;
   color: var(--ink-4);
-  border-radius: 6px 0 0 6px;
+  border-radius: 7px 0 0 7px;
 }
 .pgroup-add:hover { background: #fffdf6; color: var(--accent-ink); }
 
@@ -5937,12 +5927,10 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .pgroup-peek-flag.is-diff {
   background: #fbf1e9;
-  border-left: 2px solid var(--accent);
   color: var(--accent-ink);
 }
 .pgroup-peek-flag.is-same {
   background: #f2f5f0;
-  border-left: 2px solid var(--ok, #4f7a4a);
   color: #40573c;
 }
 /* 规模 / 溶剂用量：数字用等宽、加重，一眼看到 */
@@ -6038,14 +6026,13 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   font-size: 11.5px;
   line-height: 1.5;
 }
+/* 差异 / 条件相同：只靠淡底 + 字色区分（左边那道 2px 色条也去掉了，用户不喜欢红条） */
 .pgroup-peek-float .peek-flag.is-diff {
   background: #fbf1e9;
-  border-left: 2px solid var(--accent);
   color: var(--accent-ink);
 }
 .pgroup-peek-float .peek-flag.is-same {
   background: #f2f5f0;
-  border-left: 2px solid var(--ok);
   color: #40573c;
 }
 /* 「基准」只有一个词，做成小胶囊，不要整条横幅占一行 */
