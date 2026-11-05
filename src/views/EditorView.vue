@@ -777,10 +777,18 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
               <div class="pgroup-peek-line">{{ peek.date }} · {{ peek.status }}<template v-if="peek.yield_pct != null"> · 产率 {{ peek.yield_pct }}%</template></div>
               <div v-if="peek.substrates" class="pgroup-peek-line">底物：{{ peek.substrates }}</div>
               <div v-if="[peek.solvent, peek.temperature, peek.duration].filter(Boolean).length" class="pgroup-peek-line">
-                {{ [peek.solvent, peek.temperature, peek.duration].filter(Boolean).join(' · ') }}<template v-if="peek.base_mmol"> ｜ {{ peek.base_mmol }} mmol</template>
+                {{ [peek.solvent, peek.temperature, peek.duration].filter(Boolean).join(' · ') }}
               </div>
-              <div v-if="peek.variant === '重复'" class="pgroup-peek-line">与基准条件相同（重复实验）<template v-if="peek.scaleNote">，规模 {{ peek.scaleNote }}</template></div>
-              <div v-else-if="peek.diffs && peek.diffs.length" class="pgroup-peek-line">与基准相比：{{ peek.diffs.join('、') }}</div>
+              <div v-if="peek.base_mmol || peek.solvent_ml" class="pgroup-peek-scale">
+                <template v-if="peek.base_mmol"><b>{{ peek.base_mmol }}</b> mmol</template>
+                <template v-if="peek.solvent_ml"><template v-if="peek.base_mmol"> · </template>溶剂 ≈ <b>{{ peek.solvent_ml }}</b> mL</template>
+              </div>
+              <div v-if="peek.variant === '重复'" class="pgroup-peek-flag is-same">
+                与基准条件相同<template v-if="peek.scaleNote"> · 规模 {{ peek.scaleNote }}</template>
+              </div>
+              <div v-else-if="peek.diffs && peek.diffs.length" class="pgroup-peek-flag is-diff">
+                与基准相比：{{ peek.diffs.join('、') }}
+              </div>
               <div class="pgroup-peek-line">{{ peek.code }} · 点一下切到这条</div>
             </div>
           </Teleport>

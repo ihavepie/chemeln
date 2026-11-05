@@ -119,6 +119,14 @@ const LIST_VARS = [
   ['atmosphere', '气氛'],
   ['rxn_type', '类型'],
 ];
+/** 当量差在 2%（且 ≤0.005）以内算同一个条件——放大/取整常让当量差一点点 */
+function eqSame(a, b) {
+  const x = Number(a);
+  const y = Number(b);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return String(a ?? '') === String(b ?? '');
+  return Math.abs(x - y) <= Math.max(0.005, 0.02 * Math.max(Math.abs(x), Math.abs(y)));
+}
+
 function listDiff(base, m) {
   const diffs = [];
   // 规模变了，浓度多半是被动跟着变的（放大时溶剂不一定等比加）——不算改条件
@@ -147,7 +155,7 @@ function listDiff(base, m) {
     for (const [k, r] of Object.entries(a)) if (!b[k]) notes.push(`去 ${r.name || '（未命名）'}`);
     for (const [k, rb] of Object.entries(b)) {
       const ra = a[k];
-      if (ra && String(ra.eq ?? '') !== String(rb.eq ?? '')) notes.push(`${rb.name || '（未命名）'} 当量`);
+      if (ra && !eqSame(ra.eq, rb.eq)) notes.push(`${rb.name || '（未命名）'} 当量`);
     }
     if (notes.length) diffs.push(`投料（${notes.slice(0, 3).join('，')}${notes.length > 3 ? ' 等' : ''}）`);
   }

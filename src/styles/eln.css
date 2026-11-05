@@ -5793,3 +5793,31 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .stack-chip .chip-status { margin-left: 5px; color: var(--ink-4); }
 .stack-chip .chip-yield { margin-left: 5px; }
 .stack-chip.is-on .chip-status { color: var(--accent-ink); opacity: 0.8; }
+
+/* 悬停预览卡：差异那一条要跳出来，常规信息退到后面 */
+.pgroup-peek-flag {
+  margin: 6px 0 4px;
+  padding: 3px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.pgroup-peek-flag.is-diff {
+  background: #fbf1e9;
+  border-left: 2px solid var(--accent);
+  color: var(--accent-ink);
+}
+.pgroup-peek-flag.is-same {
+  background: #f2f5f0;
+  border-left: 2px solid var(--ok, #4f7a4a);
+  color: #40573c;
+}
+/* 规模 / 溶剂用量：数字用等宽、加重，一眼看到 */
+.pgroup-peek-scale {
+  margin-top: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  letter-spacing: 0.02em;
+}
+.pgroup-peek-scale b { font-weight: 600; color: var(--ink); }

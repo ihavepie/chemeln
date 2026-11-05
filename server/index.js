@@ -293,6 +293,27 @@ const GROUP_VARS = [
 ];
 
 /**
+ * 当量算不算「一样」：放大 / 称量取整常让当量差一点点（0.995 vs 1.0），
+ * 差在 2%（且不超过 0.005）以内就当同一个条件，免得满屏「改：投料」。
+ */
+function eqSame(a, b) {
+  const x = Number(a);
+  const y = Number(b);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return String(a ?? '') === String(b ?? '');
+  return Math.abs(x - y) <= Math.max(0.005, 0.02 * Math.max(Math.abs(x), Math.abs(y)));
+}
+
+/** 溶剂用量：浓度 + 规模能算出来（mL = mmol ÷ M），没有浓度就是 null */
+function solventMlOf(row) {
+  const mmol = Number(row.base_mmol);
+  const m = /([0-9]*\.?[0-9]+)\s*M/.exec(String(row.concentration || ''));
+  if (!Number.isFinite(mmol) || mmol <= 0 || !m) return null;
+  const conc = Number(m[1]);
+  if (!(conc > 0)) return null;
+  return Math.round((mmol / conc) * 10) / 10;
+}
+
+/**
  * 这一条相对基准（组里最早那条）改了哪些东西。
  * 规模一变，浓度多半是被动跟着变的（放大时溶剂常常不是等比加），
  * 这种「顺带变了的浓度」不算改条件，否则纯放大也会被标成控制变量实验。
@@ -312,7 +333,7 @@ function groupDiff(base, other) {
   for (const [k, r] of a) if (!b.has(k)) notes.push(`去 ${r.name || '（未命名）'}`);
   for (const [k, rb] of b) {
     const ra = a.get(k);
-    if (ra && String(ra.eq ?? '') !== String(rb.eq ?? '')) notes.push(`${rb.name || '（未命名）'} 当量`);
+    if (ra && !eqSame(ra.eq, rb.eq)) notes.push(`${rb.name || '（未命名）'} 当量`);
   }
   if (notes.length) diffs.push(`投料（${notes.slice(0, 3).join('，')}${notes.length > 3 ? ' 等' : ''}）`);
   return diffs;
@@ -359,6 +380,7 @@ function groupMembers(groupId) {
       diffs,
       variant,
       scaleNote,
+      solvent_ml: solventMlOf(m),
     };
   });
 }
