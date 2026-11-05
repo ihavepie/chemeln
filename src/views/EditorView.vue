@@ -117,14 +117,27 @@ function fill(e) {
 /** 打开这条记录时的内容快照，用来「重置」 */
 const baseline = ref('');
 
-/* 切记录时纸面淡进来一下，别「瞬间换页」。
-   只用 opacity、不加位移——纸外那排平行书签是按 sheet 的 rect 算位置的，
-   位移会让它跟着抖。系统开了「减少动态效果」就不动。 */
+/* 切记录时新的一页「落」下来：一点点上浮 + 淡入，比单纯淡入更像换了一页
+   （只淡不动的观感就是「闪一下」）。系统开了「减少动态效果」就不动。
+   注意纸外那排平行书签是按 sheet 的 rect 算位置的，位移期间会差几像素，
+   所以动画结束要再量一次（updateRail）。 */
 function fadeInPaper() {
   const el = innerEl.value;
   if (!el || typeof el.animate !== 'function') return;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  el.animate([{ opacity: 0.3 }, { opacity: 1 }], { duration: 200, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+  const anim = el.animate(
+    [
+      { opacity: 0.6, transform: 'translateY(8px)' },
+      { opacity: 1, transform: 'none' },
+    ],
+    { duration: 260, easing: 'cubic-bezier(.16, 1, .3, 1)' }
+  );
+  // 纸面在动，纸外那排书签是按 rect 定位的：跟着它每帧重算一次，不然动画期间会错开、结束才跳回来
+  const follow = () => {
+    updateRail();
+    if (anim.playState !== 'finished') requestAnimationFrame(follow);
+  };
+  requestAnimationFrame(follow);
 }
 
 async function load() {

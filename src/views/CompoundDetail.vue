@@ -68,13 +68,19 @@ function fill(data) {
   markLoaded();
 }
 
-/* 换一个化合物时纸面淡进来一下（跟实验页一个做法）。
-   只用 opacity、不加位移，系统开了「减少动态效果」就不动。 */
+/* 换一个化合物时新的一页「落」下来（跟实验页一个做法：上浮一点点 + 淡入）。
+   系统开了「减少动态效果」就不动。 */
 function fadeInPaper() {
   const el = innerEl.value;
   if (!el || typeof el.animate !== 'function') return;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  el.animate([{ opacity: 0.3 }, { opacity: 1 }], { duration: 200, easing: 'cubic-bezier(.16, 1, .3, 1)' });
+  el.animate(
+    [
+      { opacity: 0.6, transform: 'translateY(10px)' },
+      { opacity: 1, transform: 'none' },
+    ],
+    { duration: 260, easing: 'cubic-bezier(.16, 1, .3, 1)' }
+  );
 }
 
 async function load() {
