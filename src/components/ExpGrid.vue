@@ -37,7 +37,7 @@ function stackOf(items) {
   for (const it of items) {
     const gid = it.group_id || '';
     if (!gid || !(it.group_size > 1)) {
-      out.push({ key: `i${it.id}`, it, members: [it] });
+      out.push({ key: `i${it.id}`, it, members: [it], anchor: it.id });
       continue;
     }
     const found = byGid.get(gid);
@@ -45,7 +45,7 @@ function stackOf(items) {
       found.members.push(it);
       continue;
     }
-    const card = { key: `g${gid}`, it, members: [it] };
+    const card = { key: `g${gid}`, it, members: [it], anchor: it.id };
     byGid.set(gid, card);
     out.push(card);
   }
@@ -53,8 +53,12 @@ function stackOf(items) {
     if (c.members.length < 2) continue;
     c.members.sort((a, b) => a.id - b.id);
     c.it = c.members.find((m) => m.id === activeId()) || c.members[0];
+    c.anchor = c.members[0].id;      // 位置永远按最早那条算
   }
-  return out;
+  // 按「基准那条」在列表里的位置排：新建一条平行实验会排到最前面，
+  // 但那一摞不该跟着跳到最上面去
+  const slot = new Map(items.map((x, i) => [x.id, i]));
+  return out.sort((a, b) => (slot.get(a.anchor) ?? 1e9) - (slot.get(b.anchor) ?? 1e9));
 }
 
 /** 每个分类都占一格（空的也显示），筛了某类就只留那一组；未分类放最后 */

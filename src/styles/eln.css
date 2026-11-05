@@ -278,13 +278,14 @@ body {
 .listpane-body {
   overflow-y: auto;
   flex: 1;
-  /* 右边多留 4px：卡片堆的两张纸会往右上方错出去，不留够会拱出横向滚动条 */
-  padding: 8px 12px 10px 8px;
+  /* 右边多留：卡片堆的两张纸会往右上方错出去 11px，不留够会拱出横向滚动条 */
+  padding: 8px 16px 10px 8px;
 }
 
 /* 中栏列表的卡片：跟卡片墙一样走「亚克力」——不描边，纸白 + 柔和投影分层
    （列表底色是 --bone，卡片是纸白，靠投影浮起来；卡片之间留 6px 缝才看得出影子） */
 .exp-card {
+  position: relative;
   display: block;
   width: 100%;
   text-align: left;
@@ -298,8 +299,8 @@ body {
   box-shadow:
     0 1px 2px rgba(20, 18, 14, 0.04),
     0 6px 14px -9px rgba(20, 18, 14, 0.16);
-  transition: box-shadow 140ms var(--ease);
-  margin-bottom: 6px;
+  transition: box-shadow 140ms var(--ease), background 140ms var(--ease);
+  margin-bottom: 12px;
 }
 
 .exp-card:hover {
@@ -308,12 +309,24 @@ body {
     0 10px 20px -10px rgba(20, 18, 14, 0.22);
 }
 
-/* 正在看的那条：一圈淡强调色光晕（不描边，别做成硬边框） */
+/* 正在看的那条：不用红框，改成暖白底 + 左边一道细标记 + 编号变强调色 */
 .exp-card[aria-current="true"] {
+  background: #fffdf6;
   box-shadow:
-    0 0 0 1px rgba(168, 71, 31, 0.5),
-    0 8px 18px -9px rgba(20, 18, 14, 0.18);
+    0 2px 5px rgba(20, 18, 14, 0.05),
+    0 10px 22px -10px rgba(20, 18, 14, 0.22);
 }
+.exp-card[aria-current="true"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+.exp-card[aria-current="true"] .exp-code { color: var(--accent-ink); }
 
 .exp-card .top {
   display: flex;
@@ -382,7 +395,8 @@ body {
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
-  gap: 13px;
+  /* 列距 / 行距都放大：平行组的垫纸会往右上方斜出去 15px，离太近就和邻居糊在一起 */
+  gap: 26px 20px;
   align-items: start;
 }
 
@@ -418,12 +432,15 @@ body {
 
 .grid-card:active { transform: scale(0.995); }
 
-/* 当前这条：不描边，靠一圈强调色的光晕（只在记录页开着那条时才会出现） */
+/* 当前这条：暖白底 + 编号变强调色，不描边 */
 .grid-card[aria-current="true"] {
+  background: #fffdf6;
   box-shadow:
-    0 0 0 1px rgba(168, 71, 31, 0.5),
-    0 10px 24px -8px rgba(20, 18, 14, 0.18);
+    0 2px 4px rgba(20, 18, 14, 0.05),
+    0 12px 26px -10px rgba(20, 18, 14, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
+.grid-card[aria-current="true"] .exp-code { color: var(--accent-ink); }
 
 .grid-thumb {
   position: relative;
@@ -491,7 +508,7 @@ body {
 
 .grid-body .exp-meta { font-size: 10px; gap: 5px; }
 
-/* 空位：虚线卡片，点一下新建 */
+/* 空位：不画框，就是一块很淡的「还能放东西的地方」；悬停才浮成一张纸 */
 .grid-new {
   display: flex;
   flex-direction: column;
@@ -499,20 +516,22 @@ body {
   justify-content: center;
   gap: 7px;
   min-height: 150px;
-  border: 1px dashed var(--line-2);
+  border: none;
   border-radius: var(--r);
-  background: transparent;
-  color: var(--ink-3);
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--ink-4);
   font-family: inherit;
   font-size: 11.5px;
   cursor: pointer;
-  transition: border-color 140ms var(--ease), color 140ms var(--ease), background 140ms var(--ease);
+  transition: box-shadow 140ms var(--ease), color 140ms var(--ease), background 140ms var(--ease);
 }
 
 .grid-new:hover {
-  border-color: var(--ink-4);
-  color: var(--ink);
-  background: #fbfaf8;
+  background: var(--paper);
+  color: var(--ink-2);
+  box-shadow:
+    0 1px 2px rgba(20, 18, 14, 0.04),
+    0 8px 20px -8px rgba(20, 18, 14, 0.14);
 }
 
 .grid-note {
@@ -5750,14 +5769,14 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   pointer-events: none;
 }
 .stack-top::before {
-  background: #fff;
-  transform: translate(8px, -8px);
-  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.1), 0 3px 8px -4px rgba(20, 18, 14, 0.16);
+  background: #faf8f1;
+  transform: translate(11px, -11px);
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .stack-top::after {
-  background: #fffefb;
-  transform: translate(4px, -4px);
-  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.08);
+  background: #fdfcf7;
+  transform: translate(5.5px, -5.5px);
+  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
 .exp-card.is-stack {
@@ -5779,10 +5798,10 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
     0 10px 20px -10px rgba(20, 18, 14, 0.22);
 }
 .exp-stack.is-active .exp-card.is-stack {
+  background: #fffdf6;
   box-shadow:
-    0 0 0 1px rgba(168, 71, 31, 0.5),
     0 -2px 6px -3px rgba(20, 18, 14, 0.1),
-    0 8px 18px -9px rgba(20, 18, 14, 0.18);
+    0 10px 22px -10px rgba(20, 18, 14, 0.22);
 }
 
 .stack-badge {
@@ -5947,6 +5966,8 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .exp-card.is-member:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--line-2); }
 .exp-card.is-member:hover { background: #f2f0ec; }
 .exp-card.is-member[aria-current="true"] { background: #f7f5f0; box-shadow: none; }
+.exp-card.is-member[aria-current="true"]::before { content: none; }
+.exp-card.is-member::before { content: none; }
 .exp-card.is-member .top { gap: 6px; margin-bottom: 3px; }
 .exp-card.is-member .exp-title {
   font-size: 12px;
@@ -6106,16 +6127,17 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   border-radius: var(--r);
   pointer-events: none;
 }
-/* 白纸才看得出「斜着叠」：画布是 #f5f4f1，纸色差太小就只剩一道灰影 */
+/* 白纸才看得出「斜着叠」：画布是 #f5f4f1，纸色差太小就只剩一道灰影。
+   两张纸各自带一道影子 + 顶张上方再落一道，三层才数得清。 */
 .grid-stack::before {
-  background: #fff;
-  transform: translate(11px, -11px);
-  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.1), 0 3px 8px -4px rgba(20, 18, 14, 0.16);
+  background: #faf8f1;
+  transform: translate(15px, -15px);
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .grid-stack::after {
-  background: #fffefb;
-  transform: translate(5.5px, -5.5px);
-  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.08);
+  background: #fdfcf7;
+  transform: translate(7.5px, -7.5px);
+  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
 /* 卡片本身撑满这一格（.card-grid.is-even 让同一行的卡片等高）；

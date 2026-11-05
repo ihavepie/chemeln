@@ -67,7 +67,7 @@ const rows = computed(() => {
   for (const it of store.items) {
     const gid = it.group_id || '';
     if (!gid) {
-      out.push({ key: `e${it.id}`, one: it });
+      out.push({ key: `e${it.id}`, one: it, anchor: it.id });
       continue;
     }
     if (seen.has(gid)) continue;
@@ -75,7 +75,7 @@ const rows = computed(() => {
     const members = store.items.filter((x) => (x.group_id || '') === gid);
     // 搜索只命中组里一条时，不装成卡片堆
     if (members.length < 2) {
-      out.push({ key: `e${it.id}`, one: it });
+      out.push({ key: `e${it.id}`, one: it, anchor: it.id });
       continue;
     }
     const ordered = [...members].sort((a, b) => a.id - b.id);   // 最早那条当「面子」
@@ -101,13 +101,17 @@ const rows = computed(() => {
     out.push({
       key: `g${gid}`,
       gid,
+      anchor: ordered[0].id,     // 位置按「最早那条」算，新建平行实验不会让这一堆往上跳
       members: withVariant,
       kindLabel: allRepeat ? `重复 ×${withVariant.length}` : `${kinds.size + 1} 种条件`,
       face: active || withVariant[0],
       mean: yields.length ? Math.round((yields.reduce((a, b) => a + Number(b), 0) / yields.length) * 10) / 10 : null,
     });
   }
-  return out;
+  // 卡片堆按基准那条在列表里的位置排：新建平行实验会排在列表最前，
+  // 但那一堆仍然待在原来的位置（以前整堆会突然跳到最上面）
+  const slot = new Map(store.items.map((x, i) => [x.id, i]));
+  return out.sort((a, b) => (slot.get(a.anchor) ?? 1e9) - (slot.get(b.anchor) ?? 1e9));
 });
 
 /** 列表里能拿到的条件字段：跟基准比一下，看这条是重复还是改了变量 */
