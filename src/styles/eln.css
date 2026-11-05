@@ -5745,7 +5745,10 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    中栏列表里的「平行组」卡片堆：同 group_id 的重复 / 控制变量实验合成一张，
    后面露出两层纸边，组员用编号小签直接点进去。
    ================================================================ */
-.exp-stack { position: relative; margin-bottom: 1px; }
+/* 一摞占的间距跟单张卡片一样，统一由 .exp-stack 自己给：
+   以前这里是 1px，收起时靠面子卡片自己的 12px 外边距漏出来看着正常，
+   展开后最后一行组员就贴着下一张卡片了（用户报的「太近了」） */
+.exp-stack { position: relative; margin-bottom: 12px; }
 
 /* 后面那两层纸边：只露 3px 和 6px */
 /* 下面压着两张纸：跟卡片墙一个做法，**往右上方斜着错开**（不是变小居中），
@@ -5778,6 +5781,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   border-radius: var(--r);
   padding: 10px 11px 8px;
   z-index: 1;
+  /* 面子这张卡片不出自己的下边距：一摞对外的间距由 .exp-stack 统一给，
+     不然收起 / 展开两种状态靠外边距塌陷凑出来的距离不一样 */
+  margin-bottom: 0;
   /* 自己也要往上落一点影子，压在下面那张纸上的层次才出来 */
   box-shadow:
     0 -2px 6px -3px rgba(20, 18, 14, 0.1),
@@ -5939,7 +5945,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    行与行之间几乎不空（2px），靠行的内边距把两条记录分开——以前 9px + 2px 内边距，
    看着是「薄薄几行漂在大空隙里」，又窄又散。 */
 .stack-members {
-  margin-top: 5px;
+  /* 贴着自己的面子卡片近一点（8px < 卡片之间 12px），看得出组员在「这一摞里面」；
+     组员整体对这一摞外面不吃自己的下边距，下面那条 12px 由 .exp-stack 给 */
+  margin-top: 8px;
   padding-left: 7px;
   border-left: 2px solid #eceae2;
   display: flex;
