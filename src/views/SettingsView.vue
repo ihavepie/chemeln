@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import Icon from '../components/Icon.vue';
 import AppModal from '../components/AppModal.vue';
 import { api } from '../api.js';
+import { peekPrefs, setPeekPref, PEEK_LABELS } from '../lib/peek.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 
@@ -572,6 +573,17 @@ async function removeProject(p) {  const ok = await confirm({
           <span><kbd>⌘</kbd> <kbd>N</kbd> 新建实验</span>
           <span><kbd>⌘</kbd> <kbd>K</kbd> 搜索</span>
           <span><kbd>Esc</kbd> 关闭对话框</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2 class="card-title"><span class="n">05</span>书签悬停预览</h2></div>
+        <p class="card-note">实验页纸面左边那排平行书签，鼠标停上去会浮一张预览卡。这里决定卡片上显示哪些块（只存在这台浏览器里，跟记录无关）。</p>
+        <div class="row" style="gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
+          <label v-for="(label, key) in PEEK_LABELS" :key="key" style="display: flex; align-items: center; gap: 6px; cursor: pointer">
+            <input type="checkbox" :checked="peekPrefs[key]" @change="setPeekPref(key, $event.target.checked)" />
+            {{ label }}
+          </label>
         </div>
       </section>
 

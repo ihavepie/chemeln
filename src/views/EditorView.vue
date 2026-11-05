@@ -22,6 +22,7 @@ import { useAutosave } from '../lib/autosave.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
 import { flattenTextareas } from '../lib/autogrow.js';
+import { peekPrefs } from '../lib/peek.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -505,7 +506,7 @@ const peek = ref(null);
 const peekPos = ref({});
 function showPeek(s, ev) {
   const r = ev.currentTarget.getBoundingClientRect();
-  const width = 232;
+  const width = 272;
   // 卡片右边贴在书签左边；左边不够就尽量靠左，别出屏幕
   const left = Math.max(8, r.left - width - 10);
   const top = Math.max(8, Math.min(window.innerHeight - 152, r.top - 6));
@@ -515,6 +516,28 @@ function showPeek(s, ev) {
 function hidePeek() {
   peek.value = null;
 }
+
+/** 预览卡的「条件」：溶剂（带浓度）· 温度 · 时长 · 气氛 */
+const peekConds = computed(() => {
+  const p = peek.value;
+  if (!p) return '';
+  // 溶剂没填但浓度填了，就别画出「（）」这种空括号
+  const sol = p.solvent ? (p.concentration ? `${p.solvent}（${p.concentration}）` : p.solvent) : p.concentration || '';
+  return [sol, p.temperature, p.duration, p.atmosphere].filter(Boolean).join(' · ');
+});
+
+/** 关键数字那一排：规模 / 溶剂用量 / 产率 / ee（没有 ee 就显示 dr） */
+const peekMetrics = computed(() => {
+  const p = peek.value;
+  if (!p) return [];
+  const out = [];
+  if (p.base_mmol) out.push({ k: '规模', v: `${p.base_mmol} mmol` });
+  if (p.solvent_ml) out.push({ k: '溶剂', v: `${p.solvent_ml} mL` });
+  if (peekPrefs.result && p.yield_pct != null) out.push({ k: '产率', v: `${p.yield_pct}%`, ok: true });
+  if (peekPrefs.result && p.ee_pct != null) out.push({ k: 'ee', v: `${p.ee_pct}%` });
+  else if (peekPrefs.result && p.dr_ee) out.push({ k: 'dr/ee', v: String(p.dr_ee) });
+  return out;
+});
 
 /** 书签上那一行小字：产率有就写产率，没有就写状态 */
 function sibMeta(s) {
@@ -773,23 +796,38 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
           <Teleport to="body">
             <div v-if="peek" class="pgroup-peek-float" :style="peekPos">
-              <div class="pgroup-peek-title">{{ peek.title || '（未命名实验）' }}</div>
-              <div class="pgroup-peek-line">{{ peek.date }} · {{ peek.status }}<template v-if="peek.yield_pct != null"> · 产率 {{ peek.yield_pct }}%</template></div>
-              <div v-if="peek.substrates" class="pgroup-peek-line">底物：{{ peek.substrates }}</div>
-              <div v-if="[peek.solvent, peek.temperature, peek.duration].filter(Boolean).length" class="pgroup-peek-line">
-                {{ [peek.solvent, peek.temperature, peek.duration].filter(Boolean).join(' · ') }}
+              <div class="peek-head">
+                <span class="peek-title">{{ peek.title || '（未命名实验）' }}</span>
+                <span class="tag" :class="STATUS_TONE[peek.status]" style="font-size: 9px; padding: 1px 6px">{{ peek.status }}</span>
               </div>
-              <div v-if="peek.base_mmol || peek.solvent_ml" class="pgroup-peek-scale">
-                <template v-if="peek.base_mmol"><b>{{ peek.base_mmol }}</b> mmol</template>
-                <template v-if="peek.solvent_ml"><template v-if="peek.base_mmol"> · </template>溶剂 ≈ <b>{{ peek.solvent_ml }}</b> mL</template>
-              </div>
-              <div v-if="peek.variant === '重复'" class="pgroup-peek-flag is-same">
+
+              <div v-if="peek.variant === '基准'" class="peek-flag is-base">本组基准（最早这条）</div>
+              <div v-else-if="peek.variant === '重复'" class="peek-flag is-same">
                 与基准条件相同<template v-if="peek.scaleNote"> · 规模 {{ peek.scaleNote }}</template>
               </div>
-              <div v-else-if="peek.diffs && peek.diffs.length" class="pgroup-peek-flag is-diff">
-                与基准相比：{{ peek.diffs.join('、') }}
+              <div v-else-if="peek.diffs && peek.diffs.length" class="peek-flag is-diff">与基准相比：{{ peek.diffs.join('、') }}</div>
+
+              <div v-if="peekMetrics.length" class="peek-metrics">
+                <span v-for="m in peekMetrics" :key="m.k" class="peek-k" :class="{ 'is-ok': m.ok }">
+                  <em>{{ m.k }}</em><b>{{ m.v }}</b>
+                </span>
               </div>
-              <div class="pgroup-peek-line">{{ peek.code }} · 点一下切到这条</div>
+
+              <div v-if="peekPrefs.conditions && peekConds" class="peek-row">
+                <span class="peek-label">条件</span><span class="peek-val">{{ peekConds }}</span>
+              </div>
+              <div v-if="peekPrefs.substrates && (peek.substrates || peek.product_name)" class="peek-row">
+                <span class="peek-label">底物</span>
+                <span class="peek-val">{{ peek.substrates || '—' }}<template v-if="peek.product_name"> → {{ peek.product_name }}</template></span>
+              </div>
+              <div v-if="peekPrefs.conclusion && peek.conclusion" class="peek-note">
+                <span class="peek-label">结论</span><span class="peek-val">{{ peek.conclusion }}</span>
+              </div>
+              <div v-if="peekPrefs.notes && peek.notes" class="peek-note">
+                <span class="peek-label">备注</span><span class="peek-val">{{ peek.notes }}</span>
+              </div>
+
+              <div class="peek-foot">{{ peek.code }} · {{ peek.date }} · 点一下切到这条</div>
             </div>
           </Teleport>
         </Teleport>

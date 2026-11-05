@@ -368,11 +368,21 @@ function groupMembers(groupId) {
       status: m.status,
       yield_pct: m.yield_pct,
       solvent: m.solvent,
+      concentration: m.concentration,
       temperature: m.temperature,
       duration: m.duration,
       atmosphere: m.atmosphere,
       base_mmol: m.base_mmol,
+      // 悬停卡要显示的内容都带上，前端按「显示哪些」的偏好挑着画
       product_name: m.product_name,
+      product_mass: m.product_mass,
+      product_mw: m.product_mw,
+      ee_pct: m.ee_pct,
+      dr_ee: m.dr_ee,
+      sel_method: m.sel_method,
+      sel_condition: m.sel_condition,
+      conclusion: m.conclusion,
+      notes: m.notes,
       substrates: reagents
         .filter((r) => r.role === '底物' && r.name)
         .map((r) => r.name)

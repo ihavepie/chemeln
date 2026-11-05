@@ -5863,3 +5863,119 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   color: var(--ok);
 }
 .exp-card.is-member .exp-date { margin-left: 8px; }
+
+/* ================================================================
+   平行书签的悬停预览卡（v2）：标题行 + 差异横幅 + 关键数字一排 + 条件/底物/结论/备注
+   —— 关键数字用等宽加粗，标签用小号灰字，正文最多两行，别把卡片拉太长。
+   ================================================================ */
+.pgroup-peek-float .peek-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pgroup-peek-float .peek-title {
+  flex: 1 1 auto;
+  font-family: var(--serif);
+  font-size: 13.5px;
+  line-height: 1.3;
+  color: var(--ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.pgroup-peek-float .peek-flag {
+  margin: 0 0 7px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.pgroup-peek-float .peek-flag.is-diff {
+  background: #fbf1e9;
+  border-left: 2px solid var(--accent);
+  color: var(--accent-ink);
+}
+.pgroup-peek-float .peek-flag.is-same {
+  background: #f2f5f0;
+  border-left: 2px solid var(--ok);
+  color: #40573c;
+}
+.pgroup-peek-float .peek-flag.is-base {
+  background: #f5f4f1;
+  border-left: 2px solid var(--line-2);
+  color: var(--ink-3);
+}
+
+/* 关键数字：一排，数字大一点、等宽，单位小字跟在后面 */
+.pgroup-peek-float .peek-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 0 7px;
+  border-top: 1px dotted var(--line-2);
+  border-bottom: 1px dotted var(--line-2);
+  margin-bottom: 6px;
+}
+.pgroup-peek-float .peek-k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.pgroup-peek-float .peek-k em {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--ink-4);
+  margin-right: 3px;
+}
+.pgroup-peek-float .peek-k b {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink);
+}
+.pgroup-peek-float .peek-k.is-ok b { color: var(--ok); }
+
+/* 条件 / 底物：标签固定宽度，值自然折行 */
+.pgroup-peek-float .peek-row {
+  display: flex;
+  gap: 7px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.pgroup-peek-float .peek-label {
+  flex: none;
+  width: 26px;
+  color: var(--ink-4);
+  font-size: 9.5px;
+  padding-top: 1px;
+}
+.pgroup-peek-float .peek-val { flex: 1 1 auto; }
+.pgroup-peek-float .peek-note {
+  display: flex;
+  gap: 7px;
+  margin-top: 5px;
+  padding: 5px 7px;
+  background: #f8f7f3;
+  border-radius: 3px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.pgroup-peek-float .peek-note .peek-val {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.pgroup-peek-float .peek-foot {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px dotted var(--line-2);
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+}
