@@ -291,7 +291,7 @@ function isGroupActive(row) {
           <div class="stack-top">
             <div
               class="exp-card is-stack"
-              :aria-current="isGroupActive(row) ? 'true' : 'false'"
+              :aria-current="isGroupActive(row) && !isGroupOpen(row.gid) ? 'true' : 'false'"
               role="button"
               tabindex="0"
               @click="router.push(`/e/${row.face.id}`)"
