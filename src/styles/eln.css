@@ -5830,3 +5830,36 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   letter-spacing: 0.02em;
 }
 .pgroup-peek-scale b { font-weight: 600; color: var(--ink); }
+
+/* 平行组展开后的组员行：行距松开、标题单独一行，别全挤在 meta 那一条里 */
+.stack-members {
+  margin-top: 7px;
+  padding-left: 9px;
+  border-left: 2px solid #eceae2;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.exp-card.is-member {
+  padding: 8px 10px;
+  background: #fcfbf8;
+  border: 1px solid #f0eee7;
+  border-radius: 5px;
+}
+.exp-card.is-member:hover { background: #f7f5f0; }
+.exp-card.is-member .top { gap: 6px; margin-bottom: 2px; }
+.exp-card.is-member .exp-title {
+  font-size: 12px;
+  line-height: 1.3;
+  margin-bottom: 0;
+  color: var(--ink-2);
+  -webkit-line-clamp: 1;
+}
+/* 产率靠右（在日期前面），用等宽字，扫一眼就知道哪条好 */
+.member-yield {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ok);
+}
+.exp-card.is-member .exp-date { margin-left: 8px; }

@@ -279,15 +279,12 @@ function isGroupActive(row) {
               <div class="top">
                 <span class="exp-code">{{ m.code }}</span>
                 <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
-                <span class="exp-date">{{ m.date }}</span>
-              </div>
-              <div class="exp-meta">
                 <span class="stack-variant" :title="m.diffs && m.diffs.length ? m.diffs.join('、') : '与基准条件相同'">{{ m.variant }}</span>
                 <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
-                <span class="sep">·</span>
-                <template v-if="m.yield_pct != null"><span style="color: var(--ok)">{{ m.yield_pct }}%</span><span class="sep">·</span></template>
-                <span>{{ m.title || '（未命名实验）' }}</span>
+                <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
+                <span class="exp-date">{{ m.date }}</span>
               </div>
+              <div class="exp-title">{{ m.title || '（未命名实验）' }}</div>
             </button>
           </div>
         </div>
