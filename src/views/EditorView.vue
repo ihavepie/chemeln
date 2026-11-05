@@ -827,8 +827,8 @@ const openAttachment = (id) => window.open(`/api/files/${id}`, '_blank');
               <span class="pgroup-row">
                 <i class="pgroup-dot" :class="`tone-${STATUS_TONE[s.status] || 'plain'}`" />
                 <span class="pgroup-code">{{ s.code }}</span>
-                <span class="pgroup-meta">{{ sibMeta(s) }}</span>
               </span>
+              <span class="pgroup-meta">{{ sibMeta(s) }}</span>
             </button>
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
           </nav>
