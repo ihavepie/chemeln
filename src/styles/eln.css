@@ -5765,20 +5765,19 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .stack-top::after {
   content: '';
   position: absolute;
-  /* 贴住卡片底边、只往右错：上下边都齐，也不会糊到展开的组员行上 */
-  inset: auto 0 0 0;
-  height: 44px;
+  /* 跟卡片一样大，往右上方错开（上面那一截可以突出来） */
+  inset: 0;
   border-radius: var(--r);
   pointer-events: none;
 }
 .stack-top::before {
   background: #faf8f1;
-  transform: translateX(8px);
+  transform: translate(8px, -8px);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .stack-top::after {
   background: #fdfcf7;
-  transform: translateX(4px);
+  transform: translate(4px, -4px);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
@@ -6126,10 +6125,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .grid-stack::after {
   content: '';
   position: absolute;
-  /* 贴住卡片**底边**、只往右错：上下边都和同排卡片齐平，
-     只在右下角露一小截当「这摞不止一张」的提示 */
-  inset: auto 0 0 0;
-  height: 64px;
+  /* 跟卡片一样大，**往右上方错开**：整张纸的边缘都能看出来（上边和右边露一截），
+     用户明确要求「上面可以突出来」，不要为了齐平把纸截成半截 */
+  inset: 0;
   border-radius: var(--r);
   pointer-events: none;
 }
@@ -6138,12 +6136,12 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    错开量别太大（11 / 5.5），再大就成一摞砖了。 */
 .grid-stack::before {
   background: #faf8f1;
-  transform: translateX(13px);
+  transform: translate(13px, -13px);
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
 }
 .grid-stack::after {
   background: #fdfcf7;
-  transform: translateX(6.5px);
+  transform: translate(6.5px, -6.5px);
   box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
 }
 
