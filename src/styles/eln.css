@@ -5664,3 +5664,90 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 @media (max-width: 1100px) {
   .pgroup { display: none; }
 }
+
+/* ================================================================
+   中栏列表里的「平行组」卡片堆：同 group_id 的重复 / 控制变量实验合成一张，
+   后面露出两层纸边，组员用编号小签直接点进去。
+   ================================================================ */
+.exp-stack { position: relative; margin-bottom: 7px; }
+
+/* 后面那两层纸边：只露 3px 和 6px */
+.exp-stack::before,
+.exp-stack::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 26px;
+  background: #f7f5f1;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  pointer-events: none;
+}
+.exp-stack::before { top: -6px; left: 4px; right: 4px; opacity: 0.75; }
+.exp-stack::after { top: -3px; left: 2px; right: 2px; opacity: 0.9; }
+
+.exp-card.is-stack {
+  position: relative;
+  background: var(--paper);
+  border-color: var(--line-2);
+  border-radius: var(--r);
+  padding: 10px 11px 8px;
+  z-index: 1;
+}
+.exp-card.is-stack:hover { background: #fdfcf8; }
+.exp-stack.is-active .exp-card.is-stack { border-color: var(--ink-4); }
+
+.stack-badge {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+  background: #f8f0e9;
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* 组员小签：一条一句编号 + 产率，点了直接跳那条 */
+.stack-codes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dotted var(--line-2);
+}
+
+.stack-chip,
+.stack-more {
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background: #f4f2ee;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.stack-chip:hover { background: #ece9e2; color: var(--ink-2); }
+.stack-chip.is-on { background: var(--paper); border-color: var(--ink-4); color: var(--accent-ink); }
+
+.stack-more {
+  margin-left: auto;
+  background: none;
+  color: var(--ink-4);
+}
+.stack-more:hover { color: var(--accent-ink); }
+
+/* 展开后的组员行：比普通卡片矮一档，左边缩进一点，看得出从属于上面那堆 */
+.stack-members {
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-2);
+  margin-left: 4px;
+}
+.exp-card.is-member { padding: 6px 8px; }
+.exp-card.is-member .exp-meta { margin-top: 1px; }

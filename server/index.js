@@ -394,6 +394,9 @@ function listExperiments(query) {
            (SELECT f.id FROM compound_files f
              WHERE f.compound_id = e.product_compound_id AND f.category = 'structure'
              ORDER BY f.id LIMIT 1) AS product_structure_id,
+           -- 平行组：中栏列表要把同组的几条叠成一张卡片
+           e.group_id,
+           (SELECT COUNT(*) FROM experiments g WHERE g.group_id = e.group_id AND e.group_id <> '') AS group_size,
            -- 卡片墙上的缩略图：优先反应式，其次顺手挑一张图片附件
            (SELECT a.id FROM attachments a
              WHERE a.exp_id = e.id

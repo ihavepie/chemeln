@@ -54,6 +54,57 @@ async function newCategory() {
 const catName = (it) => it.category_name || '';
 
 const activeId = () => (route.name === 'editor' ? Number(route.params.id) : null);
+
+/**
+ * 中栏列表的行：同一个平行组（重复 / 控制变量实验）收成一张卡片堆，
+ * 其余还是一行一条。组里第一条当「面子」，正在看的是组里哪一条就把哪条翻到前面。
+ */
+const openGroups = ref(new Set());
+
+const rows = computed(() => {
+  const out = [];
+  const seen = new Set();
+  for (const it of store.items) {
+    const gid = it.group_id || '';
+    if (!gid) {
+      out.push({ key: `e${it.id}`, one: it });
+      continue;
+    }
+    if (seen.has(gid)) continue;
+    seen.add(gid);
+    const members = store.items.filter((x) => (x.group_id || '') === gid);
+    // 搜索只命中组里一条时，不装成卡片堆
+    if (members.length < 2) {
+      out.push({ key: `e${it.id}`, one: it });
+      continue;
+    }
+    const ordered = [...members].sort((a, b) => a.id - b.id);   // 最早那条当「面子」
+    const active = ordered.find((m) => m.id === activeId());
+    const yields = ordered.map((m) => m.yield_pct).filter((y) => y != null && y >= 0 && y <= 100);
+    out.push({
+      key: `g${gid}`,
+      gid,
+      members: ordered,
+      face: active || ordered[0],
+      mean: yields.length ? Math.round((yields.reduce((a, b) => a + Number(b), 0) / yields.length) * 10) / 10 : null,
+    });
+  }
+  return out;
+});
+
+function toggleGroup(gid) {
+  const next = new Set(openGroups.value);
+  if (next.has(gid)) next.delete(gid);
+  else next.add(gid);
+  openGroups.value = next;
+}
+function isGroupOpen(gid) {
+  return openGroups.value.has(gid);
+}
+/** 组里任意一条正在看，就把卡片堆标成选中 */
+function isGroupActive(row) {
+  return row.members.some((m) => m.id === activeId());
+}
 </script>
 
 <template>
@@ -77,28 +128,90 @@ const activeId = () => (route.name === 'editor' ? Number(route.params.id) : null
     </div>
 
     <div class="listpane-body">
-      <button
-        v-for="it in store.items"
-        :key="it.id"
-        class="exp-card"
-        :aria-current="it.id === activeId() ? 'true' : 'false'"
-        @click="router.push(`/e/${it.id}`)"
-      >
-        <div class="top">
-          <span class="exp-code">{{ it.code }}</span>
-          <span class="tag" :class="STATUS_TONE[it.status]" style="font-size: 9px; padding: 1px 6px">{{ it.status }}</span>
-          <span class="exp-date">{{ it.date }}</span>
+      <template v-for="row in rows" :key="row.key">
+        <!-- 普通记录 -->
+        <button
+          v-if="row.one"
+          class="exp-card"
+          :aria-current="row.one.id === activeId() ? 'true' : 'false'"
+          @click="router.push(`/e/${row.one.id}`)"
+        >
+          <div class="top">
+            <span class="exp-code">{{ row.one.code }}</span>
+            <span class="tag" :class="STATUS_TONE[row.one.status]" style="font-size: 9px; padding: 1px 6px">{{ row.one.status }}</span>
+            <span class="exp-date">{{ row.one.date }}</span>
+          </div>
+          <div class="exp-title">{{ row.one.title || '（未命名实验）' }}</div>
+          <div class="exp-meta">
+            <span v-if="catName(row.one)" class="cat-tag">{{ catName(row.one) }}</span>
+            <span v-if="row.one.project">{{ row.one.project }}</span>
+            <template v-if="row.one.rxn_type"><span class="sep">·</span><span>{{ row.one.rxn_type }}</span></template>
+            <template v-if="row.one.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ row.one.yield_pct }}%</span></template>
+            <template v-if="row.one.attach_count"><span class="sep">·</span><span>{{ row.one.attach_count }} 附件</span></template>
+            <template v-if="row.one.locked"><span class="sep">·</span><span style="color: var(--accent)">已锁定</span></template>
+          </div>
+        </button>
+
+        <!-- 平行组：叠成一张卡片，后面露出两层纸边；展开后组员一条一行 -->
+        <div v-else class="exp-stack" :class="{ 'is-active': isGroupActive(row) }">
+          <div
+            class="exp-card is-stack"
+            :aria-current="isGroupActive(row) ? 'true' : 'false'"
+            role="button"
+            tabindex="0"
+            @click="router.push(`/e/${row.face.id}`)"
+            @keydown.enter="router.push(`/e/${row.face.id}`)"
+          >
+            <div class="top">
+              <span class="exp-code">{{ row.face.code }}</span>
+              <span class="stack-badge">平行 ×{{ row.members.length }}</span>
+              <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
+              <span class="exp-date">{{ row.face.date }}</span>
+            </div>
+            <div class="exp-title">{{ row.face.title || '（未命名实验）' }}</div>
+            <div class="exp-meta">
+              <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
+              <span v-if="row.face.project">{{ row.face.project }}</span>
+              <template v-if="row.mean != null"><span class="sep">·</span><span style="color: var(--ok)">均值 {{ row.mean }}%</span></template>
+            </div>
+            <div class="stack-codes">
+              <button
+                v-for="m in row.members"
+                :key="m.id"
+                type="button"
+                class="stack-chip"
+                :class="{ 'is-on': m.id === activeId() }"
+                :title="`${m.code}${m.yield_pct != null ? ` · ${m.yield_pct}%` : ''}`"
+                @click.stop="router.push(`/e/${m.id}`)"
+              >
+                {{ m.yield_pct != null ? `${m.code} ${m.yield_pct}%` : m.code }}
+              </button>
+              <button type="button" class="stack-more" @click.stop="toggleGroup(row.gid)">
+                {{ isGroupOpen(row.gid) ? '收起' : '展开' }}
+              </button>
+            </div>
+          </div>
+          <div v-if="isGroupOpen(row.gid)" class="stack-members">
+            <button
+              v-for="m in row.members"
+              :key="m.id"
+              class="exp-card is-member"
+              :aria-current="m.id === activeId() ? 'true' : 'false'"
+              @click="router.push(`/e/${m.id}`)"
+            >
+              <div class="top">
+                <span class="exp-code">{{ m.code }}</span>
+                <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
+                <span class="exp-date">{{ m.date }}</span>
+              </div>
+              <div class="exp-meta">
+                <template v-if="m.yield_pct != null"><span style="color: var(--ok)">{{ m.yield_pct }}%</span><span class="sep">·</span></template>
+                <span>{{ m.title || '（未命名实验）' }}</span>
+              </div>
+            </button>
+          </div>
         </div>
-        <div class="exp-title">{{ it.title || '（未命名实验）' }}</div>
-        <div class="exp-meta">
-          <span v-if="catName(it)" class="cat-tag">{{ catName(it) }}</span>
-          <span v-if="it.project">{{ it.project }}</span>
-          <template v-if="it.rxn_type"><span class="sep">·</span><span>{{ it.rxn_type }}</span></template>
-          <template v-if="it.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ it.yield_pct }}%</span></template>
-          <template v-if="it.attach_count"><span class="sep">·</span><span>{{ it.attach_count }} 附件</span></template>
-          <template v-if="it.locked"><span class="sep">·</span><span style="color: var(--accent)">已锁定</span></template>
-        </div>
-      </button>
+      </template>
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}

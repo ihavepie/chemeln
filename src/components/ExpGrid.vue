@@ -173,6 +173,7 @@ async function onDrop(ev, g) {
               <div class="grid-body">
                 <div class="top">
                   <span class="exp-code">{{ it.code }}</span>
+                  <span v-if="it.group_size > 1" class="stack-badge" title="属于一个平行组（重复 / 控制变量实验）">平行 ×{{ it.group_size }}</span>
                   <span class="tag" :class="STATUS_TONE[it.status]" style="font-size: 9px; padding: 1px 6px">{{ it.status }}</span>
                   <span class="exp-date">{{ it.date }}</span>
                 </div>
