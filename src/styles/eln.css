@@ -2713,7 +2713,18 @@ kbd {
 
 /* 组分选择：和「反应温度」那类选择器一样的胶囊面板 */
 .sheet .rtable .role-menu { min-width: 196px; max-width: 268px; }
-.sheet .rtable .role-menu .qchip { font-family: var(--sans); font-size: 11.5px; padding: 4px 8px; }
+/* 胶囊按行撑满：菜单里不留「看着是菜单、点了却没反应」的空档（用户报过「有时候点不生效」）；
+   胶囊之间的 4px 缝点下去会落到菜单底色上，那条走 closeRoleMenu，也有反应 */
+.sheet .rtable .role-menu .qchip {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  padding: 4px 8px;
+}
+.sheet .rtable .role-menu { gap: 4px; }
 
 
 

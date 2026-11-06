@@ -49,7 +49,7 @@
 - `src/views/EmptyEditor.vue` — `/list` 的容器：中栏列表 + `.editor`（里面是 `.grid-tools` 工具行 + `ExpTable` 或 `ExpGrid`）。工具行两个按钮：**表格视图 / 卡片视图**（`setView('exp', …)`）和 **新建实验**。
 - `src/views/CompoundsView.vue` — `/compounds` 的容器：跟实验页同构，工具行是 **表格视图 / 卡片视图 · 批量标签 · 新建化合物**，`LabelBatchPanel` 也挂在这里（`batchOpen`）。
 - `src/views/EditorView.vue` — 实验编辑器：两页 A4 版式、自动保存；**第 1 页纸外左侧有一排平行实验书签**（`.pgroup--float`：`Teleport to="body"` 的固定浮层，钉在纸面左边缘、整条在纸外，同 `group_id` 的重复 / 控制变量实验显示「状态点 + 编号 · 产率或状态」，悬停出预览卡、点了才切记录，末尾「＋」从当前这条再建一条）；工具栏只剩 已保存 / 保存 / 重置 / **⋯ 菜单**，**二维码、打印、锁定·解锁、导出、复制、产物存库、删除**都在菜单里（删除是红色项，删前先 `gone = true` 停自动保存）。**手机上（≤820px）直接渲染 `ExperimentMobile`** 并跳过 `load()`。二维码弹窗里的「打印这张码」打的是独立纸片 `.exp-qr-sheet`（40mm 码 + 编号），**没有动记录本身的版式**——别往 `.sheet-runner` 里塞码，会破坏「打印恒 2 页」。
-- `src/components/ReagentTable.vue` — 投料表（最复杂的组件：组分/角色菜单、试剂名自动带库、当量 mmol 用量联动、结构卡与解绑、多步）。
+- `src/components/ReagentTable.vue` — 投料表（最复杂的组件：组分/角色菜单、试剂名自动带库、当量 mmol 用量联动、结构卡与解绑、多步）。**「组分」那个胶囊菜单点空白处也要有反应**：以前菜单里除了胶囊就是一大片点不动的底色（被 `@click.stop` 吞了），用户报「有时候点不生效」——现在 `.role-menu` 上挂 `@click.stop="closeRoleMenu"`（点空白 = 关菜单），并且 `.role-menu .qchip` 改成 `flex: 1 1 auto` **按行撑满**（`gap: 4px`），最后一行的「其他」会独占一整行，菜单里基本没有死区。
 - `src/components/CondRow.vue` — 条件行（溶剂/浓度/温度/时间节点/气氛）。
 - `src/components/ResultBlock.vue` — 结果块（产物、MW、质量、收率、dr/ee、产物挂库）。「产物是库里的哪个化合物」那个弹窗（`.recipe-list` / `.recipe-opt`，跟「套用已有投料表」共用）**每条前面挂一张 38×38 的结构式缩略图**（`c.structure_id` → `/api/compound-files/:id`，没有结构图就给 `molecule` 图标；`.recipe-opt` 的 `align-items` 从 `baseline` 改成 `center`）。
 - `src/components/SchemeBlock.vue` — 反应式上传位。

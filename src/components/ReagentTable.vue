@@ -751,7 +751,8 @@ function onDrop(ev) {
                     <Icon name="down" :size="11" />
                   </button>
                 </div>
-                <div v-if="roleMenuFor === rows.indexOf(r)" class="qmenu role-menu" :class="{ up: roleMenuUp }" @click.stop>
+                <!-- 点菜单空白处也算「有反应」：直接关掉，别让那一下像是没点到 -->
+                <div v-if="roleMenuFor === rows.indexOf(r)" class="qmenu role-menu" :class="{ up: roleMenuUp }" @click.stop="closeRoleMenu">
                   <button
                     v-for="role in ROLES"
                     :key="role"
