@@ -6449,3 +6449,12 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .ctx-opt.is-danger .ctx-icon { color: #c58b8a; }
 .ctx-opt.is-danger:hover { background: var(--bad-soft); color: var(--bad); }
 .ctx-sep { height: 1px; margin: 2px 2px; background: #f1f0ec; }
+
+/* 锁定的记录：编号后面一枚小锁（原来 meta 里那句「已锁定」改用图标，不占那行地方） */
+.exp-lock {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--accent);
+}
+.exp-lock .i { display: block; }

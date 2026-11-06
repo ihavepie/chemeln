@@ -293,6 +293,7 @@ function onStackFace(row) {
         >
           <div class="top">
             <span class="exp-code">{{ row.one.code }}</span>
+            <span v-if="row.one.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
             <span class="tag" :class="STATUS_TONE[row.one.status]" style="font-size: 9px; padding: 1px 6px">{{ row.one.status }}</span>
             <span class="exp-date">{{ row.one.date }}</span>
           </div>
@@ -303,7 +304,6 @@ function onStackFace(row) {
             <template v-if="row.one.rxn_type"><span class="sep">·</span><span>{{ row.one.rxn_type }}</span></template>
             <template v-if="row.one.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ row.one.yield_pct }}%</span></template>
             <template v-if="row.one.attach_count"><span class="sep">·</span><span>{{ row.one.attach_count }} 附件</span></template>
-            <template v-if="row.one.locked"><span class="sep">·</span><span style="color: var(--accent)">已锁定</span></template>
           </div>
         </button>
 
@@ -322,6 +322,7 @@ function onStackFace(row) {
             >
               <div class="top">
                 <span class="exp-code">{{ row.face.code }}</span>
+                <span v-if="row.face.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                 <span class="stack-badge">平行 ×{{ row.members.length }}</span>
                 <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
                 <span class="exp-date">{{ row.face.date }}</span>
@@ -369,6 +370,7 @@ function onStackFace(row) {
               >
                 <div class="top">
                   <span class="exp-code">{{ m.code }}</span>
+                  <span v-if="m.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                   <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
                   <span class="stack-variant" :title="m.diffs && m.diffs.length ? m.diffs.join('、') : '与基准条件相同'">{{ m.variant }}</span>
                   <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
