@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
-import { store, loadBoot, loadList, setProject, addProject } from '../store.js';
+import { store, loadBoot, loadList, setProject, addProject, createCompound } from '../store.js';
 import { api } from '../api.js';
 import { prompt, toast } from '../lib/feedback.js';
 
@@ -32,6 +32,9 @@ const active = computed(() => {
   // v1 里筛选表的详情页不点亮任何一个导航项（route.name 就叫 screening）
   return n || 'home';
 });
+
+/** 现在是不是在化合物那一侧（库或某个化合物页）——决定大按钮建什么 */
+const onCompounds = computed(() => active.value === 'compounds');
 
 /* ------------------------------------------------------------ 课题切换 */
 
@@ -104,6 +107,17 @@ async function newExperiment() {
   router.push(`/e/${exp.id}`);
   toast('已新建实验记录');
 }
+
+/** 在化合物库 / 化合物页时，那个大按钮改成「新建化合物」 */
+async function newCompound() {
+  try {
+    const c = await createCompound();
+    router.push(`/c/${c.id}`);
+    toast('已新建化合物');
+  } catch (e) {
+    toast(e.message || '建不了这个化合物', 'err');
+  }
+}
 </script>
 
 <template>
@@ -163,8 +177,8 @@ async function newExperiment() {
     </div>
 
     <div class="rail-actions">
-      <button class="btn btn-primary" style="width: 100%" @click="newExperiment">
-        <Icon name="plus" :size="14" /> 新建实验
+      <button class="btn btn-primary" style="width: 100%" @click="onCompounds ? newCompound() : newExperiment()">
+        <Icon name="plus" :size="14" /> {{ onCompounds ? '新建化合物' : '新建实验' }}
       </button>
     </div>
 
