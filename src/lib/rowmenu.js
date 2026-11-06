@@ -190,11 +190,11 @@ async function removeGroup(row, router) {
 export function groupMenu(ev, row, router, opts = {}) {
   const n = row.members.length;
   const allLocked = row.members.every((m) => m.locked);
+  // 删除这类破坏性动作一律压到最下面（用户点名要的排法）
   const items = [
     { key: 'parallel', label: '新建平行实验', icon: 'plus', hint: '加进这一组' },
     { key: 'lockgroup', label: allLocked ? '解锁整组' : '锁定整组', icon: allLocked ? 'unlock' : 'lock', hint: `${n} 条` },
     { key: 'copycodes', label: '复制整组编号', icon: 'hash' },
-    { key: 'delgroup', label: '移入回收站（整组）', icon: 'trash', danger: true, hint: `${n} 条` },
     CTX_SEP,
     { head: '单独处理' },
     ...row.members.map((m) => ({
@@ -209,6 +209,8 @@ export function groupMenu(ev, row, router, opts = {}) {
         { key: `del:${m.id}`, label: '移入回收站（只这条）', icon: 'trash', danger: true },
       ],
     })),
+    CTX_SEP,
+    { key: 'delgroup', label: '移入回收站（整组）', icon: 'trash', danger: true, hint: `${n} 条` },
   ];
   openCtxMenu(ev, items, (key) => {
     if (key === 'parallel') return void newParallel(row.face, router);
