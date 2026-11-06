@@ -39,7 +39,7 @@
 - `src/components/FilePreview.vue` — **附件就地预览弹窗**（实验附件 `/api/files/:id`、化合物文件 `/api/compound-files/:id` 共用）：图片直接铺开、PDF 用 `<iframe>`（Safari 自带阅读器）、`.txt/.csv/.md/.jdx` 拉下来放等宽区（>200 KB 截断），其它格式给个说明 + 下载；底部「新标签页打开 / 下载」。
 - `src/components/AppModal.vue` — 通用弹窗（`modelValue/title/confirmText/danger/showFooter/showConfirm/width/closeOnBackdrop`）。`modelValue` 默认 `true`，传 `false` 只是隐藏不销毁内容（给需要「关了还在」的 iframe 用）。
 - `src/components/CatPick.vue` — 分类下拉（自绘菜单；`show-all` 决定是「筛选」还是「给记录归类」）。传 `kinds` 时菜单里会多一节「类型」（两列排、`.cat-menu-kinds`），选中的值形如 `kind:底物`，由调用方区分。菜单有 `max-height: 56vh` + 滚动，分类多了不会把屏幕顶下去。
-- `src/components/ProjPick.vue` — 记录页「课题」格子的下拉（能打字，也能从已有课题里点一个）。小箭头**贴在输入框右侧内部、无边框**（不要做成带框的小方块，用户明确讨厌那种“空白的框”）；菜单贴着输入框下方弹出、宽度同输入框，下面放不下就往上翻。
+- `src/components/ProjPick.vue` — 记录页「课题」格子的下拉（能打字，也能从已有课题里点一个）。小箭头**贴在输入框右侧内部、无边框**（不要做成带框的小方块，用户明确讨厌那种“空白的框”）；菜单贴着输入框下方弹出，下面放不下就往上翻。**宽度不是照抄输入框**：记录页那个格子只有 ~95px（`.cmp-fields` 是 4 列网格），照抄会让「这个是测试课题 16」溢出成一截、`overflow-y:auto` 顺带把 `overflow-x` 也变成 auto —— 于是那个下拉**能横向拖**（用户截图问过「为什么这个是横向拖动」）。现在 `MENU_MIN_W = 176`，宽度 = max(输入框宽, 176) 再夹进视口，并且 `overflow-x: hidden`。
 - `src/components/PrintPanel.vue` — 打印面板：克隆真实两页 DOM 缩成 A4 缩略图 + 选项（范围/附件/页眉/黑白）；可以走系统打印（`body` 挂 `print-*` 类，`afterprint` 时摘掉），也可以「存成 PDF」走后端 WebKit 渲染；`window.print()` 前关掉自动保存。
 - `src/components/LabelBatchPanel.vue` — 批量打印化合物标签：勾选当前列表里的化合物 + 四档排版（大 100×46 / 中 65×30 / 小 50×23 / 迷你 34×14mm，分别 12 / 27 / 48 / 95 张一页），自己拼 A4 页（页边距 3mm）；整版 `justify-content: flex-end` **靠右对齐**，一次生成多页 PDF。大/中/小是原版式整体缩放，迷你走 `labelMarkupMini`（精简版式：结构式 9.5mm + 编号/名称/MW·Rf + 二维码 8mm）。
 - `src/lib/print.js` — 打印导出共用：`collectCss()`（把 `@media print` 规则提到最后）、`A4_CSS`（`body{zoom:0.7498}` + `.pdf-page` 210×297mm）、`downloadBlob()`。

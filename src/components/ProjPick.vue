@@ -20,14 +20,19 @@ const wrap = ref(null);
 const pos = ref({ top: 0, left: 0, width: 0, maxHeight: 0 });
 
 /**
- * 就是普通下拉：菜单贴着输入框正下方弹出、宽度跟输入框一样；
- * 下面放不下就往上翻。之所以用 fixed，是因为表格和滚动区会把它裁掉。
+ * 就是普通下拉：菜单贴着输入框正下方弹出、下面放不下就往上翻；
+ * 之所以用 fixed，是因为表格和滚动区会把它裁掉。
+ * **宽度不跟输入框一样**：记录页的「课题」格只有 ~95px（`.cmp-fields` 是 4 列网格），
+ * 照抄那个宽度会让「这个是测试课题 16」这种长的溢出成一截、还能横向拖，
+ * 所以至少给 MENU_MIN_W，再把左边夹回视口内。
  */
+const MENU_MIN_W = 176;
+
 function toggle() {
   if (props.disabled) return;
   if (!open.value && wrap.value) {
     const r = wrap.value.getBoundingClientRect();
-    const width = Math.round(r.width);
+    const width = Math.min(Math.max(Math.round(r.width), MENU_MIN_W), window.innerWidth - 16);
     const est = Math.min(Math.max((props.projects.length || 3) * 27 + 10, 74), Math.round(window.innerHeight * 0.4));
     const roomBelow = window.innerHeight - r.bottom;
     const top = roomBelow < est + 10 ? Math.max(8, Math.round(r.top - est - 4)) : Math.round(r.bottom + 4);
@@ -81,6 +86,7 @@ onBeforeUnmount(() => {
         maxWidth: 'none',
         maxHeight: `${pos.maxHeight}px`,
         overflowY: 'auto',
+        overflowX: 'hidden',
       }"
       @click.stop
     >
