@@ -2728,6 +2728,19 @@ const LOOKUP_DIR = path.join(__dirname, '..', '.cache', 'lookup');
 const LOOKUP_TTL = 30 * 24 * 3600 * 1000;
 const CAS_RX = /^\d{2,7}-\d{2}-\d$/;
 
+/** CAS 号有校验位（最后一位 = 前面数字从右往左加权 1,2,3… 求和 mod 10）：
+    光靠正则会把供应商货号（2231932-21-1 这种）当成 CAS，实测踩过。 */
+function casValid(cas) {
+  const s = String(cas || '').trim();
+  if (!CAS_RX.test(s)) return false;
+  // CAS_RX 没有分组，直接按「前段-中段-校验位」拆
+  const [head, mid, check] = s.split('-');
+  const digits = (head + mid).split('').reverse();
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) sum += Number(digits[i]) * (i + 1);
+  return sum % 10 === Number(check);
+}
+
 /** 取 JSON（不引第三方库）：404 当「查不到」返回 null，其它非 200 抛错 */
 function fetchJson(target, ms = 12000) {
   return new Promise((resolve, reject) => {
@@ -2770,19 +2783,21 @@ async function pubchemLookup(kind, value) {
   const cids = await pubchemCids(kind, value);
   if (!cids.length) return { found: false, query: value };
   const cid = cids[0];
-  const table = await fetchJson(
-    `${PUBCHEM}/compound/cid/${cid}/property/IUPACName,MolecularFormula,MolecularWeight,InChIKey/JSON`
-  );
+  // 三个请求互不依赖，一起发：不然一次查询要串行等 3 秒（用户会问「快吗」）
+  const [table, syn, props] = await Promise.all([
+    fetchJson(`${PUBCHEM}/compound/cid/${cid}/property/IUPACName,MolecularFormula,MolecularWeight,InChIKey/JSON`),
+    fetchJson(`${PUBCHEM}/compound/cid/${cid}/synonyms/JSON`).catch(() => null),
+    pubchemProps(cid),
+  ]);
   const p = (table && table.PropertyTable && table.PropertyTable.Properties && table.PropertyTable.Properties[0]) || {};
-  let cas = [];
-  try {
-    const syn = await fetchJson(`${PUBCHEM}/compound/cid/${cid}/synonyms/JSON`);
-    const list = (syn && syn.InformationList && syn.InformationList.Information && syn.InformationList.Information[0] &&
-      syn.InformationList.Information[0].Synonym) || [];
-    cas = list.map(String).filter((s) => CAS_RX.test(s)).slice(0, 3);
-  } catch {
-    /* 同义词接口偶尔 404，没有就没有 */
-  }
+  const list = (syn && syn.InformationList && syn.InformationList.Information && syn.InformationList.Information[0] &&
+    syn.InformationList.Information[0].Synonym) || [];
+  // 校验位能挡掉「长得像 CAS 的供应商货号」；按登记号从小到大排，最小的一般就是母体的 CAS
+  const cas = list
+    .map(String)
+    .filter(casValid)
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+    .slice(0, 3);
   return {
     found: true,
     query: value,
@@ -2792,8 +2807,68 @@ async function pubchemLookup(kind, value) {
     mw: p.MolecularWeight ? String(p.MolecularWeight) : '',
     inchikey: str(p.InChIKey),
     cas,
+    props,
     url: `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`,
     others: cids.slice(1, 4),
+  };
+}
+
+/** PubChem 的「实验性质」那一节：熔点 / 沸点 / 密度 / 闪点 / 性状 / 溶解度
+    （PUG REST 的 property 接口没有这些，只能走 pug_view，一次取一整节，约 78 KB） */
+const PUG_VIEW = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound';
+
+function collectHeadings(sec, wanted, out) {
+  const head = str(sec.TOCHeading).trim();
+  if (wanted.has(head)) {
+    for (const info of sec.Information || []) {
+      for (const m of (info.Value && info.Value.StringWithMarkup) || []) {
+        if (m && m.String) out[head].push(String(m.String).trim());
+      }
+      const num = info.Value && info.Value.Number;
+      if (num != null) out[head].push(String(num));
+    }
+  }
+  for (const child of sec.Section || []) collectHeadings(child, wanted, out);
+}
+
+/**
+ * 优先挑带 ℃ 的那条（化学习惯），没有就第一条，然后把「(NTP, 1992)」「at 760 mmHg」「- Denser than water…」
+ * 这些出处 / 补充说明砍掉——否则一行物性会拖成两屏。max 控制长度。
+ */
+function pickProp(list, max = 40, stripAt = true) {
+  const arr = (list || []).map((x) => String(x).trim()).filter(Boolean);
+  if (!arr.length) return '';
+  let v = arr.find((x) => /°C|℃/.test(x)) || arr[0];
+  v = v
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/\s+[-–]\s.*$/, '')   // 只砍「空格-空格」这种补充说明，别把 needle-like 砍断
+    .replace(/\s*;.*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // 「1.4 at 20 °C/4 °C」这种测定条件，数字后面那截去掉（溶解度例外，那是它的意思）
+  if (stripAt) v = v.replace(/\s+at\s+[\d.].*$/i, '').trim();
+  if (!v) v = arr[0];
+  return v.length > max ? `${v.slice(0, max - 1).trim()}…` : v;
+}
+
+async function pubchemProps(cid) {
+  const wanted = new Set(['Melting Point', 'Boiling Point', 'Density', 'Flash Point', 'Color/Form', 'Physical Description', 'Solubility']);
+  const got = {};
+  for (const k of wanted) got[k] = [];
+  try {
+    const data = await fetchJson(`${PUG_VIEW}/${cid}/JSON?heading=Experimental+Properties`, 15000);
+    for (const sec of (data && data.Record && data.Record.Section) || []) collectHeadings(sec, wanted, got);
+  } catch {
+    return {}; // 这一节没有就只拿到名称 / CAS，不算失败
+  }
+  return {
+    mp: pickProp(got['Melting Point']),
+    bp: pickProp(got['Boiling Point']),
+    density: pickProp(got.Density, 28),
+    flash: pickProp(got['Flash Point']),
+    // 性状常常是一整句，留长一点（表单那一格是整行）
+    appearance: pickProp(got['Color/Form'].length ? got['Color/Form'] : got['Physical Description'], 80, false),
+    solubility: pickProp(got.Solubility, 60, false),
   };
 }
 

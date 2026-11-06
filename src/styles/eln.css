@@ -6263,7 +6263,28 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .sk-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 
 /* 化合物页「结构式」格子下面的小工具行（画结构式） */
-.cmp-structure-tools { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+/* .cmp-top 是「缩略图 | 字段」两栏：三个子元素要显式排，不然自动布局会把字段挤进 148px 的窄格（踩过一次） */
+.cmp-top > .cmp-structure { grid-column: 1; grid-row: 1; }
+.cmp-top > .cmp-fields { grid-column: 2; grid-row: 1; }
+/* 「画结构式」+ 查询链接 + 物性：贴在下面独占一行 */
+.cmp-structure-tools {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.cmp-props {
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
 
 /* 结构信息查询（PubChem）：画板里查出来的一行 + 化合物页那两个跳转链接 */
 .sk-info {
@@ -6289,3 +6310,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   border-bottom: 1px dotted var(--line-2);
 }
 .cmp-lookup-link:hover { color: var(--accent-ink); }
+
+/* 画板信息条里的物性（熔点 / 密度 / 沸点）：比名称那行淡一点，太窄时直接不显示 */
+.sk-info-props { color: var(--ink-4); }
+@media (max-width: 900px) {
+  .sk-info-props { display: none; }
+}

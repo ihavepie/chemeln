@@ -205,6 +205,16 @@ async function fillFromLookup(smiles) {
     form.mw = info.mw;
     filled.push('MW');
   }
+  // 物性：PubChem 的「实验性质」那一节。熔点 / 性状有对应的格子，其余（密度 / 沸点…）只显示不落库
+  const pr = info.props || {};
+  if (!String(form.mp || '').trim() && pr.mp) {
+    form.mp = pr.mp;
+    filled.push('熔点');
+  }
+  if (!String(form.appearance || '').trim() && pr.appearance) {
+    form.appearance = pr.appearance;
+    filled.push('性状');
+  }
   if (filled.length) toast(`PubChem：已补上${filled.join(' / ')}`, 'ok');
   return info;
 }
@@ -221,6 +231,24 @@ async function lookupNow() {
     toast(describeInfo(info) || `PubChem #${info.cid}`, 'info');
   }
 }
+
+/** CAS 那格有值就能去 ChemicalBook 搜（不用等这次会话查过；刷新后链接也还在） */
+const cbUrl = computed(() => {
+  if (lastLookup.value && lastLookup.value.found && chemicalBookUrl(lastLookup.value)) return chemicalBookUrl(lastLookup.value);
+  const cas = String(form.cas || '').trim();
+  return /^\d{2,7}-\d{2}-\d$/.test(cas) ? chemicalBookUrl({ cas: [cas] }) : '';
+});
+
+/** 熔点 / 性状已经填进格子了，这里只列没地方放的物性（密度 / 沸点 / 闪点 / 溶解度） */
+const lookupProps = computed(() => {
+  const pr = (lastLookup.value && lastLookup.value.props) || {};
+  const bits = [];
+  if (pr.density) bits.push(`密度 ${pr.density}`);
+  if (pr.bp) bits.push(`沸点 ${pr.bp}`);
+  if (pr.flash) bits.push(`闪点 ${pr.flash}`);
+  if (pr.solubility) bits.push(`溶解度 ${pr.solubility}`);
+  return bits.join(' · ');
+});
 
 async function applySketched({ smiles, info: sketchedInfo }) {
   if (!c.value || !smiles) return;
@@ -597,13 +625,14 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
               title="这条结构是从 PubChem 查的"
             >PubChem #{{ lastLookup.cid }}</a>
             <a
-              v-if="lastLookup && chemicalBookUrl(lastLookup)"
+              v-if="cbUrl"
               class="cmp-lookup-link"
-              :href="chemicalBookUrl(lastLookup)"
+              :href="cbUrl"
               target="_blank"
               rel="noreferrer"
               title="按 CAS 去 ChemicalBook 搜"
             >ChemicalBook</a>
+            <span v-if="lookupProps" class="cmp-props">{{ lookupProps }}</span>
           </div>
 
           <div class="cmp-fields">
@@ -622,8 +651,9 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <label class="c-field"><span>分子式</span><input v-model="form.formula" placeholder="C8H8O" /></label>
             <label class="c-field"><span>MW</span><input class="n" type="number" step="any" v-model="form.mw" placeholder="120.15" /></label>
             <label class="c-field"><span>CAS</span><input class="mono" v-model="form.cas" placeholder="50-78-2" title="结构式查出来的，也能手填；后面的 ChemicalBook 链接按它去搜" /></label>
-            <label class="c-field"><span>性状</span><input v-model="form.appearance" placeholder="无色液体" /></label>
             <label class="c-field"><span>熔点</span><input v-model="form.mp" placeholder="−26 ℃" /></label>
+            <!-- 性状常常是一整句（PubChem 上就是 "Monoclinic tablets or needle-like crystals"），独占一行 -->
+            <label class="c-field full"><span>性状</span><input v-model="form.appearance" placeholder="无色液体" /></label>
             <label class="c-field full"><span>HRMS</span><input v-model="form.hrms" placeholder="calcd for C8H9O [M+H]+ 121.0648, found 121.0651" /></label>
             <label class="c-field full"><span>IR</span><input v-model="form.ir" placeholder="ν/cm⁻¹ 2928, 1712, 1612" /></label>
             <label class="c-field full"><span>旋光</span><input v-model="form.rotation" placeholder="[α]D²⁰ = +12.4 (c 1.0, CHCl₃)" /></label>

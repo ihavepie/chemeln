@@ -2,7 +2,7 @@
 import { onBeforeUnmount, ref, watch } from 'vue';
 import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
-import { structureInfo, chemicalBookUrl, describeInfo } from '../lib/lookup.js';
+import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../lib/lookup.js';
 
 /**
  * 画结构式：弹窗里嵌 Ketcher（`/vendor/ketcher/index.html`，由 vendor-build/ketcher 打包而来，
@@ -125,6 +125,7 @@ function clearAll() {
         <span class="sk-info-name">{{ info.name || '（PubChem 没有正式名）' }}</span>
         <span v-if="info.cas && info.cas.length" class="sk-info-cas mono">CAS {{ info.cas[0] }}</span>
         <span class="sk-info-sub">{{ describeInfo({ ...info, name: '', cas: [] }).replace(/^ · /, '') }}</span>
+        <span v-if="describeProps(info)" class="sk-info-sub sk-info-props">{{ describeProps(info) }}</span>
         <span class="spacer" style="flex: 1" />
         <a :href="info.url" target="_blank" rel="noreferrer">PubChem</a>
         <a v-if="chemicalBookUrl(info)" :href="chemicalBookUrl(info)" target="_blank" rel="noreferrer">ChemicalBook</a>

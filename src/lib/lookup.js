@@ -51,3 +51,13 @@ export function describeInfo(info) {
   if (info.mw) bits.push(info.mw);
   return bits.join(' · ');
 }
+
+/** 物性一行：熔点 / 密度 / 沸点（PubChem「实验性质」那一节，有才列） */
+export function describeProps(info) {
+  const pr = (info && info.props) || {};
+  const bits = [];
+  if (pr.mp) bits.push(`熔点 ${pr.mp}`);
+  if (pr.density) bits.push(`密度 ${pr.density}`);
+  if (pr.bp) bits.push(`沸点 ${pr.bp}`);
+  return bits.join(' · ');
+}
