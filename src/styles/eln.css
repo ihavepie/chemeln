@@ -6469,3 +6469,25 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .ctx-caret { flex: none; margin-left: 2px; color: var(--ink-4); font-size: 12px; line-height: 1; }
 .ctx-menu.is-sub { z-index: 2101; min-width: 132px; }
+
+/* 记录页表头：关掉「温度 / 湿度」时补一个占位的空单元格，
+   不然那一行只剩 4 格，右边会缺一块没有边框的白洞 */
+.sheet-meta td.meta-fill {
+  border: none;
+  background: var(--paper);
+}
+
+/* 设置页 06「记录页显示」：一堆勾选框，排成两列 */
+.sheet-blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.sheet-blocks label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}

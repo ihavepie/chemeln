@@ -19,6 +19,7 @@ import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, store, categoriesOfProject, addCategory } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
+import { sheetPrefs } from '../lib/sheetprefs.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -783,10 +784,13 @@ const openAttachment = (id) => {
                   <input type="date" v-model="fields.date" :disabled="exp.locked" />
                   <button type="button" class="mini noprint" title="设为今天" @click="fields.date = todayISO(); notify()">今</button>
                 </td>
-                <th>温度</th>
-                <td><input v-model="fields.ambient_temp" placeholder="18.8 ℃" :disabled="exp.locked" /></td>
-                <th>湿度</th>
-                <td><input v-model="fields.ambient_humid" placeholder="34 %" :disabled="exp.locked" /></td>
+                <template v-if="sheetPrefs.env">
+                  <th>温度</th>
+                  <td><input v-model="fields.ambient_temp" placeholder="18.8 ℃" :disabled="exp.locked" /></td>
+                  <th>湿度</th>
+                  <td><input v-model="fields.ambient_humid" placeholder="34 %" :disabled="exp.locked" /></td>
+                </template>
+                <td v-else colspan="4" class="meta-fill" />
               </tr>
               <tr>
                 <th>实验人</th>
@@ -816,7 +820,7 @@ const openAttachment = (id) => {
                   </div>
                 </td>
               </tr>
-              <tr>
+              <tr v-if="sheetPrefs.literature">
                 <th>文献</th>
                 <td colspan="7"><input v-model="fields.literature" placeholder="DOI / 参考文献" :disabled="exp.locked" /></td>
               </tr>
@@ -824,6 +828,7 @@ const openAttachment = (id) => {
           </table>
 
           <SchemeBlock
+            v-if="sheetPrefs.scheme"
             :attachments="exp.attachments || []"
             :locked="exp.locked"
             :hovered="hovered"
@@ -832,15 +837,18 @@ const openAttachment = (id) => {
             :on-open="openAttachment"
           />
 
-          <ReagentTable :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
+          <ReagentTable v-if="sheetPrefs.reagents" :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
             <template #cond>
               <CondRow :model="fields" :notify="notify" :locked="exp.locked" :fixed="condFixed" />
             </template>
           </ReagentTable>
 
-          <ResultBlock :model="fields" :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)" />
+          <ResultBlock
+            v-if="sheetPrefs.result"
+            :model="fields"
+            :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)" />
 
-          <section class="sec sec-tight sec-tlc">
+          <section v-if="sheetPrefs.tlc" class="sec sec-tight sec-tlc">
             <div class="block-head">
               <span class="lbl">TLC</span>
               <input class="tlc-note" v-model="fields.tlc_note" placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸" :disabled="exp.locked" />
@@ -929,35 +937,36 @@ const openAttachment = (id) => {
             <span>{{ exp.code }}</span>
           </div>
 
-          <section class="sec">
+          <section v-if="sheetPrefs.objective" class="sec">
             <h2 class="sec-title"><span class="num">一</span>实验目的</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.objective" :disabled="exp.locked" placeholder="实验目的与预期结果" />
           </section>
-          <section class="sec">
+          <section v-if="sheetPrefs.procedure" class="sec">
             <h2 class="sec-title"><span class="num">二</span>实验操作</h2>
             <textarea class="sheet-text mono" rows="3" v-autogrow v-model="fields.procedure" :disabled="exp.locked" placeholder="按时间顺序记录加料、换气、升温、取样等操作节点" />
           </section>
-          <section class="sec">
+          <section v-if="sheetPrefs.notes" class="sec">
             <h2 class="sec-title"><span class="num">三</span>实验现象</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.notes" :disabled="exp.locked" placeholder="颜色、溶解性、放热、气体、析出、TLC 变化" />
           </section>
-          <section class="sec">
+          <section v-if="sheetPrefs.workup" class="sec">
             <h2 class="sec-title"><span class="num">四</span>后处理</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.workup" :disabled="exp.locked" placeholder="淬灭、萃取、干燥、柱层析（洗脱剂配比、Rf）" />
           </section>
-          <section class="sec">
+          <section v-if="sheetPrefs.characterization" class="sec">
             <h2 class="sec-title"><span class="num">五</span>表征数据</h2>
             <textarea class="sheet-text mono" rows="4" v-autogrow v-model="fields.characterization" :disabled="exp.locked" />
             <div class="chips noprint">
               <button v-for="c in chips" :key="c" class="chip" type="button" @click="insertChip(c)">{{ c }}</button>
             </div>
           </section>
-          <section class="sec">
+          <section v-if="sheetPrefs.conclusion" class="sec">
             <h2 class="sec-title"><span class="num">六</span>讨论与结论</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.conclusion" :disabled="exp.locked" placeholder="本组条件的结论与下一轮拟考察的变量" />
           </section>
 
           <AttachmentsBlock
+            v-if="sheetPrefs.attachments"
             :exp-id="exp.id"
             :attachments="exp.attachments || []"
             :locked="exp.locked"

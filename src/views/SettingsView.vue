@@ -4,6 +4,7 @@ import Icon from '../components/Icon.vue';
 import AppModal from '../components/AppModal.vue';
 import { api } from '../api.js';
 import { peekPrefs, setPeekPref, PEEK_LABELS } from '../lib/peek.js';
+import { sheetPrefs, setSheetPref, showAllSheetBlocks, SHEET_BLOCKS } from '../lib/sheetprefs.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 
@@ -584,6 +585,23 @@ async function removeProject(p) {  const ok = await confirm({
         <div class="row" style="gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
           <label v-for="(label, key) in PEEK_LABELS" :key="key" style="display: flex; align-items: center; gap: 6px; cursor: pointer">
             <input type="checkbox" :checked="peekPrefs[key]" @change="setPeekPref(key, $event.target.checked)" />
+            {{ label }}
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2 class="card-title"><span class="n">06</span>记录页显示</h2>
+          <span class="spacer" />
+          <button class="btn btn-sm btn-ghost" @click="showAllSheetBlocks()">全部显示</button>
+        </div>
+        <p class="card-note">
+          实验记录那张 A4 上要出现哪几块。取消勾选的块，页面和打印 / 存 PDF 都不出现（内容不会丢，重新勾上就回来；只存在这台浏览器里）。
+        </p>
+        <div class="sheet-blocks">
+          <label v-for="(label, key) in SHEET_BLOCKS" :key="key">
+            <input type="checkbox" :checked="sheetPrefs[key]" @change="setSheetPref(key, $event.target.checked)" />
             {{ label }}
           </label>
         </div>
