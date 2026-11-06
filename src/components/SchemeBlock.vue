@@ -54,7 +54,7 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
     </div>
     <div
       class="scheme-slot"
-      :class="{ 'is-hover': hovered === 'scheme' }"
+      :class="{ 'is-hover': hovered === 'scheme', has: !!scheme }"
       @mouseenter="onHover('scheme')"
       @mouseleave="onHover('')"
       @click="onPick('scheme')"

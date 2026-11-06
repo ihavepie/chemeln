@@ -1810,7 +1810,7 @@ kbd {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 300px;   /* 特别方的图（只有一个底物时）别把第 1 页顶太长 */
+  max-height: 240px;   /* 再高就把第 1 页顶得太长了（用户说「高度太高」） */
   object-fit: contain;
   padding: 0;
 }

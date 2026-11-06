@@ -54,7 +54,7 @@
 - `src/components/CondRow.vue` — 条件行（溶剂/浓度/温度/时间节点/气氛）。
 - 投料表里双击试剂名弹出的 **「从化合物库选一个」**（`ReagentTable` 的 `browse`，`.cmp-browse`）：每行左边一栏是结构式缩略图，**尺寸 96×64**（`grid-template-columns: 96px 40px 1fr auto`，行内边距 8/12；以前 64×40 被用户说「结构式还是有点小」）。
 - `src/components/ResultBlock.vue` — 结果块（产物、MW、质量、收率、dr/ee、产物挂库）。「产物是库里的哪个化合物」那个弹窗（`.recipe-list` / `.recipe-opt`，跟「套用已有投料表」共用）**每条前面挂一张 52×52 的结构式缩略图**（`c.structure_id` → `/api/compound-files/:id`，没有结构图就给 `molecule` 图标；`.recipe-opt` 的 `align-items` 从 `baseline` 改成 `center`）。
-- `src/components/SchemeBlock.vue` — 反应式格子（`.scheme-slot`：**图片按宽度铺满**，`img{width:100%;height:auto;max-height:300px;object-fit:contain}`、格子 `height:auto;min-height:132px`；以前是 `height:100%` + 132 px 高的框，宽图被高度掐住、只用了一半宽度，用户说「有点小」；打印时另有 `max-height:210px` 收着）：点击上传图片，右上角三个按钮 **「画反应式」（打开 `SketcherModal` 的 `mode="reaction"`）/「按投料表生成」/「从反应式填表」**（后两个就是「反应式 ↔ 投料表」互认，逻辑在 `EditorView` 的 `schemeFromTable()` / `fillTableFromScheme()`）。
+- `src/components/SchemeBlock.vue` — 反应式格子（`.scheme-slot`：**图片按宽度铺满**，`img{width:100%;height:auto;max-height:240px;object-fit:contain}`、格子 `height:auto;min-height:132px`，**有图时挂 `has` class**（`.scheme-slot.has{padding:0}`，以前 CSS 里有这个 class 但模板没挂）；以前是 `height:100%` + 132 px 高的框，宽图被高度掐住、只用了一半宽度，用户说「有点小」；后来 300px 又嫌「高度太高」，改成 240px；打印时另有 `max-height:210px` 收着）：点击上传图片，右上角三个按钮 **「画反应式」（打开 `SketcherModal` 的 `mode="reaction"`）/「按投料表生成」/「从反应式填表」**（后两个就是「反应式 ↔ 投料表」互认，逻辑在 `EditorView` 的 `schemeFromTable()` / `fillTableFromScheme()`）。
 - `src/components/TlcStrip.vue` — TLC 板图片条。
 - `src/components/AttachmentsBlock.vue` — 谱图/其它附件分组。
 - `src/views/CompoundDetail.vue` — 化合物档案（结构式、三栏核磁图、TLC、纯化、瓶签）；工具栏跟实验页一个排法：已保存 / 保存 / 重置 / **⋯ 菜单（打印瓶子标签 / ── / 删除这个化合物）**，恒定有「课题」格（清空 = 共用课题）。
