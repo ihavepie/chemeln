@@ -184,30 +184,17 @@ async function removeGroup(row, router) {
 }
 
 /**
- * 卡片堆上右键：整组动作**直接平铺在最上面**（常用、一眼能看到、一次点中），
- * 中间是每条子实验（各自展开子菜单），最下面一道分隔线接「移入回收站（整组）」。
- * opts.activeId = 正在看的那条，标一下。
+ * 卡片堆（那一摞的面子卡）上右键：只给**整组**的动作，不再列子实验——
+ * 子实验的单独操作走它自己：右键组员小签 / 展开后的组员行（都走 experimentMenu）。
+ * 破坏性动作排最后（用户点名要的）。
  */
-export function groupMenu(ev, row, router, opts = {}) {
+export function groupMenu(ev, row, router) {
   const n = row.members.length;
   const allLocked = row.members.every((m) => m.locked);
   const items = [
     { key: 'parallel', label: '新建平行实验', icon: 'plus', hint: '加进这一组' },
     { key: 'lockgroup', label: allLocked ? '解锁整组' : '锁定整组', icon: allLocked ? 'unlock' : 'lock', hint: `${n} 条` },
     { key: 'copycodes', label: '复制整组编号', icon: 'hash' },
-    ...row.members.map((m) => ({
-      key: `m:${m.id}`,
-      label: m.code,
-      icon: 'file',
-      hint: m.id === opts.activeId ? '在看' : m.locked ? '锁定' : '',
-      sub: [
-        { key: `open:${m.id}`, label: '打开记录', icon: 'file' },
-        { key: `lock:${m.id}`, label: m.locked ? '解锁（恢复可编辑）' : '锁定（此后只读）', icon: m.locked ? 'unlock' : 'lock' },
-        { key: `copy:${m.id}`, label: '复制编号', icon: 'hash', hint: m.code },
-        CTX_SEP,
-        { key: `del:${m.id}`, label: '移入回收站（只这条）', icon: 'trash', danger: true },
-      ],
-    })),
     CTX_SEP,
     { key: 'delgroup', label: '移入回收站（整组）', icon: 'trash', danger: true, hint: `${n} 条` },
   ];
@@ -216,12 +203,5 @@ export function groupMenu(ev, row, router, opts = {}) {
     if (key === 'lockgroup') return void toggleGroupLock(row, router);
     if (key === 'copycodes') return void copyText(row.members.map((m) => m.code).join(' '), '整组编号');
     if (key === 'delgroup') return void removeGroup(row, router);
-    const [act, id] = String(key).split(':');
-    const m = row.members.find((x) => x.id === Number(id));
-    if (!m) return;
-    if (act === 'open') return void router.push(`/e/${m.id}`);
-    if (act === 'lock') return void toggleLock(m);
-    if (act === 'copy') return void copyText(m.code, '编号');
-    if (act === 'del') return void removeExperiment(m, router);
   });
 }

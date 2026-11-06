@@ -252,7 +252,7 @@ function isGroupActive(row) {
  */
 /** 卡片堆上右键：整组的动作 + 「单独处理」里每条子实验一个子菜单 */
 function onStackMenu(ev, row) {
-  groupMenu(ev, row, router, { activeId: activeId() });
+  groupMenu(ev, row, router);
 }
 
 function onStackFace(row) {
@@ -352,6 +352,7 @@ function onStackFace(row) {
                   :class="{ 'is-on': m.id === activeId() }"
                   :title="`${m.code} · ${m.status}${m.yield_pct != null ? ` · ${m.yield_pct}%` : ''}`"
                   @click.stop="router.push(`/e/${m.id}`)"
+                  @contextmenu.stop="experimentMenu($event, m, router, { groupSize: row.members.length })"
                 >
                   <i class="stack-dot" :class="`tone-${STATUS_TONE[m.status] || 'plain'}`" /><span class="chip-code">{{ m.code }}</span><span class="chip-status">{{ STATUS_SHORT[m.status] || m.status }}</span><span v-if="m.yield_pct != null" class="chip-yield">{{ m.yield_pct }}%</span>
                 </button>
