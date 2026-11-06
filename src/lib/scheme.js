@@ -225,7 +225,10 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
   });
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+    // `xmlns:xlink` 别省：带缩写的分子是 Indigo 画的，它用 `xlink:href="#glyph…"` 引字形，
+    // 根节点没声明这个前缀，内联进 HTML 里看不出来（HTML 解析器容忍），但存成文件用 <img> 加载
+    // 就是致命的 XML 错误——整张图空白（踩过）
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     `<rect width="100%" height="100%" fill="#ffffff"/>` +
     placed.map(molTag).join('') +
     pluses +
