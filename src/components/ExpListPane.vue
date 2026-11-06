@@ -238,6 +238,15 @@ function membersSettled(el) {
 function isGroupActive(row) {
   return row.members.some((m) => m.id === activeId());
 }
+
+/**
+ * 点卡片堆的面子：**正在看这一组**时不再重复跳同一条记录（页面没变化，看着像没反应），
+ * 改成展开 / 收起组员；别的组还是照旧跳过去（跳过去会由 EditorView 自动展开）。
+ */
+function onStackFace(row) {
+  if (isGroupActive(row)) return toggleGroup(row.gid);
+  router.push(`/e/${row.face.id}`);
+}
 </script>
 
 <template>
@@ -294,8 +303,8 @@ function isGroupActive(row) {
               :aria-current="isGroupActive(row) && !isGroupOpen(row.gid) ? 'true' : 'false'"
               role="button"
               tabindex="0"
-              @click="router.push(`/e/${row.face.id}`)"
-              @keydown.enter="router.push(`/e/${row.face.id}`)"
+              @click="onStackFace(row)"
+              @keydown.enter="onStackFace(row)"
             >
               <div class="top">
                 <span class="exp-code">{{ row.face.code }}</span>

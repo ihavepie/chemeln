@@ -5968,7 +5968,11 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .exp-card.is-member:focus { outline: none; }
 .exp-card.is-member:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--line-2); }
 .exp-card.is-member:hover { background: #f2f0ec; }
-.exp-card.is-member[aria-current="true"] { background: none; box-shadow: none; }
+/* 当前那条不该被 hover 底色盖掉 */
+.exp-card.is-member[aria-current="true"]:hover { background: #fcf7f4; }
+/* 选中的组员行跟别的卡片一样「稍微变色」（用户要的），只是不带自己的投影 */
+.exp-card.is-member[aria-current="true"] { background: #fcf7f4; box-shadow: none; }
+.exp-card.is-member[aria-current="true"] .exp-code { color: var(--accent-ink); }
 /* 一摞展开着的时候，当前态挪到具体那条组员行上（面子卡不再套虚线，不然一摞里两圈）：
    从书签切过来时，选中框要落在「到底是哪条子实验」上 */
 .exp-card.is-member[aria-current="true"]::after {
