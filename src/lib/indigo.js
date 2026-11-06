@@ -40,6 +40,9 @@ export async function indigoSvg(smiles, { width = 0, height = 0 } = {}) {
   const M = await moduleIndigo();
   const opts = new M.MapStringString();
   opts.set('render-output-format', 'svg');
+  // 杂原子要跟 ChemDraw / 以前那套一样上色（O 红、N 蓝、S 黄），
+  // Indigo 默认是全黑的，用户明确要「原子需要有颜色」
+  opts.set('render-coloring', 'true');
   if (width && height) opts.set('render-image-size', `${width},${height}`);
   const raw = String(M.render(s, opts) || '');
   // render() 回来的是 SVG 文本的 base64（WASM 那边按字节返回），解一下再给出去
