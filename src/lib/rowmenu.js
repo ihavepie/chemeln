@@ -184,19 +184,27 @@ async function removeGroup(row, router) {
 }
 
 /**
- * 卡片堆上右键：上面是整组的动作，下面「单独处理」里每条子实验各带一个子菜单
- * （打开 / 锁定 / 复制编号 / 只删这条）。opts.activeId = 正在看的那条，标一下。
+ * 卡片堆上右键：只留四行——「整组」一行 + 每条子实验一行，各自展开子菜单。
+ * 不再用分隔线/小节标题把菜单拉长（用户嫌「隔开也不顺手」），删除项在每一层的最后。
+ * opts.activeId = 正在看的那条，标一下。
  */
 export function groupMenu(ev, row, router, opts = {}) {
   const n = row.members.length;
   const allLocked = row.members.every((m) => m.locked);
-  // 删除这类破坏性动作一律压到最下面（用户点名要的排法）
   const items = [
-    { key: 'parallel', label: '新建平行实验', icon: 'plus', hint: '加进这一组' },
-    { key: 'lockgroup', label: allLocked ? '解锁整组' : '锁定整组', icon: allLocked ? 'unlock' : 'lock', hint: `${n} 条` },
-    { key: 'copycodes', label: '复制整组编号', icon: 'hash' },
-    CTX_SEP,
-    { head: '单独处理' },
+    {
+      key: 'g',
+      label: '整组',
+      icon: 'grid',
+      hint: `${n} 条${allLocked ? ' · 锁定' : ''}`,
+      sub: [
+        { key: 'parallel', label: '新建平行实验', icon: 'plus' },
+        { key: 'lockgroup', label: allLocked ? '解锁整组' : '锁定整组', icon: allLocked ? 'unlock' : 'lock', hint: `${n} 条` },
+        { key: 'copycodes', label: '复制整组编号', icon: 'hash' },
+        CTX_SEP,
+        { key: 'delgroup', label: '移入回收站（整组）', icon: 'trash', danger: true },
+      ],
+    },
     ...row.members.map((m) => ({
       key: `m:${m.id}`,
       label: m.code,
@@ -206,11 +214,10 @@ export function groupMenu(ev, row, router, opts = {}) {
         { key: `open:${m.id}`, label: '打开记录', icon: 'file' },
         { key: `lock:${m.id}`, label: m.locked ? '解锁（恢复可编辑）' : '锁定（此后只读）', icon: m.locked ? 'unlock' : 'lock' },
         { key: `copy:${m.id}`, label: '复制编号', icon: 'hash', hint: m.code },
+        CTX_SEP,
         { key: `del:${m.id}`, label: '移入回收站（只这条）', icon: 'trash', danger: true },
       ],
     })),
-    CTX_SEP,
-    { key: 'delgroup', label: '移入回收站（整组）', icon: 'trash', danger: true, hint: `${n} 条` },
   ];
   openCtxMenu(ev, items, (key) => {
     if (key === 'parallel') return void newParallel(row.face, router);
