@@ -9,6 +9,7 @@ const props = defineProps({
   onHover: Function,
   onPick: Function,
   onOpen: Function,
+  onSketch: Function,
 });
 
 const scheme = computed(() => props.attachments.find((a) => a.category === 'scheme'));
@@ -18,6 +19,17 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
   <div class="scheme-block">
     <div class="scheme-head">
       <span class="lbl">反应式</span>
+      <span class="spacer" />
+      <!-- 懒得起 ChemDraw 时，直接在画板里把反应物 → 产物连起来 -->
+      <button
+        v-if="!locked"
+        type="button"
+        class="btn btn-sm btn-ghost noprint"
+        title="打开画板画整条反应式（反应物 ＋ → 产物，条件可以写在箭头上）"
+        @click.stop="onSketch && onSketch()"
+      >
+        <Icon name="molecule" :size="13" /> 画反应式
+      </button>
     </div>
     <div
       class="scheme-slot"
@@ -36,7 +48,7 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
       />
       <div v-else class="scheme-empty noprint">
         <Icon name="image" :size="22" />
-        <span>点击上传反应式（ChemDraw 截图 / 图片）</span>
+        <span>点击上传反应式，或点右上「画反应式」直接在画板里画</span>
       </div>
     </div>
   </div>

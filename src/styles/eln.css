@@ -6578,3 +6578,8 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .qmenu.cat-menu::-webkit-scrollbar,
 .kind-menu::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* 反应式格子右上角的「画反应式」按钮：字号跟着这一带走，别把标签挤歪 */
+.scheme-head { align-items: center; }
+.scheme-head .spacer { flex: 1; }
+.scheme-head .btn-sm { padding: 2px 8px; }

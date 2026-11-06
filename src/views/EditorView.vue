@@ -10,6 +10,7 @@ import CondRow from '../components/CondRow.vue';
 import ReagentTable from '../components/ReagentTable.vue';
 import ResultBlock from '../components/ResultBlock.vue';
 import SchemeBlock from '../components/SchemeBlock.vue';
+import SketcherModal from '../components/SketcherModal.vue';
 import TlcStrip from '../components/TlcStrip.vue';
 import Icon from '../components/Icon.vue';
 import CatPick from '../components/CatPick.vue';
@@ -38,6 +39,7 @@ const statusMenu = ref(false);
 const moreMenu = ref(false);
 const gone = ref(false);   // 删掉了就不再自动保存
 const historyOpen = ref(false);
+const schemeSketcherOpen = ref(false);   // 画反应式（Ketcher 画板，反应物 → 产物）
 const recipeModal = ref(false);
 const qrModal = ref(false);
 const recipeList = ref([]);
@@ -50,6 +52,7 @@ const fields = reactive({
   appearance: '', yield_pct: '', product_mass: '', product_mw: '', tlc_note: '', dr_ee: '',
   ee_pct: '', sel_method: '', sel_condition: '', sel_rt: '',
   characterization: '', notes: '', conclusion: '', product_compound_id: null, category_id: null,
+  scheme_rxn: '',
 });
 
 const reagent = reactive({ base: null, steps: [], rows: [] });
@@ -452,6 +455,26 @@ async function onPaste(ev) {
   await refreshAttachments();
 }
 
+/**
+ * 画板里画完的反应式：RXN 存进这条记录（下次点「画反应式」能接着改），
+ * 图交给 Ketcher 自己的 Indigo 渲染成 SVG，当方案反应式那张附件存（替换旧的那张）。
+ */
+async function applySketchScheme({ rxn, svg }) {
+  if (!exp.value || exp.value.locked || !rxn || !svg) return;
+  const old = (exp.value.attachments || []).find((a) => a.category === 'scheme');
+  try {
+    if (old) await api.deleteAttachment(old.id).catch(() => {});
+    const fd = new FormData();
+    fd.append('file', new File([svg], '反应式.svg', { type: 'image/svg+xml' }), '反应式.svg');
+    fd.append('category', 'scheme');
+    await api.upload(exp.value.id, fd);
+    fields.scheme_rxn = rxn;
+    await refreshAttachments();
+  } catch (e) {
+    notify(e.message || '反应式没存上', 'err');
+  }
+}
+
 async function openRecipe() {
   recipeList.value = await api.experiments({ sort: 'newest' });
   recipePick.value = recipeList.value.find((x) => x.id !== exp.value.id && x.reagent_count)?.id ?? null;
@@ -835,6 +858,7 @@ const openAttachment = (id) => {
             :on-hover="onHover"
             :on-pick="pickFile"
             :on-open="openAttachment"
+            :on-sketch="() => (schemeSketcherOpen = true)"
           />
 
           <ReagentTable v-if="sheetPrefs.reagents" :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
@@ -1010,6 +1034,14 @@ const openAttachment = (id) => {
     </AppModal>
 
     <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
+
+    <SketcherModal
+      :open="schemeSketcherOpen"
+      mode="reaction"
+      :initial="fields.scheme_rxn || ''"
+      @close="schemeSketcherOpen = false"
+      @pick="applySketchScheme"
+    />
 
     <PrintPanel
       v-if="printPanel"

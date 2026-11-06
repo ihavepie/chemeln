@@ -191,6 +191,8 @@ ensureColumn('experiments', 'product_compound_id', 'product_compound_id INTEGER'
 // 平行组：重复 / 控制变量实验共用同一个 group_id，纸面左侧的书签就是它；
 // 空串 = 没有平行实验（单条记录）
 ensureColumn('experiments', 'group_id', "group_id TEXT NOT NULL DEFAULT ''");
+// 画板里画出来的反应式本体（RXN），存着下次能接着改；图本身是 scheme 附件
+ensureColumn('experiments', 'scheme_rxn', "scheme_rxn TEXT NOT NULL DEFAULT ''");
 // 化合物的「标准实验」：当初在哪条实验里做出来的
 ensureColumn('compounds', 'standard_exp_id', 'standard_exp_id INTEGER');
 // 记录可以归到一个分类里（没归就是未分类）

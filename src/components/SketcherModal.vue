@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../lib/lookup.js';
@@ -21,10 +21,14 @@ import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../
 const props = defineProps({
   /** 打开 / 收起（不是销毁） */
   open: { type: Boolean, default: false },
-  /** 打开时预填的结构（SMILES 或 MOL），可选；不给就清空画板 */
+  /** 打开时预填的结构（SMILES / MOL）或反应式（RXN），可选；不给就清空画板 */
   initial: { type: String, default: '' },
+  /** molecule = 画单个结构式（化合物页）；reaction = 画整条反应式（实验页的「反应式」格子） */
+  mode: { type: String, default: 'molecule' },
 });
 const emit = defineEmits(['close', 'pick']);
+
+const isReaction = computed(() => props.mode === 'reaction');
 
 const frame = ref(null);
 const loading = ref(true);
@@ -78,6 +82,17 @@ onBeforeUnmount(() => {
 async function pick() {
   const a = api();
   if (!a || !a.ready()) return toast('画板还在加载', 'warn');
+  // 反应式：不自动排版（箭头和 + 的位置是人手摆的，排一遍反而会挪走），
+  // 直接拿 RXN 让 Ketcher 自己的 Indigo 画成图，连同 RXN 一起交回去存着，下次能接着改
+  if (props.mode === 'reaction') {
+    const rxn = String((await a.getRxn()) || '').trim();
+    if (!rxn) return toast('画板上还是空的', 'warn');
+    const svg = await a.image(rxn);
+    if (!svg || !svg.includes('<svg')) return toast('反应式导不出来，再试一次', 'err');
+    emit('pick', { rxn, svg });
+    emit('close');
+    return;
+  }
   // 先让 Indigo 排一遍版：拖出来的环常常是扁的、原子挤在一起，取之前摆正了再取
   await a.layout?.();
   // Ketcher 的接口是异步的（导出要过一遍 Indigo），等它算完再取
@@ -111,7 +126,7 @@ function clearAll() {
 <template>
   <AppModal
     :model-value="open"
-    title="画结构式"
+    :title="isReaction ? '画反应式' : '画结构式'"
     :show-confirm="false"
     cancel-text="关闭"
     width="min(1080px, 94vw)"
@@ -136,13 +151,14 @@ function clearAll() {
     </div>
 
     <div class="sk-foot">
-      <span class="hint">原子之间拖一下就连键；停在原子上打字 = 换原子；<b>⌘Z</b> 撤销。</span>
+      <span v-if="isReaction" class="hint">先画反应物，用工具栏的 <b>＋</b> 添料、点 <b>→</b> 画箭头，再把产物画在右边；条件想写在箭头上就用 <b>文字</b> 工具。不自动排版，摆成什么样就存什么样。</span>
+      <span v-else class="hint">原子之间拖一下就连键；停在原子上打字 = 换原子；<b>⌘Z</b> 撤销。</span>
       <span class="spacer" style="flex: 1" />
-      <button class="btn btn-sm btn-ghost" :disabled="looking" @click="lookup">
+      <button v-if="!isReaction" class="btn btn-sm btn-ghost" :disabled="looking" @click="lookup">
         {{ looking ? '查…' : '查一下是什么' }}
       </button>
       <button class="btn btn-sm btn-ghost" @click="clearAll">清空</button>
-      <button class="btn btn-sm" @click="pick">用这个结构</button>
+      <button class="btn btn-sm" @click="pick">{{ isReaction ? '用这个反应式' : '用这个结构' }}</button>
     </div>
   </AppModal>
 </template>

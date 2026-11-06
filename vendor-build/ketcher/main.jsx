@@ -42,6 +42,18 @@ window.sketcherApi = {
   getMol: async () => {
     try { return (await window.ketcher.getMolfile()) || '' } catch { return '' }
   },
+  /** 整张反应式（反应物 + 箭头 + 产物）存成 RXN，方便下次接着改 */
+  getRxn: async () => {
+    try { return (await window.ketcher.getRxn()) || '' } catch { return '' }
+  },
+  /** 画板上的东西 → SVG 文本：用 Ketcher 自带的 Indigo 渲染，
+      反应式的 +、箭头、条件文字都能画进去（openchemlib 画不了反应式） */
+  image: async (data) => {
+    try {
+      const blob = await window.ketcher.generateImage(data, { outputFormat: 'svg' })
+      return (await blob.text()) || ''
+    } catch { return '' }
+  },
   set: async (text) => {
     try { if (text) await window.ketcher.setMolecule(text) } catch { /* 读不出来就当空白 */ }
     pickBondTool(10)
