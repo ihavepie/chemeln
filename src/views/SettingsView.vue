@@ -336,7 +336,7 @@ async function editProjectPrefix(p) {
   try {
     await api.createProject({ name: p.name, prefix });
     await loadBoot();
-    toast(prefix ? `新实验会用 ${prefix}-0001 这样的编号` : `已改回自动前缀「${auto}」`);
+    toast(prefix ? `新实验会用 ${prefix}-1 这样的编号` : `已改回自动前缀「${auto}」`);
   } catch (e) {
     toast(e.message, 'err');
   }

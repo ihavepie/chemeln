@@ -345,13 +345,14 @@ function maxCodeNumber(prefix, project) {
  */
 function nextCode(prefix, project = '') {
   let n = maxCodeNumber(prefix, project);
-  // 跳过已被占用的号（手工改过编号、或两个课题恰好用了同一个前缀）
+  // 跳过已被占用的号（手工改过编号、或两个课题恰好用了同一个前缀）。
+  // 不再补零：新编号就是 `前缀-1`、`前缀-2` 这样，老记录里的 `EXP-0021` 保持原样。
   for (;;) {
     n += 1;
-    const code = `${prefix}-${String(n).padStart(4, '0')}`;
+    const code = `${prefix}-${n}`;
     if (!db.prepare('SELECT 1 AS x FROM experiments WHERE code = ?').get(code)) break;
   }
-  return `${prefix}-${String(n).padStart(4, '0')}`;
+  return `${prefix}-${n}`;
 }
 
 /**
