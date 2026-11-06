@@ -2638,6 +2638,91 @@ function ensurePrintRenderer() {
   return printRendererPromise;
 }
 
+/* ---------------------------------------------------------------- 本地 OCR */
+
+let ocrRendererPromise = null;
+
+/** 编译 server/ocr.swift → .cache/ocr（只编一次）；没 swiftc 就报错，前端会提示手动填 */
+function ensureOcrRenderer() {
+  if (ocrRendererPromise) return ocrRendererPromise;
+  ocrRendererPromise = (async () => {
+    const bin = path.join(CACHE_DIR, 'ocr');
+    if (fs.existsSync(bin)) return bin;
+    await fsp.mkdir(CACHE_DIR, { recursive: true });
+    await new Promise((resolve, reject) => {
+      const p = spawn(
+        'swiftc',
+        ['-O', '-module-cache-path', path.join(CACHE_DIR, 'clang'), path.join(__dirname, 'ocr.swift'), '-o', bin],
+        { stdio: ['ignore', 'ignore', 'pipe'] }
+      );
+      let err = '';
+      p.stderr.on('data', (d) => (err += String(d)));
+      p.on('error', () => reject(new Error('这台机器没有 swiftc，读不了图里的字')));
+      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`OCR 编译失败：${err.trim().slice(0, 300)}`))));
+    });
+    return bin;
+  })().catch((e) => {
+    ocrRendererPromise = null;
+    throw e;
+  });
+  return ocrRendererPromise;
+}
+
+/** 跑一次 OCR，返回 [{text, conf, x, y}] */
+function runOcr(bin, file) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(bin, [file], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => {
+      p.kill('SIGKILL');
+      reject(new Error('识别超时（30 秒）'));
+    }, 30000);
+    p.stdout.on('data', (d) => (out += String(d)));
+    p.stderr.on('data', (d) => (err += String(d)));
+    p.on('error', (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    p.on('exit', (code) => {
+      clearTimeout(timer);
+      if (code !== 0) return reject(new Error(err.trim() || `识别失败（退出码 ${code}）`));
+      try {
+        resolve(JSON.parse(out));
+      } catch {
+        reject(new Error('识别结果读不出来'));
+      }
+    });
+  });
+}
+
+/** 把某个文件行（化合物文件 / 实验附件）解析成磁盘绝对路径 */
+function resolveFileOnDisk(scope, id) {
+  if (scope === 'attachment') {
+    // 实验附件按实验分子目录：data/attachments/<exp_id>/<filename>
+    const row = db.prepare('SELECT exp_id, filename FROM attachments WHERE id = ?').get(Number(id));
+    if (!row) return null;
+    return path.join(ATTACH_DIR, String(row.exp_id), row.filename);
+  }
+  // 化合物文件：data/compounds/<compound_id>/<filename>
+  const row = db.prepare('SELECT compound_id, filename FROM compound_files WHERE id = ?').get(Number(id));
+  if (!row) return null;
+  return path.join(COMPOUND_DIR, String(row.compound_id), row.filename);
+}
+
+route('POST', '/api/ocr', async (req, res) => {
+  const body = await readJson(req);
+  const scope = str(body.scope) === 'attachment' ? 'attachment' : 'compound';
+  const file = resolveFileOnDisk(scope, body.file_id);
+  if (!file) throw new HttpError(404, '找不到这个文件');
+  const ext = path.extname(file).toLowerCase();
+  if (!/^\.(png|jpe?g|webp|gif|tiff?|bmp|heic)$/.test(ext)) throw new HttpError(400, '这个文件不是图片，读不了');
+  if (!fs.existsSync(file)) throw new HttpError(404, '磁盘上找不到这张图');
+  const bin = await ensureOcrRenderer();
+  const lines = await runOcr(bin, file);
+  ok(res, { lines, text: lines.map((l) => l.text).join('\n') });
+});
+
 function runPrint(bin, args) {
   return new Promise((resolve, reject) => {
     const p = spawn(bin, args, { stdio: ['ignore', 'ignore', 'pipe'] });

@@ -9,6 +9,7 @@ import CompoundMobile from '../components/CompoundMobile.vue';
 import AppModal from '../components/AppModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import SketcherModal from '../components/SketcherModal.vue';
+import TlcOcr from '../components/TlcOcr.vue';
 import { api } from '../api.js';
 import { loadBoot, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
@@ -366,6 +367,26 @@ function closeSmiEdit() {
   if (!smiEditing.value) return;
   smiEditing.value = false;
   void onSmilesFieldChange();
+}
+
+/** TlcOcr 读出来的东西：只往空着的格子填，已有的值不动 */
+function applyOcr({ solvent, rf, auto, raw }) {
+  let filled = [];
+  if (solvent && !String(form.tlc_solvent || '').trim()) {
+    form.tlc_solvent = solvent;
+    filled.push(`展开剂 ${solvent}`);
+  }
+  if (rf && !String(form.tlc_rf || '').trim()) {
+    form.tlc_rf = rf;
+    filled.push(`Rf ${rf}`);
+  }
+  if (filled.length) toast(`从图上读到 ${filled.join(' · ')}`, 'ok');
+  else if (!auto) {
+    // 点了一行但两个格子都有值：至少把原文糊上去，别让人以为没反应
+    if (solvent) form.tlc_solvent = solvent;
+    if (rf) form.tlc_rf = rf;
+    if (!solvent && !rf && raw) form.tlc_solvent = raw;
+  }
 }
 
 async function copySmiles() {
@@ -813,6 +834,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <span class="lbl">TLC</span>
             <input class="tlc-note" v-model="form.tlc_solvent" placeholder="展开剂，如 PE:EA = 10:1" />
             <span class="rf-wrap">Rf <input class="rf-input" :value="form.tlc_rf" placeholder="0.45" @input="onRf($event)" /></span>
+            <TlcOcr :shots="tlcShots" scope="compound" @pick="applyOcr" />
           </div>
           <div
             class="tlc-strip"

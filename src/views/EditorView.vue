@@ -18,8 +18,9 @@ import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, store, categoriesOfProject, addCategory } from '../store.js';
-import { STATUSES, STATUS_TONE, todayISO } from '../lib/ui.js';
+import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
+import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
 import { flattenTextareas } from '../lib/autogrow.js';
@@ -258,6 +259,27 @@ async function saveNow() {
 }
 
 // 自动保存：payload 里读到的字段一变就排队保存，不用再给每个输入框挂 @input
+/** TLC 那块图（附件里 category=tlc 的图片），给「读图」用 */
+const tlcShots = computed(() =>
+  (exp.value?.attachments || []).filter((f) => f.category === 'tlc' && isImageName(f.original_name || f.filename))
+);
+
+/** 从 TLC 图里读到展开剂 / Rf：只补空格子（实验的 TLC 备注里记展开剂） */
+function applyTlcOcr({ solvent, rf, auto, raw }) {
+  const filled = [];
+  if (solvent && !String(fields.tlc_note || '').trim()) {
+    fields.tlc_note = rf ? `${solvent}，Rf ${rf}` : solvent;
+    filled.push(`展开剂 ${solvent}`);
+  } else if (solvent && !auto) {
+    fields.tlc_note = `${solvent}${rf ? `，Rf ${rf}` : ''}`;
+    filled.push(`展开剂 ${solvent}`);
+  } else if (!solvent && !auto && raw && !String(fields.tlc_note || '').trim()) {
+    fields.tlc_note = raw;
+    filled.push('原文');
+  }
+  if (filled.length) toast(`从图上读到 ${filled.join(' · ')}`, 'ok');
+}
+
 const { state: saveState, dirty, markLoaded, touch: notify, flush } = useAutosave(payload, saveNow, {
   delay: 900,
   enabled: () => !gone.value && !!exp.value && !exp.value.locked,
@@ -822,6 +844,7 @@ const openAttachment = (id) => {
             <div class="block-head">
               <span class="lbl">TLC</span>
               <input class="tlc-note" v-model="fields.tlc_note" placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸" :disabled="exp.locked" />
+              <TlcOcr :shots="tlcShots" scope="attachment" @pick="applyTlcOcr" />
             </div>
             <TlcStrip
               :attachments="exp.attachments || []"

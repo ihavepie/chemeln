@@ -34,6 +34,9 @@ export const api = {
   // 返回整个响应：课题里改标题会顺带改名，前端要拿 renamedTo 切过去
   saveSettings: (body) => request('/api/settings', { method: 'PUT', body }),
 
+  /* 本地 OCR：读图上的手写字（服务端调系统 Vision，不联网） */
+  ocrPhoto: (body) => request('/api/ocr', { method: 'POST', body }),
+
   /* 结构信息查询：服务端去问 PubChem（带本地缓存），smiles / inchikey / q 三选一 */
   lookup: ({ smiles, inchikey, q } = {}) => {
     const p = new URLSearchParams();
