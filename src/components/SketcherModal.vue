@@ -78,6 +78,8 @@ onBeforeUnmount(() => {
 async function pick() {
   const a = api();
   if (!a || !a.ready()) return toast('画板还在加载', 'warn');
+  // 先让 Indigo 排一遍版：拖出来的环常常是扁的、原子挤在一起，取之前摆正了再取
+  await a.layout?.();
   // Ketcher 的接口是异步的（导出要过一遍 Indigo），等它算完再取
   const smiles = String((await a.getSmiles()) || '').trim();
   if (!smiles) return toast('画板上还是空的', 'warn');
@@ -134,7 +136,7 @@ function clearAll() {
     </div>
 
     <div class="sk-foot">
-      <span class="hint">单键工具：原子之间拖一下就连起来。</span>
+      <span class="hint">原子之间拖一下就连键；<b>鼠标停在键上按 1 / 2 / 3 / 4</b> = 单 / 双 / 三 / 芳香键；停在原子上打字 = 换原子；<b>⌘Z</b> 撤销。</span>
       <span class="spacer" style="flex: 1" />
       <button class="btn btn-sm btn-ghost" :disabled="looking" @click="lookup">
         {{ looking ? '查…' : '查一下是什么' }}

@@ -26,7 +26,12 @@ export function looksLikeMolfile(text) {
   return /V2000|V3000/.test(s) && /M\s+END/.test(s);
 }
 
-/** molfile → { formula, mw, svg } */
+/**
+ * molfile → { formula, mw, svg, smiles }
+ * **图要重排**：molfile 里存的是画的时候的坐标，从 ChemDraw / Ketcher 粘过来的
+ * 常常是歪的（扁环、键交叉、原子挤在一起）。所以这里绕一圈 SMILES，
+ * 让 openchemlib 自己算一遍干净的 2D 坐标再画（画不出来才退回原始坐标）。
+ */
 export async function analyzeMolfile(molfile) {
   const s = String(molfile || '');
   if (!looksLikeMolfile(s)) return null;
@@ -39,11 +44,20 @@ export async function analyzeMolfile(molfile) {
   try {
     const mol = chem.Molecule.fromMolfile(s);
     const f = mol.getMolecularFormula();
-    return {
+    const out = {
       formula: f.formula,
       mw: Math.round(f.relativeWeight * 100) / 100,
       svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
     };
+    try {
+      const smiles = mol.toSmiles();
+      const tidy = chem.Molecule.fromSmiles(smiles);
+      out.svg = tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+      out.smiles = smiles;
+    } catch {
+      /* 排不出来就用原来的坐标 */
+    }
+    return out;
   } catch {
     return null;
   }

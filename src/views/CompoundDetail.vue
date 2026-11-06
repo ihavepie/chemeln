@@ -18,7 +18,7 @@ import { CMP_CAT_LABEL, CMP_CAT_ORDER, fmtSize, guessCmpCategory, isImageName } 
 import KindPick from '../components/KindPick.vue';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
+import { analyzeSmiles, analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { round } from '../lib/reagent.js';
 
@@ -308,6 +308,37 @@ const lookupProps = computed(() => {
   if (pr.solubility) bits.push(`溶解度 ${pr.solubility}`);
   return bits.join(' · ');
 });
+
+/**
+ * 已经画歪 / 挤在一起的结构式：按存着的 SMILES 让 openchemlib 重新排一遍坐标，
+ * 画一张新的换上（旧的那张在传完之后删）。
+ */
+async function tidyStructure() {
+  moreMenu.value = false;
+  if (!c.value) return;
+  const s = String(form.smiles || '').trim();
+  if (!s) return toast('这条还没有 SMILES，画一个或者粘一个再整理', 'warn');
+  const info = await analyzeSmiles(s);
+  if (!info) return toast('这条 SMILES 读不出来，检查一下', 'err');
+  const fd = new FormData();
+  fd.append('file', svgToFile(info.svg), '结构式.svg');
+  fd.append('category', 'structure');
+  try {
+    await api.uploadCompoundFile(c.value.id, fd);
+    const old = struct.value;
+    if (old) {
+      try {
+        await api.deleteCompoundFile(old.id);
+      } catch {
+        /* 旧的删不掉就留着，别让整理失败 */
+      }
+    }
+    await reload();
+    toast('结构式重新排过版了');
+  } catch (e) {
+    toast(e.message || '整理不了这张结构式', 'err');
+  }
+}
 
 async function applySketched({ smiles, info: sketchedInfo }) {
   if (!c.value || !smiles) return;
@@ -706,6 +737,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
           <button @click="label(); moreMenu = false"><Icon name="qr" :size="13" /> 打印瓶子标签</button>
           <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 修改历史</button>
           <button @click="lookupNow(); moreMenu = false"><Icon name="molecule" :size="13" /> 查这个结构（PubChem）</button>
+          <button v-if="struct && form.smiles" @click="tidyStructure"><Icon name="grid" :size="13" /> 整理结构式（重排）</button>
           <div class="menu-sep" />
           <button class="menu-danger" @click="removeCompound(); moreMenu = false">
             <Icon name="trash" :size="13" /> 移入回收站
