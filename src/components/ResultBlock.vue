@@ -158,6 +158,10 @@ function onYieldInput(ev) {
           :class="{ 'is-on': picked === c.id }"
           @click="picked = c.id"
         >
+          <span class="recipe-thumb">
+            <img v-if="c.structure_id" :src="`/api/compound-files/${c.structure_id}`" alt="" loading="lazy" />
+            <Icon v-else name="molecule" :size="14" />
+          </span>
           <span class="recipe-code mono">{{ c.code || '—' }}</span>
           <span class="recipe-title">{{ c.name || '（未命名）' }}</span>
           <span class="recipe-meta">{{ c.formula || '' }}{{ c.mw ? ` · ${c.mw}` : '' }}</span>

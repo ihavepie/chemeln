@@ -51,7 +51,7 @@
 - `src/views/EditorView.vue` — 实验编辑器：两页 A4 版式、自动保存；**第 1 页纸外左侧有一排平行实验书签**（`.pgroup--float`：`Teleport to="body"` 的固定浮层，钉在纸面左边缘、整条在纸外，同 `group_id` 的重复 / 控制变量实验显示「状态点 + 编号 · 产率或状态」，悬停出预览卡、点了才切记录，末尾「＋」从当前这条再建一条）；工具栏只剩 已保存 / 保存 / 重置 / **⋯ 菜单**，**二维码、打印、锁定·解锁、导出、复制、产物存库、删除**都在菜单里（删除是红色项，删前先 `gone = true` 停自动保存）。**手机上（≤820px）直接渲染 `ExperimentMobile`** 并跳过 `load()`。二维码弹窗里的「打印这张码」打的是独立纸片 `.exp-qr-sheet`（40mm 码 + 编号），**没有动记录本身的版式**——别往 `.sheet-runner` 里塞码，会破坏「打印恒 2 页」。
 - `src/components/ReagentTable.vue` — 投料表（最复杂的组件：组分/角色菜单、试剂名自动带库、当量 mmol 用量联动、结构卡与解绑、多步）。
 - `src/components/CondRow.vue` — 条件行（溶剂/浓度/温度/时间节点/气氛）。
-- `src/components/ResultBlock.vue` — 结果块（产物、MW、质量、收率、dr/ee、产物挂库）。
+- `src/components/ResultBlock.vue` — 结果块（产物、MW、质量、收率、dr/ee、产物挂库）。「产物是库里的哪个化合物」那个弹窗（`.recipe-list` / `.recipe-opt`，跟「套用已有投料表」共用）**每条前面挂一张 38×38 的结构式缩略图**（`c.structure_id` → `/api/compound-files/:id`，没有结构图就给 `molecule` 图标；`.recipe-opt` 的 `align-items` 从 `baseline` 改成 `center`）。
 - `src/components/SchemeBlock.vue` — 反应式上传位。
 - `src/components/TlcStrip.vue` — TLC 板图片条。
 - `src/components/AttachmentsBlock.vue` — 谱图/其它附件分组。
