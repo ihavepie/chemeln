@@ -12,6 +12,7 @@ import SketcherModal from '../components/SketcherModal.vue';
 import { api } from '../api.js';
 import { loadBoot, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
+import { structureInfo, chemicalBookUrl, describeInfo } from '../lib/lookup.js';
 import { CMP_CAT_LABEL, CMP_CAT_ORDER, COMPOUND_KINDS, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
@@ -36,7 +37,7 @@ const pathValue = ref('');
 const cat = ref('auto');
 
 const form = reactive({
-  code: '', name: '', kind: '底物', category_id: '', project: '', formula: '', mw: '', appearance: '', mp: '', smiles: '',
+  code: '', name: '', kind: '底物', category_id: '', project: '', formula: '', mw: '', cas: '', appearance: '', mp: '', smiles: '',
   hrms: '', ir: '', rotation: '',
   tlc_solvent: '', tlc_rf: '', procedure: '', notes: '',
 });
@@ -176,7 +177,52 @@ const { state: saveState, dirty, flush, markLoaded } = useAutosave(payload, save
 
 /** 填了 SMILES：算分子式 / MW（空着的才填），并在没有结构图时画一张存进去 */
 /** 画板交回来的结构：重画结构式图（有旧的会先确认再删），再填 SMILES / 分子式 / MW */
-async function applySketched({ smiles }) {
+/** 最近一次查出来的结构信息（只用来显示 PubChem / ChemicalBook 两个链接，不落库） */
+const lastLookup = ref(null);
+
+/**
+ * 联网查这个结构「叫什么 / CAS 多少」（PubChem，服务端代查并缓存）。
+ * 只补空格子：名称 / CAS / 分子式 / MW 里已经有值的一律不动，免得把用户自己写的覆盖掉。
+ */
+async function fillFromLookup(smiles) {
+  const info = await structureInfo(String(smiles || '').trim());
+  if (!info || !info.found) return null;
+  lastLookup.value = info;
+  const filled = [];
+  if (!String(form.name || '').trim() && info.name) {
+    form.name = info.name;
+    filled.push('名称');
+  }
+  if (!String(form.cas || '').trim() && info.cas && info.cas.length) {
+    form.cas = info.cas[0];
+    filled.push('CAS');
+  }
+  if (!String(form.formula || '').trim() && info.formula) {
+    form.formula = info.formula;
+    filled.push('分子式');
+  }
+  if (!String(form.mw || '').trim() && info.mw) {
+    form.mw = info.mw;
+    filled.push('MW');
+  }
+  if (filled.length) toast(`PubChem：已补上${filled.join(' / ')}`, 'ok');
+  return info;
+}
+
+/** 手动查一次（⋯ 菜单里），跟自动那次共用一套逻辑 */
+async function lookupNow() {
+  const smiles = String(form.smiles || '').trim();
+  if (!smiles) return toast('这格还没有结构，先画一个或粘贴 SMILES', 'warn');
+  const before = `${form.name}|${form.cas}|${form.formula}|${form.mw}`;
+  const info = await fillFromLookup(smiles);
+  if (!info) return toast('没查到：确认结构没问题、也联网了', 'warn');
+  // 该填的都填过了（多半是点了第二次）：至少说一声查到了什么，别让人以为没反应
+  if (`${form.name}|${form.cas}|${form.formula}|${form.mw}` === before) {
+    toast(describeInfo(info) || `PubChem #${info.cid}`, 'info');
+  }
+}
+
+async function applySketched({ smiles, info: sketchedInfo }) {
   if (!c.value || !smiles) return;
   const info = await analyzeStructureText(smiles);
   if (!info) return toast('这个结构读不出来，换个画法试试', 'err');
@@ -205,6 +251,14 @@ async function applySketched({ smiles }) {
   form.formula = info.formula;
   form.mw = String(info.mw);
   toast(`已用画板的结构：${info.formula} · MW ${info.mw}`);
+  // 画板里已经查过就直接用，省一次网络来回
+  if (sketchedInfo && sketchedInfo.found) {
+    lastLookup.value = sketchedInfo;
+    if (!String(form.name || '').trim() && sketchedInfo.name) form.name = sketchedInfo.name;
+    if (!String(form.cas || '').trim() && sketchedInfo.cas && sketchedInfo.cas.length) form.cas = sketchedInfo.cas[0];
+  } else {
+    void fillFromLookup(smiles);
+  }
 }
 
 async function useSmiles(text, { quiet = false } = {}) {
@@ -235,6 +289,7 @@ async function useSmiles(text, { quiet = false } = {}) {
   if (fillFormula) form.formula = info.formula;
   if (fillMw) form.mw = String(info.mw);
   if (!quiet) toast(`已识别：${info.formula} · MW ${info.mw}`);
+  if (!isMol) void fillFromLookup(form.smiles);
   return true;
 }
 
@@ -499,6 +554,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
         <div v-if="moreMenu" class="menu">
           <button @click="label(); moreMenu = false"><Icon name="qr" :size="13" /> 打印瓶子标签</button>
           <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 修改历史</button>
+          <button @click="lookupNow(); moreMenu = false"><Icon name="molecule" :size="13" /> 查这个结构（PubChem）</button>
           <div class="menu-sep" />
           <button class="menu-danger" @click="removeCompound(); moreMenu = false">
             <Icon name="trash" :size="13" /> 移入回收站
@@ -532,6 +588,22 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <button class="btn btn-sm btn-ghost" title="打开画板画结构式" @click.stop="sketcherOpen = true">
               <Icon name="molecule" :size="13" /> 画结构式
             </button>
+            <a
+              v-if="lastLookup && lastLookup.found"
+              class="cmp-lookup-link"
+              :href="lastLookup.url"
+              target="_blank"
+              rel="noreferrer"
+              title="这条结构是从 PubChem 查的"
+            >PubChem #{{ lastLookup.cid }}</a>
+            <a
+              v-if="lastLookup && chemicalBookUrl(lastLookup)"
+              class="cmp-lookup-link"
+              :href="chemicalBookUrl(lastLookup)"
+              target="_blank"
+              rel="noreferrer"
+              title="按 CAS 去 ChemicalBook 搜"
+            >ChemicalBook</a>
           </div>
 
           <div class="cmp-fields">
@@ -549,6 +621,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             </label>
             <label class="c-field"><span>分子式</span><input v-model="form.formula" placeholder="C8H8O" /></label>
             <label class="c-field"><span>MW</span><input class="n" type="number" step="any" v-model="form.mw" placeholder="120.15" /></label>
+            <label class="c-field"><span>CAS</span><input class="mono" v-model="form.cas" placeholder="50-78-2" title="结构式查出来的，也能手填；后面的 ChemicalBook 链接按它去搜" /></label>
             <label class="c-field"><span>性状</span><input v-model="form.appearance" placeholder="无色液体" /></label>
             <label class="c-field"><span>熔点</span><input v-model="form.mp" placeholder="−26 ℃" /></label>
             <label class="c-field full"><span>HRMS</span><input v-model="form.hrms" placeholder="calcd for C8H9O [M+H]+ 121.0648, found 121.0651" /></label>

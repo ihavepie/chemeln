@@ -201,6 +201,8 @@ ensureColumn('experiments', 'sort_index', 'sort_index REAL');
 ensureColumn('compounds', 'sort_index', 'sort_index REAL');
 // 化合物挂在哪个课题下：只有关掉「跨课题共用」才写值，空串 = 本子里的公共库
 ensureColumn('compounds', 'project', "project TEXT NOT NULL DEFAULT ''");
+// CAS 号：从 PubChem 查出来顺手存着（`/api/lookup`），方便以后对试剂 / 查 ChemicalBook
+ensureColumn('compounds', 'cas', "cas TEXT NOT NULL DEFAULT ''");
 
 /* 改动留痕：events 原来只给实验用（exp_id），现在实验和化合物共用一张表。
    entity/entity_id 记录「改的是哪一条」，fields 是这次改到的字段名（JSON 数组，去重后给界面读）。 */

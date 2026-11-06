@@ -8,6 +8,7 @@ const { Readable } = require('node:stream');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
+const https = require('node:https');
 
 const store = require('./db');
 const qr = require('./qr');
@@ -216,7 +217,7 @@ const EXP_FIELD_LABELS = {
 };
 
 const CMP_FIELD_LABELS = {
-  code: '编号', name: '名称', kind: '类型', formula: '分子式', mw: '分子量', appearance: '性状',
+  code: '编号', name: '名称', kind: '类型', formula: '分子式', mw: '分子量', cas: 'CAS', appearance: '性状',
   mp: '熔点', smiles: 'SMILES', nmr_h1: '¹H NMR', nmr_c13: '¹³C NMR', nmr_other: '其他核磁',
   hrms: 'HRMS', ir: 'IR', rotation: '旋光', tlc_solvent: '展开剂', tlc_rf: 'Rf', procedure: '合成与纯化', notes: '说明',
   category_id: '分类', project: '课题', standard_exp_id: '标准实验',
@@ -935,7 +936,7 @@ function pipeFile(res, file) {
 /* ------------------------------------------------------------ 化合物库 */
 
 const COMPOUND_COLUMNS = [
-  'code', 'name', 'kind', 'formula', 'mw', 'appearance', 'mp', 'smiles',
+  'code', 'name', 'kind', 'formula', 'mw', 'cas', 'appearance', 'mp', 'smiles',
   'nmr_h1', 'nmr_c13', 'nmr_other', 'hrms', 'ir', 'rotation', 'tlc_solvent', 'tlc_rf', 'procedure', 'notes',
   'standard_exp_id', 'category_id', 'project',
 ];
@@ -2711,6 +2712,134 @@ route('POST', '/api/print/pdf', async (req, res) => {
     PRINT_TOKENS.delete(token);
     fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
+});
+
+/* ------------------------------------- 结构信息查询（PubChem；联网 + 本地缓存） */
+
+/**
+ * 画完/粘完一个结构，想知道「这是什么」：查 PubChem 的 PUG REST（免费、无需 key）。
+ * 按 SMILES（其次 InChIKey、名称）换 CID，再取 IUPAC 名 / 分子式 / 分子量 / 同义词里的 CAS。
+ * 结果按查询键缓存在 `.cache/lookup/`（30 天），断网或 PubChem 抽风时用旧缓存顶上。
+ * **ChemicalBook 没有公开接口**（而且抓页面会被反爬拦），所以那边只给前端一个跳转链接，
+ * 不在这里抓。
+ */
+const PUBCHEM = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug';
+const LOOKUP_DIR = path.join(__dirname, '..', '.cache', 'lookup');
+const LOOKUP_TTL = 30 * 24 * 3600 * 1000;
+const CAS_RX = /^\d{2,7}-\d{2}-\d$/;
+
+/** 取 JSON（不引第三方库）：404 当「查不到」返回 null，其它非 200 抛错 */
+function fetchJson(target, ms = 12000) {
+  return new Promise((resolve, reject) => {
+    const lib = target.startsWith('https:') ? https : http;
+    const req = lib.get(
+      target,
+      { headers: { 'user-agent': 'ELN-local/1.0 (personal notebook)', accept: 'application/json' }, timeout: ms },
+      (r) => {
+        let buf = '';
+        r.setEncoding('utf8');
+        r.on('data', (c) => {
+          buf += c;
+          if (buf.length > 4e6) req.destroy(new Error('上游响应太大'));
+        });
+        r.on('end', () => {
+          if (r.statusCode === 404) return resolve(null);
+          if (r.statusCode !== 200) return reject(new Error(`上游返回 ${r.statusCode}`));
+          try {
+            resolve(JSON.parse(buf));
+          } catch {
+            reject(new Error('上游返回的不是 JSON'));
+          }
+        });
+      }
+    );
+    req.on('timeout', () => req.destroy(new Error('查询超时')));
+    req.on('error', reject);
+  });
+}
+
+const pubchemCids = async (kind, value) => {
+  const path = kind === 'smiles' ? 'smiles' : kind === 'inchikey' ? 'inchikey' : 'name';
+  const data = await fetchJson(`${PUBCHEM}/compound/${path}/${encodeURIComponent(value)}/cids/JSON`);
+  const list = data && data.IdentifierList && data.IdentifierList.CID;
+  return Array.isArray(list) ? list : [];
+};
+
+/** 一次完整查询；查不到返回 { found:false } */
+async function pubchemLookup(kind, value) {
+  const cids = await pubchemCids(kind, value);
+  if (!cids.length) return { found: false, query: value };
+  const cid = cids[0];
+  const table = await fetchJson(
+    `${PUBCHEM}/compound/cid/${cid}/property/IUPACName,MolecularFormula,MolecularWeight,InChIKey/JSON`
+  );
+  const p = (table && table.PropertyTable && table.PropertyTable.Properties && table.PropertyTable.Properties[0]) || {};
+  let cas = [];
+  try {
+    const syn = await fetchJson(`${PUBCHEM}/compound/cid/${cid}/synonyms/JSON`);
+    const list = (syn && syn.InformationList && syn.InformationList.Information && syn.InformationList.Information[0] &&
+      syn.InformationList.Information[0].Synonym) || [];
+    cas = list.map(String).filter((s) => CAS_RX.test(s)).slice(0, 3);
+  } catch {
+    /* 同义词接口偶尔 404，没有就没有 */
+  }
+  return {
+    found: true,
+    query: value,
+    cid,
+    name: str(p.IUPACName),
+    formula: str(p.MolecularFormula),
+    mw: p.MolecularWeight ? String(p.MolecularWeight) : '',
+    inchikey: str(p.InChIKey),
+    cas,
+    url: `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`,
+    others: cids.slice(1, 4),
+  };
+}
+
+/** 缓存：同一个结构别每次都去敲 PubChem */
+function lookupCachePath(kind, value) {
+  const h = crypto.createHash('sha1').update(`${kind}:${value}`).digest('hex');
+  return path.join(LOOKUP_DIR, `${h}.json`);
+}
+
+route('GET', '/api/lookup', async (req, res, params, url) => {
+  const smiles = str(url.searchParams.get('smiles')).trim();
+  const inchikey = str(url.searchParams.get('inchikey')).trim();
+  const q = str(url.searchParams.get('q')).trim();
+  const kind = smiles ? 'smiles' : inchikey ? 'inchikey' : q ? 'name' : '';
+  const value = smiles || inchikey || q;
+  if (!kind) throw new HttpError(400, '要带 smiles / inchikey / q 其中一个');
+  if (value.length > 800) throw new HttpError(400, '查询内容太长');
+
+  const file = lookupCachePath(kind, value);
+  let stale = null;
+  try {
+    const raw = JSON.parse(await fsp.readFile(file, 'utf8'));
+    if (raw && raw.info) {
+      if (Date.now() - (raw.at || 0) < LOOKUP_TTL) return ok(res, { ...raw.info, cached: true });
+      stale = raw.info;
+    }
+  } catch {
+    /* 没缓存 */
+  }
+
+  let info;
+  try {
+    info = await pubchemLookup(kind, value);
+  } catch (e) {
+    // 断网 / 超时：有旧结果就给旧的，没有就明说
+    if (stale) return ok(res, { ...stale, cached: true, stale: true });
+    throw new HttpError(502, `查不到（${e.message || '网络不通'}）`);
+  }
+  if (!info.found && stale) return ok(res, { ...stale, cached: true, stale: true });
+  try {
+    await fsp.mkdir(LOOKUP_DIR, { recursive: true });
+    await fsp.writeFile(file, JSON.stringify({ at: Date.now(), info }), 'utf8');
+  } catch {
+    /* 缓存写不进去也不要紧 */
+  }
+  ok(res, info);
 });
 
 /* --------------------------------------------------------------- server */

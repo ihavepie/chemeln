@@ -1,0 +1,53 @@
+import { api } from '../api.js';
+
+/**
+ * 结构信息查询（PubChem，服务端代查 + 本地缓存）。
+ * 断网 / 查不到都只是「没有额外信息」，不能让画结构、存记录这些主流程挂掉，
+ * 所以这里一律吞异常、返回 null。
+ */
+const memo = new Map();
+
+/** SMILES → { found, name, cas[], formula, mw, cid, url, inchikey } 或 null */
+export async function structureInfo(smiles) {
+  const key = String(smiles || '').trim();
+  if (!key) return null;
+  if (memo.has(key)) return memo.get(key);
+  let info = null;
+  try {
+    const res = await api.lookup({ smiles: key });
+    info = res && res.found ? res : { found: false };
+  } catch {
+    info = null;
+  }
+  memo.set(key, info);
+  return info;
+}
+
+/** 按名称查（给「这个试剂是什么」用） */
+export async function nameInfo(name) {
+  const key = String(name || '').trim();
+  if (!key) return null;
+  try {
+    const res = await api.lookup({ q: key });
+    return res && res.found ? res : null;
+  } catch {
+    return null;
+  }
+}
+
+/** ChemicalBook 没有公开接口，只能带 CAS（没有就用名称）跳过去搜 */
+export function chemicalBookUrl(info) {
+  const key = (info && info.cas && info.cas[0]) || (info && info.name);
+  return key ? `https://www.chemicalbook.com/Search_EN.aspx?keyword=${encodeURIComponent(key)}` : '';
+}
+
+/** 一行摘要：名称 · CAS 50-78-2 · C9H8O4 · 180.16 */
+export function describeInfo(info) {
+  if (!info || !info.found) return '';
+  const bits = [];
+  if (info.name) bits.push(info.name);
+  if (info.cas && info.cas.length) bits.push(`CAS ${info.cas[0]}`);
+  if (info.formula) bits.push(info.formula);
+  if (info.mw) bits.push(info.mw);
+  return bits.join(' · ');
+}

@@ -34,6 +34,15 @@ export const api = {
   // 返回整个响应：课题里改标题会顺带改名，前端要拿 renamedTo 切过去
   saveSettings: (body) => request('/api/settings', { method: 'PUT', body }),
 
+  /* 结构信息查询：服务端去问 PubChem（带本地缓存），smiles / inchikey / q 三选一 */
+  lookup: ({ smiles, inchikey, q } = {}) => {
+    const p = new URLSearchParams();
+    if (smiles) p.set('smiles', smiles);
+    else if (inchikey) p.set('inchikey', inchikey);
+    else if (q) p.set('q', q);
+    return request(`/api/lookup?${p.toString()}`);
+  },
+
   /* 自己生成 PDF：返回二进制，不走 JSON */
   printPdf: async (body) => {
     const res = await fetch('/api/print/pdf', {
