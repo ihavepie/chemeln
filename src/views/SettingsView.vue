@@ -321,12 +321,13 @@ async function newProject() {
   }
 }
 
-/** 课题自己的编号前缀；清空就回到全局前缀 */
+/** 课题自己的编号前缀；清空就按课题名自动生成（每个课题都从 xxxx-0001 起，互不干扰） */
 async function editProjectPrefix(p) {
+  const auto = p.auto_prefix || p.name || 'EXP';
   const prefix = await prompt({
     title: `「${p.name}」的编号前缀`,
     value: p.prefix || '',
-    placeholder: '留空 = 用全局前缀',
+    placeholder: `留空 = 自动用「${auto}」`,
     confirmText: '确定',
     allowEmpty: true,
   });
@@ -334,7 +335,7 @@ async function editProjectPrefix(p) {
   try {
     await api.createProject({ name: p.name, prefix });
     await loadBoot();
-    toast(prefix ? `新实验会用 ${prefix}-0001 这样的编号` : '已改回全局前缀');
+    toast(prefix ? `新实验会用 ${prefix}-0001 这样的编号` : `已改回自动前缀「${auto}」`);
   } catch (e) {
     toast(e.message, 'err');
   }
@@ -508,7 +509,7 @@ async function removeProject(p) {  const ok = await confirm({
             <span v-if="isCurrentProject(gp.name)" class="tree-tag">当前</span>
             <span v-if="isTarget(gp.name)" class="tree-tag is-fill">新建到此</span>
             <span class="tree-meta mono">
-              {{ gp.info.prefix || store.boot?.settings?.code_prefix || 'EXP' }} · {{ gp.info.n }} 条 · {{ gp.info.cmp || 0 }} 个
+              {{ gp.info.prefix || (gp.name ? gp.info.auto_prefix : store.boot?.settings?.code_prefix) || 'EXP' }} · {{ gp.info.n }} 条 · {{ gp.info.cmp || 0 }} 个
             </span>
             <span class="spacer" />
             <button class="icon-act" title="给课题改名" @click.stop="renameProject(gp.info)">

@@ -327,20 +327,30 @@ function initSettings() {
   }
 }
 
-/** 取一个从未用过的实验编号（删除记录也不会回收编号）。 */
-function nextCode(prefix) {
-  const key = `seq:${prefix}`;
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-  let n = row ? Number(row.value) || 0 : 0;
+/** 这个课题里已经用到的最大编号（`<前缀>-<数字>` 里那个数字） */
+function maxCodeNumber(prefix, project) {
+  const re = new RegExp(`^${String(prefix).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`);
+  let max = 0;
+  for (const r of db.prepare('SELECT code FROM experiments WHERE project = ?').all(project)) {
+    const m = re.exec(String(r.code ?? ''));
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return max;
+}
 
-  // 兼容手工改过编号的情况：跳过已被占用的号
+/**
+ * 取一个这个课题下还没用过的实验编号——**编号按课题分开数**：
+ * 每次都从「这个课题里同前缀的最大号 + 1」开始，所以每个课题都从 xxxx-0001 起，
+ * 互不干扰，删掉最新那条时号也会收回来（不再一路往上涨）。
+ */
+function nextCode(prefix, project = '') {
+  let n = maxCodeNumber(prefix, project);
+  // 跳过已被占用的号（手工改过编号、或两个课题恰好用了同一个前缀）
   for (;;) {
     n += 1;
     const code = `${prefix}-${String(n).padStart(4, '0')}`;
-    const taken = db.prepare('SELECT 1 AS x FROM experiments WHERE code = ?').get(code);
-    if (!taken) break;
+    if (!db.prepare('SELECT 1 AS x FROM experiments WHERE code = ?').get(code)) break;
   }
-  setSetting(key, String(n));
   return `${prefix}-${String(n).padStart(4, '0')}`;
 }
 

@@ -612,7 +612,41 @@ function listProjects() {
     uncat_exp: uncat.get(name)?.exp || 0,
     uncat_cmp: uncat.get(name)?.cmp || 0,
     prefix: getSetting(`prefix:${name}`) || '',
+    auto_prefix: derivedPrefix(name),   // 没手设前缀时实际会用的那个
   }));
+}
+
+/**
+ * 课题名 → 自动前缀：ASCII 取字母数字（最多 3 位、大写），
+ * 中文名取前两个字（「氨基环丁酮类」→「氨基」）。撞了后面加 2、3…
+ */
+function derivedPrefix(name) {
+  const s = str(name).trim();
+  if (!s) return 'EXP';
+  const ascii = s.replace(/[^A-Za-z0-9]/g, '');
+  const base = ascii ? ascii.toUpperCase().slice(0, 3) : [...s].slice(0, 2).join('');
+  return base || 'EXP';
+}
+
+/**
+ * 这个课题实际用的编号前缀：手设的（设置页的「编号前缀」）优先，
+ * 没设就按课题名自动生成一个，并保证跟别的课题不重（重了就加 2/3…）。
+ * **编号是按课题分开数的**（见 db.js 的 nextCode），所以每个课题都从 xxxx-0001 起。
+ */
+function projectPrefix(project) {
+  const name = str(project).trim();
+  const own = str(getSetting(`prefix:${name}`));
+  if (own) return own;
+  if (!name) return 'EXP';                     // 共用课题沿用 EXP
+  const base = derivedPrefix(name);
+  const used = new Set();
+  for (const p of listProjects()) {
+    if (p.name === name) continue;
+    used.add((str(getSetting(`prefix:${p.name}`)) || derivedPrefix(p.name)).toUpperCase());
+  }
+  let cand = base;
+  for (let i = 2; used.has(cand.toUpperCase()); i += 1) cand = `${base}${i}`;
+  return cand;
 }
 
 /** 每个课题能覆盖的记录本信息：留空的项跟着全局走 */
@@ -1847,10 +1881,10 @@ route('POST', '/api/experiments', async (req, res) => {
   if (catProject !== null) data.project = catProject;
   // 编号前缀：显式传的最优先，其次这个课题自己的前缀，最后才是全局的
   const projectName = str(data.project).trim();
-  const prefix = str(body.prefix) || settingsFor(projectName).code_prefix || 'EXP';
-  let code = str(body.code).trim() || nextCode(prefix);
+  const prefix = str(body.prefix) || projectPrefix(projectName);
+  let code = str(body.code).trim() || nextCode(prefix, projectName);
   if (db.prepare('SELECT 1 AS x FROM experiments WHERE code = ?').get(code)) {
-    code = nextCode(prefix);
+    code = nextCode(prefix, projectName);
   }
   const ts = nowISO();
 
@@ -2030,7 +2064,7 @@ route('POST', '/api/experiments/:id/lock', async (req, res, params) => {
 route('POST', '/api/experiments/:id/duplicate', async (req, res, params) => {
   const src = getExperiment(Number(params.id));
   if (!src) return fail(res, 404, '实验不存在');
-  const prefix = settingsFor(str(src.project)).code_prefix || 'EXP';
+  const prefix = projectPrefix(src.project);
   const ts = nowISO();
   const data = {};
   for (const key of EXP_COLUMNS) if (key !== 'code') data[key] = src[key];
@@ -2055,7 +2089,7 @@ route('POST', '/api/experiments/:id/duplicate', async (req, res, params) => {
        VALUES (${EXP_COLUMNS.map(() => '?').join(',')}, 0, ?, ?)`
     )
     .run(
-      nextCode(prefix),
+      nextCode(prefix, str(src.project)),
       // 连点两次复制不会叠出「（重复）（重复）」
       `${(data.title || '未命名').replace(/（重复）$/, '')}（重复）`,
       new Date().toISOString().slice(0, 10),
@@ -2081,7 +2115,7 @@ route('POST', '/api/experiments/:id/parallel', async (req, res, params) => {
   if (!src) return fail(res, 404, '实验不存在');
   if (src.locked) return fail(res, 423, '实验已锁定');
   const body = await readJson(req);
-  const prefix = settingsFor(str(src.project)).code_prefix || 'EXP';
+  const prefix = projectPrefix(src.project);
   const ts = nowISO();
 
   const data = {};
@@ -2115,7 +2149,7 @@ route('POST', '/api/experiments/:id/parallel', async (req, res, params) => {
          VALUES (${EXP_COLUMNS.map(() => '?').join(',')}, 0, ?, ?)`
       )
       .run(
-        nextCode(prefix),
+        nextCode(prefix, str(src.project)),
         data.title,
         data.date,
         data.status,
