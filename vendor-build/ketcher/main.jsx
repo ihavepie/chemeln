@@ -22,6 +22,42 @@ function pickBondTool(tries = 60) {
   if (tries > 0) setTimeout(() => pickBondTool(tries - 1), 100)
 }
 
+/* ⌘V 直接把结构 / 反应式粘进画板。
+   Ketcher 自己不吃系统的粘贴（实测派发 paste 事件画布毫无反应），而 ChemDraw 里
+   「Copy As → Molfile / SMILES」拿到的东西正好是纯文本，所以这里自己接管：
+   MOL、反应式 SMILES、RXN、以及 ChemDraw 自己的剪贴板格式 CDXML（Indigo 都认得）。 */
+function looksLikeChem(text) {
+  const s = String(text || '').trim()
+  if (s.length < 2 || s.length > 300000) return false
+  if (/V2000|V3000/.test(s) && /M\s+END/.test(s)) return true          // molfile
+  if (s.startsWith('$RXN') || /^\$RXN/.test(s)) return true            // rxn
+  if (/<CDXML/i.test(s.slice(0, 3000))) return true                    // ChemDraw 的 CDXML
+  if (/^[A-Za-z0-9@+\[\]()=#$:\/\\.\-*%]+(>>|>)[A-Za-z0-9@+\[\]()=#$:\/\\.\-*%]+/.test(s)) return true // 反应式 SMILES
+  // SMILES：只有结构字符、没有空白、至少一个字母
+  if (!/\s/.test(s) && /[A-Za-z]/.test(s) && /^[A-Za-z0-9@+\[\]()=#$:\/\\.\-*%]+$/.test(s)) return true
+  return false
+}
+
+window.addEventListener(
+  'paste',
+  async (ev) => {
+    const data = ev.clipboardData
+    if (!data) return
+    const text = data.getData('text/plain') || ''
+    if (!looksLikeChem(text)) return
+    ev.preventDefault()
+    ev.stopPropagation()
+    try {
+      await window.ketcher.setMolecule(text)
+      pickBondTool(10)
+      window.__lastPaste = 'ok'
+    } catch (err) {
+      window.__lastPaste = 'err: ' + ((err && err.message) || err)
+    }
+  },
+  true,
+)
+
 window.__ketcherReady = false
 window.sketcherApi = {
   /** 切回单键工具（载入结构后 Ketcher 有时会退回框选） */

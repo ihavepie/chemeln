@@ -151,8 +151,8 @@ function clearAll() {
     </div>
 
     <div class="sk-foot">
-      <span v-if="isReaction" class="hint">先画反应物，用工具栏的 <b>＋</b> 添料、点 <b>→</b> 画箭头，再把产物画在右边；条件想写在箭头上就用 <b>文字</b> 工具。不自动排版，摆成什么样就存什么样。</span>
-      <span v-else class="hint">原子之间拖一下就连键；停在原子上打字 = 换原子；<b>⌘Z</b> 撤销。</span>
+      <span v-if="isReaction" class="hint">先画反应物，用工具栏的 <b>＋</b> 添料、点 <b>→</b> 画箭头，再把产物画在右边；条件想写在箭头上就用 <b>文字</b> 工具。<b>⌘V</b> 可以直接粘 ChemDraw 的反应式。不自动排版，摆成什么样就存什么样。</span>
+      <span v-else class="hint">原子之间拖一下就连键；停在原子上打字 = 换原子；<b>⌘V</b> 粘 ChemDraw 的结构，<b>⌘Z</b> 撤销。</span>
       <span class="spacer" style="flex: 1" />
       <button v-if="!isReaction" class="btn btn-sm btn-ghost" :disabled="looking" @click="lookup">
         {{ looking ? '查…' : '查一下是什么' }}
