@@ -52,7 +52,21 @@ export const CMP_CAT_LABEL = {
   other: '其他',
 };
 
-export const COMPOUND_KINDS = ['底物', '中间体', '产物', '催化剂', '配体', '其他'];
+/** 化合物的「类型」：按一条合成路线的顺序排（原料 → 中间体 → 粗品 → 成品），后面几个是工具型角色。
+    注意「中间体」就是用户说的「中间产物」，别再加一个同义的选项。 */
+export const COMPOUND_KINDS = [
+  '底物',
+  '试剂',
+  '中间体',
+  '粗产物',
+  '纯化产物',
+  '产物',
+  '催化剂',
+  '配体',
+  '添加剂',
+  '标准品',
+  '其他',
+];
 
 export const isImageName = (name) => /\.(png|jpe?g|gif|webp|svg|bmp|heic)$/i.test(String(name || ''));
 

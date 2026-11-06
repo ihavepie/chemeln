@@ -14,7 +14,8 @@ import { api } from '../api.js';
 import { loadBoot, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
 import { structureInfo, chemicalBookUrl, describeInfo } from '../lib/lookup.js';
-import { CMP_CAT_LABEL, CMP_CAT_ORDER, COMPOUND_KINDS, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
+import { CMP_CAT_LABEL, CMP_CAT_ORDER, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
+import KindPick from '../components/KindPick.vue';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
@@ -766,9 +767,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <label class="c-field wide"><span>名称</span><input v-model="form.name" placeholder="4-甲基苯甲醛" /></label>
             <label class="c-field">
               <span>类型</span>
-              <select v-model="form.kind">
-                <option v-for="k in COMPOUND_KINDS" :key="k">{{ k }}</option>
-              </select>
+              <KindPick v-model="form.kind" />
             </label>
             <label class="c-field">
               <span>课题</span>

@@ -38,6 +38,7 @@
 - `vendor-build/ketcher/`（**源码进 git，node_modules 不进**）— 那个 Ketcher 小工程的源码：`index.html` / `main.jsx`（挂 `ketcher-react` 的 `<Editor>` + `ketcher-standalone` 的 `StandaloneStructServiceProvider`，并暴露 `window.sketcherApi`）/ `vite.config.js` / `package.json`。`npm install` + `vite build` 就把产物写到 `vendor/ketcher/`。
 - `src/components/FilePreview.vue` — **附件就地预览弹窗**（实验附件 `/api/files/:id`、化合物文件 `/api/compound-files/:id` 共用）：图片直接铺开、PDF 用 `<iframe>`（Safari 自带阅读器）、`.txt/.csv/.md/.jdx` 拉下来放等宽区（>200 KB 截断），其它格式给个说明 + 下载；底部「新标签页打开 / 下载」。
 - `src/components/AppModal.vue` — 通用弹窗（`modelValue/title/confirmText/danger/showFooter/showConfirm/width/closeOnBackdrop`）。`modelValue` 默认 `true`，传 `false` 只是隐藏不销毁内容（给需要「关了还在」的 iframe 用）。
+- `src/components/KindPick.vue` — 化合物「类型」的自绘下拉（`.kind-pick` / `.kind-trigger` / `.kind-menu`，菜单复用 `.cat-menu` 那套）：**不要换成系统 `<select>`**（弹出来是系统蓝底菜单，跟纸面不搭，用户点名要改掉）。`COMPOUND_KINDS` 里没有的老值（比如「试剂」）也会照样显示、不丢。
 - `src/components/CatPick.vue` — 分类下拉（自绘菜单；`show-all` 决定是「筛选」还是「给记录归类」）。传 `kinds` 时菜单里会多一节「类型」（两列排、`.cat-menu-kinds`），选中的值形如 `kind:底物`，由调用方区分。菜单有 `max-height: 56vh` + 滚动，分类多了不会把屏幕顶下去。
 - `src/components/ProjPick.vue` — 记录页「课题」格子的下拉（能打字，也能从已有课题里点一个）。小箭头**贴在输入框右侧内部、无边框**（不要做成带框的小方块，用户明确讨厌那种“空白的框”）；菜单贴着输入框下方弹出，下面放不下就往上翻。**宽度不是照抄输入框**：记录页那个格子只有 ~95px（`.cmp-fields` 是 4 列网格），照抄会让「这个是测试课题 16」溢出成一截、`overflow-y:auto` 顺带把 `overflow-x` 也变成 auto —— 于是那个下拉**能横向拖**（用户截图问过「为什么这个是横向拖动」）。现在 `MENU_MIN_W = 176`，宽度 = max(输入框宽, 176) 再夹进视口，并且 `overflow-x: hidden`。
 - `src/components/PrintPanel.vue` — 打印面板：克隆真实两页 DOM 缩成 A4 缩略图 + 选项（范围/附件/页眉/黑白）；可以走系统打印（`body` 挂 `print-*` 类，`afterprint` 时摘掉），也可以「存成 PDF」走后端 WebKit 渲染；`window.print()` 前关掉自动保存。
@@ -74,7 +75,7 @@
 - `src/lib/sheetprefs.js` — 「记录页显示哪几块」的前端偏好（`sheetPrefs` / `setSheetPref` / `showAllSheetBlocks` / `SHEET_BLOCKS`，存 localStorage `eln:sheet`，默认全开）；`EditorView` 用 `v-if` 挂着，关掉的块页面和打印都没有。
 - `src/lib/peek.js` — 「书签悬停预览显示哪些块」的前端偏好（`peekPrefs` / `setPeekPref` / `PEEK_LABELS`，存 localStorage `eln:peek`；默认条件 / 底物 / 结果 / 结论开，备注关）。
 - `src/lib/feedback.js` — `toast` / `confirm` / `prompt`（Element Plus 封装）。
-- `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量（`STATUSES` / `STATUS_TONE` / 窄地方用的 `STATUS_SHORT`）、瓶子标签、内联 SVG 图标。
+- `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量（`STATUSES` / `STATUS_TONE` / 窄地方用的 `STATUS_SHORT`）、瓶子标签、内联 SVG 图标。**`COMPOUND_KINDS`**（化合物的类型）按一条路线的顺序排：底物 / 试剂 / 中间体 / 粗产物 / 纯化产物 / 产物 / 催化剂 / 配体 / 添加剂 / 标准品 / 其他 ——「中间体」就是「中间产物」，别再塞一个同义项进去；老数据里的「试剂」原本不在列表里，这次补上了。
 - `src/styles/eln.css` — 全站样式（v1 规则在前，v2 新增追加在文件末尾并写注释）。
 - `server/index.js` — HTTP 服务 + 全部路由。
 - `server/ocr.swift` — **本地 OCR**（`ocr <图片>` → `[{text,conf,x,y,w,h}]` 的 JSON）：用系统的 Vision 框架认图上的字，**不联网、不引第三方库**；服务启动后第一次用到才编到 `.cache/ocr`（跟 `print.swift` 一个套路），没 swiftc 就报错让用户手填。

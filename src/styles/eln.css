@@ -6521,3 +6521,39 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   max-height: 100%;
   object-fit: contain;
 }
+
+/* 化合物「类型」的自绘下拉（`KindPick.vue`）：触发器长得跟旁边那些格子一样，
+   弹出来的菜单跟「分类」下拉同一套（.cat-menu），不用系统 select 的蓝底菜单 */
+.kind-pick { position: relative; min-width: 0; }
+
+.kind-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 130ms;
+}
+
+.kind-trigger:hover { background: #f8f7f3; }
+.kind-trigger:focus-visible { outline: none; background: #f6f5f1; }
+.kind-trigger:disabled { cursor: default; color: var(--ink-3); }
+.kind-text { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kind-trigger .i { flex: none; color: var(--ink-4); }
+
+.kind-menu {
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 100%;
+  max-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+}
