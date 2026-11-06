@@ -3149,8 +3149,10 @@ kbd {
 
 .c-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .c-field.wide { grid-column: span 3; }
-/* 整行一格：HRMS / IR / 旋光 这类长文本，挤在 84px 的小格里看不见 */
+/* 整行一格：HRMS / IR / 旋光 / SMILES 这类长文本 */
 .c-field.full { grid-column: 1 / -1; }
+/* 两格宽：性状这种「一句话」的，独占一行太浪费（用户嫌太长） */
+.c-field.half { grid-column: span 2; }
 
 .c-field > span {
   font-family: var(--mono);

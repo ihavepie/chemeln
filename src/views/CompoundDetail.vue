@@ -733,8 +733,11 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <label class="c-field"><span>MW</span><input class="n" type="number" step="any" v-model="form.mw" placeholder="120.15" /></label>
             <label class="c-field"><span>CAS</span><input class="mono" v-model="form.cas" placeholder="50-78-2" title="结构式查出来的，也能手填；后面的 ChemicalBook 链接按它去搜" /></label>
             <label class="c-field"><span>熔点</span><input v-model="form.mp" placeholder="−26 ℃" /></label>
-            <!-- 性状常常是一整句（PubChem 上就是 "Monoclinic tablets or needle-like crystals"），独占一行 -->
-            <label class="c-field full"><span>性状</span><input v-model="form.appearance" placeholder="无色液体" /></label>
+            <!-- 性状给两格宽（一行最多一句「白色粉末 / 无色液体」），太长就靠 hover 看全 -->
+            <label class="c-field half">
+              <span>性状</span>
+              <input v-model="form.appearance" :title="form.appearance" placeholder="无色液体" />
+            </label>
             <label class="c-field full"><span>HRMS</span><input v-model="form.hrms" placeholder="calcd for C8H9O [M+H]+ 121.0648, found 121.0651" /></label>
             <label class="c-field full"><span>IR</span><input v-model="form.ir" placeholder="ν/cm⁻¹ 2928, 1712, 1612" /></label>
             <label class="c-field full"><span>旋光</span><input v-model="form.rotation" placeholder="[α]D²⁰ = +12.4 (c 1.0, CHCl₃)" /></label>
