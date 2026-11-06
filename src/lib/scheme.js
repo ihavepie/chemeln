@@ -81,13 +81,14 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
 
   const GAP = 14;          // 结构之间的一般间距
   const PLUS = 18;         // 加号的宽度
-  const ARROW = 150;       // 箭头长度（长一点，条件写在上下才不挤）
+  const ARROW_MIN = 150;   // 箭头最短多长；实际长度会按上下最长那行字拉长（至少盖住所有条件再留点余量）
   // 箭头那块地方要放得下最长的那行字（13px 字，中文按全角估），否则字会压到反应物上
   const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 13 : 7.1), 0);
   const capAbove = above.filter((t) => String(t || '').trim());
   const capBelow = below.filter((t) => String(t || '').trim());
   const capW = Math.max(0, ...[...capAbove, ...capBelow].map(textW));
-  const arrowW = Math.max(ARROW, Math.round(capW) + 28);
+  const arrowLen = Math.max(ARROW_MIN, Math.round(capW) + 30); // 箭头要比最长的条件行再宽 30px
+  const arrowW = arrowLen + 34;                                // 这块区域两头各留 17px，字不会贴到结构上
   const LINE_H = 18;
   const CAP_GAP = 15;      // 最近那行字离箭头多远
   const capTopH = capAbove.length ? capAbove.length * LINE_H + CAP_GAP : 0;
@@ -108,8 +109,8 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
   x += GAP * 2;
   const arrowZone = x;
   // 箭头画在这块地方的正中，字也居中在箭头上
-  const arrowX1 = arrowZone + (arrowW - ARROW) / 2;
-  const arrowX2 = arrowX1 + ARROW;
+  const arrowX1 = arrowZone + (arrowW - arrowLen) / 2;
+  const arrowX2 = arrowX1 + arrowLen;
   x = arrowZone + arrowW + GAP * 2;
   const prodPos = { ...prod, x, y: cy - prod.h / 2 };
   x += prod.w + PAD;
