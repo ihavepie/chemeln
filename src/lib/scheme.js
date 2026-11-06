@@ -37,7 +37,8 @@ function splitScript(text) {
       buf = '';
     }
   };
-  const isAlnumTail = (ch) => /[A-Za-z)\]·]/.test(ch || '');
+  // 注意别把「·」算进来：CuSO4·5H2O 里的 5 是结晶水的系数，得占正常字号
+  const isAlnumTail = (ch) => /[A-Za-z)\]]/.test(ch || '');
   for (let i = 0; i < s.length; i++) {
     if (s.startsWith('_{', i) || s.startsWith('^{', i)) {
       const end = s.indexOf('}', i + 2);
