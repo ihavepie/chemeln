@@ -1,0 +1,146 @@
+/**
+ * 按投料表拼一张反应式图（不经过画板）：反应物 —— 箭头（上方写试剂 / 条件）—— 产物。
+ *
+ * 为什么要自己拼：Ketcher 画板里没法用代码往箭头上写文字（它的文本对象没有开放接口），
+ * 而 ChemDraw 的习惯就是「试剂、催化剂、溶剂、温度都堆在箭头横线上方」。所以这里用
+ * openchemlib 出每个结构（跟全站结构式图同一套观感：杂原子彩色），自己画加号、箭头和那几行字，
+ * 拼成一张 SVG。
+ *
+ * 尺度：`BOND_PX` 是「一根键多少像素」，所有分子按它统一缩放——不然小分子被放大、
+ * 大分子被塞小，摆在一起键长不齐。字（箭头上的条件）比键小一号，看着才像 ChemDraw。
+ */
+
+const BOND_PX = 26; // 一根键的像素长度，整张图的尺度基准
+const PAD = 16;
+
+let cached = null;
+async function chem() {
+  if (!cached) cached = await import('openchemlib');
+  return cached;
+}
+
+const esc = (s) =>
+  String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+/** 一个分子 → 一张小 SVG（内容紧凑裁边、键长≈BOND_PX） */
+async function molSvg(smiles, id) {
+  const lib = await chem();
+  const mol = lib.Molecule.fromSmiles(smiles);
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  for (let i = 0; i < mol.getAllAtoms(); i++) {
+    const x = mol.getAtomX(i);
+    const y = mol.getAtomY(i);
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  const bw = Math.max(0.6, x1 - x0);
+  const bh = Math.max(0.6, y1 - y0);
+  // 请求尺寸只影响内部渲染精度；真正占多大由下面按「键长 = BOND_PX」反推
+  const svg = mol.toSVG(Math.round((bw + 3) * BOND_PX), Math.round((bh + 3) * BOND_PX), id, {
+    autoCrop: true,
+    autoCropMargin: 6,
+  });
+  const vb = (svg.match(/viewBox="([^"]+)"/) || [])[1] || '';
+  // 分子坐标里一根键≈1，所以「键长 BOND_PX 像素」= 宽高各给 bbox*BOND_PX；
+  // 里面 viewBox 的形状和它差不多，缩放就≈1，键长才是齐的
+  const EDGE = 10;
+  return {
+    w: Math.round(bw * BOND_PX + EDGE * 2),
+    h: Math.round(bh * BOND_PX + EDGE * 2),
+    body: svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, ''),
+    vb,
+  };
+}
+
+/**
+ * 拼一张完整的反应式 SVG。
+ * @param {object} p
+ * @param {string[]} p.reactants 反应物 SMILES（两个底物就是两条）
+ * @param {string} p.product     产物 SMILES
+ * @param {string[]} p.caption   箭头上方的几行字（试剂 / 条件）
+ */
+export async function composeSchemeSvg({ reactants = [], product = '', caption = [] } = {}) {
+  const rs = [];
+  for (let i = 0; i < reactants.length; i++) {
+    if (!String(reactants[i] || '').trim()) continue;
+    rs.push(await molSvg(reactants[i], `r${i}`));
+  }
+  const prod = product ? await molSvg(product, 'p') : null;
+  if (!rs.length || !prod) throw new Error('至少要一个反应物和一个产物');
+
+  const GAP = 10;          // 结构之间的一般间距
+  const PLUS = 18;         // 加号的宽度
+  const ARROW = 104;       // 箭头长度
+  // 箭头那块地方要放得下最长的条件行（13px 字，中文按全角估），否则字会压到反应物上
+  const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 13 : 7.1), 0);
+  const capW = Math.max(0, ...caption.map(textW));
+  const arrowW = Math.max(ARROW, Math.round(capW) + 18);
+  const LINES = caption.filter((t) => String(t || '').trim());
+  const LINE_H = 17;
+  const CAP_GAP = 10;      // 最后一行字离箭头多远
+  const capH = LINES.length ? LINES.length * LINE_H + CAP_GAP : 0;
+
+  const maxMolH = Math.max(...rs.map((r) => r.h), prod.h);
+  const cy = PAD + capH + maxMolH / 2; // 所有结构都按这条中轴对齐
+  const height = Math.round(cy + maxMolH / 2 + PAD);
+
+  // 横向排：反应物（+ 加号）→ 箭头 → 产物
+  let x = PAD;
+  const placed = [];
+  rs.forEach((r, i) => {
+    if (i) x += PLUS + GAP * 2;
+    placed.push({ ...r, x, y: cy - r.h / 2 });
+    x += r.w;
+  });
+  x += GAP * 2;
+  const arrowZone = x;
+  // 箭头画在这块地方的正中，字也居中在箭头上
+  const arrowX1 = arrowZone + (arrowW - ARROW) / 2;
+  const arrowX2 = arrowX1 + ARROW;
+  x = arrowZone + arrowW + GAP * 2;
+  const prodPos = { ...prod, x, y: cy - prod.h / 2 };
+  x += prod.w + PAD;
+  const width = Math.round(x);
+
+  const molTag = (m) =>
+    `<svg x="${Math.round(m.x)}" y="${Math.round(m.y)}" width="${m.w}" height="${m.h}" viewBox="${esc(m.vb)}" preserveAspectRatio="xMidYMid meet">${m.body}</svg>`;
+
+  let pluses = '';
+  let px = placed[0].x + placed[0].w;
+  for (let i = 1; i < placed.length; i++) {
+    const mid = (px + placed[i].x) / 2;
+    pluses += `<text x="${Math.round(mid)}" y="${Math.round(cy + 7)}" text-anchor="middle" font-size="20" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">+</text>`;
+    px = placed[i].x + placed[i].w;
+  }
+
+  const arrow =
+    `<line x1="${Math.round(arrowX1)}" y1="${Math.round(cy)}" x2="${Math.round(arrowX2 - 9)}" y2="${Math.round(cy)}" stroke="#1b1a17" stroke-width="1.8"/>` +
+    `<path d="M ${Math.round(arrowX2 - 10)} ${Math.round(cy - 5.5)} L ${Math.round(arrowX2)} ${Math.round(cy)} L ${Math.round(arrowX2 - 10)} ${Math.round(cy + 5.5)} Z" fill="#1b1a17"/>`;
+
+  const capX = Math.round(arrowZone + arrowW / 2);
+  let cap = '';
+  LINES.forEach((line, i) => {
+    const y = Math.round(cy - CAP_GAP - (LINES.length - 1 - i) * LINE_H);
+    cap += `<text x="${capX}" y="${y}" text-anchor="middle" font-size="13" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${esc(line)}</text>`;
+  });
+
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+    `<rect width="100%" height="100%" fill="#ffffff"/>` +
+    placed.map(molTag).join('') +
+    pluses +
+    arrow +
+    molTag(prodPos) +
+    cap +
+    '</svg>'
+  );
+}

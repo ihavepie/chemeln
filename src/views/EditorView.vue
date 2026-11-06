@@ -28,6 +28,7 @@ import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { peekPrefs } from '../lib/peek.js';
 import { canonicalSmiles } from '../lib/chem.js';
+import { composeSchemeSvg } from '../lib/scheme.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -551,8 +552,9 @@ async function runFillTableFromScheme() {
 }
 
 /**
- * 投料表 + 产物 → 反应式：把挂了化合物库的行拼成一条反应式（反应物 >> 产物），
- * 先塞进画板让人看一眼 / 调箭头和条件，再点「用这个反应式」存下来。
+ * 按投料表 + 条件拼一张反应式图（不经过画板）。
+ * 底物（可以两个）画成反应物，试剂 / 催化剂 / 碱……和溶剂、温度、时间写在箭头上方一格，
+ * 产物取结果块里挂库的那个。尺度和字号在 lib/scheme.js 里统一控制。
  */
 async function schemeFromTable() {
   if (!exp.value || exp.value.locked) return;
@@ -563,17 +565,78 @@ async function schemeFromTable() {
   }
   const lib = store.compounds || [];
   const byId = new Map(lib.map((c) => [Number(c.id), c]));
-  const parts = [];
+
+  const reactants = [];
+  const up = [];       // 箭头上方第一行：试剂 / 催化剂之类
   for (const r of reagent.rows) {
     if (r.role === '溶剂') continue;
     const c = r.compound_id ? byId.get(Number(r.compound_id)) : null;
-    if (c && c.smiles) parts.push(c.smiles);
+    if (r.role === '底物') {
+      if (c && c.smiles) reactants.push(c.smiles);
+      continue;
+    }
+    const name = String(r.name || (c && (c.name || c.code)) || '').trim();
+    if (!name) continue;
+    const eq = num(r.eq);
+    up.push(eq != null && eq !== 1 ? `${name} (${round(eq, 2)} eq)` : name);
   }
-  if (!parts.length) return toast('投料表里还没有挂化合物库的行（双击试剂名选一个）', 'warn');
+  if (!reactants.length) {
+    return toast(
+      reactantHint() || '投料表里还没有挂化合物库的底物——双击试剂名选一个',
+      'warn'
+    );
+  }
   const prod = fields.product_compound_id ? byId.get(Number(fields.product_compound_id)) : null;
   if (!prod || !prod.smiles) return toast('产物还没挂化合物库——先在结果块里选上', 'warn');
-  schemePadSeed.value = `${parts.join('.')}>>${prod.smiles}`;
-  schemeSketcherOpen.value = true;
+
+  const cond = [fields.solvent, fields.concentration, fields.temperature, fields.duration]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .join('，');
+
+  let svg;
+  try {
+    svg = await composeSchemeSvg({
+      reactants,
+      product: prod.smiles,
+      caption: [up.join('，'), cond],
+    });
+  } catch (e) {
+    return toast(e.message || '反应式没拼出来', 'err');
+  }
+
+  const ok = await confirm({
+    title: '按投料表重画反应式？',
+    body: '会用投料表里的底物画反应物、试剂和条件写在箭头上，产物用结果块里挂的那个；现在这张反应式图会被替换。',
+  });
+  if (!ok) return;
+
+  const old = (exp.value.attachments || []).find((a) => a.category === 'scheme');
+  try {
+    if (old) await api.deleteAttachment(old.id).catch(() => {});
+    const fd = new FormData();
+    fd.append('file', new File([svg], '反应式.svg', { type: 'image/svg+xml' }), '反应式.svg');
+    fd.append('category', 'scheme');
+    await api.upload(exp.value.id, fd);
+    // 顺手记一份反应式文本，这样还能用「从反应式填表」跟投料表对一遍
+    fields.scheme_smiles = `${reactants.join('.')}>>${prod.smiles}`;
+    await refreshAttachments();
+    toast('反应式图按投料表重画好了');
+  } catch (e) {
+    toast(e.message || '反应式没存上', 'err');
+  }
+}
+
+/** 底物行了但没挂化合物库时，给一句说得更具体的话 */
+function reactantHint() {
+  const subs = reagent.rows.filter((r) => r.role === '底物');
+  if (!subs.length) return '投料表里还没有「底物」行';
+  const bound = subs.filter((r) => r.compound_id);
+  if (!bound.length) return '底物还没挂化合物库（双击试剂名选一个）';
+  if (bound.some((r) => !(store.compounds || []).find((c) => Number(c.id) === Number(r.compound_id))?.smiles)) {
+    return '底物挂的那个化合物没有 SMILES，先给它粘个结构';
+  }
+  return '';
 }
 
 /** 点「画反应式」：不预填别的，用上次存的那条 RXN */
