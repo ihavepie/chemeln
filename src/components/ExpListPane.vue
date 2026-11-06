@@ -7,6 +7,7 @@ import { store, loadList, loadBoot, recordCategories, addCategory } from '../sto
 import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
 import { prompt, toast } from '../lib/feedback.js';
+import { experimentMenu } from '../lib/rowmenu.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -243,6 +244,15 @@ function isGroupActive(row) {
  * 点卡片堆的面子：**正在看这一组**时不再重复跳同一条记录（页面没变化，看着像没反应），
  * 改成展开 / 收起组员；别的组还是照旧跳过去（跳过去会由 EditorView 自动展开）。
  */
+/** 卡片堆上右键：菜单作用在「面子」那条，顶上多一条展开 / 收起 */
+function onStackMenu(ev, row) {
+  experimentMenu(ev, row.face, router, {
+    groupSize: row.members.length,
+    stackOpen: isGroupOpen(row.gid),
+    toggleStack: () => toggleGroup(row.gid),
+  });
+}
+
 function onStackFace(row) {
   if (isGroupActive(row)) return toggleGroup(row.gid);
   router.push(`/e/${row.face.id}`);
@@ -277,6 +287,7 @@ function onStackFace(row) {
           class="exp-card"
           :aria-current="row.one.id === activeId() ? 'true' : 'false'"
           @click="router.push(`/e/${row.one.id}`)"
+          @contextmenu="experimentMenu($event, row.one, router)"
         >
           <div class="top">
             <span class="exp-code">{{ row.one.code }}</span>
@@ -305,6 +316,7 @@ function onStackFace(row) {
               tabindex="0"
               @click="onStackFace(row)"
               @keydown.enter="onStackFace(row)"
+              @contextmenu="onStackMenu($event, row)"
             >
               <div class="top">
                 <span class="exp-code">{{ row.face.code }}</span>
@@ -351,6 +363,7 @@ function onStackFace(row) {
                 class="exp-card is-member"
                 :aria-current="m.id === activeId() ? 'true' : 'false'"
                 @click="router.push(`/e/${m.id}`)"
+                @contextmenu.stop="experimentMenu($event, m, router, { groupSize: row.members.length })"
               >
                 <div class="top">
                   <span class="exp-code">{{ m.code }}</span>

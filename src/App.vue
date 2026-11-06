@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppRail from './components/AppRail.vue';
+import ContextMenu from './components/ContextMenu.vue';
 import { loadBoot, store } from './store.js';
 
 const route = useRoute();
@@ -27,5 +28,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', onResize));
       </div>
       <router-view v-else />
     </div>
+    <!-- 右键菜单全站只挂这一个（卡片上右键时由 lib/rowmenu.js 填内容） -->
+    <ContextMenu />
   </div>
 </template>

@@ -6,6 +6,7 @@ import { api } from '../api.js';
 import { store, loadBoot, loadList, recordCategories, createExperiment } from '../store.js';
 import { STATUS_TONE } from '../lib/ui.js';
 import { toast } from '../lib/feedback.js';
+import { experimentMenu } from '../lib/rowmenu.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -211,6 +212,7 @@ async function onDrop(ev, g) {
                 @dragstart="onDragStart($event, card)"
                 @dragend="onDragEnd"
                 @click="router.push(`/e/${card.it.id}`)"
+                @contextmenu="experimentMenu($event, card.it, router, { groupSize: card.members.length })"
               >
                 <div class="grid-thumb">
                   <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
@@ -244,6 +246,7 @@ async function onDrop(ev, g) {
               @dragstart="onDragStart($event, card)"
               @dragend="onDragEnd"
               @click="router.push(`/e/${card.it.id}`)"
+              @contextmenu="experimentMenu($event, card.it, router)"
             >
               <div class="grid-thumb">
                 <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />

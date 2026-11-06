@@ -573,6 +573,7 @@ async function removeProject(p) {  const ok = await confirm({
           <span><kbd>⌘</kbd> <kbd>N</kbd> 新建实验</span>
           <span><kbd>⌘</kbd> <kbd>K</kbd> 搜索</span>
           <span><kbd>Esc</kbd> 关闭对话框</span>
+          <span><kbd>右键</kbd> 列表卡片上出快捷菜单（复制 / 锁定 / 删除）</span>
         </div>
       </section>
 

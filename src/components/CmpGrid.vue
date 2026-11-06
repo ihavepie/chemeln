@@ -6,6 +6,7 @@ import { api } from '../api.js';
 import { store, loadBoot, loadCompounds, recordCategories, createCompound } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { toast } from '../lib/feedback.js';
+import { compoundMenu } from '../lib/rowmenu.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -158,6 +159,7 @@ async function onDrop(ev, g) {
               @dragstart="onDragStart($event, c)"
               @dragend="onDragEnd"
               @click="router.push(`/c/${c.id}`)"
+              @contextmenu="compoundMenu($event, c, router)"
             >
               <div class="grid-thumb is-structure">
                 <img v-if="c.structure_id" :src="`/api/compound-files/${c.structure_id}`" alt="" loading="lazy" draggable="false" />

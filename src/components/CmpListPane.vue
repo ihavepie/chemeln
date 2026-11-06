@@ -6,6 +6,7 @@ import CatPick from './CatPick.vue';
 import { loadBoot, loadCompounds, setProject, store, recordCategories, addCategory } from '../store.js';
 import { COMPOUND_KINDS } from '../lib/ui.js';
 import { prompt, toast } from '../lib/feedback.js';
+import { compoundMenu } from '../lib/rowmenu.js';
 import { round } from '../lib/reagent.js';
 
 const route = useRoute();
@@ -90,6 +91,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         :aria-current="c.id === activeId() ? 'true' : 'false'"
         :style="{ '--i': Math.min(i, 12) }"
         @click="router.push(`/c/${c.id}`)"
+        @contextmenu="compoundMenu($event, c, router)"
       >
         <div class="top">
           <span class="exp-code">{{ c.code || '—' }}</span>
