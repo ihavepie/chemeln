@@ -1,7 +1,12 @@
 /**
  * 化学结构的解析与绘制 —— 用 openchemlib（本地跑，不联网）。
  * 只在真正需要的时候才动态加载，所以首屏不变慢。
+ *
+ * 唯一例外：**结构里带基团缩写**（ChemDraw 的 Ts / Boc / Ph 这些超原子）时，改用 Indigo 画
+ * ——openchemlib 会把缩写展开画成全结构、标签丢掉（见 lib/indigo.js）。
  */
+
+import { indigoSvg } from './indigo.js';
 
 let cached = null;
 
@@ -17,6 +22,11 @@ export function looksLikeSmiles(text) {
   if (/[\u4e00-\u9fa5\s]/.test(s)) return false; // 有中文或空白就不是
   if (!/[A-Za-z]/.test(s)) return false;
   return /^[A-Za-z0-9@+()[\]{}=#$:/\\.\-*%]+$/.test(s);
+}
+
+/** molfile 里有没有「基团缩写」：超原子 S-group 或原子别名 */
+export function hasAbbrev(mol) {
+  return /^M  (STY|SMT|ALS)\b/m.test(String(mol || ''));
 }
 
 /** 看起来像 molfile 吗（ChemDraw 的 Copy As → MOL/SDF） */
@@ -49,13 +59,24 @@ export async function analyzeMolfile(molfile) {
       mw: Math.round(f.relativeWeight * 100) / 100,
       svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
     };
-    try {
-      const smiles = mol.toSmiles();
-      const tidy = chem.Molecule.fromSmiles(smiles);
-      out.svg = tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
-      out.smiles = smiles;
-    } catch {
-      /* 排不出来就用原来的坐标 */
+    // 带缩写：交给 Indigo 画（它认得超原子，Ts 就显示成 Ts）；
+    // 别的结构仍用 openchemlib 那套（SMILES 重排一遍再画）
+    if (hasAbbrev(s)) {
+      try {
+        out.svg = await indigoSvg(s);
+      } catch {
+        /* Indigo 拿不到就退回下面 */
+      }
+    }
+    if (!out.svg) {
+      try {
+        const smiles = mol.toSmiles();
+        const tidy = chem.Molecule.fromSmiles(smiles);
+        out.svg = tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+        out.smiles = smiles;
+      } catch {
+        /* 排不出来就用原来的坐标 */
+      }
     }
     return out;
   } catch {
