@@ -1,6 +1,9 @@
 # ELN 云服务器部署（2026-10-29 建立）
 
-阿里云 ECS「Ubuntu-tuku」上跑的是 **v2 构建产物（dist）+ 同一个 Node 服务端**，nginx 在前面发静态文件并反代 `/api`。
+> 这是一份**脱敏模板**：文里的 `203.0.113.10`（RFC5737 文档地址）代表你自己的服务器 IP，`~/.ssh/eln.pem` 代表你的私钥，用户名按需改。
+> 真实的 IP / 私钥路径 / 密码只放在本机 `CLOUD-DEPLOY.local.md`（已 gitignore），**别提交进仓库**。
+
+一台 Ubuntu 24.04 云主机上跑的是 **v2 构建产物（dist）+ 同一个 Node 服务端**，nginx 在前面发静态文件并反代 `/api`。
 
 ## 访问
 
@@ -15,17 +18,17 @@
 
 ```bash
 # 1) 设密码
-ssh root@203.0.113.10 'htpasswd -cb /etc/nginx/.eln_htpasswd maple 你的密码'
+ssh root@203.0.113.10 'htpasswd -cb /etc/nginx/.eln_htpasswd eln 你的密码'
 # 2) 把 /etc/nginx/sites-available/eln 里那两行 auth_basic 的注释去掉
 ssh root@203.0.113.10 'sed -i "s|^    # auth_basic|    auth_basic|" /etc/nginx/sites-available/eln && nginx -t && systemctl reload nginx'
 ```
 
-旧的密码文件还在 `/etc/nginx/.eln_htpasswd`（用户 `maple`，原密码 `REDACTED`），注释掉配置后它没在生效。
+旧的密码文件还在 `/etc/nginx/.eln_htpasswd`（用户 `eln`）。**密码不写在这个文件里**——真实地址 / 私钥 / 密码放在本机 `CLOUD-DEPLOY.local.md`（已 gitignore，不进仓库）。
 
 ## 机器与路径
 
 - 服务器：`root@203.0.113.10`，密钥 `~/.ssh/eln.pem`（权限已改 600）
-- 主机指纹记录在 `<本机路径>/.ssh_known_hosts`（沙箱不允许写 `~/.ssh/known_hosts`）
+- 主机指纹记录在 `~/.ssh/known_hosts`（沙箱不允许写 `~/.ssh/known_hosts`）
 - 系统：Ubuntu 24.04.2 / 2 vCPU / 1.6 GiB / 40 GB，Node v22.23.4（NodeSource）、nginx 1.24.0
 
 | 内容 | 服务器路径 | 权限 |
@@ -40,7 +43,7 @@ Node 只监听 `127.0.0.1:4780`，公网只有 nginx 的 80。服务端由 `ELN_
 
 ## 主从关系（定了，别再反过来）
 
-- **本机 `<本机路径>/Software/ELN/data/` 是主库**，服务器 `/var/lib/eln` 是**同步上去的副本**。
+- **本机 `~/Software/ELN/data/` 是主库**，服务器 `/var/lib/eln` 是**同步上去的副本**。
 - 数据只往一个方向走：**本机 → 服务器（整份覆盖）**。不要在服务器上录数据再往回拉，那样两边一定会岔。
 - 因此服务器上的任何「数据改动」（新建记录、改设置、删化合物）在下次同步时都会**被本机覆盖**。
 - 有一个例外必须靠环境变量：**二维码里的地址**。设置页里的「瓶子标签的二维码地址」存在库里，同步会冲掉，所以服务器用 `ELN_LABEL_BASE_URL` 指定（优先级：URL 参数 > 环境变量 > 设置页 > 局域网地址）。
@@ -90,11 +93,11 @@ tar -czf /root/eln-data-$(date +%F).tar.gz -C /var/lib/eln .
 在 Mac 上重新构建并推上去，`.cache` / `node_modules` / `data` 都不要传：
 
 ```bash
-cd <本机路径>/Software/ELN
+cd ~/Software/ELN
 npm run build            # 产物在 public/（index.html + assets/）
 
 KEY=~/.ssh/eln.pem
-SSH="ssh -i $KEY -o UserKnownHostsFile=<本机路径>/.ssh_known_hosts root@203.0.113.10"
+SSH="ssh -i $KEY -o UserKnownHostsFile=~/.ssh/known_hosts root@203.0.113.10"
 
 # 只同步前端产物 + 服务端代码
 tar -C public -czf - . | $SSH 'rm -rf /opt/eln/dist && mkdir -p /opt/eln/dist && tar -xzf - -C /opt/eln/dist'
@@ -113,7 +116,7 @@ $SSH 'chown -R root:eln /opt/eln; chmod -R a+rX /opt/eln; systemctl restart eln'
 服务器上的库是 2026-10-29 从本机 `data/` 用 `sqlite3 .backup` 做的一致性快照。要再同步一次：
 
 ```bash
-cd <本机路径>/Software/ELN
+cd ~/Software/ELN
 # 先停服务端，避免边写边传
 $SSH 'systemctl stop eln'
 # 一致性快照（本机 4780 正在跑也没关系，.backup 是 WAL-aware 的）

@@ -25,3 +25,6 @@ node_modules/
 # 源码在 vendor-build/ketcher/（进仓库），跑 scripts/build-ketcher.sh 重新打包
 vendor/
 vendor-build/*/node_modules/
+
+# 部署说明里的真实地址 / 私钥 / 密码：只留在本机，不进仓库
+CLOUD-DEPLOY.local.md
