@@ -6356,3 +6356,21 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .smi-text:focus { background: #f6f5f1; }
 .smi-text::placeholder { color: var(--ink-4); }
+
+/* SMILES 平时就是一行（点一下复制），够长就省略号；点「改」才换成 .smi-text 输入框 */
+.smi-line {
+  display: block;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: copy;
+}
+.smi-line:hover { background: #f6f5f1; border-color: var(--line-2); }
+.smi-line.is-empty { color: var(--ink-4); cursor: default; font-family: var(--sans); }
+.smi-line.is-empty:hover { background: none; border-color: transparent; }

@@ -64,6 +64,7 @@ const baseline = ref('');
 
 function fill(data) {
   c.value = data;
+  smiEditing.value = false;
   for (const k of Object.keys(form)) form[k] = data[k] ?? '';
   baseline.value = JSON.stringify({ ...form });
   markLoaded();
@@ -358,6 +359,15 @@ async function useSmiles(text, { quiet = false } = {}) {
 }
 
 /** 在 SMILES 格子里直接粘贴：把 SMILES 之后的其它文本也一并收下 */
+/** SMILES 平时是不可编辑的一行（点一下复制），点「改」才展开成输入框 */
+const smiEditing = ref(false);
+
+function closeSmiEdit() {
+  if (!smiEditing.value) return;
+  smiEditing.value = false;
+  void onSmilesFieldChange();
+}
+
 async function copySmiles() {
   const text = String(form.smiles || '').trim();
   if (!text) return toast('这格还是空的', 'warn');
@@ -728,22 +738,37 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <label class="c-field full"><span>HRMS</span><input v-model="form.hrms" placeholder="calcd for C8H9O [M+H]+ 121.0648, found 121.0651" /></label>
             <label class="c-field full"><span>IR</span><input v-model="form.ir" placeholder="ν/cm⁻¹ 2928, 1712, 1612" /></label>
             <label class="c-field full"><span>旋光</span><input v-model="form.rotation" placeholder="[α]D²⁰ = +12.4 (c 1.0, CHCl₃)" /></label>
-            <!-- SMILES 常常上百个字符，单行输入框只能看见一截；换成会自动长高的文本域，右边给个复制 -->
+            <!-- SMILES 常常上百个字符：平时就一行「点一下复制」，想手动敲再点「改」展开 -->
             <label class="c-field full smi-field">
               <span class="c-field-head">
                 SMILES
                 <button type="button" class="mini-copy noprint" title="复制整条 SMILES" @click.prevent.stop="copySmiles">复制</button>
+                <button
+                  type="button"
+                  class="mini-copy noprint"
+                  :title="smiEditing ? '收起输入框' : '手动改 / 粘贴'"
+                  @click.prevent.stop="smiEditing = !smiEditing"
+                >{{ smiEditing ? '收起' : '改' }}</button>
               </span>
               <textarea
+                v-if="smiEditing"
                 class="mono smi-text"
                 rows="2"
                 v-autogrow
                 v-model="form.smiles"
-                placeholder="可从 ChemDraw 直接粘贴结构"
-                title="可以直接从 ChemDraw 复制结构黏贴，会自动算分子式 / MW 并画结构式"
+                placeholder="粘贴 SMILES / MOL，或手敲"
                 @paste="onSmilesFieldPaste"
-                @change="onSmilesFieldChange"
+                @blur="closeSmiEdit"
+                @keydown.meta.enter="closeSmiEdit"
+                @keydown.ctrl.enter="closeSmiEdit"
               />
+              <div
+                v-else
+                class="smi-line mono"
+                :class="{ 'is-empty': !String(form.smiles || '').trim() }"
+                :title="form.smiles ? '点一下复制整条 SMILES' : '还没有结构'"
+                @click="copySmiles"
+              >{{ String(form.smiles || '').trim() || '还没有结构 —— 直接 ⌘V 粘贴 SMILES / MOL，或点左边「画结构式」' }}</div>
             </label>
           </div>
         </div>
