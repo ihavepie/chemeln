@@ -7,6 +7,7 @@
  */
 
 import { indigoSvg } from './indigo.js';
+import { abbreviatedParts } from './abbrev.js';
 
 let cached = null;
 
@@ -54,13 +55,11 @@ export async function analyzeMolfile(molfile) {
   try {
     const mol = chem.Molecule.fromMolfile(s);
     const f = mol.getMolecularFormula();
-    const out = {
-      formula: f.formula,
-      mw: Math.round(f.relativeWeight * 100) / 100,
-      svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
-    };
-    // 带缩写：交给 Indigo 画（它认得超原子，Ts 就显示成 Ts）；
-    // 别的结构仍用 openchemlib 那套（SMILES 重排一遍再画）
+    const raw = mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+    const out = { formula: f.formula, mw: Math.round(f.relativeWeight * 100) / 100, svg: raw };
+    // 带缩写：交给 Indigo 画（它认得超原子，Ts 就显示成 Ts）。
+    // 这种 MOL 里没有「干净的 smiles」（抄出来是展开式），所以 out.smiles 留空，
+    // ⋯ 里的「整理结构式（重排）」对它们不出现
     if (hasAbbrev(s)) {
       try {
         out.svg = await indigoSvg(s);
@@ -68,14 +67,28 @@ export async function analyzeMolfile(molfile) {
         /* Indigo 拿不到就退回下面 */
       }
     }
-    if (!out.svg) {
+    // 没缩写：绕一圈 SMILES 重排一遍再画（裸 MOL 的坐标常常是歪的）。
+    // 注意这里的 `svg` 一开始就有值，所以判断的是「要不要重排」，不能写成 if (!out.svg)
+    if (!hasAbbrev(s)) {
+      let smiles = '';
       try {
-        const smiles = mol.toSmiles();
-        const tidy = chem.Molecule.fromSmiles(smiles);
-        out.svg = tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
-        out.smiles = smiles;
+        smiles = mol.toSmiles();
       } catch {
-        /* 排不出来就用原来的坐标 */
+        /* 连 SMILES 都抄不出来就保留原始坐标 */
+      }
+      if (smiles) {
+        out.smiles = smiles;
+        // 认得出基团缩写（Ts / CO2Et / Boc…）就让 Indigo 按缩写画；否则 openchemlib 重排着画
+        const ab = await abbreviatedParts(smiles);
+        if (ab?.svg) {
+          out.svg = ab.svg;
+        } else {
+          try {
+            out.svg = chem.Molecule.fromSmiles(smiles).toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+          } catch {
+            /* 排不出来就用原来的坐标 */
+          }
+        }
       }
     }
     return out;
@@ -108,10 +121,12 @@ export async function analyzeSmiles(smiles) {
   try {
     const mol = chem.Molecule.fromSmiles(s);
     const f = mol.getMolecularFormula();
+    const ab = await abbreviatedParts(s);
     return {
       formula: f.formula,
       mw: Math.round(f.relativeWeight * 100) / 100,
-      svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
+      // 认得出基团缩写（Ts / CO2Et / Boc…）就让 Indigo 按缩写画，否则 openchemlib
+      svg: ab?.svg || mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
     };
   } catch {
     return null;
