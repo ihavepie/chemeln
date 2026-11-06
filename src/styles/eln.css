@@ -3140,8 +3140,10 @@ kbd {
 
 .cmp-fields {
   display: grid;
-  grid-template-columns: 88px 1fr 84px 1fr;
-  gap: 8px 12px;
+  /* 四列等宽：每格是「标签 + 值」一整个字段，所以别把列写得一大一小
+     （以前写死 88/84px 的是小格子，分子式 C29H29NO5S、CAS 2231932-21-9 这种会被截掉） */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 10px;
   align-content: start;
 }
 
@@ -6322,3 +6324,35 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 @media (max-width: 900px) {
   .sk-info-props { display: none; }
 }
+
+/* SMILES 那格：会换行的文本域（长 SMILES 一眼能看全），标签行右边放「复制」 */
+.c-field-head { display: flex; align-items: center; gap: 8px; }
+.c-field-head .mini-copy,
+.mini-copy {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.mini-copy:hover { color: var(--accent-ink); text-decoration: underline; }
+.smi-text {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+  padding: 3px 5px;
+  resize: none;
+  outline: none;
+  word-break: break-all;
+  white-space: pre-wrap;
+  min-height: 34px;
+}
+.smi-text:focus { background: #f6f5f1; }
+.smi-text::placeholder { color: var(--ink-4); }

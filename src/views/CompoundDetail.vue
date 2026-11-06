@@ -358,6 +358,17 @@ async function useSmiles(text, { quiet = false } = {}) {
 }
 
 /** 在 SMILES 格子里直接粘贴：把 SMILES 之后的其它文本也一并收下 */
+async function copySmiles() {
+  const text = String(form.smiles || '').trim();
+  if (!text) return toast('这格还是空的', 'warn');
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('SMILES 已复制');
+  } catch {
+    toast('浏览器不让写剪贴板，手动选一下再复制', 'err');
+  }
+}
+
 function onSmilesFieldPaste(ev) {
   const text = ev.clipboardData?.getData('text/plain') || '';
   if (!looksLikeSmiles(text) && !looksLikeMolfile(text)) return;
@@ -717,10 +728,16 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <label class="c-field full"><span>HRMS</span><input v-model="form.hrms" placeholder="calcd for C8H9O [M+H]+ 121.0648, found 121.0651" /></label>
             <label class="c-field full"><span>IR</span><input v-model="form.ir" placeholder="ν/cm⁻¹ 2928, 1712, 1612" /></label>
             <label class="c-field full"><span>旋光</span><input v-model="form.rotation" placeholder="[α]D²⁰ = +12.4 (c 1.0, CHCl₃)" /></label>
-            <label class="c-field wide">
-              <span>SMILES</span>
-              <input
-                class="mono"
+            <!-- SMILES 常常上百个字符，单行输入框只能看见一截；换成会自动长高的文本域，右边给个复制 -->
+            <label class="c-field full smi-field">
+              <span class="c-field-head">
+                SMILES
+                <button type="button" class="mini-copy noprint" title="复制整条 SMILES" @click.prevent.stop="copySmiles">复制</button>
+              </span>
+              <textarea
+                class="mono smi-text"
+                rows="2"
+                v-autogrow
                 v-model="form.smiles"
                 placeholder="可从 ChemDraw 直接粘贴结构"
                 title="可以直接从 ChemDraw 复制结构黏贴，会自动算分子式 / MW 并画结构式"
