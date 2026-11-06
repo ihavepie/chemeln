@@ -1,37 +1,13 @@
-/** 化学结构的解析与绘制 —— 用 openchemlib（本地跑，不联网）。
- *  只在真正需要的时候才动态加载，所以首屏不变慢。
+/**
+ * 化学结构的解析与绘制 —— 用 openchemlib（本地跑，不联网）。
+ * 只在真正需要的时候才动态加载，所以首屏不变慢。
  */
-
-import { indigoSvg } from './indigo.js';
 
 let cached = null;
 
 async function lib() {
   if (!cached) cached = await import('openchemlib');
   return cached;
-}
-
-/**
- * 结构式图优先交给 Indigo 画（见 lib/indigo.js：openchemlib 的自动排版在
- * 「环丁酮 + 磺酰胺 + 几个苄基」这种分子上会键交叉、甲氧基叠在一起）。
- * Indigo 拿不到（wasm 没拷过去 / 加载失败）就退回 openchemlib 那张，
- * 反正分子式、MW 一直是 openchemlib 算的，不受影响。
- */
-async function bestSvg(smiles, mol) {
-  if (smiles) {
-    try {
-      return await indigoSvg(smiles);
-    } catch {
-      /* 退回去：还得用 SMILES 重建一遍分子，直接拿 mol 画是原始坐标（歪的） */
-      try {
-        const chem = await lib();
-        return chem.Molecule.fromSmiles(smiles).toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
-      } catch {
-        /* 连 SMILES 都排不出来，就用传进来的分子 */
-      }
-    }
-  }
-  return mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
 }
 
 /** 看起来像 SMILES 吗（用来判断剪贴板里的纯文本要不要当结构式处理） */
@@ -71,14 +47,16 @@ export async function analyzeMolfile(molfile) {
     const out = {
       formula: f.formula,
       mw: Math.round(f.relativeWeight * 100) / 100,
-      svg: '',
+      svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
     };
     try {
-      out.smiles = mol.toSmiles();
+      const smiles = mol.toSmiles();
+      const tidy = chem.Molecule.fromSmiles(smiles);
+      out.svg = tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+      out.smiles = smiles;
     } catch {
-      /* 拿不到 SMILES 就退回按原坐标画 */
+      /* 排不出来就用原来的坐标 */
     }
-    out.svg = await bestSvg(out.smiles, mol);
     return out;
   } catch {
     return null;
@@ -112,7 +90,7 @@ export async function analyzeSmiles(smiles) {
     return {
       formula: f.formula,
       mw: Math.round(f.relativeWeight * 100) / 100,
-      svg: await bestSvg(s, mol),
+      svg: mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }),
     };
   } catch {
     return null;

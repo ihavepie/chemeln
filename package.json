@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "element-plus": "^2.8.8",
-    "indigo-ketcher": "^1.46.0",
     "openchemlib": "^9.25.1",
     "vue": "^3.5.13",
     "vue-router": "^4.4.5"
