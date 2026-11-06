@@ -89,7 +89,9 @@ async function pick() {
     if (!rxn) return toast('画板上还是空的', 'warn');
     const svg = await a.image(rxn);
     if (!svg || !svg.includes('<svg')) return toast('反应式导不出来，再试一次', 'err');
-    emit('pick', { rxn, svg });
+    // 顺手把反应式文本也带回去：RXN 保留版式（重新打开用），SMILES 用来认反应物 / 产物
+    const smiles = String((await a.getSmiles()) || '').trim();
+    emit('pick', { rxn, smiles, svg });
     emit('close');
     return;
   }

@@ -97,6 +97,18 @@ export async function analyzeSmiles(smiles) {
   }
 }
 
+/** SMILES → 规范写法（用来判断「画板里的这个分子」和「库里的那个化合物」是不是同一个） */
+export async function canonicalSmiles(smiles) {
+  const s = String(smiles || '').trim();
+  if (!s) return '';
+  try {
+    const chem = await lib();
+    return chem.Molecule.fromSmiles(s).toSmiles();
+  } catch {
+    return '';
+  }
+}
+
 /** 把 SVG 字符串包装成可以直接上传的 File */
 export function svgToFile(svg, name = '结构式.svg') {
   return new File([svg], name, { type: 'image/svg+xml' });

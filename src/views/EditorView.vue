@@ -18,7 +18,7 @@ import HistoryModal from '../components/HistoryModal.vue';
 import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
-import { loadBoot, loadList, store, categoriesOfProject, addCategory } from '../store.js';
+import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
 import { sheetPrefs } from '../lib/sheetprefs.js';
 import { useAutosave } from '../lib/autosave.js';
@@ -27,6 +27,7 @@ import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { peekPrefs } from '../lib/peek.js';
+import { canonicalSmiles } from '../lib/chem.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -40,6 +41,7 @@ const moreMenu = ref(false);
 const gone = ref(false);   // 删掉了就不再自动保存
 const historyOpen = ref(false);
 const schemeSketcherOpen = ref(false);   // 画反应式（Ketcher 画板，反应物 → 产物）
+const schemePadSeed = ref('');           // 打开画板时先塞进去的东西（按投料表拼出来的反应式）
 const recipeModal = ref(false);
 const qrModal = ref(false);
 const recipeList = ref([]);
@@ -53,6 +55,7 @@ const fields = reactive({
   ee_pct: '', sel_method: '', sel_condition: '', sel_rt: '',
   characterization: '', notes: '', conclusion: '', product_compound_id: null, category_id: null,
   scheme_rxn: '',
+  scheme_smiles: '',
 });
 
 const reagent = reactive({ base: null, steps: [], rows: [] });
@@ -459,7 +462,7 @@ async function onPaste(ev) {
  * 画板里画完的反应式：RXN 存进这条记录（下次点「画反应式」能接着改），
  * 图交给 Ketcher 自己的 Indigo 渲染成 SVG，当方案反应式那张附件存（替换旧的那张）。
  */
-async function applySketchScheme({ rxn, svg }) {
+async function applySketchScheme({ rxn, smiles, svg }) {
   if (!exp.value || exp.value.locked || !rxn || !svg) return;
   const old = (exp.value.attachments || []).find((a) => a.category === 'scheme');
   try {
@@ -469,10 +472,114 @@ async function applySketchScheme({ rxn, svg }) {
     fd.append('category', 'scheme');
     await api.upload(exp.value.id, fd);
     fields.scheme_rxn = rxn;
+    if (smiles) fields.scheme_smiles = smiles;
     await refreshAttachments();
   } catch (e) {
-    notify(e.message || '反应式没存上', 'err');
+    toast(e.message || '反应式没存上', 'err');
   }
+}
+
+/**
+ * 反应式 → 投料表：把画板里那条反应式的反应物按 SMILES 跟化合物库对上，
+ * 对上就按库里的名字 / 分子量 / 类型填行（类型是底物的当底物，其余当试剂）；
+ * 产物那一侧对上的话，结果块的产物名 / MW / 挂库也一起填。
+ */
+async function fillTableFromScheme() {
+  if (!exp.value || exp.value.locked) return;
+  try {
+    await runFillTableFromScheme();
+  } catch (e) {
+    toast(e.message || '按反应式填表失败', 'err');
+  }
+}
+
+async function runFillTableFromScheme() {
+  const smi = String(fields.scheme_smiles || '').trim();
+  if (!smi) return toast('这条反应式还没有文本形态，重新画一次就行', 'warn');
+  const [left, right] = smi.split('>>');
+  const reactants = String(left || '').split('.').map((x) => x.trim()).filter(Boolean);
+  const products = String(right || '').split('.').map((x) => x.trim()).filter(Boolean);
+  if (!reactants.length) return toast('反应式里没读出反应物', 'warn');
+
+  await loadCompounds();
+  const lib = store.compounds || [];
+  const index = new Map();
+  for (const c of lib) {
+    if (!c.smiles) continue;
+    const key = (await canonicalSmiles(c.smiles)) || c.smiles;
+    if (key && !index.has(key)) index.set(key, c);
+  }
+  const hitOf = async (s) => index.get((await canonicalSmiles(s)) || s) || null;
+
+  const ok = await confirm({
+    title: '按反应式填投料表？',
+    body: `会用画板里这条反应式的 ${reactants.length} 个反应物重建投料表（现在表里的行会被覆盖），产物那一格也一起填。`,
+  });
+  if (!ok) return;
+
+  const rows = [];
+  let miss = 0;
+  for (const s of reactants) {
+    const c = await hitOf(s);
+    if (!c) {
+      miss += 1;
+      continue;
+    }
+    const role = c.kind === '底物' ? '底物' : '试剂';
+    rows.push(
+      toRow({
+        step: 1,
+        role,
+        name: c.name || c.code || '',
+        mw: c.mw ?? null,
+        eq: role === '底物' ? 1 : null,
+        compound_id: c.id,
+        note: '',
+      })
+    );
+  }
+  if (!rows.length) return toast('反应物一个都没在化合物库里找到——先把它们存进库，或者手工填', 'warn');
+  reagent.rows.splice(0, reagent.rows.length, ...rows);
+
+  const prod = products.length ? await hitOf(products[0]) : null;
+  if (prod) {
+    fields.product_name = prod.name || fields.product_name;
+    if (prod.mw != null) fields.product_mw = String(prod.mw);
+    fields.product_compound_id = prod.id;
+  }
+  toast(`填了 ${rows.length} 行${miss ? `，${miss} 个反应物库里没有` : ''}${prod ? '；产物也填上了' : ''}`);
+}
+
+/**
+ * 投料表 + 产物 → 反应式：把挂了化合物库的行拼成一条反应式（反应物 >> 产物），
+ * 先塞进画板让人看一眼 / 调箭头和条件，再点「用这个反应式」存下来。
+ */
+async function schemeFromTable() {
+  if (!exp.value || exp.value.locked) return;
+  try {
+    await loadCompounds();
+  } catch (e) {
+    return toast(e.message || '化合物库没读出来', 'err');
+  }
+  const lib = store.compounds || [];
+  const byId = new Map(lib.map((c) => [Number(c.id), c]));
+  const parts = [];
+  for (const r of reagent.rows) {
+    if (r.role === '溶剂') continue;
+    const c = r.compound_id ? byId.get(Number(r.compound_id)) : null;
+    if (c && c.smiles) parts.push(c.smiles);
+  }
+  if (!parts.length) return toast('投料表里还没有挂化合物库的行（双击试剂名选一个）', 'warn');
+  const prod = fields.product_compound_id ? byId.get(Number(fields.product_compound_id)) : null;
+  if (!prod || !prod.smiles) return toast('产物还没挂化合物库——先在结果块里选上', 'warn');
+  schemePadSeed.value = `${parts.join('.')}>>${prod.smiles}`;
+  schemeSketcherOpen.value = true;
+}
+
+/** 点「画反应式」：不预填别的，用上次存的那条 RXN */
+function openSchemePad() {
+  schemePadSeed.value = '';
+  schemeSketcherOpen.value = true;
 }
 
 async function openRecipe() {
@@ -858,7 +965,10 @@ const openAttachment = (id) => {
             :on-hover="onHover"
             :on-pick="pickFile"
             :on-open="openAttachment"
-            :on-sketch="() => (schemeSketcherOpen = true)"
+            :on-sketch="openSchemePad"
+            :has-scheme="!!fields.scheme_smiles"
+            :on-fill="fillTableFromScheme"
+            :on-from-table="schemeFromTable"
           />
 
           <ReagentTable v-if="sheetPrefs.reagents" :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
@@ -1038,7 +1148,7 @@ const openAttachment = (id) => {
     <SketcherModal
       :open="schemeSketcherOpen"
       mode="reaction"
-      :initial="fields.scheme_rxn || ''"
+      :initial="schemePadSeed || fields.scheme_rxn || ''"
       @close="schemeSketcherOpen = false"
       @pick="applySketchScheme"
     />

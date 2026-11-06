@@ -10,6 +10,9 @@ const props = defineProps({
   onPick: Function,
   onOpen: Function,
   onSketch: Function,
+  onFill: Function,        // 反应式 → 投料表
+  onFromTable: Function,   // 投料表 + 产物 → 反应式
+  hasScheme: Boolean,
 });
 
 const scheme = computed(() => props.attachments.find((a) => a.category === 'scheme'));
@@ -25,10 +28,28 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
         v-if="!locked"
         type="button"
         class="btn btn-sm btn-ghost noprint"
-        title="打开画板画整条反应式（反应物 ＋ → 产物，条件可以写在箭头上）"
+        title="打开画板画整条反应式（反应物 ＋ → 产物，条件可以写在箭头上）；⌘V 能直接粘 ChemDraw 的"
         @click.stop="onSketch && onSketch()"
       >
         <Icon name="molecule" :size="13" /> 画反应式
+      </button>
+      <button
+        v-if="!locked"
+        type="button"
+        class="btn btn-sm btn-ghost noprint"
+        title="按投料表和结果块里的产物拼一条反应式，塞进画板让你调"
+        @click.stop="onFromTable && onFromTable()"
+      >
+        按投料表生成
+      </button>
+      <button
+        v-if="!locked && hasScheme"
+        type="button"
+        class="btn btn-sm btn-ghost noprint"
+        title="把这条反应式里的反应物跟化合物库对上，重建投料表并填上产物"
+        @click.stop="onFill && onFill()"
+      >
+        从反应式填表
       </button>
     </div>
     <div

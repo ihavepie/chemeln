@@ -137,7 +137,7 @@ const EXP_COLUMNS = [
   'product_name', 'appearance', 'yield_pct', 'dr_ee', 'characterization', 'notes', 'conclusion',
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
-  'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn',
+  'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles',
 ];
 
 const NUMERIC_COLUMNS = new Set([
@@ -205,7 +205,7 @@ function liveCompoundId(value) {
 
 /* 改动留痕：字段名 → 界面上的叫法（「改了 产率、表征数据」比「改了 yield_pct」好读） */
 const EXP_FIELD_LABELS = {
-  scheme_rxn: '反应式（画板）', title: '标题', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
+  scheme_rxn: '反应式（画板）', scheme_smiles: '反应式（文本）', title: '标题', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
   ambient_humid: '湿度', project: '课题', rxn_type: '类型', literature: '文献', objective: '实验目的',
   solvent: '溶剂', concentration: '浓度', temperature: '温度', duration: '时间', atmosphere: '气氛',
   workup: '后处理', procedure: '操作步骤', product_name: '产物', appearance: '性状', yield_pct: '产率',
@@ -1089,6 +1089,8 @@ function listCompounds(query) {
   const sql = `
     SELECT c.id, c.code, c.name, c.kind, c.formula, c.mw, c.tlc_rf, c.appearance, c.updated_at,
            c.standard_exp_id, c.category_id,
+           -- smiles 一起回去：反应式 ↔ 投料表互认（按结构对化合物）要靠它，详情页那一路是另一条查询
+           c.smiles,
            (SELECT name FROM categories g WHERE g.id = c.category_id) AS category_name,
            (SELECT code FROM experiments WHERE id = c.standard_exp_id) AS standard_code,
            (SELECT COUNT(*) FROM compound_files f WHERE f.compound_id = c.id) AS file_count,
