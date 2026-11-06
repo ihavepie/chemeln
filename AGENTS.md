@@ -22,7 +22,9 @@
 - **数据备份用 `node scripts/backup.js`**：`VACUUM INTO` 把（含 WAL 的）真数据写成一个自包含单文件，再连 `attachments/`、`compounds/` 一起拷到 `.backups/<日期>/`，默认留 7 份（`--list` 看已有、`--keep N` 改份数）。**别用 `cp data/eln.db` 当备份**——真数据在 `-wal` 里，拷出来是空壳。目前**没有排定时任务**，要手动跑；`.backups/` 不进 git。
 - **绝对不能删**：`data/`（用户全部实验记录）、`server/package.json`（内容是 `{"type":"commonjs"}`，删了服务端起不来）、`src/styles/eln.css` 里从 v1 原样搬来的大段规则、`public/`（**现在就是 v2 构建产物，删了 4780 打不开**；旧 v1 在 `.backup/public-v1-*/`）。
 - **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。常用：`git diff` 看改了啥、`git checkout -- <文件>` 撤销未提交改动、`git log --oneline` 看历史。**git 只保代码，不保数据**：`data/` 得自己拷走。
-  **本机备份**：`../ELN-backup.git` 是个裸仓库，已经配成 `origin`（`git push` 就推一份过去，2026-11-06 建）；要换成远程仓库（GitHub / Gitee）就 `git remote set-url origin <地址>`，`data/`、`vendor/`、`node_modules/` 都在 `.gitignore` 里不会上去。
+  **两个远程**：`backup` = 本机裸仓库 `<项目目录>-backup.git`（`git push backup main` 推一份）；`origin` = `git@github.com:hvaepe/chemlen.git`（公开仓库）。
+  **这台机器连 github.com 的 HTTPS 会超时**（`curl https://github.com/` 000，但 `api.github.com` 通），所以走 SSH：私钥在 `<本机路径>/.ssh/<私钥>`（不进门目录，沙箱写不了 `~/.ssh`），仓库里已配好 `core.sshCommand` 指到它，公钥要在 GitHub 账号里登记过才能推。
+  **脱敏**：`CLOUD-DEPLOY.md` 是模板（服务器地址用 `203.0.113.10` 占位、私钥写 `~/.ssh/eln.pem`），真实 IP / 私钥 / 密码只在本机 `CLOUD-DEPLOY.local.md`（已 gitignore）。**历史已经用 `git filter-branch` 重写过一遍**（服务器 IP、basic-auth 密码、`<用户目录>` 全部抹掉，72 个 commit 的 hash 都变了），旧对象已 `reflog expire` + `gc --prune=now` 清掉 —— 以后别再把这些写进仓库。
 
 ## 4. 目录结构（一句话一个）
 - `src/main.js` — 入口：挂 router / Element Plus / 全局指令。
