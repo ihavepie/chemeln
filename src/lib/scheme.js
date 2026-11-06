@@ -20,6 +20,58 @@ async function chem() {
   return cached;
 }
 
+/**
+ * 一行字拆成「正常 / 下标 / 上标」几段：
+ *  - 字母或右括号后面的数字当下标（Pd(PPh3)4 → Pd(PPh₃)₄，H2O → H₂O），
+ *    空格开头的数字不动（0.05 eq、12 h、-78 °C、4:1 这些都不是化学计量数）；
+ *  - 字母 / 右括号后面、紧跟空白或结尾的 +/- 当上标（Na+）；
+ *  - 想强制就当手写 `_{3}` / `^{2}`。
+ */
+function splitScript(text) {
+  const s = String(text || '');
+  const out = [];
+  let buf = '';
+  const flush = () => {
+    if (buf) {
+      out.push({ t: buf, kind: 'n' });
+      buf = '';
+    }
+  };
+  const isAlnumTail = (ch) => /[A-Za-z)\]·]/.test(ch || '');
+  for (let i = 0; i < s.length; i++) {
+    if (s.startsWith('_{', i) || s.startsWith('^{', i)) {
+      const end = s.indexOf('}', i + 2);
+      if (end > 0) {
+        flush();
+        out.push({ t: s.slice(i + 2, end), kind: s[i] === '_' ? 'sub' : 'sup' });
+        i = end;
+        continue;
+      }
+    }
+    const ch = s[i];
+    if (/[0-9]/.test(ch) && isAlnumTail(s[i - 1])) {
+      flush();
+      let j = i;
+      while (j < s.length && /[0-9]/.test(s[j])) j++;
+      out.push({ t: s.slice(i, j), kind: 'sub' });
+      i = j - 1;
+      continue;
+    }
+    if (
+      (ch === '+' || ch === '-') &&
+      isAlnumTail(s[i - 1]) &&
+      (i + 1 >= s.length || /[\s,，;；)\]]/.test(s[i + 1]))
+    ) {
+      flush();
+      out.push({ t: ch, kind: 'sup' });
+      continue;
+    }
+    buf += ch;
+  }
+  flush();
+  return out;
+}
+
 const esc = (s) =>
   String(s || '')
     .replace(/&/g, '&amp;')
@@ -132,8 +184,27 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
     `<path d="M ${Math.round(arrowX2 - 10)} ${Math.round(cy - 5.5)} L ${Math.round(arrowX2)} ${Math.round(cy)} L ${Math.round(arrowX2 - 10)} ${Math.round(cy + 5.5)} Z" fill="#1b1a17"/>`;
 
   const capX = Math.round(arrowZone + arrowW / 2);
-  const textTag = (line, y) =>
-    `<text x="${capX}" y="${Math.round(y)}" text-anchor="middle" font-size="13" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${esc(line)}</text>`;
+  // 下标 / 上标靠 tspan 的 dy 挪基线，字号小一号；挪完要挪回来，不然后面全跟着跑
+  const SIZE = 13;
+  const textTag = (line, y) => {
+    let pending = 0; // 上/下标挪完要挪回来，攒给下一段（别用空格占位，会把宽度撑开）
+    const spans = splitScript(line)
+      .map((r) => {
+        const dy = pending ? ` dy="${pending}"` : '';
+        pending = 0;
+        if (r.kind === 'sub') {
+          pending = -3;
+          return `<tspan${dy} font-size="${Math.round(SIZE * 0.72)}">${esc(r.t)}</tspan>`;
+        }
+        if (r.kind === 'sup') {
+          pending = 4;
+          return `<tspan${dy} font-size="${Math.round(SIZE * 0.72)}">${esc(r.t)}</tspan>`;
+        }
+        return `<tspan${dy}>${esc(r.t)}</tspan>`;
+      })
+      .join('');
+    return `<text x="${capX}" y="${Math.round(y)}" text-anchor="middle" font-size="${SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${spans}</text>`;
+  };
   let cap = '';
   capAbove.forEach((line, i) => {
     cap += textTag(line, cy - CAP_GAP - (capAbove.length - 1 - i) * LINE_H);
