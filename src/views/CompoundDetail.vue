@@ -131,9 +131,33 @@ onBeforeUnmount(() => {
 
 const payload = () => ({ ...form });
 
+/** 中栏列表 / 卡片墙读的是 store.compounds，改完名字得就地改掉那一份，不然要刷新页面才变 */
+const LIST_FIELDS = ['code', 'name', 'kind', 'formula', 'mw', 'cas', 'tlc_rf', 'project', 'category_id', 'category_name'];
+
+function patchListRow(updated) {
+  const row = (store.compounds || []).find((x) => String(x.id) === String(updated.id));
+  if (!row) return;
+  for (const k of LIST_FIELDS) if (k in updated) row[k] = updated[k];
+  // 分类名是列表接口拼的，改了分类就得问一下服务端
+  if (updated.category_id !== undefined && !('category_name' in updated)) {
+    row.category_name = categoriesOfProject('compound', row.project || '').find(
+      (g) => Number(g.id) === Number(updated.category_id)
+    )?.name || '';
+  }
+}
+
 async function save() {
-  c.value = await api.saveCompound(c.value.id, payload());
+  const before = { project: form.project, category_id: form.category_id, kind: form.kind };
+  const saved = await api.saveCompound(c.value.id, payload());
+  c.value = saved;
+  patchListRow(saved);
+  // 课题 / 分类 / 类型变了会影响这条记录还属不属于当前列表和分组，得真的重拉一次
+  const moved =
+    (before.project || '') !== (saved.project || '') ||
+    String(before.category_id ?? '') !== String(saved.category_id ?? '') ||
+    (before.kind || '') !== (saved.kind || '');
   await loadBoot();
+  if (moved) await loadCompounds();
 }
 
 /** 立刻存一次 / 丢掉这次改动（跟实验页那两个按钮一个意思） */
