@@ -187,20 +187,18 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
   // 下标 / 上标靠 tspan 的 dy 挪基线，字号小一号；挪完要挪回来，不然后面全跟着跑
   const SIZE = 13;
   const textTag = (line, y) => {
-    let pending = 0; // 上/下标挪完要挪回来，攒给下一段（别用空格占位，会把宽度撑开）
+    // 每段字自己带着「相对上一段的基线偏移」走：正常 0、下标 +3、上标 -4。
+    // 以前是「先记 pending 再还回去」写反了——下标没往下挪，后面的字反而被抬起来，
+    // 整行看着上上下下地飘（用户截过图）。现在按「目标偏移 - 当前偏移」算 dy，不会攒错。
+    let cur = 0;
     const spans = splitScript(line)
       .map((r) => {
-        const dy = pending ? ` dy="${pending}"` : '';
-        pending = 0;
-        if (r.kind === 'sub') {
-          pending = -3;
-          return `<tspan${dy} font-size="${Math.round(SIZE * 0.72)}">${esc(r.t)}</tspan>`;
-        }
-        if (r.kind === 'sup') {
-          pending = 4;
-          return `<tspan${dy} font-size="${Math.round(SIZE * 0.72)}">${esc(r.t)}</tspan>`;
-        }
-        return `<tspan${dy}>${esc(r.t)}</tspan>`;
+        const want = r.kind === 'sub' ? 3 : r.kind === 'sup' ? -4 : 0;
+        const dy = want - cur;
+        cur = want;
+        const dyAttr = dy ? ` dy="${dy}"` : '';
+        const size = r.kind === 'n' ? '' : ` font-size="${Math.round(SIZE * 0.72)}"`;
+        return `<tspan${dyAttr}${size}>${esc(r.t)}</tspan>`;
       })
       .join('');
     return `<text x="${capX}" y="${Math.round(y)}" text-anchor="middle" font-size="${SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${spans}</text>`;
