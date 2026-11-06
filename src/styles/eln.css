@@ -6555,9 +6555,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   width: max-content;
   min-width: 132px;
   max-width: 220px;
-  max-height: 320px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  /* 11 个类型一共 ~290px，干脆不设高度上限：多高就多高，不要滚动条 */
+  max-height: none;
+  overflow: visible;
 }
 
 /* 所有「分类 / 类型 / 课题」那类自绘下拉：**一律单列、横向不要滚**。
@@ -6569,3 +6569,12 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   overflow-x: hidden;
 }
 .qmenu.cat-menu .cat-menu-opt { flex: 0 0 auto; }
+
+/* 下拉菜单不要出现滚动条（分类特别多时仍然能用滚轮滚，只是不画那道杠） */
+.qmenu.cat-menu,
+.kind-menu {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.qmenu.cat-menu::-webkit-scrollbar,
+.kind-menu::-webkit-scrollbar { width: 0; height: 0; display: none; }
