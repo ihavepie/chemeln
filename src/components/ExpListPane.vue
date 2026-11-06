@@ -62,7 +62,13 @@ const activeId = () => (route.name === 'editor' ? Number(route.params.id) : null
  */
 /* 展开着哪些组存在 store 里（不是组件内）：/list 和 /e/:id 是两个页面，
    点进记录时这个组件会被重建，存在组件里的状态一重建就没了 → 卡片堆会自己收起 */
+/* 动画没走完就不再响应（约一个过渡时长的防抖）：连续快点两下时，Vue 会等上一段
+   展开动画收完再开始收起，看着是「先弹到满高再收回去」，像抖了一下。 */
+const stackBusy = new Set();
 function toggleGroup(gid) {
+  if (stackBusy.has(gid)) return;
+  stackBusy.add(gid);
+  window.setTimeout(() => stackBusy.delete(gid), membersMs() + 40);
   if (store.openStacks[gid]) delete store.openStacks[gid];
   else store.openStacks[gid] = true;
 }
@@ -244,13 +250,9 @@ function isGroupActive(row) {
  * 点卡片堆的面子：**正在看这一组**时不再重复跳同一条记录（页面没变化，看着像没反应），
  * 改成展开 / 收起组员；别的组还是照旧跳过去（跳过去会由 EditorView 自动展开）。
  */
-/** 卡片堆上右键：菜单作用在「面子」那条，顶上多一条展开 / 收起 */
+/** 卡片堆上右键：菜单作用在「面子」那条 */
 function onStackMenu(ev, row) {
-  experimentMenu(ev, row.face, router, {
-    groupSize: row.members.length,
-    stackOpen: isGroupOpen(row.gid),
-    toggleStack: () => toggleGroup(row.gid),
-  });
+  experimentMenu(ev, row.face, router, { groupSize: row.members.length });
 }
 
 function onStackFace(row) {

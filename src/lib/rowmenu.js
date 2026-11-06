@@ -82,24 +82,12 @@ async function toggleLock(it) {
 }
 
 /**
- * 实验卡片右键。opts：
- *   groupSize —— 这条属于一个平行组（>1 时删之前说清楚「只删这条」）
- *   toggleStack / stackOpen —— 卡片堆的面子卡上多一条「展开 / 收起组员」
+ * 实验卡片右键。opts.groupSize —— 这条属于一个平行组（>1 时删除项写成「只删这条」）。
+ * 卡片堆的展开 / 收起只在卡片头上那个小按钮上做，不放进菜单（菜单里太多项反而重）。
  */
 export function experimentMenu(ev, it, router, opts = {}) {
   const items = [];
   const size = Number(opts.groupSize || 0);
-  if (opts.toggleStack) {
-    items.push(
-      {
-        key: 'stack',
-        label: opts.stackOpen ? '收起组员' : '展开组员',
-        icon: opts.stackOpen ? 'chevron' : 'down',
-        hint: `${size} 条`,
-      },
-      CTX_SEP
-    );
-  }
   items.push(
     { key: 'open', label: '打开记录', icon: 'file' },
     { key: 'parallel', label: '新建平行实验', icon: 'plus' },
@@ -110,7 +98,6 @@ export function experimentMenu(ev, it, router, opts = {}) {
     { key: 'delete', label: size > 1 ? '只删这条' : '移入回收站', icon: 'trash', danger: true }
   );
   openCtxMenu(ev, items, (key) => {
-    if (key === 'stack') return opts.toggleStack?.();
     if (key === 'open') return void router.push(`/e/${it.id}`);
     if (key === 'parallel') return void newParallel(it, router);
     if (key === 'duplicate') return void duplicateExperiment(it, router);
