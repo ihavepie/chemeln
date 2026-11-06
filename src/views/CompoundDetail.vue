@@ -180,39 +180,71 @@ const { state: saveState, dirty, flush, markLoaded } = useAutosave(payload, save
 /** 最近一次查出来的结构信息（只用来显示 PubChem / ChemicalBook 两个链接，不落库） */
 const lastLookup = ref(null);
 
+/** 哪些格子是 PubChem 代填的（记下我们填进去的值）。换了结构要先还原，
+    否则旧结构的 CAS / 熔点 / 性状会赖着不走，跟新结构对不上 */
+const autoFilled = ref({});
+
+function rememberAuto(key, value) {
+  if (!value) return;
+  autoFilled.value = { ...autoFilled.value, [key]: String(value) };
+}
+
+function clearAutoFilled() {
+  for (const [k, v] of Object.entries(autoFilled.value)) {
+    if (form[k] === v) form[k] = '';
+  }
+  autoFilled.value = {};
+}
+
 /**
  * 联网查这个结构「叫什么 / CAS 多少」（PubChem，服务端代查并缓存）。
  * 只补空格子：名称 / CAS / 分子式 / MW 里已经有值的一律不动，免得把用户自己写的覆盖掉。
  */
-async function fillFromLookup(smiles) {
+/** replaceCas：结构刚换过（画板 / 粘贴）时允许把 CAS 换成新结构查出来的那个——
+    CAS 是跟着结构走的标识，留着旧结构的只会错。熔点 / 性状这种可能是用户手写的数据不覆盖。 */
+async function fillFromLookup(smiles, { replaceCas = false } = {}) {
   const info = await structureInfo(String(smiles || '').trim());
   if (!info || !info.found) return null;
   lastLookup.value = info;
   const filled = [];
   if (!String(form.name || '').trim() && info.name) {
     form.name = info.name;
+    rememberAuto('name', info.name);
     filled.push('名称');
   }
-  if (!String(form.cas || '').trim() && info.cas && info.cas.length) {
-    form.cas = info.cas[0];
-    filled.push('CAS');
+  const curCas = String(form.cas || '').trim();
+  if (info.cas && info.cas.length) {
+    if (!curCas) {
+      form.cas = info.cas[0];
+      rememberAuto('cas', info.cas[0]);
+      filled.push('CAS');
+    } else if (replaceCas && curCas !== info.cas[0]) {
+      // 换了结构：旧 CAS 不再对应这结构，直接换成新的（会弹提示，不会闷着改）
+      form.cas = info.cas[0];
+      rememberAuto('cas', info.cas[0]);
+      filled.push('CAS');
+    }
   }
   if (!String(form.formula || '').trim() && info.formula) {
     form.formula = info.formula;
+    rememberAuto('formula', info.formula);
     filled.push('分子式');
   }
   if (!String(form.mw || '').trim() && info.mw) {
     form.mw = info.mw;
+    rememberAuto('mw', info.mw);
     filled.push('MW');
   }
   // 物性：PubChem 的「实验性质」那一节。熔点 / 性状有对应的格子，其余（密度 / 沸点…）只显示不落库
   const pr = info.props || {};
   if (!String(form.mp || '').trim() && pr.mp) {
     form.mp = pr.mp;
+    rememberAuto('mp', pr.mp);
     filled.push('熔点');
   }
   if (!String(form.appearance || '').trim() && pr.appearance) {
     form.appearance = pr.appearance;
+    rememberAuto('appearance', pr.appearance);
     filled.push('性状');
   }
   if (filled.length) toast(`PubChem：已补上${filled.join(' / ')}`, 'ok');
@@ -253,6 +285,8 @@ const lookupProps = computed(() => {
 async function applySketched({ smiles, info: sketchedInfo }) {
   if (!c.value || !smiles) return;
   const info = await analyzeStructureText(smiles);
+  // 换了结构：先把自己代填的那几格还回去，再按新结构重新查
+  clearAutoFilled();
   if (!info) return toast('这个结构读不出来，换个画法试试', 'err');
 
   if (struct.value) {
@@ -285,7 +319,7 @@ async function applySketched({ smiles, info: sketchedInfo }) {
     if (!String(form.name || '').trim() && sketchedInfo.name) form.name = sketchedInfo.name;
     if (!String(form.cas || '').trim() && sketchedInfo.cas && sketchedInfo.cas.length) form.cas = sketchedInfo.cas[0];
   } else {
-    void fillFromLookup(smiles);
+    void fillFromLookup(smiles, { replaceCas: true });
   }
 }
 
@@ -296,6 +330,8 @@ async function useSmiles(text, { quiet = false } = {}) {
     if (!quiet) toast('这段 SMILES 读不出来', 'err');
     return false;
   }
+  // 换了结构：先还掉之前代填的（名称 / CAS / 熔点 / 性状），不然会跟新结构对不上
+  clearAutoFilled();
   const fillFormula = !String(form.formula || '').trim();
   const fillMw = !String(form.mw || '').trim();
 
@@ -317,7 +353,7 @@ async function useSmiles(text, { quiet = false } = {}) {
   if (fillFormula) form.formula = info.formula;
   if (fillMw) form.mw = String(info.mw);
   if (!quiet) toast(`已识别：${info.formula} · MW ${info.mw}`);
-  if (!isMol) void fillFromLookup(form.smiles);
+  if (!isMol) void fillFromLookup(form.smiles, { replaceCas: true });
   return true;
 }
 
@@ -596,6 +632,8 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
         <div class="sheet-runner"><span>化合物档案</span><span>{{ c.code }}</span></div>
 
         <div class="cmp-top">
+          <!-- 左栏：结构缩略图 + 「画结构式」和两个查询链接（贴在缩略图下面，别飘到整块字段底下） -->
+          <div class="cmp-left">
           <div
             class="cmp-structure"
             title="点击选择文件，也可直接 ⌘V 粘贴截图"
@@ -616,6 +654,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <button class="btn btn-sm btn-ghost" title="打开画板画结构式" @click.stop="sketcherOpen = true">
               <Icon name="molecule" :size="13" /> 画结构式
             </button>
+            <span class="cmp-lookup-links">
             <a
               v-if="lastLookup && lastLookup.found"
               class="cmp-lookup-link"
@@ -632,7 +671,8 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
               rel="noreferrer"
               title="按 CAS 去 ChemicalBook 搜"
             >ChemicalBook</a>
-            <span v-if="lookupProps" class="cmp-props">{{ lookupProps }}</span>
+            </span>
+          </div>
           </div>
 
           <div class="cmp-fields">
@@ -670,6 +710,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             </label>
           </div>
         </div>
+        <div v-if="lookupProps" class="cmp-props noprint">{{ lookupProps }}</div>
 
         <section class="sec sec-tight">
           <div class="block-head"><span class="lbl">核磁</span><span class="spacer" /><span class="hint noprint">可拖入或 ⌘V 粘贴谱图截图</span></div>

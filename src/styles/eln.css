@@ -4808,6 +4808,7 @@ kbd {
   }
 
   .cmp-structure { width: 104px; height: 104px; }
+  .cmp-left { width: 104px; }
   .cmp-fields { grid-template-columns: 84px 1fr; }
   .c-field.wide { grid-column: span 1; }
 
@@ -6263,27 +6264,32 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .sk-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 
 /* 化合物页「结构式」格子下面的小工具行（画结构式） */
-/* .cmp-top 是「缩略图 | 字段」两栏：三个子元素要显式排，不然自动布局会把字段挤进 148px 的窄格（踩过一次） */
-.cmp-top > .cmp-structure { grid-column: 1; grid-row: 1; }
-.cmp-top > .cmp-fields { grid-column: 2; grid-row: 1; }
-/* 「画结构式」+ 查询链接 + 物性：贴在下面独占一行 */
-.cmp-structure-tools {
-  grid-column: 1 / -1;
-  grid-row: 2;
+/* .cmp-top 是「缩略图 | 字段」两栏：左栏只放缩略图 + 下面那行按钮，别再塞第三个平级子元素
+   （塞过：自动布局把 .cmp-fields 挤到第二行 148px 的窄格里，整块字段挤成一团） */
+.cmp-top { align-items: start; }
+.cmp-left {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 2px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 148px;
 }
+/* 「画结构式」+ PubChem / ChemicalBook：竖着排在缩略图下面，宽度就是缩略图那么宽 */
+.cmp-structure-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  width: 100%;
+}
+/* 两个查询链接并排一行（加起来约 145px，正好塞在 148px 的缩略图宽度里） */
+.cmp-lookup-links { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+/* 物性（密度 / 沸点 / 闪点 / 溶解度）：贴在表头区块下面单独一行，缩略图那栏放不下 */
 .cmp-props {
+  margin: -6px 0 10px;
   font-size: 11px;
+  line-height: 1.6;
   color: var(--ink-3);
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
 }
 
 /* 结构信息查询（PubChem）：画板里查出来的一行 + 化合物页那两个跳转链接 */
