@@ -7,7 +7,7 @@ import { store, loadList, loadBoot, recordCategories, addCategory } from '../sto
 import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
 import { prompt, toast } from '../lib/feedback.js';
-import { experimentMenu } from '../lib/rowmenu.js';
+import { experimentMenu, groupMenu } from '../lib/rowmenu.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -250,9 +250,9 @@ function isGroupActive(row) {
  * 点卡片堆的面子：**正在看这一组**时不再重复跳同一条记录（页面没变化，看着像没反应），
  * 改成展开 / 收起组员；别的组还是照旧跳过去（跳过去会由 EditorView 自动展开）。
  */
-/** 卡片堆上右键：菜单作用在「面子」那条 */
+/** 卡片堆上右键：整组的动作 + 「单独处理」里每条子实验一个子菜单 */
 function onStackMenu(ev, row) {
-  experimentMenu(ev, row.face, router, { groupSize: row.members.length });
+  groupMenu(ev, row, router, { activeId: activeId() });
 }
 
 function onStackFace(row) {

@@ -7,6 +7,7 @@ import { printCompoundLabel } from './label.js';
 /**
  * 列表卡片 / 卡片墙上的右键菜单：不先进记录页也能干活——
  * 新建平行、复制、锁定、删。危险项（回收站）排在最后、用红字。
+ * 卡片堆（平行组）另有一套：整组一起处理 + 「单独处理」子菜单（每个子实验一个小菜单）。
  */
 
 /** 复制短文本（编号之类），粘到搜索框里找东西用 */
@@ -139,5 +140,87 @@ export function compoundMenu(ev, c, router) {
     if (key === 'label') return void printCompoundLabel(c, { owner: store.boot?.settings?.owner_name });
     if (key === 'copycode') return void copyText(c.code, '编号');
     if (key === 'delete') return void removeCompound(c, router);
+  });
+}
+
+/* ───────── 卡片堆（平行组）：整组一起处理 / 单独处理 ───────── */
+
+/** 整组锁定 / 解锁：锁着的那几条不再改；要删的话得先解锁（服务端 423） */
+async function toggleGroupLock(row, router) {
+  const allLocked = row.members.every((m) => m.locked);
+  try {
+    await Promise.all(row.members.map((m) => api.lock(m.id, !allLocked)));
+    await loadList();
+    toast(allLocked ? `这一组 ${row.members.length} 条都解锁了` : `这一组 ${row.members.length} 条都锁了，之后只能查看`);
+    // 正在看的那条也在这组里：它页面上的 autosave 还不知道自己被锁了，提醒一句
+    const cur = Number(router.currentRoute.value.params.id);
+    if (router.currentRoute.value.name === 'editor' && row.members.some((m) => m.id === cur)) {
+      toast('这条正在页面里开着，重开页面才会变只读', 'info', 3200);
+    }
+  } catch (e) {
+    toast(e.message || '改不了锁定状态', 'err');
+  }
+}
+
+/** 整组移入回收站：锁着的先解锁（不然 DELETE 会被 423 拦掉） */
+async function removeGroup(row, router) {
+  const locked = row.members.filter((m) => m.locked);
+  const ok = await confirm({
+    title: `这一组 ${row.members.length} 条都移入回收站？`,
+    body: `${locked.length ? `其中 ${locked.length} 条是锁定的，会先解锁再删。` : ''}移入回收站后可以逐条恢复；彻底删除时才动磁盘上的附件。`,
+    confirmText: `移入回收站（${row.members.length} 条）`,
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    for (const m of row.members) await leaveIfOpen(router, 'editor', m.id);
+    for (const m of locked) await api.lock(m.id, false);
+    for (const m of row.members) await api.deleteExperiment(m.id);
+    await Promise.all([loadBoot(), loadList()]);
+    toast(`这一组 ${row.members.length} 条已移入回收站`);
+  } catch (e) {
+    toast(e.message || '删不掉这一组', 'err');
+  }
+}
+
+/**
+ * 卡片堆上右键：上面是整组的动作，下面「单独处理」里每条子实验各带一个子菜单
+ * （打开 / 锁定 / 复制编号 / 只删这条）。opts.activeId = 正在看的那条，标一下。
+ */
+export function groupMenu(ev, row, router, opts = {}) {
+  const n = row.members.length;
+  const allLocked = row.members.every((m) => m.locked);
+  const items = [
+    { key: 'parallel', label: '新建平行实验', icon: 'plus', hint: '加进这一组' },
+    { key: 'lockgroup', label: allLocked ? '解锁整组' : '锁定整组', icon: allLocked ? 'unlock' : 'lock', hint: `${n} 条` },
+    { key: 'copycodes', label: '复制整组编号', icon: 'hash' },
+    { key: 'delgroup', label: '移入回收站（整组）', icon: 'trash', danger: true, hint: `${n} 条` },
+    CTX_SEP,
+    { head: '单独处理' },
+    ...row.members.map((m) => ({
+      key: `m:${m.id}`,
+      label: m.code,
+      icon: 'file',
+      hint: m.id === opts.activeId ? '在看' : m.locked ? '锁定' : '',
+      sub: [
+        { key: `open:${m.id}`, label: '打开记录', icon: 'file' },
+        { key: `lock:${m.id}`, label: m.locked ? '解锁（恢复可编辑）' : '锁定（此后只读）', icon: m.locked ? 'unlock' : 'lock' },
+        { key: `copy:${m.id}`, label: '复制编号', icon: 'hash', hint: m.code },
+        { key: `del:${m.id}`, label: '移入回收站（只这条）', icon: 'trash', danger: true },
+      ],
+    })),
+  ];
+  openCtxMenu(ev, items, (key) => {
+    if (key === 'parallel') return void newParallel(row.face, router);
+    if (key === 'lockgroup') return void toggleGroupLock(row, router);
+    if (key === 'copycodes') return void copyText(row.members.map((m) => m.code).join(' '), '整组编号');
+    if (key === 'delgroup') return void removeGroup(row, router);
+    const [act, id] = String(key).split(':');
+    const m = row.members.find((x) => x.id === Number(id));
+    if (!m) return;
+    if (act === 'open') return void router.push(`/e/${m.id}`);
+    if (act === 'lock') return void toggleLock(m);
+    if (act === 'copy') return void copyText(m.code, '编号');
+    if (act === 'del') return void removeExperiment(m, router);
   });
 }

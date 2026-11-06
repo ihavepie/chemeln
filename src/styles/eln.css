@@ -6458,3 +6458,14 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   color: var(--accent);
 }
 .exp-lock .i { display: block; }
+
+/* 右键菜单的小节标题 / 子菜单箭头 / 子菜单那一层 */
+.ctx-head {
+  padding: 4px 8px 2px;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.ctx-caret { flex: none; margin-left: 2px; color: var(--ink-4); font-size: 12px; line-height: 1; }
+.ctx-menu.is-sub { z-index: 2101; min-width: 132px; }
