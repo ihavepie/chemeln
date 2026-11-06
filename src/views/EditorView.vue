@@ -203,6 +203,23 @@ function onProjectChange(v) {
     fields.category_id = null;
   }
   notify();
+  // 课题计数 / 中栏列表 / 平行组书签都跟着课题走，换完立刻刷一遍，别等刷新页面
+  void refreshSpace();
+}
+
+async function refreshSpace() {
+  // 必须先把新课题落库，否则拉回来还是旧归属（这是「要刷新页面才变」的根因）
+  try {
+    await flush();
+  } catch {
+    /* 存失败由保存状态栏提示 */
+  }
+  try {
+    await loadBoot();
+    await loadList();
+  } catch {
+    /* 刷新失败不影响正在编辑的这条 */
+  }
 }
 
 async function newCategory() {

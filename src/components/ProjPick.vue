@@ -10,6 +10,8 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   projects: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
+  /** 菜单里那个数字用哪个计数：实验页用 n（实验条数），化合物页传 cmp（化合物个数） */
+  countKey: { type: String, default: 'n' },
 });
 const emit = defineEmits(['update:modelValue']);
 
@@ -84,7 +86,7 @@ onBeforeUnmount(() => {
     >
       <button v-for="p in projects" :key="p.name" type="button" class="cat-menu-opt" @click="pick(p.name)">
         <span class="cat-menu-name">{{ p.name }}</span>
-        <span class="cat-menu-n mono">{{ p.n }}</span>
+        <span class="cat-menu-n mono">{{ p[countKey] }}</span>
       </button>
       <div v-if="!projects.length" class="cat-menu-opt" style="cursor: default; color: var(--ink-4)">直接打名字就行</div>
     </div>

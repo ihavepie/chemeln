@@ -10,7 +10,7 @@ import AppModal from '../components/AppModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import SketcherModal from '../components/SketcherModal.vue';
 import { api } from '../api.js';
-import { loadBoot, store, categoriesOfProject, addCategory } from '../store.js';
+import { loadBoot, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
 import { structureInfo, chemicalBookUrl, describeInfo } from '../lib/lookup.js';
 import { CMP_CAT_LABEL, CMP_CAT_ORDER, COMPOUND_KINDS, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
@@ -392,6 +392,26 @@ function onProjectChange(v) {
   if (cat !== '' && cat != null && !categoriesOfProject('compound', form.project).some((g) => Number(g.id) === Number(cat))) {
     form.category_id = null;
   }
+  // 换课题：先把新课题存下去（自动保存有 700ms 防抖，早了会读到旧数据），再刷课题计数和中栏列表
+  void refreshSpace();
+}
+
+/**
+ * 课题变了要刷三样：课题下拉里的计数（bootstrap）、中栏列表（这条已经不属于原来那个课题，会被筛掉）、
+ * 以及分类清单。**必须先 `flush()` 落库**——不落库就去拉，拿回来的还是旧归属（踩过，表现就是「得刷新页面才变」）。
+ */
+async function refreshSpace() {
+  try {
+    await flush();
+  } catch {
+    /* 存失败的话保存状态栏会提示，这里继续把界面刷成实际状态 */
+  }
+  try {
+    await loadBoot();
+    await loadCompounds();
+  } catch {
+    /* 刷新失败不影响正在编辑的这条 */
+  }
 }
 
 function openFile(f) {
@@ -686,7 +706,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             </label>
             <label class="c-field">
               <span>课题</span>
-              <ProjPick :model-value="form.project" :projects="projectList" @update:model-value="onProjectChange" />
+              <ProjPick :model-value="form.project" :projects="projectList" count-key="cmp" @update:model-value="onProjectChange" />
             </label>
             <label class="c-field"><span>分子式</span><input v-model="form.formula" placeholder="C8H8O" /></label>
             <label class="c-field"><span>MW</span><input class="n" type="number" step="any" v-model="form.mw" placeholder="120.15" /></label>
