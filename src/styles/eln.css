@@ -6552,8 +6552,20 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .kind-menu {
   top: calc(100% + 2px);
   left: 0;
-  min-width: 100%;
-  max-width: 200px;
+  width: max-content;
+  min-width: 132px;
+  max-width: 220px;
   max-height: 320px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
+
+/* 所有「分类 / 类型 / 课题」那类自绘下拉：**一律单列、横向不要滚**。
+   `.qmenu` 的 flex-wrap: wrap 撞上 max-height 会把菜单折成第二列，
+   看上去就是「被切了一半、还能横向拖」（用户报过两次）。 */
+.qmenu.cat-menu {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  overflow-x: hidden;
+}
+.qmenu.cat-menu .cat-menu-opt { flex: 0 0 auto; }
