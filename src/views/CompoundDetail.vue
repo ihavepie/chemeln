@@ -381,6 +381,38 @@ async function applySketched({ smiles, info: sketchedInfo }) {
   }
 }
 
+/**
+ * 用刚解析出来的结构图换掉现在这张结构图。
+ * **以前只在「还没有结构图」时才画**，于是已经有图（哪怕就是以前我们画的那张）的化合物
+ * 粘了新的结构文本，画面上一动不动，看着就是「自动整理没生效」。
+ * 规矩：现在这张是我们自己生成的 SVG（文件名 .svg）就直接换，没有信息量；
+ * 是截图（PNG/JPG，多半是 ChemDraw 贴过来的）才问一句，别把手做的图悄悄删了。
+ */
+async function redrawStructure(info) {
+  const old = struct.value;
+  if (old) {
+    const isSvg = /\.svg$/i.test(old.original_name || old.filename || '');
+    if (!isSvg) {
+      const ok = await confirm({
+        title: '换掉现在这张结构图？',
+        body: `现在这张是「${old.original_name || old.filename}」，会按新结构重画一张换上，旧的那张会删掉。`,
+      });
+      if (!ok) return false;
+    }
+    try {
+      await api.deleteCompoundFile(old.id);
+    } catch {
+      /* 删不掉就先传新的，反正页面会显示最新那张 */
+    }
+  }
+  const fd = new FormData();
+  fd.append('file', svgToFile(info.svg), '结构式.svg');
+  fd.append('category', 'structure');
+  await api.uploadCompoundFile(c.value.id, fd);
+  await reload();
+  return true;
+}
+
 async function useSmiles(text, { quiet = false } = {}) {
   const isMol = looksLikeMolfile(text);
   const info = await analyzeStructureText(text);
@@ -390,28 +422,22 @@ async function useSmiles(text, { quiet = false } = {}) {
   }
   // 换了结构：先还掉之前代填的（名称 / CAS / 熔点 / 性状），不然会跟新结构对不上
   clearAutoFilled();
-  const fillFormula = !String(form.formula || '').trim();
-  const fillMw = !String(form.mw || '').trim();
 
   // 先处理结构图（reload 会用服务端数据覆盖表单，所以必须排在赋值前面）
-  if (!struct.value) {
-    const fd = new FormData();
-    fd.append('file', svgToFile(info.svg), '结构式.svg');
-    fd.append('category', 'structure');
-    try {
-      await api.uploadCompoundFile(c.value.id, fd);
-      await reload();
-    } catch (e) {
-      toast(e.message, 'err');
-    }
+  try {
+    await redrawStructure(info);
+  } catch (e) {
+    toast(e.message || '结构图没画出来', 'err');
   }
 
-  // SMILES 存进 SMILES 栏；MOL 是整段文件内容，只用来算和画，不塞进这一格
+  // 分子式 / MW 是从这个结构算出来的，粘什么就是什么——留着旧值只会跟图对不上。
+  // MOL 那种不把整段文件塞进 SMILES 格，存解析出来的标准 SMILES。
   if (!isMol) form.smiles = String(text).trim();
-  if (fillFormula) form.formula = info.formula;
-  if (fillMw) form.mw = String(info.mw);
+  else if (info.smiles) form.smiles = info.smiles;
+  form.formula = info.formula;
+  form.mw = String(info.mw);
   if (!quiet) toast(`已识别：${info.formula} · MW ${info.mw}`);
-  if (!isMol) void fillFromLookup(form.smiles, { replaceCas: true });
+  if (String(form.smiles || '').trim()) void fillFromLookup(form.smiles, { replaceCas: true });
   return true;
 }
 
@@ -463,11 +489,12 @@ function onSmilesFieldPaste(ev) {
   void useSmiles(text);
 }
 
-/** 手输完离开这个格子：只补空着的分子式 / MW */
+/** 手输完离开这个格子：改过了就按它重画结构图，没改就只补空着的分子式 / MW */
 async function onSmilesFieldChange() {
   const v = String(form.smiles || '').trim();
   if (!looksLikeSmiles(v) && !looksLikeMolfile(v)) return;
-  if (String(form.formula || '').trim() && String(form.mw || '').trim() && struct.value) return;
+  const changed = v !== String(c.value?.smiles || '').trim();
+  if (!changed && String(form.formula || '').trim() && String(form.mw || '').trim() && struct.value) return;
   await useSmiles(v, { quiet: true });
 }
 
@@ -737,7 +764,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
           <button @click="label(); moreMenu = false"><Icon name="qr" :size="13" /> 打印瓶子标签</button>
           <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 修改历史</button>
           <button @click="lookupNow(); moreMenu = false"><Icon name="molecule" :size="13" /> 查这个结构（PubChem）</button>
-          <button v-if="struct && form.smiles" @click="tidyStructure"><Icon name="grid" :size="13" /> 整理结构式（重排）</button>
+          <button v-if="form.smiles" @click="tidyStructure"><Icon name="grid" :size="13" /> 整理结构式（重排）</button>
           <div class="menu-sep" />
           <button class="menu-danger" @click="removeCompound(); moreMenu = false">
             <Icon name="trash" :size="13" /> 移入回收站

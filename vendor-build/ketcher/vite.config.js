@@ -43,7 +43,7 @@ function patchBondHover() {
     // 补丁是在算完 hash 之后才改字节的，所以手动把版本号掺进 hash：
     // 每改一次上面的补丁，就把它 +1，浏览器才不会继续用缓存里的旧文件（/vendor 是 immutable）
     augmentChunkHash() {
-      return 'bond-hover-patch-7'
+      return 'bond-hover-patch-8'
     },
     generateBundle(_opts, bundle) {
       let hits = 0

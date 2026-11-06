@@ -136,7 +136,7 @@ function clearAll() {
     </div>
 
     <div class="sk-foot">
-      <span class="hint">原子之间拖一下就连键；<b>鼠标停在键上按 1 / 2 / 3 / 4</b> = 单 / 双 / 三 / 芳香键；停在原子上打字 = 换原子；<b>⌘Z</b> 撤销。</span>
+      <span class="hint">原子之间拖一下就连键；停在原子上打字 = 换原子；<b>⌘Z</b> 撤销。</span>
       <span class="spacer" style="flex: 1" />
       <button class="btn btn-sm btn-ghost" :disabled="looking" @click="lookup">
         {{ looking ? '查…' : '查一下是什么' }}
