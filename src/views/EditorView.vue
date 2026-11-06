@@ -567,7 +567,7 @@ async function schemeFromTable() {
   const byId = new Map(lib.map((c) => [Number(c.id), c]));
 
   const reactants = [];
-  const up = [];       // 箭头上方第一行：试剂 / 催化剂之类
+  const others = [];   // 试剂 / 催化剂 / 碱……先攒着，能塞进箭头上方就塞，塞不下挪到下方
   for (const r of reagent.rows) {
     if (r.role === '溶剂') continue;
     const c = r.compound_id ? byId.get(Number(r.compound_id)) : null;
@@ -578,7 +578,7 @@ async function schemeFromTable() {
     const name = String(r.name || (c && (c.name || c.code)) || '').trim();
     if (!name) continue;
     const eq = num(r.eq);
-    up.push(eq != null && eq !== 1 ? `${name} (${round(eq, 2)} eq)` : name);
+    others.push(eq != null && eq !== 1 ? `${name} (${round(eq, 2)} eq)` : name);
   }
   if (!reactants.length) {
     return toast(
@@ -594,13 +594,27 @@ async function schemeFromTable() {
     .filter(Boolean)
     .join('，');
 
+  // 箭头上方一行大约放得下 34 个字（中文按 1、西文按 0.55 估），剩下的挪到箭头下方
+  const MAX_ABOVE = 34;
+  const widthOf = (t) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0);
+  const fit = [];
+  const over = [];
+  let used = 0;
+  for (const name of others) {
+    const need = (fit.length ? 1 : 0) + widthOf(name);
+    if (used + need <= MAX_ABOVE) {
+      fit.push(name);
+      used += need;
+    } else {
+      over.push(name);
+    }
+  }
+  const above = fit.length ? [fit.join('，')] : [];
+  const below = [over.join('，'), cond].filter(Boolean);
+
   let svg;
   try {
-    svg = await composeSchemeSvg({
-      reactants,
-      product: prod.smiles,
-      caption: [up.join('，'), cond],
-    });
+    svg = await composeSchemeSvg({ reactants, product: prod.smiles, above, below });
   } catch (e) {
     return toast(e.message || '反应式没拼出来', 'err');
   }

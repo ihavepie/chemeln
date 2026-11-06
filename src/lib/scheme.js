@@ -1,5 +1,6 @@
 /**
- * 按投料表拼一张反应式图（不经过画板）：反应物 —— 箭头（上方写试剂 / 条件）—— 产物。
+ * 按投料表拼一张反应式图（不经过画板）：反应物 —— 箭头（上下一共可以写几行字）—— 产物。
+ * 惯例是「试剂 / 催化剂写箭头上方，溶剂、温度、时间写下方」，放不下的试剂也挪到下方。
  *
  * 为什么要自己拼：Ketcher 画板里没法用代码往箭头上写文字（它的文本对象没有开放接口），
  * 而 ChemDraw 的习惯就是「试剂、催化剂、溶剂、温度都堆在箭头横线上方」。所以这里用
@@ -66,9 +67,10 @@ async function molSvg(smiles, id) {
  * @param {object} p
  * @param {string[]} p.reactants 反应物 SMILES（两个底物就是两条）
  * @param {string} p.product     产物 SMILES
- * @param {string[]} p.caption   箭头上方的几行字（试剂 / 条件）
+ * @param {string[]} p.above     箭头上方的几行字（试剂 / 催化剂）
+ * @param {string[]} p.below     箭头下方的几行字（溶剂 / 温度 / 时间、放不下的试剂）
  */
-export async function composeSchemeSvg({ reactants = [], product = '', caption = [] } = {}) {
+export async function composeSchemeSvg({ reactants = [], product = '', above = [], below = [] } = {}) {
   const rs = [];
   for (let i = 0; i < reactants.length; i++) {
     if (!String(reactants[i] || '').trim()) continue;
@@ -77,21 +79,23 @@ export async function composeSchemeSvg({ reactants = [], product = '', caption =
   const prod = product ? await molSvg(product, 'p') : null;
   if (!rs.length || !prod) throw new Error('至少要一个反应物和一个产物');
 
-  const GAP = 10;          // 结构之间的一般间距
+  const GAP = 14;          // 结构之间的一般间距
   const PLUS = 18;         // 加号的宽度
-  const ARROW = 104;       // 箭头长度
-  // 箭头那块地方要放得下最长的条件行（13px 字，中文按全角估），否则字会压到反应物上
+  const ARROW = 150;       // 箭头长度（长一点，条件写在上下才不挤）
+  // 箭头那块地方要放得下最长的那行字（13px 字，中文按全角估），否则字会压到反应物上
   const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 13 : 7.1), 0);
-  const capW = Math.max(0, ...caption.map(textW));
-  const arrowW = Math.max(ARROW, Math.round(capW) + 18);
-  const LINES = caption.filter((t) => String(t || '').trim());
-  const LINE_H = 17;
-  const CAP_GAP = 10;      // 最后一行字离箭头多远
-  const capH = LINES.length ? LINES.length * LINE_H + CAP_GAP : 0;
+  const capAbove = above.filter((t) => String(t || '').trim());
+  const capBelow = below.filter((t) => String(t || '').trim());
+  const capW = Math.max(0, ...[...capAbove, ...capBelow].map(textW));
+  const arrowW = Math.max(ARROW, Math.round(capW) + 28);
+  const LINE_H = 18;
+  const CAP_GAP = 15;      // 最近那行字离箭头多远
+  const capTopH = capAbove.length ? capAbove.length * LINE_H + CAP_GAP : 0;
+  const capBotH = capBelow.length ? capBelow.length * LINE_H + CAP_GAP : 0;
 
   const maxMolH = Math.max(...rs.map((r) => r.h), prod.h);
-  const cy = PAD + capH + maxMolH / 2; // 所有结构都按这条中轴对齐
-  const height = Math.round(cy + maxMolH / 2 + PAD);
+  const cy = PAD + capTopH + maxMolH / 2; // 所有结构都按这条中轴对齐
+  const height = Math.round(cy + maxMolH / 2 + capBotH + PAD);
 
   // 横向排：反应物（+ 加号）→ 箭头 → 产物
   let x = PAD;
@@ -127,10 +131,14 @@ export async function composeSchemeSvg({ reactants = [], product = '', caption =
     `<path d="M ${Math.round(arrowX2 - 10)} ${Math.round(cy - 5.5)} L ${Math.round(arrowX2)} ${Math.round(cy)} L ${Math.round(arrowX2 - 10)} ${Math.round(cy + 5.5)} Z" fill="#1b1a17"/>`;
 
   const capX = Math.round(arrowZone + arrowW / 2);
+  const textTag = (line, y) =>
+    `<text x="${capX}" y="${Math.round(y)}" text-anchor="middle" font-size="13" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${esc(line)}</text>`;
   let cap = '';
-  LINES.forEach((line, i) => {
-    const y = Math.round(cy - CAP_GAP - (LINES.length - 1 - i) * LINE_H);
-    cap += `<text x="${capX}" y="${y}" text-anchor="middle" font-size="13" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${esc(line)}</text>`;
+  capAbove.forEach((line, i) => {
+    cap += textTag(line, cy - CAP_GAP - (capAbove.length - 1 - i) * LINE_H);
+  });
+  capBelow.forEach((line, i) => {
+    cap += textTag(line, cy + CAP_GAP + 9 + i * LINE_H);
   });
 
   return (
