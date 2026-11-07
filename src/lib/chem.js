@@ -8,7 +8,7 @@
 
 import { indigoSvg, indigoLayout, BOND_PX } from './indigo.js';
 import { abbreviatedParts } from './abbrev.js';
-import { relayoutMolecule, orientLandscape, alignToGrid } from './relayout.js';
+import { relayoutMolecule, orientLandscape, canonicalOrientation } from './relayout.js';
 
 let cached = null;
 
@@ -87,8 +87,8 @@ export async function analyzeMolfile(molfile) {
           try {
             const tidy = chem.Molecule.fromSmiles(smiles);
             await relayoutMolecule(chem, tidy); // 再交给 Indigo 排一遍，键角才规整
-            alignToGrid(tidy);
-            orientLandscape(tidy); // 竖着的结构摆平，免得到格子里被压小
+            orientLandscape(tidy); // 先摆平（竖着的到格子里会被压小）
+            canonicalOrientation(chem, tidy); // 再挑最像 ChemDraw 的角度：羰基竖着、环走整角度
             out.svg = samePxScale(tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
           } catch {
             /* 排不出来就用原来的坐标 */
@@ -140,8 +140,8 @@ export async function analyzeSmiles(smiles) {
     if (!svg) {
       // 认不出缩写：openchemlib 自己排的键角常常歪，先让 Indigo 重排坐标再画（保持原来的观感）
       await relayoutMolecule(chem, mol);
-      alignToGrid(mol);
       orientLandscape(mol);
+      canonicalOrientation(chem, mol);
       svg = samePxScale(mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
     }
     return {

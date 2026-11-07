@@ -12,7 +12,7 @@
  */
 
 import { abbreviatedParts } from './abbrev.js';
-import { relayoutMolecule, orientLandscape, alignToGrid } from './relayout.js';
+import { relayoutMolecule, orientLandscape, canonicalOrientation } from './relayout.js';
 
 const BOND_PX = 26; // 一根键的像素长度，整张图的尺度基准
 const PAD = 16;
@@ -99,8 +99,8 @@ async function molSvg(smiles, id) {
   const mol = lib.Molecule.fromSmiles(smiles);
   // 先让 Indigo 把坐标重排一遍（openchemlib 自己的键角常常是歪的），再按新坐标算 bbox
   await relayoutMolecule(lib, mol);
-  alignToGrid(mol);
   orientLandscape(mol);
+  canonicalOrientation(lib, mol);
   let x0 = Infinity;
   let x1 = -Infinity;
   let y0 = Infinity;

@@ -47,34 +47,95 @@ export function boundsOf(mol) {
 }
 
 /**
- * 「放置角度」：把整张图转一下，让键尽量落在 0° / 30° / 60° / 90°… 这些「整角度」上
- * （ChemDraw 那种规规矩矩的摆法）。做法是算所有键的方向偏差、取一个旋转量抵消掉
- * （按键长加权；只看 0–30° 这一档，因为 30° 一格已经能覆盖六元环 60°、四元环 90°、三元环 120°）。
+ * 「摆正」：转整张图，挑一个最像 ChemDraw 的摆法。
+ * 规则（按优先级）：
+ *  1. **羰基（C=O）竖着**——用户点名要的，环酮画成 C=O 朝上/朝下，跟 ChemDraw 一个样；
+ *  2. 环上的键尽量落在 0°/90° 或 30° 的整角度上（四元环成正方、六元环成规则六边形）；
+ *  3. 横着比竖着好看（宽格子），竖着的图扣分。
+ * 候选角度：每根键转到 12 个整角度所需的旋转量都试一遍，取分数最高的那个（几十根键，算得很快）。
  */
-export function alignToGrid(mol) {
+export function canonicalOrientation(lib, mol) {
   const n = mol.getAllAtoms();
   if (n < 2) return false;
-  let sum = 0;
-  let wsum = 0;
+  try {
+    mol.ensureHelperArrays(lib.Molecule.cHelperCIP);
+  } catch {
+    return false;
+  }
+  const bonds = [];
   for (let b = 0; b < mol.getAllBonds(); b++) {
     const a1 = mol.getBondAtom(0, b);
     const a2 = mol.getBondAtom(1, b);
     const dx = mol.getAtomX(a2) - mol.getAtomX(a1);
     const dy = mol.getAtomY(a2) - mol.getAtomY(a1);
     const len = Math.hypot(dx, dy);
-    if (!len) continue;
+    if (len < 1e-6) continue;
     const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
-    let off = deg % 30;
-    if (off > 15) off -= 30;
-    if (off < -15) off += 30;
-    sum += off * len;
-    wsum += len;
+    let carbonyl = false;
+    try {
+      carbonyl =
+        mol.getBondOrder(b) === 2 &&
+        ((mol.getAtomLabel(a1) === 'C' && mol.getAtomLabel(a2) === 'O') ||
+          (mol.getAtomLabel(a1) === 'O' && mol.getAtomLabel(a2) === 'C'));
+    } catch {
+      /* 读不出键级就当普通键 */
+    }
+    let ring = false;
+    try {
+      ring = mol.isRingBond(b);
+    } catch {
+      /* 拿不到环标记就只按普通键算 */
+    }
+    bonds.push({ a1, deg, carbonyl, ring });
   }
-  if (!wsum) return false;
-  const rot = (-sum / wsum) * (Math.PI / 180);
-  if (Math.abs(rot) < 0.01) return false;
-  const cos = Math.cos(rot);
-  const sin = Math.sin(rot);
+  if (!bonds.length) return false;
+
+  const mod = (v, m) => ((v % m) + m) % m;
+  const near = (v, target, tol = 2.5) => Math.abs(((mod(v - target, 360) + 180) % 360) - 180) <= tol;
+
+  // 候选：把任意一根键转到任意一个 30° 整角
+  const cands = [];
+  for (const bd of bonds) for (let k = 0; k < 12; k++) cands.push(mod(k * 30 - bd.deg, 360));
+
+  let best = 0;
+  let bestScore = -Infinity;
+  for (const rot of cands) {
+    let score = 0;
+    for (const bd of bonds) {
+      const a = mod(bd.deg + rot, 360);
+      if (bd.carbonyl) {
+        // 羰基：竖着最好（朝上再好一点），横着最差
+        if (near(a, 90)) score += 130;
+        else if (near(a, 270)) score += 120;
+        else if (near(a, 0) || near(a, 180)) score -= 40;
+        else score -= 10;
+      }
+      if (bd.ring) {
+        if (near(a, 0) || near(a, 180) || near(a, 90) || near(a, 270)) score += 8;
+        else if (near(a, 30) || near(a, 150) || near(a, 210) || near(a, 330)) score += 3;
+      } else if (near(a, 0) || near(a, 180)) {
+        score += 0.5;
+      }
+    }
+    // 景观加成：横着比竖着好
+    if (score > -Infinity) {
+      const [x0, y0, x1, y1] = boundsOf(mol);
+      const w = x1 - x0;
+      const h = y1 - y0;
+      const c = Math.cos((rot * Math.PI) / 180);
+      const s = Math.sin((rot * Math.PI) / 180);
+      const rw = Math.abs(w * c) + Math.abs(h * s);
+      const rh = Math.abs(w * s) + Math.abs(h * c);
+      if (rh > rw * 1.05) score -= 30;
+    }
+    if (score > bestScore + 1e-9) {
+      bestScore = score;
+      best = rot;
+    }
+  }
+  if (Math.abs(best) < 0.01) return false;
+  const cos = Math.cos((best * Math.PI) / 180);
+  const sin = Math.sin((best * Math.PI) / 180);
   for (let i = 0; i < n; i++) {
     const x = mol.getAtomX(i);
     const y = mol.getAtomY(i);
