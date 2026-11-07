@@ -6,9 +6,9 @@
  * ——openchemlib 会把缩写展开画成全结构、标签丢掉（见 lib/indigo.js）。
  */
 
-import { indigoSvg, indigoLayout } from './indigo.js';
+import { indigoSvg, indigoLayout, BOND_PX } from './indigo.js';
 import { abbreviatedParts } from './abbrev.js';
-import { relayoutMolecule } from './relayout.js';
+import { relayoutMolecule, orientLandscape, alignToGrid } from './relayout.js';
 
 let cached = null;
 
@@ -56,7 +56,7 @@ export async function analyzeMolfile(molfile) {
   try {
     const mol = chem.Molecule.fromMolfile(s);
     const f = mol.getMolecularFormula();
-    const raw = mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+    const raw = samePxScale(mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
     const out = { formula: f.formula, mw: Math.round(f.relativeWeight * 100) / 100, svg: raw };
     // 带缩写：交给 Indigo 画（它认得超原子，Ts 就显示成 Ts）。
     // 这种 MOL 里没有「干净的 smiles」（抄出来是展开式），所以 out.smiles 留空，
@@ -87,7 +87,9 @@ export async function analyzeMolfile(molfile) {
           try {
             const tidy = chem.Molecule.fromSmiles(smiles);
             await relayoutMolecule(chem, tidy); // 再交给 Indigo 排一遍，键角才规整
-            out.svg = tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+            alignToGrid(tidy);
+            orientLandscape(tidy); // 竖着的结构摆平，免得到格子里被压小
+            out.svg = samePxScale(tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
           } catch {
             /* 排不出来就用原来的坐标 */
           }
@@ -98,6 +100,15 @@ export async function analyzeMolfile(molfile) {
   } catch {
     return null;
   }
+}
+
+/** openchemlib 出图固定 24 px/键；把宽高按 BOND_PX 放大，跟 Indigo 画的图同一个像素尺度 */
+const OCL_BOND_PX = 24;
+function samePxScale(svg) {
+  const k = BOND_PX / OCL_BOND_PX;
+  if (Math.abs(k - 1) < 0.01) return svg;
+  return svg.replace(/<svg([^>]*?)\swidth="(\d+(?:\.\d+)?)(px)?"([^>]*?)\sheight="(\d+(?:\.\d+)?)(px)?"/,
+    (m, a, w, _u1, b, h) => `<svg${a} width="${Math.round(Number(w) * k)}"${b} height="${Math.round(Number(h) * k)}"`);
 }
 
 /** 文本（SMILES 或 molfile）→ { formula, mw, svg } */
@@ -129,7 +140,9 @@ export async function analyzeSmiles(smiles) {
     if (!svg) {
       // 认不出缩写：openchemlib 自己排的键角常常歪，先让 Indigo 重排坐标再画（保持原来的观感）
       await relayoutMolecule(chem, mol);
-      svg = mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 });
+      alignToGrid(mol);
+      orientLandscape(mol);
+      svg = samePxScale(mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
     }
     return {
       formula: f.formula,

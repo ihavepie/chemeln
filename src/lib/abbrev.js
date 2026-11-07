@@ -10,7 +10,7 @@
  */
 
 import { indigoSvgSized } from './indigo.js';
-import { relayoutMolecule } from './relayout.js';
+import { relayoutMolecule, orientLandscape, alignToGrid } from './relayout.js';
 
 /** [缩写, 片段 SMILES（`*` = 连接到主体）] */
 export const ABBREV_GROUPS = [
@@ -56,6 +56,11 @@ export const ABBREV_GROUPS = [
   ['OEt', '*O[CH2][CH3]'],
   ['SMe', '*S[CH3]'],
   ['NH2', '*[NH2]'],
+  // ── 兜底的「小名字」放最后：前面那些基团里含甲基 / 苯环的（Ts、Boc、Bn…）要先匹配上，
+  // 不然甲基先被 Me 吃掉，整个基团就认不出来了
+  ['Ph', '*c1ccccc1'],
+  ['Me', '*[CH3]'],
+  ['Et', '*[CH2][CH3]'],
 ];
 
 let cached = null;
@@ -158,6 +163,8 @@ export async function abbreviateSmiles(smiles) {
   // 先把坐标规整一遍：openchemlib 的 layout 带随机性，而 Indigo 渲染会照抄 molfile 里的坐标，
   // 不规整的话同一个分子每次画出来都不一样
   await relayoutMolecule(chemLib, mol);
+  alignToGrid(mol);
+  orientLandscape(mol);
 
   let molfile;
   try {

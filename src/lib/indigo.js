@@ -51,6 +51,31 @@ function fitMolfile(data) {
 export const INDIGO_BOND_UNITS = 100;
 
 /**
+ * Indigo 的线宽档位：这个数 / 30 = 「一根键的线宽」。
+ * openchemlib 画出来的比例是 stroke 1.44px / 键长 24px ≈ 0.06，对应这里就是 1.8 ——
+ * 两边线条一样粗（2.3 太粗，用户说过「目前太粗了」）。
+ */
+export const INDIGO_LINE_WIDTH = '1.8';
+
+/**
+ * 结构式图的「一根键画多少像素」：openchemlib 自己出图固定是 24 px/键（实测），
+ * 这里把两种引擎都归到同一个像素尺度（34 px/键），格子（148 px）里才大小相当、线宽也一致。
+ */
+export const BOND_PX = 34;
+
+/** Indigo 输出里一根键是 100 个单位；把整张图缩放到「一根键 24 px」，跟 openchemlib 出图的像素尺度一致 */
+function samePxScale(svg) {
+  const nums = (svg.match(/viewBox="([^"]+)"/) || [])[1];
+  if (!nums) return svg;
+  const v = nums.split(/[\s,]+/).map(Number);
+  if (v.length !== 4 || !(v[2] > 0) || !(v[3] > 0)) return svg;
+  const k = BOND_PX / INDIGO_BOND_UNITS;
+  const w = Math.round(v[2] * k);
+  const h = Math.round(v[3] * k);
+  return svg.replace(/<svg([^>]*?)\swidth="[^"]*"([^>]*?)\sheight="[^"]*"/, `<svg$1 width="${w}"$2 height="${h}"`);
+}
+
+/**
  * molfile → 重新排过 2D 坐标的 molfile。就是 Ketcher 里那个「layout」（Indigo 的 clean2d）：
  * openchemlib 自己排出来的键角常常是歪的（螺环、并环、多取代的环尤其难看），用户点名要重排一遍。
  * **第二个参数是输出格式**，缺了或者传错会报 `Cannot pass non-string to std::string`（踩过）。
@@ -73,10 +98,13 @@ export async function indigoSvg(data) {
   const opts = new M.MapStringString();
   opts.set('render-output-format', 'svg');
   opts.set('render-coloring', 'true');
+  // 线宽：Indigo 默认 1（= 一根键的 1/30），跟 openchemlib 画出来的线比明显偏细。
+  // openchemlib 的 stroke-width 1.44 / 键长 18.6 ≈ 0.077，对应的就是 2.3 —— 两边线条粗细才对得上
+  opts.set('render-bond-line-width', INDIGO_LINE_WIDTH);
   const raw = String(M.render(s, opts) || '');
   const svg = raw.includes('<svg') ? raw : utf8FromBase64(raw);
   if (!svg.includes('<svg')) throw new Error('Indigo 没画出图');
-  return svg;
+  return samePxScale(svg);
 }
 
 /**
