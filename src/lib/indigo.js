@@ -50,6 +50,21 @@ function fitMolfile(data) {
  */
 export const INDIGO_BOND_UNITS = 100;
 
+/**
+ * molfile → 重新排过 2D 坐标的 molfile。就是 Ketcher 里那个「layout」（Indigo 的 clean2d）：
+ * openchemlib 自己排出来的键角常常是歪的（螺环、并环、多取代的环尤其难看），用户点名要重排一遍。
+ * **第二个参数是输出格式**，缺了或者传错会报 `Cannot pass non-string to std::string`（踩过）。
+ */
+export async function indigoLayout(molfile) {
+  const s = fitMolfile(molfile);
+  if (!s) throw new Error('没有结构');
+  const M = await moduleIndigo();
+  const out = M.layout(s, 'molfile', new M.MapStringString());
+  const laid = String(out || '');
+  if (!/V2000|V3000/.test(laid)) throw new Error('Indigo 没排出来');
+  return laid;
+}
+
 /** MOL / RXN → SVG 字符串（走 molfile 而不是 SMILES，缩写的超原子才带得进去） */
 export async function indigoSvg(data) {
   const s = fitMolfile(data);
