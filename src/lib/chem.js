@@ -8,6 +8,7 @@
 
 import { indigoSvg, indigoLayout } from './indigo.js';
 import { abbreviatedParts } from './abbrev.js';
+import { relayoutMolecule } from './relayout.js';
 
 let cached = null;
 
@@ -35,30 +36,6 @@ export function looksLikeMolfile(text) {
   const s = String(text || '');
   if (s.length < 40) return false;
   return /V2000|V3000/.test(s) && /M\s+END/.test(s);
-}
-
-/**
- * 用 Indigo 的 layout（Ketcher 里那个「layout」）把 2D 坐标重排一遍，**只把坐标写回这个分子**——
- * 化学信息仍然用 openchemlib 自己解析的那份。openchemlib 的排版在螺环 / 并环 / 多取代的环上
- * 键角常常是歪的（用户说「好像还是按画出来的角度」），重排之后规整得多。
- * 排不出来（wasm 没拷、结构解析不了）就保持原样，绝不让画图失败。
- */
-export async function relayoutMolecule(chem, mol) {
-  try {
-    const laid = await indigoLayout(mol.toMolfile());
-    const lm = chem.Molecule.fromMolfile(laid);
-    const n = mol.getAllAtoms();
-    if (lm.getAllAtoms() !== n) return false;
-    // 序号对不上就别硬搬（搬错了整个结构就变形了），标签也必须逐个一致
-    for (let i = 0; i < n; i++) if (lm.getAtomLabel(i) !== mol.getAtomLabel(i)) return false;
-    for (let i = 0; i < n; i++) {
-      mol.setAtomX(i, lm.getAtomX(i));
-      mol.setAtomY(i, lm.getAtomY(i));
-    }
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

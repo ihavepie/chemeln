@@ -12,7 +12,7 @@
  */
 
 import { abbreviatedParts } from './abbrev.js';
-import { relayoutMolecule } from './chem.js';
+import { relayoutMolecule } from './relayout.js';
 
 const BOND_PX = 26; // 一根键的像素长度，整张图的尺度基准
 const PAD = 16;

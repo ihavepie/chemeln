@@ -10,6 +10,7 @@
  */
 
 import { indigoSvgSized } from './indigo.js';
+import { relayoutMolecule } from './relayout.js';
 
 /** [缩写, 片段 SMILES（`*` = 连接到主体）] */
 export const ABBREV_GROUPS = [
@@ -153,6 +154,10 @@ export async function abbreviateSmiles(smiles) {
     }
   }
   if (!groups.length) return null;
+
+  // 先把坐标规整一遍：openchemlib 的 layout 带随机性，而 Indigo 渲染会照抄 molfile 里的坐标，
+  // 不规整的话同一个分子每次画出来都不一样
+  await relayoutMolecule(chemLib, mol);
 
   let molfile;
   try {
