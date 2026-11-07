@@ -122,6 +122,7 @@ export async function abbreviateSmiles(smiles) {
 
   const used = new Set();
   const groups = [];
+  const stat = new Map(); // label → { free: 本可以缩的处数, kept: 实际缩的处数 }
   for (const [label, fragSmiles] of ABBREV_GROUPS) {
     let frag;
     try {
@@ -153,9 +154,24 @@ export async function abbreviateSmiles(smiles) {
       const atoms = map.slice(1).filter((i) => i >= 0);
       if (atoms.length < 1) continue;
       if (atoms.some((i) => used.has(i))) continue;
-      if (used.size + atoms.length >= heavy) continue; // 别把整个分子都缩掉
+      // 记一下「本来能缩的地方」有几处，最后用来保证同一种基团要么全缩、要么全画
+      // （不然两个苯环一个画一个写成 Ph，看着别扭）
+      const st = stat.get(label) || { free: 0, kept: 0 };
+      st.free += 1;
+      stat.set(label, st);
+      // **「主体基团不缩写」**：缩掉的原子要比剩下的还少，才叫「把基团缩成标签」；
+      // 反过来（这个基团就是分子主体，比如苯甲醛里的苯环、联苯里的一个环）就不缩，老老实实画出来
+      const rest = heavy - used.size - atoms.length;
+      if (atoms.length >= rest) continue;
       atoms.forEach((i) => used.add(i));
+      st.kept += 1;
       groups.push({ label, atoms });
+    }
+  }
+  // 同一种基团没缩全，就一个都别缩（比如 3,3-二苯基环丁酮：两个苯环都画出来）
+  for (const [label, st] of stat) {
+    if (st.kept < st.free) {
+      for (let i = groups.length - 1; i >= 0; i--) if (groups[i].label === label) groups.splice(i, 1);
     }
   }
   if (!groups.length) return null;

@@ -71,12 +71,14 @@ export function canonicalOrientation(lib, mol) {
     const len = Math.hypot(dx, dy);
     if (len < 1e-6) continue;
     const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+    // 羰基：方向要从 **C 指向 O**（openchemlib 的 y 轴朝上，一根朝上的 C=O 就是 90°）
     let carbonyl = false;
+    let degCO = deg;
     try {
-      carbonyl =
-        mol.getBondOrder(b) === 2 &&
-        ((mol.getAtomLabel(a1) === 'C' && mol.getAtomLabel(a2) === 'O') ||
-          (mol.getAtomLabel(a1) === 'O' && mol.getAtomLabel(a2) === 'C'));
+      const isC = (i) => mol.getAtomLabel(i) === 'C';
+      const isO = (i) => mol.getAtomLabel(i) === 'O';
+      carbonyl = mol.getBondOrder(b) === 2 && ((isC(a1) && isO(a2)) || (isO(a1) && isC(a2)));
+      if (carbonyl && isO(a1)) degCO = (deg + 180) % 360;
     } catch {
       /* 读不出键级就当普通键 */
     }
@@ -86,16 +88,16 @@ export function canonicalOrientation(lib, mol) {
     } catch {
       /* 拿不到环标记就只按普通键算 */
     }
-    bonds.push({ a1, deg, carbonyl, ring });
+    bonds.push({ a1, deg, degCO, carbonyl, ring });
   }
   if (!bonds.length) return false;
 
   const mod = (v, m) => ((v % m) + m) % m;
   const near = (v, target, tol = 2.5) => Math.abs(((mod(v - target, 360) + 180) % 360) - 180) <= tol;
 
-  // 候选：把任意一根键转到任意一个 30° 整角
+  // 候选：把任意一根键转到任意一个 15° 整角（ChemDraw 的键角吸附就是 15°，用户文件里 99% 的键都落在 15° 网格上）
   const cands = [];
-  for (const bd of bonds) for (let k = 0; k < 12; k++) cands.push(mod(k * 30 - bd.deg, 360));
+  for (const bd of bonds) for (let k = 0; k < 24; k++) cands.push(mod(k * 15 - bd.deg, 360));
 
   let best = 0;
   let bestScore = -Infinity;
@@ -104,17 +106,21 @@ export function canonicalOrientation(lib, mol) {
     for (const bd of bonds) {
       const a = mod(bd.deg + rot, 360);
       if (bd.carbonyl) {
-        // 羰基：竖着最好（朝上再好一点），横着最差
-        if (near(a, 90)) score += 130;
-        else if (near(a, 270)) score += 120;
-        else if (near(a, 0) || near(a, 180)) score -= 40;
-        else score -= 10;
+        // 羰基：**朝上最好**（用户的 ChemDraw 稿子基本都朝上），朝下次之，横着最差。
+        // 注意 openchemlib 的 y 轴朝上、SVG 的 y 轴朝下，画出来是上下颠倒的：
+        // 分子坐标里 270° 的那根 C=O，在图上才是「朝上」（踩过：按 90° 给分，结果全朝下）
+        const aCO = mod(bd.degCO + rot, 360);
+        if (near(aCO, 270)) score += 140;
+        else if (near(aCO, 90)) score += 40;
+        else if (near(aCO, 0) || near(aCO, 180)) score -= 60;
+        else score -= 20;
       }
       if (bd.ring) {
-        if (near(a, 0) || near(a, 180) || near(a, 90) || near(a, 270)) score += 8;
-        else if (near(a, 30) || near(a, 150) || near(a, 210) || near(a, 330)) score += 3;
+        // 环上的键落在 15° 网格里就加分（四元环菱形是 45°/135°，正六边形是 30°/90°/150°，都在 15° 网格上）
+        if (near(a, 0) || near(a, 90) || near(a, 180) || near(a, 270)) score += 8;
+        else if (near(a, 15, 15) || near(a, 45, 15) || near(a, 75, 15)) score += 6;
       } else if (near(a, 0) || near(a, 180)) {
-        score += 0.5;
+        score += 1;
       }
     }
     // 景观加成：横着比竖着好
