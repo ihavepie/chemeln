@@ -57,6 +57,9 @@ export const INDIGO_BOND_UNITS = 100;
  */
 export const INDIGO_LINE_WIDTH = '1.8';
 
+/** 字号（跟一根键 100 单位同一坐标系，56 ≈ 键长的 0.56，openchemlib 是 14/24≈0.58） */
+export const INDIGO_FONT_SIZE = '56';
+
 /**
  * 结构式图的「一根键画多少像素」：openchemlib 自己出图固定是 24 px/键（实测），
  * 这里把两种引擎都归到同一个像素尺度（34 px/键），格子（148 px）里才大小相当、线宽也一致。
@@ -101,6 +104,11 @@ export async function indigoSvg(data) {
   // 线宽：Indigo 默认 1（= 一根键的 1/30），跟 openchemlib 画出来的线比明显偏细。
   // openchemlib 的 stroke-width 1.44 / 键长 18.6 ≈ 0.077，对应的就是 2.3 —— 两边线条粗细才对得上
   opts.set('render-bond-line-width', INDIGO_LINE_WIDTH);
+  // 字（原子标签 / 缩写标签）的大小：Indigo 一根键 = 100 单位，openchemlib 那边是「一根键 24 px、字号 14 px」，
+  // 换算成同一比例 ≈ 58，取 56 看着最接近（用户说原来的缩写字太小、跟键不搭）。
+  // **必须连单位一起设**：只给 render-font-size 会被当成 0，标签整个消失（踩过）
+  opts.set('render-font-size-unit', 'px');
+  opts.set('render-font-size', INDIGO_FONT_SIZE);
   const raw = String(M.render(s, opts) || '');
   const svg = raw.includes('<svg') ? raw : utf8FromBase64(raw);
   if (!svg.includes('<svg')) throw new Error('Indigo 没画出图');

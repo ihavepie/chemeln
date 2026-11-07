@@ -45,7 +45,6 @@ export const ABBREV_GROUPS = [
   // 作为保护基 / 磺酰基一部分的（Ts、Bz、Bn、Cbz、Fmoc）照缩，那是 ChemDraw 的老规矩。
   ['tBu', '*C([CH3])([CH3])[CH3]'],
   ['iPr', '*C([CH3])[CH3]'],
-  ['nBu', '*[CH2][CH2][CH2][CH3]'],
   ['cHex', '*[CH]1CCCCC1'],
   ['cPr', '*[CH]1CC1'],
   ['Allyl', '*[CH2]C=C'],
