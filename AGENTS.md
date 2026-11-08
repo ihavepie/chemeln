@@ -156,7 +156,7 @@
 - Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
-- **Safari 里让 `<button>` 能拖**：光写 `draggable="true"` 在 WebKit 下可能拖不动（卡片墙的 `.grid-card` 就是 button），要配 `-webkit-user-drag: element`（`eln.css` 末尾那条），光标给 `grab` / `:active` 给 `grabbing` 才让人知道能拖。
+- **Safari 里 `<button>` 拖不动**：原生 `draggable` 在 WebKit 的 button 上靠不住（`-webkit-user-drag` 也不稳），要拖就用 `lib/pointdrag.js` 那套 pointer 实现。
 - **本机没有 Chromium / 无头 Edge**（只有 Safari），别再照旧笔记去调 headless 打印。要看版式/核对页面文字，用 `swiftc` 编一个 WKWebView 小程序：加载 URL（hash 路由可用，如 `/#/table`）→ `takeSnapshot` 存 PNG → 看图；要读页面上的值就 `evaluateJavaScript`。注意 swiftc 必须带 `-module-cache-path .cache/clang`（否则沙箱里 ModuleCache 写不进去）。页面文字在输入框里时 `innerText` 是空的，要读 `.value`。
 - 依赖版本别升：Vue 3.5 / Vite 6 / Element Plus 2.8 / openchemlib 9.25 是验证过的组合。
 
