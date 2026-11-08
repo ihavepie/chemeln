@@ -56,6 +56,7 @@ const dropKey = ref('');
 const gapAt = ref(-1);        // 落在该组第几张卡片前面（等于数量 = 放到最后）
 
 const sorter = createPointerSort({
+  name: 'cmp-grid',
   onStart: (id) => { dragId.value = id; },
   onTarget: (id, groupKey, gap) => {
     dropKey.value = groupKey;

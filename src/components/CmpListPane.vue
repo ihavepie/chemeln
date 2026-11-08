@@ -37,6 +37,7 @@ const dragId = ref(null);
 const dropId = ref(null);
 
 const sorter = createPointerSort({
+  name: 'cmp-list',
   onStart: (id) => { dragId.value = id; },
   onTarget: (id, groupKey, gap) => {
     // 列表是一列：gap 指向「插到第几张前面」，把落点那张卡片标出来

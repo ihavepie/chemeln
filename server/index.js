@@ -1317,6 +1317,26 @@ const route = (method, pattern, handler) => {
   routes.push({ method, regex, keys, handler });
 };
 
+/* 拖动诊断：前端每拖一次发几行现场过来，落到 data/drag-debug.log（不进 git，data/ 整体备份时就带走了）。
+   真实浏览器里拖不动、而合成事件测起来又「一切正常」时，靠这几行才能看出卡在哪一步。 */
+route('POST', '/api/debug/drag', async (req, res) => {
+  const body = await readJson(req);
+  const line = `${new Date().toISOString()} ${JSON.stringify(body)}\n`;
+  try {
+    const file = path.join(DATA_DIR, 'drag-debug.log');
+    let keep = '';
+    try {
+      keep = String(await fsp.readFile(file, 'utf8')).split('\n').slice(-400).join('\n');
+    } catch {
+      keep = '';
+    }
+    await fsp.writeFile(file, `${keep}${line}`, 'utf8');
+  } catch {
+    /* 写不进去就算了，绝不能因为诊断日志影响拖动 */
+  }
+  ok(res, { ok: true });
+});
+
 /* --- bootstrap & settings --- */
 route('GET', '/api/bootstrap', async (req, res, params, url) =>
   ok(res, bootstrap({ project: url.searchParams.get('project') || '' }))

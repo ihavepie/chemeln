@@ -6598,12 +6598,17 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .scheme-head .btn-sm { padding: 2px 8px; }
 
 /* ===== 拖动排序（2026-11）=====
-   卡片是 <button>：Safari/WebKit 下光有 `draggable="true"` 不一定起拖，
-   要显式 `-webkit-user-drag: element`；光标给个 grab 暗示能拖。卡片墙和中栏列表共用。 */
+   卡片是 <button>，拖动走 `lib/pointdrag.js`（普通 mouse 事件）。
+   **这里必须显式 `-webkit-user-drag: none`**：WebKit 里只要元素被当成可原生拖拽
+   （属性或 `-webkit-user-drag: element` 任一条），真鼠标按下再拖就会起一个原生拖拽会话，
+   后续 `mousemove` 全被它吃掉——页面表现为「按着拖完全没反应」，而合成事件测起来一切正常
+   （合成事件压根不会启动原生拖拽）。踩了整整三轮，别再往回调。 */
 .grid-card,
 .exp-card,
-.cmp-card {
-  -webkit-user-drag: element;
+.cmp-card,
+.grid-thumb img,
+.grid-card img {
+  -webkit-user-drag: none;
   cursor: grab;
 }
 .grid-card:active,
@@ -6631,3 +6636,24 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 body.is-pointer-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
 body.is-pointer-dragging * { cursor: grabbing !important; }
 .exp-card.can-drag, .grid-card.can-drag { cursor: grab; }
+
+/* 中栏实验列表的拖动排序（跟化合物中栏一致）：落点一道强调色短线，拖起来的那张淡下去 */
+.listpane .exp-card.is-dragging { opacity: 0.45; }
+.listpane .exp-card.is-drop-target::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: -7px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* 中栏列表拖到最末尾时的落点线（卡片下面没地方画「插到下一行前面」那条线） */
+.listpane .list-drop-line {
+  height: 2px;
+  margin: 5px 12px 0;
+  border-radius: 2px;
+  background: var(--accent);
+}

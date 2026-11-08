@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import { api } from '../api.js';
 import { store, loadBoot, loadList, recordCategories, createExperiment } from '../store.js';
+import { createPointerSort } from '../lib/pointdrag.js';
 import { STATUS_TONE } from '../lib/ui.js';
 import { toast } from '../lib/feedback.js';
 import { experimentMenu } from '../lib/rowmenu.js';
@@ -88,57 +89,58 @@ const groups = computed(() => {
 /** 只在「看全部」且确实分了组的时候显示分组标题 */
 const showHeads = computed(() => !store.filters.category && groups.value.length > 1);
 
-/* ---- 拖卡片换分类 / 换位置 ---- */
-const dragId = ref(null);
-const dragIds = ref([]);      // 拖一摞时整组一起动，不然同一个平行组会散在两个分类里
+/* ---- 拖卡片换分类 / 换位置 ----
+   自己实现（`lib/pointdrag.js`）：卡片是 <button>，Safari 里原生 draggable 经常起不了拖。 */
+const dragId = ref(null);      // 用「面子那条」的 id 认卡片；一摞就整摞一起挪
 const dropKey = ref('');
-const gapAt = ref(-1);        // 落在该组第几张卡片前面（等于数量 = 放到最后）
+const gapAt = ref(-1);         // 落在该组第几张卡片前面（等于数量 = 放到最后）
 
-function onDragStart(ev, card) {
-  if (!cats.value.length) return;         // 一个分类都没有就不用拖
-  dragId.value = card.it.id;
-  dragIds.value = card.members.map((m) => m.id);
-  ev.dataTransfer.effectAllowed = 'move';
-  ev.dataTransfer.setData('text/plain', String(card.it.id));
+/** 拖起来的那张卡片在哪一组（卡片身份按 card.it.id 认） */
+function cardOf(id) {
+  for (const g of groups.value) {
+    const card = g.cards.find((c) => c.it.id === id);
+    if (card) return { g, card };
+  }
+  return null;
 }
 
-function onDragEnd() {
+const sorter = createPointerSort({
+  name: 'exp-grid',
+  onStart: (id) => { dragId.value = id; },
+  onTarget: (id, groupKey, gap) => {
+    dropKey.value = groupKey;
+    gapAt.value = gap;
+  },
+  onDrop: (id, groupKey, gap) => dropCard(id, groupKey, gap),
+  onCancel: () => {
+    dragId.value = null;
+    dropKey.value = '';
+    gapAt.value = -1;
+  },
+});
+
+function onCardDown(ev, card) {
+  // 不设「有分类才能拖」的门槛：未分类里也要能排顺序
+  sorter.down(ev, card.it.id);
+}
+
+/** 拖完松手那一下会再冒一个 click，别让它跳进那条记录 */
+function openCard(card) {
+  if (sorter.clickIsDrag()) return;
+  router.push(`/e/${card.it.id}`);
+}
+
+async function dropCard(id, groupKey, at) {
+  const src = cardOf(id);
   dragId.value = null;
-  dragIds.value = [];
   dropKey.value = '';
   gapAt.value = -1;
-}
+  if (!src) return;
+  const g = groups.value.find((x) => x.key === groupKey);
+  if (!g) return;
 
-function onDragOver(ev, key, count) {
-  if (!dragId.value) return;
-  ev.preventDefault();
-  ev.dataTransfer.dropEffect = 'move';
-  dropKey.value = key;
-  if (gapAt.value < 0) gapAt.value = count;      // 落在组的空白处：放最后
-}
-
-/** 落在某张卡片上：按左右半边决定插在它前面还是后面 */
-function onCardDragOver(ev, g, idx) {
-  if (!dragId.value) return;
-  ev.preventDefault();
-  ev.stopPropagation();
-  ev.dataTransfer.dropEffect = 'move';
-  dropKey.value = g.key;
-  const r = ev.currentTarget.getBoundingClientRect();
-  gapAt.value = ev.clientX < r.left + r.width / 2 ? idx : idx + 1;
-}
-
-async function onDrop(ev, g) {
-  ev.preventDefault();
-  const ids = dragIds.value.length ? [...dragIds.value] : [Number(ev.dataTransfer.getData('text/plain') || dragId.value)].filter(Boolean);
-  const at = gapAt.value;
-  dragId.value = null;
-  dragIds.value = [];
-  dropKey.value = '';
-  gapAt.value = -1;
-  if (!ids.length) return;
-  const it = store.items.find((x) => x.id === ids[0]);
-  if (!it) return;
+  const ids = src.card.members.map((m) => m.id);   // 一摞就整组按顺序挪，别把平行实验拆到两个分类
+  const it = src.card.it;
 
   // 组内除自己这一摞之外的顺序里，这个落点原本是哪一张 → 插到它前面（没有就是最后）
   const rest = g.cards.filter((c) => !c.members.some((m) => ids.includes(m.id)));
@@ -151,12 +153,11 @@ async function onDrop(ev, g) {
   const target = g.id;
   const sameCat = (it.category_id ?? null) === target;
   const curIdx = g.cards.findIndex((c) => c.members.some((m) => ids.includes(m.id)));
-  // 原地没动（本来就在这个分类里，落点还是它现在的位置那一格）就不发请求
+  // 原地没动（本来就在这个分类里，落点还是它现在那一格）就不发请求
   if (sameCat && curIdx >= 0 && (at === curIdx || at === curIdx + 1)) return;
 
   try {
-    // 一摞就整组按顺序挪过去，别让平行实验拆到两个分类
-    for (const id of ids) await api.moveExperiment(id, { category_id: target, before_id: before });
+    for (const one of ids) await api.moveExperiment(one, { category_id: target, before_id: before });
     await loadList();
     await loadBoot();
     const what = ids.length > 1 ? `${ids.length} 条平行实验` : `「${it.code}」`;
@@ -175,9 +176,8 @@ async function onDrop(ev, g) {
         :key="g.key"
         class="grid-group"
         :class="{ 'is-drop': dropKey === g.key }"
-        @dragover="onDragOver($event, g.key, g.cards.length)"
-        @dragleave="(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget) && dropKey === g.key) { dropKey = ''; gapAt = -1; } }"
-        @drop="onDrop($event, g)"
+        :data-drag-group="g.key"
+        :data-drag-count="g.cards.length"
       >
         <div v-if="showHeads" class="grid-group-head">
           <span class="grid-group-name">{{ g.name }}</span>
@@ -207,11 +207,11 @@ async function onDrop(ev, g) {
               <button
                 class="grid-card"
                 :aria-current="card.members.some((m) => m.id === activeId()) ? 'true' : 'false'"
-                :draggable="cats.length > 0"
-                @dragover="onCardDragOver($event, g, ci)"
-                @dragstart="onDragStart($event, card)"
-                @dragend="onDragEnd"
-                @click="router.push(`/e/${card.it.id}`)"
+                :data-drag-card="card.it.id"
+                :data-drag-group="g.key"
+                :data-drag-index="ci"
+                @mousedown="onCardDown($event, card)"
+                @click="openCard(card)"
                 @contextmenu="experimentMenu($event, card.it, router, { groupSize: card.members.length })"
               >
                 <div class="grid-thumb">
@@ -241,11 +241,11 @@ async function onDrop(ev, g) {
               class="grid-card"
               :class="{ 'is-dragging': dragId === card.it.id }"
               :aria-current="card.it.id === activeId() ? 'true' : 'false'"
-              :draggable="cats.length > 0"
-              @dragover="onCardDragOver($event, g, ci)"
-              @dragstart="onDragStart($event, card)"
-              @dragend="onDragEnd"
-              @click="router.push(`/e/${card.it.id}`)"
+              :data-drag-card="card.it.id"
+              :data-drag-group="g.key"
+              :data-drag-index="ci"
+              @mousedown="onCardDown($event, card)"
+              @click="openCard(card)"
               @contextmenu="experimentMenu($event, card.it, router)"
             >
               <div class="grid-thumb">

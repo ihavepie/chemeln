@@ -7,6 +7,7 @@ import { store, loadList, loadBoot, recordCategories, addCategory } from '../sto
 import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
 import { prompt, toast } from '../lib/feedback.js';
+import { createPointerSort } from '../lib/pointdrag.js';
 import { experimentMenu, groupMenu } from '../lib/rowmenu.js';
 
 const route = useRoute();
@@ -145,6 +146,76 @@ const rows = computed(() => {
   return out.sort((a, b) => (slot.get(a.anchor) ?? 1e9) - (slot.get(b.anchor) ?? 1e9));
 });
 
+/* ---- 中栏列表拖动排序 ----
+   自己实现（`lib/pointdrag.js`）：卡片是 button，Safari 里原生拖放起不了拖。
+   一摞（平行组）拖起来是整摞一起动——只挪面子会把同一个组拆到两个分类里。
+   行身份用 `anchor`（这一行最早那条的 id）认，一摞的位置本来就按它算。 */
+const dragId = ref(null);
+const dropId = ref(null);
+const dropEnd = ref(false);   // 落点在整个列表末尾（没有「下一行」可以在它前面画线）
+
+const sorter = createPointerSort({
+  name: 'exp-list',
+  onStart: (id) => { dragId.value = id; },
+  onTarget: (id, groupKey, gap) => {
+    const next = rows.value[Math.min(gap, rows.value.length)];
+    dropId.value = next && next.anchor !== id ? next.anchor : null;
+    dropEnd.value = !next && gap >= rows.value.length;
+  },
+  onDrop: (id, groupKey, gap) => dropRow(id, gap),
+  onCancel: () => { dragId.value = null; dropId.value = null; dropEnd.value = false; },
+});
+
+function onRowDown(ev, row) {
+  sorter.down(ev, row.anchor);
+}
+
+/** 点卡片：拖完那一下的 click 不要跳页面 */
+function goRow(id) {
+  if (sorter.clickIsDrag()) return;
+  router.push(`/e/${id}`);
+}
+
+/** 这一行的分类（一摞就看作面子上那条的分类） */
+function rowCategory(row) {
+  if (!row) return null;
+  return (row.one ? row.one.category_id : row.face.category_id) ?? null;
+}
+
+async function dropRow(anchor, at) {
+  dragId.value = null;
+  dropId.value = null;
+  dropEnd.value = false;
+  const list = rows.value;
+  const row = list.find((r) => r.anchor === anchor);
+  if (!row) return;
+
+  const rest = list.filter((r) => r.anchor !== anchor);
+  let pos = 0;
+  for (let i = 0; i < at && i < list.length; i += 1) if (list[i].anchor !== anchor) pos += 1;
+  const nextRow = rest[pos] || null;
+
+  const cat = rowCategory(row);
+  if (nextRow && rowCategory(nextRow) !== cat) {
+    toast('列表里只能在同一分类内排序；换分类请到卡片视图拖', 'warn');
+    return;
+  }
+  // 原地没动（落点还是它下面那一行）就不发请求
+  const curIdx = list.findIndex((r) => r.anchor === anchor);
+  if ((list[curIdx + 1] || null) === nextRow) return;
+
+  const ids = row.one ? [row.one.id] : row.members.map((m) => m.id);
+  const before = nextRow ? nextRow.anchor : null;
+  try {
+    // 整摞按顺序插到同一个 before 前面：先面子、再组员，顺序就不会被打乱
+    for (const one of ids) await api.moveExperiment(one, { category_id: cat, before_id: before });
+    await loadList();
+    await loadBoot();
+  } catch (e) {
+    toast(e.message || '移动不了', 'err');
+  }
+}
+
 /** 列表里能拿到的条件字段：跟基准比一下，看这条是重复还是改了变量 */
 const LIST_VARS = [
   ['solvent', '溶剂'],
@@ -256,6 +327,7 @@ function onStackMenu(ev, row) {
 }
 
 function onStackFace(row) {
+  if (sorter.clickIsDrag()) return;
   if (isGroupActive(row)) return toggleGroup(row.gid);
   router.push(`/e/${row.face.id}`);
 }
@@ -281,14 +353,25 @@ function onStackFace(row) {
       </div>
     </div>
 
-    <div class="listpane-body" ref="bodyEl" @scroll="saveScroll">
-      <template v-for="row in rows" :key="row.key">
+    <div
+      class="listpane-body"
+      ref="bodyEl"
+      data-drag-group="list"
+      :data-drag-count="rows.length"
+      @scroll="saveScroll"
+    >
+      <template v-for="(row, ri) in rows" :key="row.key">
         <!-- 普通记录 -->
         <button
           v-if="row.one"
-          class="exp-card"
+          class="exp-card can-drag"
+          :class="{ 'is-dragging': dragId === row.anchor, 'is-drop-target': dropId === row.anchor }"
           :aria-current="row.one.id === activeId() ? 'true' : 'false'"
-          @click="router.push(`/e/${row.one.id}`)"
+          :data-drag-card="row.anchor"
+          data-drag-group="list"
+          :data-drag-index="ri"
+          @mousedown="onRowDown($event, row)"
+          @click="goRow(row.one.id)"
           @contextmenu="experimentMenu($event, row.one, router)"
         >
           <div class="top">
@@ -308,14 +391,25 @@ function onStackFace(row) {
         </button>
 
         <!-- 平行组：叠成一张卡片，后面露出两层纸边；展开后组员一条一行 -->
-        <div v-else class="exp-stack" :class="{ 'is-active': isGroupActive(row) }">
+        <div
+          v-else
+          class="exp-stack"
+          :class="{ 'is-active': isGroupActive(row) }"
+          data-drag-group="list"
+          :data-drag-count="ri + 1"
+        >
           <!-- 两张垫纸挂在 stack-top 上，只跟着面子那张卡片，不跟着展开出来的组员行 -->
           <div class="stack-top">
             <div
-              class="exp-card is-stack"
+              class="exp-card is-stack can-drag"
+              :class="{ 'is-dragging': dragId === row.anchor, 'is-drop-target': dropId === row.anchor }"
               :aria-current="isGroupActive(row) && !isGroupOpen(row.gid) ? 'true' : 'false'"
               role="button"
               tabindex="0"
+              :data-drag-card="row.anchor"
+              data-drag-group="list"
+              :data-drag-index="ri"
+              @mousedown="onRowDown($event, row)"
               @click="onStackFace(row)"
               @keydown.enter="onStackFace(row)"
               @contextmenu="onStackMenu($event, row)"
@@ -384,6 +478,8 @@ function onStackFace(row) {
           </Transition>
         </div>
       </template>
+
+      <div v-if="dropEnd" class="list-drop-line" />
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}
