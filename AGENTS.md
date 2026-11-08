@@ -113,7 +113,7 @@
 ## 6. 当前进度
 
 > 更早的轮次记录（同一套写法，逐字搬走、没删内容）在 **`HISTORY.md`**；这个文件有 **64 KB 注入上限**，所以最近几轮留在下面，再早的按顺序往下搬。加新内容前先看看体积。
-- **本轮（拖动排序，五轮才收稳）**：真机「完全拖不动」的真因是 `eln.css` 的 **`-webkit-user-drag: element`**（WebKit 起原生拖拽会话、吞掉所有 `mousemove`，而合成事件不会启动原生拖拽 → 测试全绿、真机全死），改 `none` + 按住期间拦 `dragstart`。实验那两处也接上（`ExpGrid` 换掉原生拖放、`ExpListPane` 原本没有），一摞整组挪、只在同分类内排序。手感：虚影卡跟手 + 原卡变虚线空位 + 贴边自动滚；落点判定改用**几何快照 + 120ms 稳定延时**，墙和列表都用**流内占位格**（占位格高度跟着卡片走）。视图页工具行加「新建分类」。四个面合成验证 `POST /move` 全对；真鼠标本机无法自动模拟，故加了 `data/drag-debug.log` 诊断渠道。版本行 **1.0.2**。
+- **本轮（拖动排序，五轮才收稳）**：真机「完全拖不动」的真因是 `eln.css` 的 **`-webkit-user-drag: element`**（WebKit 起原生拖拽会话、吞掉所有 `mousemove`，而合成事件不会启动原生拖拽 → 测试全绿、真机全死），改 `none` + 按住期间拦 `dragstart`。实验那两处也接上（`ExpGrid` 换掉原生拖放、`ExpListPane` 原本没有），一摞整组挪、只在同分类内排序。手感：虚影卡跟手 + 原卡变虚线空位 + 贴边自动滚；落点判定改用**几何快照 + 120ms 稳定延时**，墙用**流内占位格**、列表用**一条线**。视图页工具行加「新建分类」。四个面合成验证 `POST /move` 全对；真鼠标本机无法自动模拟，故加了 `data/drag-debug.log` 诊断渠道。版本行 **1.0.2**。
 - **已完成**：v2 全功能已构建进 `public/`（4780 跑的就是 v2）；逐项清单在 `HISTORY.md`。
 - **半成品 / 待确认**：条件筛选页仍是旧样式；「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
 - **明确不做**：多人协作、账号权限、云同步、富文本编辑。移动端只做「扫码看化合物档案」这一档（≤820px 的样式在 `eln.css` 末尾那段），不做手机上编辑记录。
@@ -153,7 +153,7 @@
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
 - **Safari 里卡片拖不动（三轮才定案的真因）**：卡片是 `<button>`，原生 `draggable` 和 Pointer Events 在 WebKit 的 button 上都靠不住；**更要命的是元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element`、或卡片/图片自带的拖拽能力），真鼠标一按一拖就会起一个原生拖拽会话，之后所有 `mousemove` 全被吞掉 → 页面「按着拖完全没反应」**。而 `new MouseEvent(...)` 合成事件**不会启动原生拖拽**，所以自动化测试一直全绿、真机一直死。规矩：①卡片/图片一律 `-webkit-user-drag: none`，别再加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`（不指望 CSS）；③**验证只能看 `data/drag-debug.log`**（`lib/draglog.js` → `POST /api/debug/drag`）。本机没法自动模拟真鼠标：`sendEvent` 投不进拖拽事件、`CGEvent` 没辅助功能权限。
-- **落点标识：两边都「流内占位格」**（墙 `.drop-gap`、列表 `.list-drop-slot`，虚线强调色一块空位，别的卡片真的让位）。**墙的占位格必须配几何快照用**——一插进去整墙重排，没快照的话光标底下立刻换成另一张卡、落点来回翻（「像在左右跳动」）。**列表另外两条**：①占位格高度 = 被拖那张卡的真实高度（内联 `dragH`，写死会看着靠上/靠下）；②**拖动时原卡 `visibility:hidden`**（位置留着、列表不塌；淡掉的卡 + 占位格同时出现太乱），落点等于原位时不再多画一块。
+- **落点标识：墙用「流内占位格」，中栏列表用「一条 2px 的强调色线」**（`.list-drop-line`，不推挤卡片）。墙的占位格必须配几何快照用——一插进去整墙重排，没快照的话光标底下立刻换成另一张卡、落点来回翻（「像在左右跳动」）。列表试过占位格：①高度得跟着卡片走，不然看着靠上/靠下；②为了让位就要隐藏被按下的那张卡，**而 WebKit 会把「隐藏掉的 mousedown 目标」的后续 `mousemove` 掐掉 → 直接拖不动**，所以列表回到线。**铁律：拖动过程中绝不能隐藏 / `display:none` 掉按下时命中的那张卡**。
 - **拖动虚影（`.drag-ghost`）必须 `position: fixed !important`**：中栏列表的卡片带 `cmp-card` 类，`.exp-card.cmp-card{position:relative}` 权重（0,2,0）高于 `.drag-ghost`（0,1,0），不加 `!important` 虚影就被顶回 `relative`、跑到页面最底下（卡片墙的卡没有 `cmp-card`，所以只有墙看着正常，这个不对称很容易漏测）。**另一处权重坑**：`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把**正在被拖的那张**也还原成不透明，看着像没拿起来——被拖的那张要用 `.grid-page.is-dragging .grid-group.is-drop .grid-card.is-dragging` 单独压回 0.3。
 - **瓶签尺寸 · 手机适配**：细节（四档尺寸、scale .7、≤820px 那套）见 `HISTORY.md`。
 - **本机没有 Chromium / 无头 Edge**（只有 Safari），别再照旧笔记去调 headless 打印。要看版式/核对页面文字，用 `swiftc` 编一个 WKWebView 小程序：加载 URL→ `takeSnapshot` 存 PNG → 看图；要读页面上的值就 `evaluateJavaScript`。注意 swiftc 必须带 `-module-cache-path .cache/clang`（否则沙箱里 ModuleCache 写不进去）。页面文字在输入框里时 `innerText` 是空的，要读 `.value`。

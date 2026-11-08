@@ -35,30 +35,21 @@ const filterValue = computed(
    用自己实现的 pointer 拖拽（`lib/pointdrag.js`）：卡片是 button，Safari 里原生拖放起不来。 */
 const dragId = ref(null);
 const dropIdx = ref(-1);
-const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度（写死会看着靠上或靠下）
 
-/* 原卡在拖动时是隐藏的（位置留着，列表不塌），所以占位格要跳过它自己那一格：
-   dropIdx 是「插到数组第几个位置之前」，被拖的那张占位不看，落到它原位（含它后面一格）时不再额外画一块。
-   注意在 setup 里用 computed 就要 import 到。 */
+/* 落到它自己原位（含它后面那一格）时不再画线——没有变化，不需要提示 */
 const dragIdx = computed(() => store.compounds.findIndex((c) => c.id === dragId.value));
 const slotIdx = computed(() => {
   const at = dropIdx.value;
   if (at < 0) return -1;
   const src = dragIdx.value;
-  // 原卡是「隐藏但占着位置」，所以数组下标不用补偿；
-  // 只有落点等于它原位（它前面 / 它后面那一格）时不再多画一块——洞本来就是它自己
   if (src >= 0 && (at === src || at === src + 1)) return -1;
   return at;
-});      // 占位格插在第几张卡片前面（= 长度 = 放最后）
+});      // 落点线插在第几张卡片前面（= 长度 = 放最后）
 
 const sorter = createPointerSort({
   name: 'cmp-list',
-  onStart: (id) => {
-    dragId.value = id;
-    const el = document.querySelector(`[data-drag-card="${id}"]`);
-    if (el) dragH.value = Math.round(el.getBoundingClientRect().height);
-  },
-  // 列表是一列：gap 指向「插到第几张前面」，那里放一块跟卡片一样高的占位格，下面的卡片让位
+  onStart: (id) => { dragId.value = id; },
+  // 列表是一列：gap 指向「插到第几张前面」，那里画一条强调色的线
   onTarget: (id, groupKey, gap) => {
     dropIdx.value = Math.min(gap, store.compounds.length);
   },
@@ -157,7 +148,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
 
     <div class="listpane-body" data-drag-group="list" :data-drag-count="store.compounds.length">
       <template v-for="(c, i) in store.compounds" :key="c.id">
-      <div v-if="slotIdx === i" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
+      <div v-if="slotIdx === i" class="list-drop-line" />
       <button
         class="exp-card cmp-card"
         :class="{ 'is-dragging': dragId === c.id }"
@@ -185,7 +176,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         </div>
       </button>
       </template>
-      <div v-if="slotIdx === store.compounds.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
+      <div v-if="slotIdx === store.compounds.length" class="list-drop-line" />
 
       <div v-if="!store.compounds.length" class="empty-note">
         <template v-if="store.compoundFilters.q || store.compoundFilters.kind">无匹配化合物</template>

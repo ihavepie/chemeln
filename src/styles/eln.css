@@ -6685,12 +6685,15 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 
 /* 中栏列表的拖动占位格：跟卡片一样高的一块虚线空位，下面的卡片真的让位
    （以前只有一条 2px 的线，用户说「侧边栏那边没有占位」） */
-.listpane .list-drop-slot {
-  /* 高度由组件内联给（= 被拖那张卡的真实高度），写死会看着靠上或靠下 */
-  margin-bottom: 12px;
-  border: 1.5px dashed var(--accent);
-  border-radius: var(--r);
-  background: #fbf4ee;
+/* 中栏列表的落点：**一条强调色的线**（不占位、不推挤卡片）。
+   试过「跟卡片一样高的占位格」，但它一插进去列表就整体下移、落点又会跟着变，
+   而且要把被按下的那张卡隐藏起来（WebKit 会把隐藏掉的 mousedown 目标的后续 mousemove 掐掉 → 拖不动）。
+   线最省事、最稳。 */
+.listpane .list-drop-line {
+  height: 2px;
+  margin: 6px 12px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 /* 卡片墙的占位格：插在网格里、跟卡片一样大小的一格虚线位，下面的卡片真的让位。
@@ -6704,12 +6707,3 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
   min-height: 150px;
 }
 .card-grid.is-even .drop-gap { min-height: 222px; }
-
-/* 中栏列表拖动时**原卡直接隐藏**（位置留着，列表不塌）：
-   淡掉的卡 + 占位格同时出现，看着乱（用户说「有点乱，原来的卡片可以先不显示了吗」）。 */
-.listpane .exp-card.is-dragging {
-  opacity: 0 !important;
-  visibility: hidden;
-  outline: none !important;
-  box-shadow: none !important;
-}
