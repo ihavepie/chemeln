@@ -5,6 +5,9 @@
  * 是把一段原子收进一个「超原子 S-group」里、只显示标签。所以我们自己把命中的片段收进
  * SUP S-group（写进 molfile 的 `M  STY / SAL / SMT`），再交给 Indigo 渲染——Indigo 认这个格式。
  *
+ * **当前没有接进出图链路**（用户最终要的是「画板里画了什么缩写就画什么」，所以 `chem.js` / `scheme.js`
+ * 都不再调 `abbreviatedParts()`）；这套表和实现留着，将来想恢复「自动缩写」直接调就行。
+ *
  * 匹配用 openchemlib 的 `SSSearcher`（SMILES 里 `*` 代表「连到主体上的那个原子」）。
  * 表的顺序就是优先级：越靠前的越先匹配（Ts 要先于 Ph，否则对甲苯磺酰基会先被拆成 Ph）。
  */

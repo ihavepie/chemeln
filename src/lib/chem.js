@@ -7,7 +7,6 @@
  */
 
 import { indigoSvg, indigoLayout, BOND_PX } from './indigo.js';
-import { abbreviatedParts } from './abbrev.js';
 import { relayoutMolecule, orientLandscape, canonicalOrientation } from './relayout.js';
 
 let cached = null;
@@ -79,20 +78,15 @@ export async function analyzeMolfile(molfile) {
       }
       if (smiles) {
         out.smiles = smiles;
-        // 认得出基团缩写（Ts / CO2Et / Boc…）就让 Indigo 按缩写画；否则 openchemlib 重排着画
-        const ab = await abbreviatedParts(smiles);
-        if (ab?.svg) {
-          out.svg = ab.svg;
-        } else {
-          try {
-            const tidy = chem.Molecule.fromSmiles(smiles);
-            await relayoutMolecule(chem, tidy); // 再交给 Indigo 排一遍，键角才规整
-            orientLandscape(tidy); // 先摆平（竖着的到格子里会被压小）
-            canonicalOrientation(chem, tidy); // 再挑最像 ChemDraw 的角度：羰基竖着、环走整角度
-            out.svg = samePxScale(tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
-          } catch {
-            /* 排不出来就用原来的坐标 */
-          }
+        // 不自动认缩写（画了什么就是什么）：openchemlib 重排一遍再画
+        try {
+          const tidy = chem.Molecule.fromSmiles(smiles);
+          await relayoutMolecule(chem, tidy); // 再交给 Indigo 排一遍，键角才规整
+          orientLandscape(tidy); // 先摆平（竖着的到格子里会被压小）
+          canonicalOrientation(chem, tidy); // 再挑最像 ChemDraw 的角度：羰基竖着、环走整角度
+          out.svg = samePxScale(tidy.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
+        } catch {
+          /* 排不出来就用原来的坐标 */
         }
       }
     }
@@ -135,15 +129,12 @@ export async function analyzeSmiles(smiles) {
   try {
     const mol = chem.Molecule.fromSmiles(s);
     const f = mol.getMolecularFormula();
-    const ab = await abbreviatedParts(s);
-    let svg = ab?.svg || '';
-    if (!svg) {
-      // 认不出缩写：openchemlib 自己排的键角常常歪，先让 Indigo 重排坐标再画（保持原来的观感）
-      await relayoutMolecule(chem, mol);
-      orientLandscape(mol);
-      canonicalOrientation(chem, mol);
-      svg = samePxScale(mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
-    }
+    // **不再自动认缩写**：画板 / ChemDraw 里画了什么缩写就画什么，没缩写的结构原样画全。
+    // openchemlib 自己排的键角常常歪，先让 Indigo 重排坐标再画（保持原来的观感）
+    await relayoutMolecule(chem, mol);
+    orientLandscape(mol);
+    canonicalOrientation(chem, mol);
+    const svg = samePxScale(mol.toSVG(460, 320, undefined, { autoCrop: true, autoCropMargin: 14 }));
     return {
       formula: f.formula,
       mw: Math.round(f.relativeWeight * 100) / 100,

@@ -11,7 +11,6 @@
  * 大分子被塞小，摆在一起键长不齐。字（箭头上的条件）比键小一号，看着才像 ChemDraw。
  */
 
-import { abbreviatedParts } from './abbrev.js';
 import { relayoutMolecule, orientLandscape, canonicalOrientation } from './relayout.js';
 
 const BOND_PX = 26; // 一根键的像素长度，整张图的尺度基准
@@ -85,16 +84,6 @@ const esc = (s) =>
 
 /** 一个分子 → 一张小 SVG（内容紧凑裁边、键长≈BOND_PX） */
 async function molSvg(smiles, id) {
-  // 能认出基团缩写（Ts / Boc / CO2Et…）就交给 Indigo 画：它会把整段基团收成一个标签，
-  // 尺寸按同一个 BOND_PX 反算，所以跟下面 openchemlib 画的结构键长一致
-  try {
-    const ab = await abbreviatedParts(smiles, BOND_PX, 10);
-    if (ab && ab.w > 4 && ab.h > 4) {
-      return { w: ab.w, h: ab.h, body: ab.body, vb: ab.vb };
-    }
-  } catch {
-    /* Indigo 那边出不来就用 openchemlib 画 */
-  }
   const lib = await chem();
   const mol = lib.Molecule.fromSmiles(smiles);
   // 先让 Indigo 把坐标重排一遍（openchemlib 自己的键角常常是歪的），再按新坐标算 bbox
