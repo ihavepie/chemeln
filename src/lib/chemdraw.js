@@ -16,8 +16,8 @@
 /** ChemDraw 那套：无衬线优先 */
 const FONT = 'Helvetica, Arial, sans-serif';
 
-/** 标签**字高** / 键长。Indigo 原本是 0.233；0.32 看着最接近 ChemDraw（再大就挤到键上了） */
-const LABEL_RATIO = 0.32;
+/** 标签**字高** / 键长。Indigo 原本 0.233，0.32 用了一轮用户说还小，改成 0.40（≈字体 22px/键 40px） */
+const LABEL_RATIO = 0.4;
 
 /** 键长（px）：Ketcher 出图一根键 40px（就是 matrix 里的 a） */
 const BOND_PX = 40;

@@ -148,14 +148,15 @@
 - **不要在用户正编辑时用 API 改他的记录**（他页面里的自动保存会把改动覆盖回去）；验证只用临时记录，验完删掉。
 - 打开实验页本身会触发保存（`fill()` 会补算 mmol、补起始行）→ 「只看不动」的验证要用临时记录，或在该页拦掉非 GET 请求。
 - SQLite 子查询的 `ORDER BY` 里引用不到外层表的列 → 拆成「主查询 + 一条补数据查询」。
-- **缩写基团的键会被渲染器截短**：给标签留位、截掉约 0.28 键长，**只跟标签字号有关**（放大图 / 调 bond-length 都没用），补法见 `lib/abbrevspread.js`；改 SVG 记得**重算 `viewBox`**，否则外移的标签被裁。
+- **缩写基团的键会被渲染器截短**：给标签留位、截掉约 0.28 键长，**只跟标签字号有关**（放大图 / 调 bond-length 都没用），补法见 `lib/abbrevspread.js`；改 SVG 必须重算 `viewBox`，否则外移的标签被裁。
+- **标签字高 = `chemdraw.js` 的 `LABEL_RATIO`（字高/键长，现 0.40）**。已存结构图靠两个幂等脚本对齐，别手工乘倍数：`scripts/normalize-labels.py`（按**当前文件**量字高反算倍率，任意中间态都能收敛）+ `scripts/fit-canvas.py`（按真实渲染外框重算 `viewBox`/px）。**量外框必须一张一页**：Indigo 的 `<use xlink:href="#glyph-*">` id 是文档级的，多张图塞进同一页面会互相引错，量出来的框全错（踩过，一度以为文件坏了）。
 - molfile 解析**不能 trim**（首行空行是格式的一部分），SMILES 才 trim。
 - Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
-- **Safari 里卡片拖不动（三轮才定案的真因）**：卡片是 `<button>`，原生 `draggable` 和 Pointer Events 在 WebKit 的 button 上都靠不住；**更要命的是元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element`、或卡片/图片自带的拖拽能力），真鼠标一按一拖就会起一个原生拖拽会话，之后所有 `mousemove` 全被吞掉 → 页面「按着拖完全没反应」**。而 `new MouseEvent(...)` 合成事件**不会启动原生拖拽**，所以自动化测试一直全绿、真机一直死。规矩：①卡片/图片一律 `-webkit-user-drag: none`，别再加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`（不指望 CSS）；③**验证只能看 `data/drag-debug.log`**（`lib/draglog.js` → `POST /api/debug/drag`）。本机模拟不了真鼠标（`sendEvent` 投不进、`CGEvent` 无权限）。
-- **落点标识：墙和列表都用「流内占位格」**（墙 `.drop-gap`、列表 `.list-drop-slot`，高度跟着卡片走），**两边都要配两样**：①几何快照（否则卡片让位后光标底下换成另一张卡，落点来回翻）；②`flip.js` 的 FLIP（否则卡片瞬移一格、看着「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下时命中的那张卡**（`opacity` 只影响绘制，压到 .07 只剩一点影子、事件和布局都不受影响；压到 0.02 也行，用户在 .02/.07 之间选了 .07）。
-- **拖动虚影（`.drag-ghost`）必须 `position: fixed !important`**：中栏列表的卡片带 `cmp-card` 类，`.exp-card.cmp-card{position:relative}` 权重（0,2,0）高于 `.drag-ghost`（0,1,0），不加 `!important` 虚影就被顶回 `relative`、跑到页面最底下（卡片墙的卡没有 `cmp-card`，所以只有墙看着正常，这个不对称很容易漏测）。**另一处权重坑**：`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖的那张也还原成不透明，看着像没拿起来——被拖的那张要用 `.grid-page.is-dragging .grid-group.is-drop .grid-card.is-dragging` 单独压回 .02。
+- **Safari 里卡片拖不动（三轮才定案的真因）**：元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element` / 卡片图片自带的拖拽能力），真鼠标一拖就起原生拖拽会话，之后 `mousemove` 全被吞 → 「按着拖没反应」；而 `new MouseEvent()` **不会**启动原生拖拽，所以自动化测试全绿、真机全死。规矩：①一律 `-webkit-user-drag: none`、别加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`；③**只能看 `data/drag-debug.log` 验证**（`lib/draglog.js`）。本机模拟不了真鼠标（`sendEvent` 投不进、`CGEvent` 无权限）。
+- **落点标识：墙和列表都用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量卡片实测值），且必须配 ①几何快照（否则让位后光标底下换卡、落点来回翻）②`flip.js` 的 FLIP（否则瞬移一格「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下时命中的卡**（`opacity` 只影响绘制，用户选了 0.07）。
+- **`.drag-ghost` 必须 `position: fixed !important`**：`.exp-card.cmp-card{position:relative}`（0,2,0）权重高于 `.drag-ghost`（0,1,0），不加就被顶回 `relative` 跑到页面底部（墙的卡没有 `cmp-card`，所以只有墙看着正常）。另：`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖那张也还原——要用 `.grid-card.is-dragging` 同权重压回 0.07。
 - **本机没有 Chromium / 无头 Edge**（只有 Safari），别再照旧笔记去调 headless 打印。要看版式/核对页面文字，用 `swiftc` 编一个 WKWebView 小程序：加载 URL→ `takeSnapshot` 存 PNG → 看图；要读页面上的值就 `evaluateJavaScript`。注意 swiftc 必须带 `-module-cache-path .cache/clang`（否则沙箱里 ModuleCache 写不进去）。页面文字在输入框里时 `innerText` 是空的，要读 `.value`。
 - 依赖版本别升：Vue 3.5 / Vite 6 / Element Plus 2.8 / openchemlib 9.25 是验证过的组合。
 
