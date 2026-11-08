@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../lib/lookup.js';
-import { hasAbbrev } from '../lib/chem.js';
 
 /**
  * 画结构式：弹窗里嵌 Ketcher（`/vendor/ketcher/index.html`，由 vendor-build/ketcher 打包而来，
@@ -101,15 +100,21 @@ async function pick() {
   // Ketcher 的接口是异步的（导出要过一遍 Indigo），等它算完再取
   const smiles = String((await a.getSmiles()) || '').trim();
   if (!smiles) return toast('画板上还是空的', 'warn');
-  // 画板里自己写的缩写（比如把一段构成标成 Ts）只存在 MOL 的 S-group 里，SMILES 是没有缩写的，
-  // 所以顺手把 MOL 也拿回去：带缩写就用 MOL 出图（原样保留），否则照旧走 SMILES 那条路
+  // **图直接用 Ketcher 自己渲的**（用户点名要画板里那张）：用户手画的缩写也在 MOL 里，
+  // 所以优先拿 molfile 去过 Indigo，拿不到才退回 SMILES
   let mol = '';
   try {
-    mol = String((await a.getMolfile?.()) || '');
+    mol = String((await a.getMol?.()) || '');
   } catch {
     mol = '';
   }
-  emit('pick', { smiles, mol: hasAbbrev(mol) ? mol : '', info: info.value });
+  let svg = '';
+  try {
+    svg = await a.image(mol || smiles);
+  } catch {
+    svg = '';
+  }
+  emit('pick', { smiles, mol, svg: svg && svg.includes('<svg') ? svg : '', info: info.value });
   emit('close');
 }
 

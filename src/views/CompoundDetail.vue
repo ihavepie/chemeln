@@ -340,11 +340,12 @@ async function tidyStructure() {
   }
 }
 
-async function applySketched({ smiles, mol, info: sketchedInfo }) {
+async function applySketched({ smiles, mol, svg: padSvg, info: sketchedInfo }) {
   if (!c.value || !smiles) return;
-  // 画板里自己写了缩写（MOL 带 S-group）就用 MOL 出图——SMILES 里没有缩写，绕一圈就丢了；
-  // 分子式 / 分子量照样按完整结构算（缩写只是画法）
-  const info = await analyzeStructureText(mol || smiles);
+  // 结构图优先用**画板自己渲的那张**（用户说比我们重画的好看）；分子式 / 分子量仍按完整结构算。
+  // 注意**公式必须用 SMILES 算**：Ketcher 存的 molfile 里芳香环的键级写法 openchemlib 读出来会多算氢
+  // （实测同一个结构：SMILES→C9H12O4S/216.26、molfile→C9H18O4S/222.3），拿 SMILES 才准
+  const info = await analyzeStructureText(smiles);
   // 换了结构：先把自己代填的那几格还回去，再按新结构重新查
   clearAutoFilled();
   if (!info) return toast('这个结构读不出来，换个画法试试', 'err');
@@ -363,7 +364,7 @@ async function applySketched({ smiles, mol, info: sketchedInfo }) {
   }
 
   const fd = new FormData();
-  fd.append('file', svgToFile(info.svg), '结构式.svg');
+  fd.append('file', svgToFile(padSvg || info.svg), '结构式.svg');
   fd.append('category', 'structure');
   await api.uploadCompoundFile(c.value.id, fd);
   await reload();
