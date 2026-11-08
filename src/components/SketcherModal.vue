@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../lib/lookup.js';
+import { spreadAbbrevBonds } from '../lib/abbrevspread.js';
 
 /**
  * 画结构式：弹窗里嵌 Ketcher（`/vendor/ketcher/index.html`，由 vendor-build/ketcher 打包而来，
@@ -109,6 +110,10 @@ async function pick() {
   } catch {
     mol = '';
   }
+  // 缩写基团（Ph / OMe / CO2Me…）的键会被 Indigo 截短到 0.72 倍（见 lib/abbrevspread.js），
+  // 把附着原子往外挪 0.3 个键长正好补回来。挪的是 2D 坐标，化学一点没变；
+  // 出图和存底稿都用挪过的这份，画板里再打开看到的间距跟存档图也一致。
+  mol = spreadAbbrevBonds(mol);
   let svg = '';
   try {
     svg = await a.image(mol || smiles);
