@@ -263,12 +263,11 @@ def plan_labels(base, target_ratio, segs):
         plan, worst = [], 99.0
         for (x0, y0, x1, y1), grp in zip(frames, label_groups(base)):
             by = grp['y']
-            if len(grp['items']) == 1:                       # 原子标：原地放大
-                px, py = (min(pts, key=lambda p: (p[0] - (x0 + x1) / 2) ** 2 + (p[1] - by) ** 2)
-                          if pts else ((x0 + x1) / 2, by))
-                plan.append((px, py, 0.0, 0.0, K))   # 和缩写同一倍率，原地放大
-                # 原子标只受「自己别压到不相干的键」约束，不参与整图倍率的判定——
-                # 它必须留在原子上，键线贴到字母边上是化学图里正常的样子
+            if len(grp['items']) == 1:
+                # 原子标：**就地放大**——中心取字母自己的中心，字一点都不挪。
+                # 别拿「最近键端」当中心：键端被截短过（离原子 4–5 个单位），
+                # 多键原子会被那条键带偏，看着就是「偏移」。
+                plan.append(((x0 + x1) / 2, (y0 + by) / 2, 0.0, 0.0, K))
                 continue
 
             px, py = (min(pts, key=lambda p: max(x0 - p[0], 0, p[0] - x1) ** 2 + max(by - p[1], 0, p[1] - y0) ** 2)

@@ -348,16 +348,8 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
     const by0 = by - cap;
 
     if (g.items.length === 1) {
-      // 原子标：绕最近键端（原子位置）缩放，不位移
-      let atom = [bx0, by];
-      let best = Infinity;
-      for (const [x1, y1, x2, y2] of segs) {
-        for (const p of [[x1, y1], [x2, y2]]) {
-          const d = Math.hypot(p[0] - (bx0 + bx1) / 2, p[1] - by);
-          if (d < best) { best = d; atom = p; }
-        }
-      }
-      out = wrapSpan(out, g, atom[0], atom[1], K);
+      // 原子标：就地放大——中心取字母自己的中心（拿键端会偏，因为键端被截短过）
+      out = wrapSpan(out, g, (bx0 + bx1) / 2, (by0 + by) / 2, K);
       continue;
     }
 
