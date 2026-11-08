@@ -117,7 +117,9 @@ export function canonicalOrientation(lib, mol) {
       }
       if (bd.ring) {
         // 环上的键落在 15° 网格里就加分（四元环菱形是 45°/135°，正六边形是 30°/90°/150°，都在 15° 网格上）
-        if (near(a, 0) || near(a, 90) || near(a, 180) || near(a, 270)) score += 8;
+        // 「横平竖直」给更高的分：ChemDraw 画四元环是一张正方的方块（边水平/竖直），
+        // 不是斜着的菱形——这一档就是为它加的（45°/135° 的菱形只剩 6 分）
+        if (near(a, 0) || near(a, 90) || near(a, 180) || near(a, 270)) score += 22;
         else if (near(a, 15, 15) || near(a, 45, 15) || near(a, 75, 15)) score += 6;
       } else if (near(a, 0) || near(a, 180)) {
         score += 1;
