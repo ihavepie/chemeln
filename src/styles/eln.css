@@ -3140,7 +3140,9 @@ kbd {
 }
 
 .cmp-structure:hover { border-color: var(--ink-4); }
-.cmp-structure img { max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+/* 结构图留一圈呼吸：只限不放大过头（图片顶到虚线框上会显得「放太大了」），
+   小分子按自身尺寸显示、大分子等比缩进来，都不超过框的 86% */
+.cmp-structure img { max-width: 86%; max-height: 86%; object-fit: contain; mix-blend-mode: multiply; }
 
 .cmp-structure-empty {
   display: flex;
