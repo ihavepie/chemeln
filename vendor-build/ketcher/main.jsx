@@ -91,11 +91,38 @@ window.sketcherApi = {
     } catch { return '' }
   },
   set: async (text) => {
-    try { if (text) await window.ketcher.setMolecule(text) } catch { /* 读不出来就当空白 */ }
+    // **载入前先把缩放打回 100%**：Ketcher 的 `zoomAccordingContent` 只会缩、不会放大
+    // （MAX_ZOOM_VALUE = 1），缩过的比例会一直留着。于是「上一次载入的是个大结构」之后，
+    // 后面这张小分子也停在 87% —— 分子变小、周围一大片空白，看着像「画布漂移」（实测 40px/键 → 35px）。
+    try {
+      window.ketcher.editor?.zoom(1);
+    } catch {
+      /* 拿不到就当没这回事 */
+    }
+    try {
+      if (text) await window.ketcher.setMolecule(text);
+    } catch {
+      /* 读不出来就当空白 */
+    }
+    // 再把视野对准结构（setMolecule 自己也会居中，这一步是兜底：画布被拖到空白处时拉回来）
+    try {
+      window.ketcher.editor?.centerViewportAccordingToStruct?.();
+    } catch {
+      /* 同上 */
+    }
     pickBondTool(10)
   },
   clear: async () => {
-    try { await window.ketcher.setMolecule('') } catch { /* noop */ }
+    try {
+      window.ketcher.editor?.zoom(1);
+    } catch {
+      /* 同上 */
+    }
+    try {
+      await window.ketcher.setMolecule('')
+    } catch {
+      /* noop */
+    }
   },
 }
 
