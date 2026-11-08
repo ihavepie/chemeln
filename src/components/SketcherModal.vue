@@ -95,8 +95,9 @@ async function pick() {
     emit('close');
     return;
   }
-  // 先让 Indigo 排一遍版：拖出来的环常常是扁的、原子挤在一起，取之前摆正了再取
-  await a.layout?.();
+  // **不要在这里 layout**：以前取图前会先让 Indigo 重排一遍坐标，结果是「画板上一个样、
+  // 存下来另一个样」（四元环被转成菱形、手摆的原子全被挪走）。用户要的是「画板画什么就出什么」，
+  // 所以原样取；真想摆正画板上的结构，点底部的「摆正」按钮（`straighten()`）。
   // Ketcher 的接口是异步的（导出要过一遍 Indigo），等它算完再取
   const smiles = String((await a.getSmiles()) || '').trim();
   if (!smiles) return toast('画板上还是空的', 'warn');
@@ -137,6 +138,18 @@ function clearAll() {
   info.value = null;
   api()?.clear();
 }
+
+/**
+ * 手动「摆正」：让 Indigo 重新算一遍 2D 坐标（拖歪的环、挤在一起的原子会规整）。
+ * **只能手点，不能自动跑** —— 以前在 `pick()` 里自动跑，结果就是「画板上一个样、
+ * 存下来的图另一个样」（四元环被转成菱形），用户明确要「画板画什么就出什么」。
+ */
+async function straighten() {
+  const a = api();
+  if (!a || !a.ready()) return toast('画板还在加载', 'warn');
+  const ok = await a.layout?.();
+  if (!ok) toast('摆正失败，再试一次', 'err');
+}
 </script>
 
 <template>
@@ -168,8 +181,9 @@ function clearAll() {
 
     <div class="sk-foot">
       <span v-if="isReaction" class="hint">先画反应物，用工具栏的 <b>＋</b> 添料、点 <b>→</b> 画箭头，再把产物画在右边；条件想写在箭头上就用 <b>文字</b> 工具。<b>⌘V</b> 可以直接粘 ChemDraw 的反应式。不自动排版，摆成什么样就存什么样。</span>
-      <span v-else class="hint">原子之间拖一下就连键；停在原子上打字 = 换原子；<b>⌘V</b> 粘 ChemDraw 的结构，<b>⌘Z</b> 撤销。</span>
+      <span v-else class="hint">原子之间拖一下就连键；停在原子上打字 = 换原子；<b>⌘V</b> 粘 ChemDraw 的结构，<b>⌘Z</b> 撤销。画成什么样就存什么样，不会替你重排。</span>
       <span class="spacer" style="flex: 1" />
+      <button v-if="!isReaction" class="btn btn-sm btn-ghost" @click="straighten">摆正</button>
       <button v-if="!isReaction" class="btn btn-sm btn-ghost" :disabled="looking" @click="lookup">
         {{ looking ? '查…' : '查一下是什么' }}
       </button>
