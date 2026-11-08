@@ -121,17 +121,38 @@ def measure(svg, boxes):
     return (max(caps) if caps else 0), frames
 
 
-def wrap(svg, K, frames):
+def bond_points(svg):
+    """所有键端点的用户坐标：局部坐标要过 matrix 变换，楔形键直接是绝对坐标"""
+    pts = []
+    for m in re.finditer(r'<path[^>]*d="([^"]+)"[^>]*(?:transform="matrix\((-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\)")?', svg):
+        nums = [float(v) for v in re.findall(r'-?\d*\.?\d+', m.group(1))]
+        xy = list(zip(nums[0::2], nums[1::2]))
+        if m.group(2):
+            a, b, _c, d, e, f = (float(m.group(i)) for i in range(2, 8))
+            xy = [(x * a + y * _c + e, x * b + y * d + f) for x, y in xy]
+        pts += xy
+    return pts
+
+
+def wrap(svg, K, frames, pts):
     """按标签中心整体缩放；同时把标签框按 K 放大后返回，供画布修正用"""
     out, cursor, new_frames = [], 0, []
     for (x0, y0, x1, y1), g in zip(frames, label_groups(svg)):
-        cx, by = (x0 + x1) / 2, g['y']
+        by = g['y']
+        # 缩放中心落在「离键最近的那条边」上：这样朝键一侧的留白不变，字只朝外侧长，
+        # 不会出现放大后标签贴到键线上、看着「偏离」的问题
+        if pts:
+            px, py = min(pts, key=lambda p: (max(x0 - p[0], 0, p[0] - x1) ** 2 + max(y0 - p[1], 0, p[1] - y1) ** 2))
+        else:
+            px, py = (x0 + x1) / 2, by
+        ax = min(max(px, x0), x1)
+        ay = min(max(py, y0), y1)
         first, last = g['items'][0]['start'], g['items'][-1]['end']
         out.append(svg[cursor:first])
-        out.append(f'<g transform="translate({r3(cx)} {r3(by)}) scale({r3(K)}) translate({r3(-cx)} {r3(-by)})">'
+        out.append(f'<g transform="translate({r3(ax)} {r3(ay)}) scale({r3(K)}) translate({r3(-ax)} {r3(-ay)})">'
                    + svg[first:last] + '</g>')
         cursor = last
-        new_frames.append((cx + (x0 - cx) * K, by + (y0 - by) * K, cx + (x1 - cx) * K, by + (y1 - by) * K))
+        new_frames.append((ax + (x0 - ax) * K, ay + (y0 - ay) * K, ax + (x1 - ax) * K, ay + (y1 - ay) * K))
     out.append(svg[cursor:])
     return ''.join(out), new_frames
 
@@ -199,7 +220,7 @@ for f in sorted(glob.glob(os.path.join(DATA, '*/*.svg'))):
             rows.append((rel, kind, '量不到键长/字高，跳过'))
             continue
         K = TO * bond / cap
-        out, _ = wrap(base, K, frames)
+        out, _ = wrap(base, K, frames, bond_points(base))
         note = f'字高 {r3(cap)} / 键长 {bond} = {r3(cap / bond)} → ×{r3(K)}' + (f'，清碎片 {junk}' if junk else '')
     elif 'font-family="Helvetica, Arial, sans-serif"' in src:
         kind = 'text'

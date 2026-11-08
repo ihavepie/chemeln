@@ -149,7 +149,7 @@
 - 打开实验页本身会触发保存（`fill()` 会补算 mmol、补起始行）→ 「只看不动」的验证要用临时记录，或在该页拦掉非 GET 请求。
 - SQLite 子查询的 `ORDER BY` 里引用不到外层表的列 → 拆成「主查询 + 一条补数据查询」。
 - **缩写基团的键会被渲染器截短**：给标签留位、截掉约 0.28 键长，**只跟标签字号有关**（放大图 / 调 bond-length 都没用），补法见 `lib/abbrevspread.js`；改 SVG 必须重算 `viewBox`，否则外移的标签被裁。
-- **标签字高 = `chemdraw.js` 的 `LABEL_RATIO`（字高/键长，现 0.40）**。已存结构图靠两个幂等脚本对齐，别手工乘倍数：`scripts/normalize-labels.py`（按**当前文件**量字高反算倍率，任意中间态都能收敛）+ `scripts/fit-canvas.py`（按真实渲染外框重算 `viewBox`/px）。**量外框必须一张一页**：Indigo 的 `<use xlink:href="#glyph-*">` id 是文档级的，多张图塞进同一页面会互相引错，量出来的框全错（踩过，一度以为文件坏了）。
+- **标签字高 = `chemdraw.js` 的 `LABEL_RATIO`（字高/键长，现 0.40）**。**放大标签必须绕「离键最近的那条边」缩放**（`normalize-labels.py` 里取最近键端点在标签框上的投影点当缩放中心）：绕中心放大会让朝键一侧涨 3–9 个单位，把留白吃光甚至压到键线上，看着就是「标签偏离」。已存结构图靠两个幂等脚本对齐，别手工乘倍数：`scripts/normalize-labels.py`（按**当前文件**量字高反算倍率，任意中间态都能收敛）+ `scripts/fit-canvas.py`（按真实渲染外框重算 `viewBox`/px）。**量外框必须一张一页**：Indigo 的 `<use xlink:href="#glyph-*">` id 是文档级的，多张图塞进同一页面会互相引错，量出来的框全错（踩过，一度以为文件坏了）。
 - molfile 解析**不能 trim**（首行空行是格式的一部分），SMILES 才 trim。
 - Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
