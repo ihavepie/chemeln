@@ -6670,3 +6670,50 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
   font-size: 11px;
   color: var(--ink-3);
 }
+
+/* 拖动时跟着光标走的虚影卡：拿在手上的感觉。
+   不加它的版本只有「原卡淡下去 + 一道落点线」，用户说「很僵硬、没有虚影卡片」。 */
+.drag-ghost {
+  /* 必须 `!important`：中栏列表的卡片带 `cmp-card`（`.exp-card.cmp-card{position:relative}` 权重更高），
+     不用 !important 的话虚影会被顶回 `relative`、掉到页面最下面去。 */
+  position: fixed !important;
+  left: 0;
+  top: 0;
+  margin: 0 !important;
+  z-index: 9998;
+  pointer-events: none !important;
+  opacity: 0.97;
+  border-radius: var(--r);
+  transform-origin: 50% 30%;
+  box-shadow:
+    0 22px 44px rgba(24, 20, 16, 0.2),
+    0 4px 10px rgba(24, 20, 16, 0.12);
+  will-change: transform;
+}
+.drag-ghost * { pointer-events: none !important; }
+/* 虚影里的缩略图别重新播一次淡入 */
+.drag-ghost img { opacity: 1 !important; animation: none !important; }
+
+/* 被拿起来的那张变成一块「空位」：淡下去 + 一圈淡虚线，别的卡片让位时看得清原来的坑 */
+.grid-card.is-dragging,
+.exp-card.is-dragging,
+.cmp-card.is-dragging,
+.grid-stack.is-dragging {
+  opacity: 0.3;
+  box-shadow: none;
+  outline: 1.5px dashed var(--line-2);
+  outline-offset: -1px;
+}
+
+/* 「拖到这一组时整组不再淡下去」这条老规则会把**正在被拖的那张**也一起还原成不透明，
+   于是它看着没被拿起来。这里把被拖的那张排除掉。 */
+.grid-page.is-dragging .grid-group.is-drop .grid-card:not(.is-dragging) { opacity: 1; }
+/* 而被拿起来的那张要**压过**上面那条（它的选择器有 4 个类，光靠 `.grid-card.is-dragging` 顶不住），
+   否则拖到自己组上时原卡又变回不透明，看着像没被拿起来。 */
+.grid-page.is-dragging .grid-group.is-drop .grid-card.is-dragging,
+.grid-page.is-dragging .grid-stack.is-dragging { opacity: 0.3; }
+/* 老规则 `.grid-page.is-dragging .grid-card { opacity:.4 }` 的权重比 `.grid-card.is-dragging` 高，
+   所以被拿起的那张在实验页上还是 0.4。这里用同前缀、多一个类的写法把它压住。 */
+.grid-page.is-dragging .grid-card.is-dragging,
+.grid-page.is-dragging .grid-stack.is-dragging,
+.listpane .exp-card.is-dragging { opacity: 0.3; }
