@@ -5,6 +5,7 @@ import Icon from './Icon.vue';
 import CatPick from './CatPick.vue';
 import { loadBoot, loadCompounds, setProject, store, recordCategories, addCategory } from '../store.js';
 import { api } from '../api.js';
+import { createPointerSort } from '../lib/pointdrag.js';
 import { COMPOUND_KINDS } from '../lib/ui.js';
 import { prompt, toast } from '../lib/feedback.js';
 import { compoundMenu } from '../lib/rowmenu.js';
@@ -30,45 +31,51 @@ const filterValue = computed(
   () => store.compoundFilters.category || (store.compoundFilters.kind ? `kind:${store.compoundFilters.kind}` : '')
 );
 
-/* ---- 中栏列表拖动：拖到某张卡片上 = 插到它前面（同时换到它那个分类） ---- */
+/* ---- 中栏列表拖动排序 ----
+   用自己实现的 pointer 拖拽（`lib/pointdrag.js`）：卡片是 button，Safari 里原生拖放起不来。 */
 const dragId = ref(null);
 const dropId = ref(null);
 
-function onDragStart(ev, c) {
-  dragId.value = c.id;
-  if (ev.dataTransfer) {
-    ev.dataTransfer.effectAllowed = 'move';
-    ev.dataTransfer.setData('text/plain', String(c.id));   // Firefox 必须要有一份数据才会真的开始拖
-  }
+const sorter = createPointerSort({
+  onStart: (id) => { dragId.value = id; },
+  onTarget: (id, groupKey, gap) => {
+    // 列表是一列：gap 指向「插到第几张前面」，把落点那张卡片标出来
+    const list = store.compounds;
+    const next = list[Math.min(gap, list.length)];
+    dropId.value = next && next.id !== id ? next.id : null;
+  },
+  onDrop: (id, groupKey, gap) => dropList(id, gap),
+  onCancel: () => { dragId.value = null; dropId.value = null; },
+});
+
+function onCardDown(ev, c) {
+  sorter.down(ev, c.id);
 }
 
-function onDragEnd() {
+/** 拖完那一下的 click 不要跳页面 */
+function openCard(c) {
+  if (sorter.clickIsDrag()) return;
+  router.push(`/c/${c.id}`);
+}
+
+async function dropList(id, at) {
   dragId.value = null;
   dropId.value = null;
-}
-
-function onCardDragOver(ev, c) {
-  if (!dragId.value || dragId.value === c.id) return;
-  ev.preventDefault();
-  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
-  dropId.value = c.id;
-}
-
-async function onDrop(ev, target) {
-  ev.preventDefault();
-  const id = Number((ev.dataTransfer && ev.dataTransfer.getData('text/plain')) || dragId.value);
-  dragId.value = null;
-  dropId.value = null;
-  if (!id || !target || target.id === id) return;
-  const c = store.compounds.find((x) => x.id === id);
+  const list = store.compounds;
+  const c = list.find((x) => x.id === id);
   if (!c) return;
-  // 列表里拖 = **只排顺序**：跨分类不在这条路上改归属（换分类去卡片视图里拖，那里有分组看得见）
-  if ((c.category_id ?? null) !== (target.category_id ?? null)) {
+  const rest = list.filter((x) => x.id !== id);
+  let pos = 0;
+  for (let i = 0; i < at && i < list.length; i += 1) if (list[i].id !== id) pos += 1;
+  const before = rest[pos] || null;
+  if (before && (c.category_id ?? null) !== (before.category_id ?? null)) {
     toast('列表里只能在同一分类内排序；换分类请到卡片视图拖', 'warn');
     return;
   }
+  if (!before && at === 0) return;             // 放在原地
+  if (before && before.id === c.id) return;
   try {
-    await api.moveCompound(id, { category_id: c.category_id ?? null, before_id: target.id });
+    await api.moveCompound(id, { category_id: c.category_id ?? null, before_id: before ? before.id : null });
     await loadCompounds();
     await loadBoot();
   } catch (e) {
@@ -130,7 +137,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
       </div>
     </div>
 
-    <div class="listpane-body">
+    <div class="listpane-body" data-drag-group="list" :data-drag-count="store.compounds.length">
       <button
         v-for="(c, i) in store.compounds"
         :key="c.id"
@@ -138,12 +145,11 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         :class="{ 'is-dragging': dragId === c.id, 'is-drop-target': dropId === c.id }"
         :aria-current="c.id === activeId() ? 'true' : 'false'"
         :style="{ '--i': Math.min(i, 12) }"
-        draggable="true"
-        @dragstart="onDragStart($event, c)"
-        @dragend="onDragEnd"
-        @dragover="onCardDragOver($event, c)"
-        @drop="onDrop($event, c)"
-        @click="router.push(`/c/${c.id}`)"
+        :data-drag-card="c.id"
+        data-drag-group="list"
+        :data-drag-index="i"
+        @pointerdown="onCardDown($event, c)"
+        @click="openCard(c)"
         @contextmenu="compoundMenu($event, c, router)"
       >
         <div class="top">

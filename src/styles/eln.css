@@ -6626,3 +6626,8 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   background: var(--accent);
 }
 .exp-card.cmp-card { position: relative; }
+
+/* 自己实现的 pointer 拖拽（不走原生 DnD）：拖的时候别选字、光标变抓手 */
+body.is-pointer-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+body.is-pointer-dragging * { cursor: grabbing !important; }
+.exp-card.can-drag, .grid-card.can-drag { cursor: grab; }

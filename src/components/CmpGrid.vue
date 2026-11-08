@@ -7,6 +7,7 @@ import { store, loadBoot, loadCompounds, recordCategories, createCompound } from
 import { round } from '../lib/reagent.js';
 import { toast } from '../lib/feedback.js';
 import { compoundMenu } from '../lib/rowmenu.js';
+import { createPointerSort } from '../lib/pointdrag.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -48,53 +49,45 @@ const groups = computed(() => {
 
 const showHeads = computed(() => !store.compoundFilters.category && groups.value.length > 1);
 
-/* ---- 拖卡片换分类 / 换位置 ---- */
+/* ---- 拖卡片换分类 / 换位置 ----
+   自己实现（`lib/pointdrag.js`）：卡片是 <button>，Safari 里原生 `draggable` 经常起不了拖。 */
 const dragId = ref(null);
 const dropKey = ref('');
 const gapAt = ref(-1);        // 落在该组第几张卡片前面（等于数量 = 放到最后）
 
-function onDragStart(ev, c) {
-  if (!cats.value.length) return;
-  dragId.value = c.id;
-  ev.dataTransfer.effectAllowed = 'move';
-  ev.dataTransfer.setData('text/plain', String(c.id));
+const sorter = createPointerSort({
+  onStart: (id) => { dragId.value = id; },
+  onTarget: (id, groupKey, gap) => {
+    dropKey.value = groupKey;
+    gapAt.value = gap;
+  },
+  onDrop: (id, groupKey, gap) => dropCard(id, groupKey, gap),
+  onCancel: () => {
+    dragId.value = null;
+    dropKey.value = '';
+    gapAt.value = -1;
+  },
+});
+
+function onCardDown(ev, c) {
+  if (!cats.value.length) return;   // 没有分类可拖进，就不折腾
+  sorter.down(ev, c.id);
 }
 
-function onDragEnd() {
-  dragId.value = null;
-  dropKey.value = '';
-  gapAt.value = -1;
+/** 拖完松手那一下会再冒一个 click，别让它跳进那张卡片 */
+function openCard(c) {
+  if (sorter.clickIsDrag()) return;
+  router.push(`/c/${c.id}`);
 }
 
-function onDragOver(ev, key, count) {
-  if (!dragId.value) return;
-  ev.preventDefault();
-  ev.dataTransfer.dropEffect = 'move';
-  dropKey.value = key;
-  if (gapAt.value < 0) gapAt.value = count;      // 落在组的空白处：放最后
-}
-
-/** 落在某张卡片上：按左右半边决定插在它前面还是后面 */
-function onCardDragOver(ev, g, idx) {
-  if (!dragId.value) return;
-  ev.preventDefault();
-  ev.stopPropagation();
-  ev.dataTransfer.dropEffect = 'move';
-  dropKey.value = g.key;
-  const r = ev.currentTarget.getBoundingClientRect();
-  gapAt.value = ev.clientX < r.left + r.width / 2 ? idx : idx + 1;
-}
-
-async function onDrop(ev, g) {
-  ev.preventDefault();
-  const id = Number(ev.dataTransfer.getData('text/plain') || dragId.value);
-  const at = gapAt.value;
+async function dropCard(id, groupKey, at) {
   dragId.value = null;
   dropKey.value = '';
   gapAt.value = -1;
   if (!id) return;
   const c = store.compounds.find((x) => x.id === id);
-  if (!c) return;
+  const g = groups.value.find((x) => x.key === groupKey);
+  if (!c || !g) return;
 
   // 组内除自己之外的顺序里，这个落点原本是哪一条 → 插到它前面（没有就是最后）
   const rest = g.items.filter((x) => x.id !== id);
@@ -123,9 +116,8 @@ async function onDrop(ev, g) {
         :key="g.key"
         class="grid-group"
         :class="{ 'is-drop': dropKey === g.key }"
-        @dragover="onDragOver($event, g.key, g.items.length)"
-        @dragleave="(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget) && dropKey === g.key) { dropKey = ''; gapAt = -1; } }"
-        @drop="onDrop($event, g)"
+        :data-drag-group="g.key"
+        :data-drag-count="g.items.length"
       >
         <div v-if="showHeads" class="grid-group-head">
           <span class="grid-group-name">{{ g.name }}</span>
@@ -152,13 +144,13 @@ async function onDrop(ev, g) {
             <div v-if="dropKey === g.key && gapAt === ci" class="drop-gap" />
             <button
               class="grid-card"
-              :class="{ 'is-dragging': dragId === c.id }"
+              :class="{ 'is-dragging': dragId === c.id, 'can-drag': cats.length > 0 }"
               :aria-current="c.id === activeId() ? 'true' : 'false'"
-              :draggable="cats.length > 0"
-              @dragover="onCardDragOver($event, g, ci)"
-              @dragstart="onDragStart($event, c)"
-              @dragend="onDragEnd"
-              @click="router.push(`/c/${c.id}`)"
+              :data-drag-card="c.id"
+              :data-drag-group="g.key"
+              :data-drag-index="ci"
+              @pointerdown="onCardDown($event, c)"
+              @click="openCard(c)"
               @contextmenu="compoundMenu($event, c, router)"
             >
               <div class="grid-thumb is-structure">
