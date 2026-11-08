@@ -34,11 +34,16 @@ const filterValue = computed(
 /* ---- 中栏列表拖动排序 ----
    用自己实现的 pointer 拖拽（`lib/pointdrag.js`）：卡片是 button，Safari 里原生拖放起不来。 */
 const dragId = ref(null);
-const dropIdx = ref(-1);      // 占位格插在第几张卡片前面（= 长度 = 放最后）
+const dropIdx = ref(-1);
+const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度（写死会看着靠上或靠下）      // 占位格插在第几张卡片前面（= 长度 = 放最后）
 
 const sorter = createPointerSort({
   name: 'cmp-list',
-  onStart: (id) => { dragId.value = id; },
+  onStart: (id) => {
+    dragId.value = id;
+    const el = document.querySelector(`[data-drag-card="${id}"]`);
+    if (el) dragH.value = Math.round(el.getBoundingClientRect().height);
+  },
   // 列表是一列：gap 指向「插到第几张前面」，那里放一块跟卡片一样高的占位格，下面的卡片让位
   onTarget: (id, groupKey, gap) => {
     dropIdx.value = Math.min(gap, store.compounds.length);
@@ -138,7 +143,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
 
     <div class="listpane-body" data-drag-group="list" :data-drag-count="store.compounds.length">
       <template v-for="(c, i) in store.compounds" :key="c.id">
-      <div v-if="dropIdx === i" class="list-drop-slot" />
+      <div v-if="dropIdx === i" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
       <button
         class="exp-card cmp-card"
         :class="{ 'is-dragging': dragId === c.id }"
@@ -166,7 +171,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         </div>
       </button>
       </template>
-      <div v-if="dropIdx === store.compounds.length" class="list-drop-slot" />
+      <div v-if="dropIdx === store.compounds.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
 
       <div v-if="!store.compounds.length" class="empty-note">
         <template v-if="store.compoundFilters.q || store.compoundFilters.kind">无匹配化合物</template>

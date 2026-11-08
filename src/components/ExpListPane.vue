@@ -151,11 +151,16 @@ const rows = computed(() => {
    一摞（平行组）拖起来是整摞一起动——只挪面子会把同一个组拆到两个分类里。
    行身份用 `anchor`（这一行最早那条的 id）认，一摞的位置本来就按它算。 */
 const dragId = ref(null);
-const dropIdx = ref(-1);      // 占位格插在第几行前面（= 行数 = 放最后）
+const dropIdx = ref(-1);
+const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度（写死会看着靠上或靠下）      // 占位格插在第几行前面（= 行数 = 放最后）
 
 const sorter = createPointerSort({
   name: 'exp-list',
-  onStart: (id) => { dragId.value = id; },
+  onStart: (id) => {
+    dragId.value = id;
+    const el = document.querySelector(`[data-drag-card="${id}"]`);
+    if (el) dragH.value = Math.round(el.getBoundingClientRect().height);
+  },
   // 列表是一列：gap 指向「插到第几行前面」，那里放一块跟卡片一样高的占位格
   onTarget: (id, groupKey, gap) => {
     dropIdx.value = Math.min(gap, rows.value.length);
@@ -358,7 +363,7 @@ function onStackFace(row) {
       @scroll="saveScroll"
     >
       <template v-for="(row, ri) in rows" :key="row.key">
-        <div v-if="dropIdx === ri" class="list-drop-slot" />
+        <div v-if="dropIdx === ri" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
         <!-- 普通记录 -->
         <button
           v-if="row.one"
@@ -477,7 +482,7 @@ function onStackFace(row) {
         </div>
       </template>
 
-      <div v-if="dropIdx === rows.length" class="list-drop-slot" />
+      <div v-if="dropIdx === rows.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}

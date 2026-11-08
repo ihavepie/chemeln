@@ -6686,18 +6686,21 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 /* 中栏列表的拖动占位格：跟卡片一样高的一块虚线空位，下面的卡片真的让位
    （以前只有一条 2px 的线，用户说「侧边栏那边没有占位」） */
 .listpane .list-drop-slot {
-  height: 74px;
+  /* 高度由组件内联给（= 被拖那张卡的真实高度），写死会看着靠上或靠下 */
   margin-bottom: 12px;
   border: 1.5px dashed var(--accent);
   border-radius: var(--r);
   background: #fbf4ee;
 }
 
-/* 卡片墙的落点标识：**不动别的卡片**，只在目标那一格描一圈强调色。
-   以前是往网格里插一块 150/222px 高的占位格——它一插进来整面墙就重排（实测第二张卡横移 452px），
-   每过一次界就整墙跳一下，用户说「让位速度太快了，像是在左右跳动」。
-   实线 = 插到这一格前面，虚线 = 放到这一组最后。 */
-.grid-card.is-slot:not(.is-dragging),
-.grid-stack.is-slot { outline: 2px solid var(--accent); outline-offset: 3px; }
-.grid-card.is-slot-end:not(.is-dragging),
-.grid-stack.is-slot-end { outline: 2px dashed var(--accent); outline-offset: 3px; }
+/* 卡片墙的占位格：插在网格里、跟卡片一样大小的一格虚线位，下面的卡片真的让位。
+   它是流内的——**必须靠 `pointdrag` 的几何快照判定落点**，否则占位格一插进来卡片就移开、
+   光标底下换成另一张卡，落点会来回翻（用户报过「让位速度太快，像在左右跳动」）。
+   高度交给 grid 的行高（卡片会把行撑到卡片那么高），只有在单独成一行时才用 min-height 兜底。 */
+.drop-gap {
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--r);
+  background: #fbf4ee;
+  min-height: 150px;
+}
+.card-grid.is-even .drop-gap { min-height: 222px; }
