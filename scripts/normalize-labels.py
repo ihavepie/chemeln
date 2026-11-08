@@ -121,40 +121,169 @@ def measure(svg, boxes):
     return (max(caps) if caps else 0), frames
 
 
-def bond_points(svg):
-    """所有键端点的用户坐标：局部坐标要过 matrix 变换，楔形键直接是绝对坐标"""
-    pts = []
-    for m in re.finditer(r'<path[^>]*d="([^"]+)"[^>]*(?:transform="matrix\((-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\)")?', svg):
-        nums = [float(v) for v in re.findall(r'-?\d*\.?\d+', m.group(1))]
-        xy = list(zip(nums[0::2], nums[1::2]))
-        if m.group(2):
-            a, b, _c, d, e, f = (float(m.group(i)) for i in range(2, 8))
-            xy = [(x * a + y * _c + e, x * b + y * d + f) for x, y in xy]
-        pts += xy
-    return pts
+def bond_segments(svg):
+    """所有键段（用户坐标）：局部坐标过 matrix 变换，楔形键直接是绝对坐标"""
+    segs = []
+    # defs 里是字形轮廓（局部坐标），必须排除，否则几何全乱
+    body = svg.split('</defs>')[-1] if '</defs>' in svg else svg
+    for tag in re.finditer(r'<path\b[^>]*>', body):
+        t = tag.group(0)
+        dm = re.search(r'd="([^"]+)"', t)
+        if not dm:
+            continue
+        xy = list(zip(*[iter(float(v) for v in re.findall(r'-?\d*\.?\d+', dm.group(1)))]*2))
+        mm = re.search(r'transform="matrix\(([^)]+)\)"', t)
+        if mm:
+            a, b, c, d, e, f = (float(v) for v in re.findall(r'-?\d*\.?\d+', mm.group(1)))
+            xy = [(x * a + y * c + e, x * b + y * d + f) for x, y in xy]
+        segs += list(zip(xy, xy[1:]))
+    for l in re.finditer(r'<line\b[^>]*>', body):
+        t = l.group(0)
+        v = {k: float(m.group(1)) for k in ('x1', 'y1', 'x2', 'y2')
+             if (m := re.search(k + r'="(-?[\d.]+)"', t))}
+        if len(v) == 4:
+            segs.append(((v['x1'], v['y1']), (v['x2'], v['y2'])))
+    return segs
 
 
-def wrap(svg, K, frames, pts):
-    """按标签中心整体缩放；同时把标签框按 K 放大后返回，供画布修正用"""
-    out, cursor, new_frames = [], 0, []
-    for (x0, y0, x1, y1), g in zip(frames, label_groups(svg)):
-        by = g['y']
-        # 缩放中心落在「离键最近的那条边」上：这样朝键一侧的留白不变，字只朝外侧长，
-        # 不会出现放大后标签贴到键线上、看着「偏离」的问题
-        if pts:
-            px, py = min(pts, key=lambda p: (max(x0 - p[0], 0, p[0] - x1) ** 2 + max(y0 - p[1], 0, p[1] - y1) ** 2))
-        else:
-            px, py = (x0 + x1) / 2, by
-        ax = min(max(px, x0), x1)
-        ay = min(max(py, y0), y1)
+def _seg_box_dist(p, q, box):
+    """线段到矩形的最短距离；相交返回 0"""
+    x0, y0, x1, y1 = box
+    # 快速：线段两端都在同一侧且距离 > 0
+    def inside(pt):
+        return x0 <= pt[0] <= x1 and y0 <= pt[1] <= y1
+    if inside(p) or inside(q):
+        return 0.0
+    # 线段与矩形四条边求交
+    def seg_inter(a, b, c, d):
+        d1 = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+        d2 = (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0])
+        d3 = (d[0] - c[0]) * (a[1] - c[1]) - (d[1] - c[1]) * (a[0] - c[0])
+        d4 = (d[0] - c[0]) * (b[1] - c[1]) - (d[1] - c[1]) * (b[0] - c[0])
+        return ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0))
+    corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    for k in range(4):
+        if seg_inter(p, q, corners[k], corners[(k + 1) % 4]):
+            return 0.0
+    def pt_seg(pt, a, b):
+        vx, vy = b[0] - a[0], b[1] - a[1]
+        L = vx * vx + vy * vy
+        t = 0.0 if L == 0 else max(0.0, min(1.0, ((pt[0] - a[0]) * vx + (pt[1] - a[1]) * vy) / L))
+        return ((pt[0] - (a[0] + t * vx)) ** 2 + (pt[1] - (a[1] + t * vy)) ** 2) ** 0.5
+    d = min(min(pt_seg(p, corners[k], corners[(k + 1) % 4]) for k in range(4)),
+            min(pt_seg(q, corners[k], corners[(k + 1) % 4]) for k in range(4)),
+            min(pt_seg(corners[k], p, q) for k in range(4)))
+    return d
+
+
+MIN_CLEAR = 2.2   # 标签离键线的最小留白（用户单位），太小看着就「压线」
+
+
+def nudge_for_clearance(box, segs, center, want=MIN_CLEAR, cap=8.0):
+    """留白不够就把整块标签往外让。两个方向都试：①离开最近键段 ②离开整张图的中心，
+    取让完留白更大的那个（夹在两根键中间的标签只有②走得出去）。"""
+    if not segs:
+        return (0.0, 0.0)
+    x0, y0, x1, y1 = box
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+
+    def clear(b):
+        return min((_seg_box_dist(p, q, b) for p, q in segs), default=99)
+
+    d0 = clear(box)
+    if d0 >= want:
+        return (0.0, 0.0)
+
+    best = (0.0, 0.0)
+    best_clear = d0
+    # 方向①：最近的键段
+    nearest = min(segs, key=lambda sq: _seg_box_dist(sq[0], sq[1], box))
+    p, q = nearest
+    vx, vy = q[0] - p[0], q[1] - p[1]
+    L = vx * vx + vy * vy
+    t = 0.0 if L == 0 else max(0.0, min(1.0, ((cx - p[0]) * vx + (cy - p[1]) * vy) / L))
+    dirs = [(cx - (p[0] + t * vx), cy - (p[1] + t * vy))]
+    if center:
+        dirs.append((cx - center[0], cy - center[1]))
+    for ux, uy in dirs:
+        n = (ux * ux + uy * uy) ** 0.5
+        if n < 1e-6:
+            continue
+        ux, uy = ux / n, uy / n
+        step = 0.5
+        while step <= cap:            # 细扫：夹在两根键中间时，最优位移不一定在「刚好够」那里
+            _step = step
+            nb = (box[0] + ux * _step, box[1] + uy * _step, box[2] + ux * _step, box[3] + uy * _step)
+            c = clear(nb)
+            if c > best_clear:
+                best_clear, best = c, (ux * _step, uy * _step)
+            if c >= want:
+                return best
+            step += 0.5
+    return best
+
+
+def pick_anchor(box, K, segs, hint):
+    """在标签框上挑缩放中心：放大后与所有键段留白最大的那个；同分时偏向 hint（离自己键最近的点）"""
+    x0, y0, x1, y1 = box
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    cands = [(x0, y1), (x1, y1), (cx, y1), (x0, cy), (x1, cy), (cx, cy), (x0, y0), (x1, y0), (cx, y0)]
+    best, best_score = (cx, y1), None
+    for ax, ay in cands:
+        nb = (min(ax + (x0 - ax) * K, ax), min(ay + (y0 - ay) * K, ay),
+              max(ax + (x1 - ax) * K, ax), max(ay + (y1 - ay) * K, ay))
+        clear = min((_seg_box_dist(p, q, nb) for p, q in segs), default=99)
+        score = (round(clear, 2), -((ax - hint[0]) ** 2 + (ay - hint[1]) ** 2))
+        if best_score is None or score > best_score:
+            best, best_score = (ax, ay), score
+    return best
+
+
+def plan_labels(base, target_ratio, segs):
+    """给这张图挑一个「能放得下」的倍率：从目标值往下试，直到每个标签都留出 MIN_CLEAR。
+    返回 (K, 每个标签的 (缩放中心, 位移))。"""
+    cap, frames = measure(base, glyph_boxes(base))
+    bond = bond_of(base)
+    if not (cap and bond):
+        return 1.0, []
+    xs_all = [v for seg in segs for pt in seg for v in pt]
+    center = ((min(xs_all[0::2]) + max(xs_all[0::2])) / 2,
+              (min(xs_all[1::2]) + max(xs_all[1::2])) / 2) if segs else None
+    best = None
+    K = target_ratio * bond / cap
+    while K > 1.1:
+        plan, worst = [], 99.0
+        for (x0, y0, x1, y1), grp in zip(frames, label_groups(base)):
+            by = grp['y']
+            px, py = min((pt for seg in segs for pt in seg),
+                         key=lambda p: max(x0 - p[0], 0, p[0] - x1) ** 2 + max(by - p[1], 0, p[1] - y0) ** 2) \
+                if segs else ((x0 + x1) / 2, by)
+            hint = (min(max(px, x0), x1), min(max(py, y0), by))
+            ax, ay = pick_anchor((x0, y0, x1, y1), K, segs, hint)
+            nb = (min(ax + (x0 - ax) * K, ax), min(ay + (y0 - ay) * K, ay),
+                  max(ax + (x1 - ax) * K, ax), max(ay + (by - ay) * K, ay))
+            dx, dy = nudge_for_clearance(nb, segs, center)
+            nb2 = (nb[0] + dx, nb[1] + dy, nb[2] + dx, nb[3] + dy)
+            worst = min(worst, min((_seg_box_dist(p, q, nb2) for p, q in segs), default=99))
+            plan.append((ax, ay, dx, dy))
+        if worst >= MIN_CLEAR:
+            return K, plan
+        if best is None or worst > best[0]:
+            best = (worst, K, plan)
+        K -= 0.02
+    return (best[1], best[2]) if best else (1.1, [])
+
+
+def wrap_planned(svg, K, plan):
+    out, cursor = [], 0
+    for (ax, ay, dx, dy), g in zip(plan, label_groups(svg)):
         first, last = g['items'][0]['start'], g['items'][-1]['end']
         out.append(svg[cursor:first])
-        out.append(f'<g transform="translate({r3(ax)} {r3(ay)}) scale({r3(K)}) translate({r3(-ax)} {r3(-ay)})">'
-                   + svg[first:last] + '</g>')
+        out.append(f'<g transform="translate({r3(ax + dx)} {r3(ay + dy)}) scale({r3(K)}) '
+                   f'translate({r3(-ax)} {r3(-ay)})">' + svg[first:last] + '</g>')
         cursor = last
-        new_frames.append((ax + (x0 - ax) * K, ay + (y0 - ay) * K, ax + (x1 - ax) * K, ay + (y1 - ay) * K))
     out.append(svg[cursor:])
-    return ''.join(out), new_frames
+    return ''.join(out)
 
 
 def text_frames(svg):
@@ -215,13 +344,15 @@ for f in sorted(glob.glob(os.path.join(DATA, '*/*.svg'))):
         kind = 'glyph'
         base = unwrap(src)                    # 回到原始坐标，倍率才是绝对值
         base, junk = JUNK_RE.subn('', base)    # 清掉早期脚本留下的标签碎片
-        cap, frames = measure(base, glyph_boxes(base))
+        cap, _ = measure(base, glyph_boxes(base))
         if not (bond and cap):
             rows.append((rel, kind, '量不到键长/字高，跳过'))
             continue
-        K = TO * bond / cap
-        out, _ = wrap(base, K, frames, bond_points(base))
-        note = f'字高 {r3(cap)} / 键长 {bond} = {r3(cap / bond)} → ×{r3(K)}' + (f'，清碎片 {junk}' if junk else '')
+        segs = bond_segments(base)
+        K, plan = plan_labels(base, TO, segs)
+        out = wrap_planned(base, K, plan)
+        note = (f'字高 {r3(cap)} / 键长 {bond} = {r3(cap / bond)} → ×{r3(K)}'
+                f'（字高比 {r3(cap * K / bond)}）') + (f'，清碎片 {junk}' if junk else '')
     elif 'font-family="Helvetica, Arial, sans-serif"' in src:
         kind = 'text'
         main = max(float(v) for v in re.findall(r'font-size="([\d.]+)"', src))
