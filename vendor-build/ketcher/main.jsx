@@ -58,6 +58,31 @@ window.addEventListener(
   true,
 )
 
+/* 视野「居中 + 100%」。
+   Ketcher 的 `zoomAccordingContent()`（`setMolecule` 里自动调的）**只缩不放**（MAX_ZOOM_VALUE = 1），
+   而且算的时候要拿画布真实尺寸：**弹窗还没显示出来**（display:none，尺寸 0）时载入一次，
+   缩放会被算成下限 0.1 —— 结构缩成拇指大、缩在左上角，画布一片空白还有滚动条（用户截图报过）。
+   所以载入前后都打一次 `zoom(1)` + `centerViewportAccordingToStruct()`，载完再补两次。 */
+function recenter() {
+  try {
+    const ed = window.ketcher?.editor
+    ed?.zoom?.(1)
+    ed?.centerViewportAccordingToStruct?.()
+  } catch {
+    /* 拿不到就当没这回事 */
+  }
+}
+
+/* 等画板容器真正有尺寸再载入结构（弹窗打开的那一瞬间 iframe 还是 0×0） */
+async function waitForSize() {
+  for (let i = 0; i < 40; i++) {
+    const box = document.body.getBoundingClientRect()
+    if (box.width > 40 && box.height > 40) return true
+    await new Promise((r) => window.setTimeout(r, 60))
+  }
+  return false
+}
+
 window.__ketcherReady = false
 window.sketcherApi = {
   /** 切回单键工具（载入结构后 Ketcher 有时会退回框选） */
@@ -91,33 +116,25 @@ window.sketcherApi = {
     } catch { return '' }
   },
   set: async (text) => {
+    await waitForSize()
     // **载入前先把缩放打回 100%**：Ketcher 的 `zoomAccordingContent` 只会缩、不会放大
     // （MAX_ZOOM_VALUE = 1），缩过的比例会一直留着。于是「上一次载入的是个大结构」之后，
     // 后面这张小分子也停在 87% —— 分子变小、周围一大片空白，看着像「画布漂移」（实测 40px/键 → 35px）。
-    try {
-      window.ketcher.editor?.zoom(1);
-    } catch {
-      /* 拿不到就当没这回事 */
-    }
+    recenter()
     try {
       if (text) await window.ketcher.setMolecule(text);
     } catch {
       /* 读不出来就当空白 */
     }
-    // 再把视野对准结构（setMolecule 自己也会居中，这一步是兜底：画布被拖到空白处时拉回来）
-    try {
-      window.ketcher.editor?.centerViewportAccordingToStruct?.();
-    } catch {
-      /* 同上 */
-    }
+    // 再居中一次，并在弹窗动画停下来之后补两次（容器尺寸刚定下来时算出来的视野是错的）
+    recenter()
+    window.setTimeout(recenter, 250)
+    window.setTimeout(recenter, 700)
     pickBondTool(10)
   },
   clear: async () => {
-    try {
-      window.ketcher.editor?.zoom(1);
-    } catch {
-      /* 同上 */
-    }
+    await waitForSize()
+    recenter()
     try {
       await window.ketcher.setMolecule('')
     } catch {
