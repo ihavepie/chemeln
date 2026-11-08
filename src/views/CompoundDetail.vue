@@ -340,9 +340,11 @@ async function tidyStructure() {
   }
 }
 
-async function applySketched({ smiles, info: sketchedInfo }) {
+async function applySketched({ smiles, mol, info: sketchedInfo }) {
   if (!c.value || !smiles) return;
-  const info = await analyzeStructureText(smiles);
+  // 画板里自己写了缩写（MOL 带 S-group）就用 MOL 出图——SMILES 里没有缩写，绕一圈就丢了；
+  // 分子式 / 分子量照样按完整结构算（缩写只是画法）
+  const info = await analyzeStructureText(mol || smiles);
   // 换了结构：先把自己代填的那几格还回去，再按新结构重新查
   clearAutoFilled();
   if (!info) return toast('这个结构读不出来，换个画法试试', 'err');
