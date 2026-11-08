@@ -6659,14 +6659,19 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 /* 虚影里的缩略图别重新播一次淡入 */
 .drag-ghost img { opacity: 1 !important; animation: none !important; }
 
-/* 被拿起来的那张变成一块「空位」：淡下去 + 一圈淡虚线，别的卡片让位时看得清原来的坑 */
+/* 被拿起来的那张原卡：**留在原地、几乎看不见**。
+   为什么不能真删 / `display:none` / `visibility:hidden`：①它就是 `mousedown` 命中的那个元素，
+   WebKit 会把这个「被隐藏掉的 mousedown 目标」的后续 `mousemove` 掐掉 → 直接拖不动（侧边栏踩过）；
+   ②它占着网格的格子，一删整墙就塌一格、所有卡片瞬移，落点也会跟着偏。
+   所以只压到 0.12：看着像一块淡淡的坑，内容几乎看不出来，又不影响事件和布局。 */
 .grid-card.is-dragging,
 .exp-card.is-dragging,
 .cmp-card.is-dragging,
 .grid-stack.is-dragging {
-  opacity: 0.3;
+  opacity: 0.12;
   box-shadow: none;
-  outline: 1.5px dashed var(--line-2);
+  background: transparent;
+  outline: 1px dashed rgba(0, 0, 0, 0.06);
   outline-offset: -1px;
 }
 
@@ -6676,12 +6681,12 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 /* 而被拿起来的那张要**压过**上面那条（它的选择器有 4 个类，光靠 `.grid-card.is-dragging` 顶不住），
    否则拖到自己组上时原卡又变回不透明，看着像没被拿起来。 */
 .grid-page.is-dragging .grid-group.is-drop .grid-card.is-dragging,
-.grid-page.is-dragging .grid-stack.is-dragging { opacity: 0.3; }
+.grid-page.is-dragging .grid-stack.is-dragging { opacity: 0.12; }
 /* 老规则 `.grid-page.is-dragging .grid-card { opacity:.4 }` 的权重比 `.grid-card.is-dragging` 高，
    所以被拿起的那张在实验页上还是 0.4。这里用同前缀、多一个类的写法把它压住。 */
 .grid-page.is-dragging .grid-card.is-dragging,
 .grid-page.is-dragging .grid-stack.is-dragging,
-.listpane .exp-card.is-dragging { opacity: 0.3; }
+.listpane .exp-card.is-dragging { opacity: 0.12; }
 
 /* 中栏列表的拖动占位格：跟卡片一样高的一块虚线空位，下面的卡片真的让位
    （以前只有一条 2px 的线，用户说「侧边栏那边没有占位」） */
