@@ -190,8 +190,13 @@ async function dropCard(id, groupKey, at) {
         </div>
 
         <!-- 空分类：只留拖拽落点 -->
-        <div v-if="showHeads && !g.items.length" class="grid-drop-line" :class="{ 'is-live': dropKey === g.key }">
-          <template v-if="dragId">{{ dropKey === g.key ? `松手放到「${g.name}」` : '' }}</template>
+        <!-- 空分类：平时只占组头那一行；拖起来时这一行长成一个够大的落点，不然只有 20 多像素高，很难拖进去 -->
+        <div
+          v-if="showHeads && !g.items.length"
+          class="grid-drop-line"
+          :class="{ 'is-live': dropKey === g.key, 'is-armed': !!dragId }"
+        >
+          <template v-if="dragId">{{ dropKey === g.key ? `松手放到「${g.name}」` : `拖到这里放进「${g.name}」` }}</template>
         </div>
 
         <div v-else class="card-grid is-even">
