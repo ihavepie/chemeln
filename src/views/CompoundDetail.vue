@@ -13,7 +13,7 @@ import TlcOcr from '../components/TlcOcr.vue';
 import { api } from '../api.js';
 import { loadBoot, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
-import { structureInfo, chemicalBookUrl, pubchemUrl, describeInfo } from '../lib/lookup.js';
+import { structureInfo, pubchemUrl, describeInfo, LOOKUP_SITES } from '../lib/lookup.js';
 import { CMP_CAT_LABEL, CMP_CAT_ORDER, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
 import KindPick from '../components/KindPick.vue';
 import { useAutosave } from '../lib/autosave.js';
@@ -301,25 +301,25 @@ const casOk = computed(() => {
 const nameOk = computed(() => String(form.name || '').trim());
 
 /**
- * 外面那两个链接：**只要能拿标识就算得出来**，不用先点「查这个结构」，刷新也不会消失。
- * PubChem 有 CID 就进化合物页、否则按 CAS / 名称 / SMILES 搜；ChemicalBook 只能按 CAS / 名称搜。
+ * 外面那几个「去别处查」的链接：**只要能拿标识就算得出来**，不用先点「查这个结构」，刷新也不会消失。
+ * 站点表在 `lib/lookup.js` 的 `LOOKUP_SITES`（每个站点自己决定用 CID / CAS / 名称 / SMILES 里哪个）；
+ * 拿不到标识的那一项直接不显示，不留死链。
  */
-const pcUrl = computed(() => {
-  const lk = lastLookup.value;
-  if (lk && lk.found && lk.url) return lk.url;
-  return pubchemUrl({ cas: casOk.value, name: nameOk.value, smiles: String(form.smiles || '').trim() });
-});
-const pcTitle = computed(() => {
-  const lk = lastLookup.value;
-  if (lk && lk.found && lk.cid) return `在 PubChem 看这个化合物（CID ${lk.cid}）：名称 / CAS / 性质 / 谱图`;
-  if (casOk.value) return `按 CAS ${casOk.value} 去 PubChem 搜（名称 / 性质 / 谱图）`;
-  if (nameOk.value) return `按名称去 PubChem 搜：${nameOk.value}`;
-  return '按结构式（SMILES）去 PubChem 搜';
-});
-const cbUrl = computed(() => {
-  const lk = lastLookup.value;
-  if (lk && lk.found && chemicalBookUrl(lk)) return chemicalBookUrl(lk);
-  return chemicalBookUrl({ cas: casOk.value ? [casOk.value] : [], name: nameOk.value });
+const lookupLinks = computed(() => {
+  const lk = lastLookup.value && lastLookup.value.found ? lastLookup.value : null;
+  const ids = {
+    cid: (lk && lk.cid) || '',
+    cas: casOk.value ? [casOk.value] : [],
+    name: nameOk.value,
+    smiles: String(form.smiles || '').trim(),
+  };
+  const used = casOk.value ? `CAS ${casOk.value}` : nameOk.value ? `「${nameOk.value}」` : '结构式';
+  return LOOKUP_SITES.map((s) => ({
+    key: s.key,
+    label: s.label,
+    href: s.url(ids),
+    title: `${s.label}：${s.hint}（按 ${s.key === 'pubchem' && ids.cid ? `CID ${ids.cid}` : used} 查）`,
+  })).filter((s) => s.href);
 });
 
 /** 熔点 / 性状已经填进格子了，这里只列没地方放的物性（密度 / 沸点 / 闪点 / 溶解度） */
@@ -832,12 +832,18 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <button class="btn btn-sm btn-ghost" title="打开画板画结构式" @click.stop="sketcherOpen = true">
               <Icon name="molecule" :size="13" /> 画结构式
             </button>
-            <!-- 外部查资料：PubChem（名称 / CAS / 性质 / 谱图）、ChemicalBook（试剂信息） -->
-            <span class="cmp-lookup-links">
-              <a v-if="pcUrl" class="cmp-lookup-link" :href="pcUrl" target="_blank" rel="noreferrer" :title="pcTitle">PubChem ↗</a>
-              <a v-if="cbUrl" class="cmp-lookup-link" :href="cbUrl" target="_blank" rel="noreferrer"
-                 :title="casOk ? `按 CAS ${casOk} 去 ChemicalBook 查（试剂信息 / 供应商）` : `按名称去 ChemicalBook 查：${nameOk}`"
-              >ChemicalBook ↗</a>
+            <!-- 外部查资料：PubChem（名称 / CAS / 性质 / 谱图）、ChemicalBook（中文资料 / 供应商）、TCI（试剂规格 / MSDS / 价格） -->
+            <span class="cmp-lookup-links noprint">
+              <span class="cmp-lookup-cap">外部查询</span>
+              <a
+                v-for="s in lookupLinks"
+                :key="s.key"
+                class="cmp-lookup-link"
+                :href="s.href"
+                target="_blank"
+                rel="noreferrer"
+                :title="s.title"
+              >{{ s.label }} ↗</a>
             </span>
           </div>
           </div>

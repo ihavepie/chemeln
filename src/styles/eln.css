@@ -6302,8 +6302,14 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   gap: 5px;
   width: 100%;
 }
-/* 两个查询链接并排一行（加起来约 145px，正好塞在 148px 的缩略图宽度里） */
-.cmp-lookup-links { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+/* 外部查询：左栏只有 148px，一律竖排（横排一换行就参差不齐）；上面一行小标题说明这是干什么的 */
+.cmp-lookup-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.cmp-lookup-cap {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  margin-top: 2px;
+}
 /* 物性（密度 / 沸点 / 闪点 / 溶解度）：贴在表头区块下面单独一行，缩略图那栏放不下 */
 .cmp-props {
   margin: -6px 0 10px;

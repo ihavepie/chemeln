@@ -81,7 +81,7 @@
 - `src/lib/autosave.js` — `useAutosave(payload, save, opts)`：JSON 快照监听 + 防抖；**卸载时会补一次 `flush()`**（最后不到 1 秒的输入不丢），`lastSaved` 记的是「请求发出那一刻」的快照。
 - `src/lib/autogrow.js` — 文本域跟着内容长（`v-autogrow` 用的 `growTextarea` / `growAll`）；`flattenTextareas(root)` 把文本域换成 div，**打印 / 存 PDF 前必须调**（textarea 只印得出自己那几行高，长表征会被截断，实测 12 行只出 5 行）。
 - `src/components/HistoryModal.vue` — 改动历史弹窗（`entity` = experiment / compound + `id`），读 `/api/history/...`；实验页和化合物页的 ⋯ 菜单里都有入口。
-- `src/lib/lookup.js` — **结构信息查询**（`structureInfo(smiles)` / `nameInfo(name)` / `chemicalBookUrl(info)` / `describeInfo(info)`）：
+- `src/lib/lookup.js` — **结构信息查询**（`structureInfo(smiles)` / `nameInfo(name)` / `describeInfo(info)`）+ **外部数据库站点表 `LOOKUP_SITES`**（PubChem / ChemicalBook / NIST / TCI / CAS Common Chemistry；每项一个 `url(ids)`，缺标识就返回空、前端不显示）+ 各自的 `pubchemUrl` / `chemicalBookUrl` / `nistUrl` / `tciUrl` / `casCommonUrl`：
   走 `/api/lookup`（服务端问 PubChem、带缓存），拿 IUPAC 名 / CAS / 分子式 / MW；网络失败一律返回 null，不让主流程受影响。
 - `src/lib/sheetprefs.js` — 「记录页显示哪几块」的前端偏好（`sheetPrefs` / `setSheetPref` / `showAllSheetBlocks` / `SHEET_BLOCKS`，存 localStorage `eln:sheet`，默认全开）；`EditorView` 用 `v-if` 挂着，关掉的块页面和打印都没有。
 - `src/lib/peek.js` — 「书签悬停预览显示哪些块」的前端偏好（`peekPrefs` / `setPeekPref` / `PEEK_LABELS`，存 localStorage `eln:peek`；默认条件 / 底物 / 结果 / 结论开，备注关）。
@@ -115,6 +115,7 @@
 - **本轮（小分子的结构图别撑满格子）**：用户说「小一点的化合物可以稍微小一点吗，就是放大得有点大」。`.cmp-structure img` 收到 `max-width/height: 86%`（只夹上限、小图不放大）。实测 `/#/c/59`（小）`/#/c/51`（大）都留出呼吸。
 - **本轮（观感往 ChemDraw 靠：标签换无衬线 + 放大）**：用户说「稍微优化一下，模拟一下 chemdraw 的感觉」。差距：**字体**（Indigo 标签是衬线矢量字形）+ **大小**（字高 0.23 键长）。见 `lib/chemdraw.js`，`SketcherModal.pick()` 出图后过一道，已有那张图用同一函数重出（备份 `.backup/svg-20261108/*.indigo.svg`）。实测 `/#/c/59` 标签变无衬线、下标正常不出界；`/#/c/51`（openchemlib 那张）不动。
 - **本轮（结构式下面那两个链接改成真能用的）**：用户截图问「这边是干什么的，修正一下，成为有用功能」。原来一个是 `PubChem #CID`（号没用）且**只有本次会话查过才出现**、刷新就没，另一个只认 CAS。现在标签改 `PubChem ↗` / `ChemicalBook ↗`，URL 由 `lib/lookup.js` 的 `pubchemUrl()` 按「CID → CAS → 名称 → SMILES」降级（ChemicalBook 用 CAS → 名称），**不查也在、刷新也在**；`title` 说明点了给什么。CSS 从 `--ink-3` 提到 `--ink-2`、hover 连下划线一起变强调色。
+- **本轮（外部查询：补到 5 个站，改成站点表）**：用户问「还有其他的查询网站吗」。逐个**在真浏览器里**试过：能用的是 PubChem、ChemicalBook、**NIST**（CAS → `ID=C<去横线>`，IR/MS + 热力学）、**TCI**（CAS → `search/?text=`）、**CAS Common Chemistry**（`results?q=`）；不能用的：ChemSpider（CloudFront 403）、Sigma-Aldrich（区域 Access Denied）、SDBS / NMRShiftDB / Google Scholar（连不上）。**教训**：`curl` 的状态码不可信——TCI 的 curl 是 403、NIST 是 000，但浏览器里都正常（反爬 / 网络差异），所以这类链接必须用 WKWebView 截图验。实现上收成 `lib/lookup.js` 的 `LOOKUP_SITES` 表（前端 `v-for`），左栏改成竖排 + 一行「外部查询」小标题。
 - **已完成**：**v2 已构建进 `public/`、4780 跑的就是 v2**（手机适配、实验二维码在正式端口上也能用）；手机/窄屏（≤820px）基础适配（扫码看化合物档案：收起侧栏导轨和中栏列表，纸面铺满、工具栏横向滚、表格可横滑）；两页 A4 记录版式、打印（恒为 2 页）、瓶子标签 QR、投料表（组分英文缩写、从化合物库带 MW、当量/mmol/用量联动、结构卡与「移除」解绑、多步折叠）、条件行、结果块、TLC、附件上传、化合物档案（结构式 + 三栏核磁图 + TLC + 瓶签）、实验与化合物的卡片墙（缩略图优先反应式、没有则退回产物/主要底物结构式）、分类（实验与化合物**两套独立**、可拖拽换分类与换位置、落位虚线格）、ChemDraw 粘贴（SMILES/MOL → 分子式/MW + 结构图）、自动保存 + 保存/重置、锁定、搜索与筛选、**课题（侧栏切换的「空间」：列表/卡片墙/工作台统计/导出都按课题走，可给每个课题单独设编号前缀；分类与化合物都严格按课题归属）**。
 - **半成品 / 待确认**：条件筛选页仍是旧样式；「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
 - **明确不做**：多人协作、账号权限、云同步、富文本编辑。移动端只做「扫码看化合物档案」这一档（≤820px 的样式在 `eln.css` 末尾那段），不做手机上编辑记录。

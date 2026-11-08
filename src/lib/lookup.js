@@ -51,6 +51,75 @@ export function chemicalBookUrl(info) {
   return key ? `https://www.chemicalbook.com/Search_EN.aspx?keyword=${encodeURIComponent(key)}` : '';
 }
 
+/**
+ * NIST Chemistry WebBook：谱图（IR / MS）和热力学数据最全的免费站。
+ * **只认 CAS 的 ID 形式**（`ID=C104870`，即 C + 去掉横线的 CAS）；没有 CAS 就用 Name= 查。
+ */
+export function nistUrl({ cas, name } = {}) {
+  const c = (Array.isArray(cas) ? cas[0] : cas) || '';
+  if (c) return `https://webbook.nist.gov/cgi/cbook.cgi?ID=C${c.replace(/-/g, '')}&Units=SI`;
+  const n = String(name || '').trim();
+  return n ? `https://webbook.nist.gov/cgi/cbook.cgi?Name=${encodeURIComponent(n)}&Units=SI` : '';
+}
+
+/** CAS Common Chemistry（免费）：给标准名 / 同义词 / CAS，按 CAS 或名称搜 */
+export function casCommonUrl({ cas, name } = {}) {
+  const key = (Array.isArray(cas) ? cas[0] : cas) || String(name || '').trim();
+  return key ? `https://commonchemistry.cas.org/results?q=${encodeURIComponent(key)}` : '';
+}
+
+/** TCI（日本老牌试剂）：只认 CAS，能直接落到搜索结果页（实测 104-87-0 → 找到 2 个结果） */
+export function tciUrl({ cas } = {}) {
+  const key = (Array.isArray(cas) ? cas[0] : cas) || '';
+  return key ? `https://www.tcichemicals.com/CN/zh/search/?text=${encodeURIComponent(key)}` : '';
+}
+
+/**
+ * 化合物页「外部查询」那一列。每项自己说明**怎么把化合物变成一个地址**，
+ * 缺需要的标识就返回 ''（前端据此不显示，不留死链）。
+ *
+ * **只收实测能用的**（2026-11 从这台机器逐个试过）：
+ * - PubChem：CID / CAS / 名称 / SMILES 都能用；
+ * - ChemicalBook：CAS → 名称，搜索结果里确实带出 CAS；
+ * - TCI：CAS，浏览器里能落到结果页（curl 会 403，是它的反爬；所以**别只看 curl 的状态码**）。
+ * - NIST：CAS → `ID=C<去横线>`，谱图 / 热力学；CAS Common Chemistry：按 CAS / 名称。
+ * 没加的：ChemSpider（CloudFront 403）、Sigma-Aldrich（区域 Access Denied）、
+ * SDBS / NMRShiftDB / Google Scholar（这台机器连不上）。
+ * 想再加一个，先确认上面的 URL 在浏览器里真能查出东西。
+ */
+export const LOOKUP_SITES = [
+  {
+    key: 'pubchem',
+    label: 'PubChem',
+    hint: '名称 / CAS / 性质 / 谱图',
+    url: (ids) => (ids.cid ? `https://pubchem.ncbi.nlm.nih.gov/compound/${ids.cid}` : pubchemUrl(ids)),
+  },
+  {
+    key: 'chemicalbook',
+    label: 'ChemicalBook',
+    hint: '中文化合物资料 / 供应商',
+    url: (ids) => chemicalBookUrl({ cas: ids.cas, name: ids.name }),
+  },
+  {
+    key: 'nist',
+    label: 'NIST',
+    hint: 'IR / MS 谱图、热力学数据',
+    url: (ids) => nistUrl({ cas: ids.cas, name: ids.name }),
+  },
+  {
+    key: 'tci',
+    label: 'TCI',
+    hint: '试剂规格 / MSDS / 价格',
+    url: (ids) => tciUrl({ cas: ids.cas }),
+  },
+  {
+    key: 'cas',
+    label: 'CAS',
+    hint: '标准名 / 同义词 / CAS 号',
+    url: (ids) => casCommonUrl({ cas: ids.cas, name: ids.name }),
+  },
+];
+
 /** 一行摘要：名称 · CAS 50-78-2 · C9H8O4 · 180.16 */
 export function describeInfo(info) {
   if (!info || !info.found) return '';
