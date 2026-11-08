@@ -4,7 +4,7 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../lib/lookup.js';
 import { spreadAbbrevBonds } from '../lib/abbrevspread.js';
-import { chemdrawLabels } from '../lib/chemdraw.js';
+import { chemdrawLabels, scaleGlyphLabels } from '../lib/chemdraw.js';
 
 /**
  * 画结构式：弹窗里嵌 Ketcher（`/vendor/ketcher/index.html`，由 vendor-build/ketcher 打包而来，
@@ -124,7 +124,12 @@ async function pick() {
   // 观感往 ChemDraw 靠：Indigo 那张图的标签是它自带的衬线矢量字形、还偏小，
   // 这里把标签换回真正的文字（无衬线、字号调到 0.32 键长，见 lib/chemdraw.js）。
   // 没有缩写标签 / 认不准的图它会原样返回，不会把图弄坏。
-  if (svg && svg.includes('<svg')) svg = chemdrawLabels(svg, mol);
+  if (svg && svg.includes('<svg')) {
+    svg = chemdrawLabels(svg, mol);
+    // 认不准缩写文本时它原样返回 → 那就至少把这套 Indigo 字形放大（同 LABEL_RATIO），
+    // 不然新存的图又是小字，跟墙里其它图不是一个尺度
+    if (svg.includes('xlink:href="#glyph')) svg = scaleGlyphLabels(svg);
+  }
   emit('pick', { smiles, mol, svg: svg && svg.includes('<svg') ? svg : '', info: info.value });
   emit('close');
 }

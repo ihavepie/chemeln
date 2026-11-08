@@ -82,6 +82,17 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
   for (const u of src.matchAll(/<use xlink:href="#([^"]+)" x="(-?[\d.]+)" y="(-?[\d.]+)"\/>/g)) {
     uses.push({ raw: u[0], id: u[1], x: +u[2], y: +u[3] });
   }
+  const wrapGroup = (body, ax, ay, k) => `<g transform="translate(${num(ax)} ${num(ay)}) scale(${num(k)}) translate(${num(-ax)} ${num(-ay)})">${body}</g>`;
+  // 一个标签的几个 <use> 在源文件里可能被换行/其它标签隔开：按首尾 raw 的位置整段包起来
+  const wrapSpan = (svgText, grp, ax, ay, k) => {
+    const firstRaw = grp.items[0].raw;
+    const lastRaw = grp.items[grp.items.length - 1].raw;
+    const i0 = svgText.indexOf(firstRaw);
+    const i1 = svgText.indexOf(lastRaw, i0);
+    if (i0 < 0 || i1 < 0) return svgText;
+    const body = svgText.slice(i0, i1 + lastRaw.length);
+    return svgText.slice(0, i0) + wrapGroup(body, ax, ay, k) + svgText.slice(i1 + lastRaw.length);
+  };
   if (!uses.length) return src;
   const groups = [];
   for (const it of uses) {
@@ -187,6 +198,25 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
   return fitCanvas(out, mainSize, subSize);
 }
 
+/** 去掉本函数以前加过的缩放层（重复调用要幂等，别叠倍率） */
+function stripLabelWrappers(svg) {
+  const open = /<g transform="translate\((-?[\d.]+) (-?[\d.]+)\) scale\((-?[\d.]+)\) translate\((-?[\d.]+) (-?[\d.]+)\)">/;
+  let out = svg;
+  for (;;) {
+    const m = open.exec(out);
+    if (!m) return out;
+    let depth = 1;
+    let i = m.index + m[0].length;
+    while (depth > 0) {
+      const o = out.indexOf('<g', i);
+      const c = out.indexOf('</g>', i);
+      if (c < 0) return out;
+      if (o >= 0 && o < c) { depth += 1; i = o + 2; } else { depth -= 1; i = c + 4; }
+    }
+    out = out.slice(0, m.index) + out.slice(m.index + m[0].length, i - 4) + out.slice(i);
+  }
+}
+
 /** 重算画布：无衬线字比原来宽，标签会顶出去（不重算就被裁） */
 function fitCanvas(svg, mainSize, subSize) {
   const mat = svg.match(/transform="matrix\(([^)]+)\)"/);
@@ -213,6 +243,177 @@ function fitCanvas(svg, mainSize, subSize) {
   const w = Math.max(...xs) + pad - x0;
   const h = Math.max(...ys) + pad - y0;
   return svg.replace(
+    /<svg[^>]*>/,
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${Math.round(w)}" height="${Math.round(h)}" viewBox="${num(x0)} ${num(y0)} ${num(w)} ${num(h)}">`,
+  );
+}
+
+/**
+ * 兜底：`chemdrawLabels` 认不准（`M  SMT` 与字形组对不上）时，**不换文字、只放大**标签。
+ *
+ * 为什么需要：换文字那条路要么全对要么原样返回；一旦返回原样，新存的图就是 Indigo
+ * 自带的小字（0.23 键长），在一面墙里和别的小图对不上——用户会直接看到「这张字小了」。
+ * 这里退一步：保留 Indigo 的字形，只把它们按 `LABEL_RATIO` 放大（几何原样，不改化学）。
+ *
+ * 与 `src/../scripts/normalize-labels.py` 同一套思路：同一个标签的若干 `<use>` 一起缩放，
+ * 缩放中心挑「放大后与键线留白最大」的那个点，单字原子标绕原子（键端）原地放大。
+ */
+export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
+  const src = stripLabelWrappers(String(svg || ''));
+  if (!src.includes('<svg') || !src.includes('xlink:href="#glyph')) return src;
+  const mat = src.match(/transform="matrix\(([^)]+)\)"/);
+  if (!mat) return src;
+  const [mA, mB, , mD, mTx, mTy] = mat[1].split(',').map(Number);
+  const bond = Math.hypot(mA, mB) || BOND_PX;   // 键长 = matrix 的缩放量（Ketcher 出图是 40）
+
+  // 字形墨迹尺寸
+  const glyphs = new Map();
+  for (const g of src.matchAll(/<g id="(glyph-[^"]+)">([\s\S]*?)<\/g>/g)) {
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const p of g[2].matchAll(/d="([^"]+)"/g)) {
+      const b = pathBox(p[1]);
+      x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0);
+      x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1);
+    }
+    if (Number.isFinite(x0)) glyphs.set(g[1], { w: x1 - x0, h: y1 - y0 });
+  }
+  if (!glyphs.size) return src;
+
+  // 键段（用户坐标），用来算留白
+  const segs = [];
+  for (const m of src.matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
+    segs.push([mTx + 40 * +m[1], mTy + mD * +m[2], mTx + 40 * +m[3], mTy + mD * +m[4]]);
+  }
+
+  // 分组：同基线 + 横向相邻
+  const uses = [];
+  for (const u of src.matchAll(/<use xlink:href="#([^"]+)" x="(-?[\d.]+)" y="(-?[\d.]+)"\/>/g)) {
+    uses.push({ raw: u[0], id: u[1], x: +u[2], y: +u[3] });
+  }
+  const wrapGroup = (body, ax, ay, k) => `<g transform="translate(${num(ax)} ${num(ay)}) scale(${num(k)}) translate(${num(-ax)} ${num(-ay)})">${body}</g>`;
+  // 一个标签的几个 <use> 在源文件里可能被换行/其它标签隔开：按首尾 raw 的位置整段包起来
+  const wrapSpan = (svgText, grp, ax, ay, k) => {
+    const firstRaw = grp.items[0].raw;
+    const lastRaw = grp.items[grp.items.length - 1].raw;
+    const i0 = svgText.indexOf(firstRaw);
+    const i1 = svgText.indexOf(lastRaw, i0);
+    if (i0 < 0 || i1 < 0) return svgText;
+    const body = svgText.slice(i0, i1 + lastRaw.length);
+    return svgText.slice(0, i0) + wrapGroup(body, ax, ay, k) + svgText.slice(i1 + lastRaw.length);
+  };
+  if (!uses.length) return src;
+  const capMax = Math.max(...[...glyphs.values()].map((v) => v.h), 1);
+  const groups = [];
+  for (const it of uses) {
+    const g = groups[groups.length - 1];
+    const gap = g ? it.x - g.maxX : 0;
+    // 字距 = 字宽 + 一点空隙，用字高做尺子（不同图的 px 尺度不一样，别写死数字）
+    if (g && Math.abs(it.y - g.ys[0]) < capMax * 0.45 && gap > -capMax * 0.6 && gap < capMax * 1.2) {
+      g.items.push(it);
+      g.maxX = Math.max(g.maxX, it.x);
+      g.ys.push(it.y);
+    } else {
+      groups.push({ items: [it], maxX: it.x, ys: [it.y] });
+    }
+  }
+
+  const capOld = Math.max(...[...glyphs.values()].map((v) => v.h), 1);
+  const K = ratio * bond / capOld;
+  if (!(K > 1.02)) return src;
+
+  // 点到矩形距离（判断标签会不会压到键线）
+  const segBoxDist = ([ax, ay, bx, by], box) => {
+    const [x0, y0, x1, y1] = box;
+    const cl = (v, a, b) => Math.min(Math.max(v, a), b);
+    // 采样 12 个点判断是否穿过（够用；精确求交对这里没有必要）
+    let d = Infinity;
+    for (let i = 0; i <= 12; i += 1) {
+      const x = ax + ((bx - ax) * i) / 12;
+      const y = ay + ((by - ay) * i) / 12;
+      const dx = x - cl(x, x0, x1);
+      const dy = y - cl(y, y0, y1);
+      d = Math.min(d, Math.hypot(dx, dy));
+    }
+    return d;
+  };
+
+  let out = src;
+  for (const g of groups) {
+    const xs = g.items.map((i) => i.x);
+    const bx0 = Math.min(...xs);
+    const lastW = (glyphs.get(g.items[g.items.length - 1].id) || { w: capOld }).w;
+    const bx1 = Math.max(...xs) + lastW;
+    const by = g.ys[0];
+    const cap = Math.max(...g.items.map((i) => (glyphs.get(i.id) || { h: capOld }).h));
+    const by0 = by - cap;
+
+    if (g.items.length === 1) {
+      // 原子标：绕最近键端（原子位置）缩放，不位移
+      let atom = [bx0, by];
+      let best = Infinity;
+      for (const [x1, y1, x2, y2] of segs) {
+        for (const p of [[x1, y1], [x2, y2]]) {
+          const d = Math.hypot(p[0] - (bx0 + bx1) / 2, p[1] - by);
+          if (d < best) { best = d; atom = p; }
+        }
+      }
+      out = wrapSpan(out, g, atom[0], atom[1], K);
+      continue;
+    }
+
+    // 多字标签：候选 9 点里挑留白最大的
+    const cx = (bx0 + bx1) / 2;
+    const cy = (by0 + by) / 2;
+    const cands = [[bx0, by], [bx1, by], [cx, by], [bx0, cy], [bx1, cy], [cx, cy], [bx0, by0], [bx1, by0], [cx, by0]];
+    let bestP = [cx, by];
+    let bestClear = -Infinity;
+    for (const [ax, ay] of cands) {
+      const box = [
+        Math.min(ax + (bx0 - ax) * K, ax), Math.min(ay + (by0 - ay) * K, ay),
+        Math.max(ax + (bx1 - ax) * K, ax), Math.max(ay + (by - ay) * K, ay),
+      ];
+      let clear = Infinity;
+      for (const s of segs) clear = Math.min(clear, segBoxDist(s, box));
+      const near = Math.hypot(ax - cx, ay - cy);
+      if (clear > bestClear + 1e-6 || (Math.abs(clear - bestClear) < 1e-6 && near < Math.hypot(bestP[0] - cx, bestP[1] - cy))) {
+        bestClear = clear;
+        bestP = [ax, ay];
+      }
+    }
+    out = wrapSpan(out, g, bestP[0], bestP[1], K);
+  }
+
+  // 画布：键端 + 放大后的标签框都要装得下
+  const pts = [];
+  for (const m of out.matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
+    pts.push([mTx + 40 * +m[1], mTy + mD * +m[2]], [mTx + 40 * +m[3], mTy + mD * +m[4]]);
+  }
+  for (const m of out.matchAll(/<g transform="translate\((-?[\d.]+) (-?[\d.]+)\) scale\((-?[\d.]+)\) translate\((-?[\d.]+) (-?[\d.]+)\)">([\s\S]*?)<\/g>/g)) {
+    const k = +m[3];
+    const ox = +m[1];
+    const oy = +m[2];
+    const cx0 = -(+m[4]);
+    const cy0 = -(+m[5]);
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const u of m[6].matchAll(/x="(-?[\d.]+)" y="(-?[\d.]+)"/g)) {
+      const x = +u[1];
+      const y = +u[2];
+      const gl = glyphs.get((m[6].match(/href="#([^"]+)"/) || [])[1]) || { w: capOld, h: capOld };
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x + gl.w);
+      y0 = Math.min(y0, y - gl.h); y1 = Math.max(y1, y);
+    }
+    if (!Number.isFinite(x0)) continue;
+    pts.push([ox + (x0 - cx0) * k, oy + (y0 - cy0) * k], [ox + (x1 - cx0) * k, oy + (y1 - cy0) * k]);
+  }
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  if (!xs.length) return out;
+  const pad = Math.max(1.5, 0.05 * bond);
+  const x0 = Math.min(...xs) - pad;
+  const y0 = Math.min(...ys) - pad;
+  const w = Math.max(...xs) + pad - x0;
+  const h = Math.max(...ys) + pad - y0;
+  return out.replace(
     /<svg[^>]*>/,
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${Math.round(w)}" height="${Math.round(h)}" viewBox="${num(x0)} ${num(y0)} ${num(w)} ${num(h)}">`,
   );

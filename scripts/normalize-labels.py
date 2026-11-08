@@ -266,20 +266,7 @@ def plan_labels(base, target_ratio, segs):
             if len(grp['items']) == 1:                       # 原子标：原地放大
                 px, py = (min(pts, key=lambda p: (p[0] - (x0 + x1) / 2) ** 2 + (p[1] - by) ** 2)
                           if pts else ((x0 + x1) / 2, by))
-                # 与本原子相连的键段要排除：原子本来就在键端点上，算进去永远是 0 留白
-                # 半径取 7：键端离原子被截短了 4 左右，所以「自己的键」就是这个范围里的；
-                # 只排掉自己的键，别的键（会真压上来的）仍要参与判断
-                near = lambda pt: (pt[0] - px) ** 2 + (pt[1] - py) ** 2 < 49.0
-                others = [sg for sg in segs if not (near(sg[0]) or near(sg[1]))]
-                atomK, dk = K, 99.0
-                while atomK > 1.0:
-                    box = (min(px + (x0 - px) * atomK, px), min(py + (y0 - py) * atomK, py),
-                           max(px + (x1 - px) * atomK, px), max(py + (by - py) * atomK, py))
-                    dk = min((_seg_box_dist(a, b, box) for a, b in others), default=99)
-                    if dk >= 1.0:                            # 别压到不相干的键
-                        break
-                    atomK -= 0.05
-                plan.append((px, py, 0.0, 0.0, max(atomK, 1.0)))
+                plan.append((px, py, 0.0, 0.0, K))   # 和缩写同一倍率，原地放大
                 # 原子标只受「自己别压到不相干的键」约束，不参与整图倍率的判定——
                 # 它必须留在原子上，键线贴到字母边上是化学图里正常的样子
                 continue
