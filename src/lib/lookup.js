@@ -35,6 +35,16 @@ export async function nameInfo(name) {
   }
 }
 
+/**
+ * PubChem：有 CID 就直接进化合物页，没有就拿 CAS / 名称 / SMILES 去搜。
+ * 这样链接**不用等这次会话查过**也一直有用（刷新、别人接手都一样）。
+ */
+export function pubchemUrl({ cid, cas, name, smiles } = {}) {
+  if (cid) return `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`;
+  const key = (Array.isArray(cas) ? cas[0] : cas) || name || smiles;
+  return key ? `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(key)}` : '';
+}
+
 /** ChemicalBook 没有公开接口，只能带 CAS（没有就用名称）跳过去搜 */
 export function chemicalBookUrl(info) {
   const key = (info && info.cas && info.cas[0]) || (info && info.name);

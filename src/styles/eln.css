@@ -6329,13 +6329,15 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .sk-info-sub { font-size: 12px; color: var(--ink-3); }
 .sk-info a { font-size: 12px; color: var(--accent-ink); text-decoration: none; }
 .sk-info a:hover { text-decoration: underline; }
+/* 结构式下面那两个「去外面查」的链接：是动作、不是装饰，所以比说明文字深一档、不换行 */
 .cmp-lookup-link {
   font-size: 11.5px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-decoration: none;
+  white-space: nowrap;
   border-bottom: 1px dotted var(--line-2);
 }
-.cmp-lookup-link:hover { color: var(--accent-ink); }
+.cmp-lookup-link:hover { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
 
 /* 画板信息条里的物性（熔点 / 密度 / 沸点）：比名称那行淡一点，太窄时直接不显示 */
 .sk-info-props { color: var(--ink-4); }
