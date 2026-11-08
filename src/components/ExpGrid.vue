@@ -5,6 +5,7 @@ import Icon from './Icon.vue';
 import { api } from '../api.js';
 import { store, loadBoot, loadList, recordCategories, createExperiment } from '../store.js';
 import { createPointerSort } from '../lib/pointdrag.js';
+import { withFlip } from '../lib/flip.js';
 import { STATUS_TONE } from '../lib/ui.js';
 import { toast } from '../lib/feedback.js';
 import { experimentMenu } from '../lib/rowmenu.js';
@@ -108,8 +109,12 @@ const sorter = createPointerSort({
   name: 'exp-grid',
   onStart: (id) => { dragId.value = id; },
   onTarget: (id, groupKey, gap) => {
-    dropKey.value = groupKey;
-    gapAt.value = gap;
+    if (groupKey === dropKey.value && gap === gapAt.value) return;   // 同一个落点就不折腾
+    // 占位格一插进去整面墙就重排：用 FLIP 让它「滑」过去，而不是瞬移一格
+    withFlip([...document.querySelectorAll('.grid-card, .grid-stack')], () => {
+      dropKey.value = groupKey;
+      gapAt.value = gap;
+    });
   },
   onDrop: (id, groupKey, gap) => dropCard(id, groupKey, gap),
   onCancel: () => {
