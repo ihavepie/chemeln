@@ -40,6 +40,8 @@ const cat = ref('auto');
 
 const form = reactive({
   code: '', name: '', kind: '底物', category_id: '', project: '', formula: '', mw: '', cas: '', appearance: '', mp: '', smiles: '',
+  // 画板那版的 molfile（带坐标）：再打开画板时拿它当底，Ketcher 就不会重排一遍
+  mol: '',
   hrms: '', ir: '', rotation: '',
   tlc_solvent: '', tlc_rf: '', procedure: '', notes: '',
 });
@@ -371,6 +373,9 @@ async function applySketched({ smiles, mol, svg: padSvg, info: sketchedInfo }) {
 
   // reload 会用服务端数据覆盖表单，所以这几格必须放在它后面填
   form.smiles = smiles;
+  // 把画板这版的 molfile 一起存下来：下次打开画板拿它当底，Ketcher 直接照坐标摆，
+  // 不会再按 SMILES 重排一次（用户报过「回来又重排了」）
+  form.mol = mol || '';
   form.formula = info.formula;
   form.mw = String(info.mw);
   toast(`已用画板的结构：${info.formula} · MW ${info.mw}`);
@@ -437,6 +442,9 @@ async function useSmiles(text, { quiet = false } = {}) {
   // MOL 那种不把整段文件塞进 SMILES 格，存解析出来的标准 SMILES。
   if (!isMol) form.smiles = String(text).trim();
   else if (info.smiles) form.smiles = info.smiles;
+  // 粘的是 MOL（ChemDraw / 画板导出的）就把它原样留着当画板底稿，坐标跟着走；
+  // 粘的是 SMILES 就没有坐标可用，清掉旧的，免得打开画板时翻出上一版的结构
+  form.mol = isMol ? String(text).trim() : '';
   form.formula = info.formula;
   form.mw = String(info.mw);
   if (!quiet) toast(`已识别：${info.formula} · MW ${info.mw}`);
@@ -1047,7 +1055,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
     <!-- 常挂着、只切 open：Ketcher 那个包 29 MB，销毁了每次都要重下一遍 -->
     <SketcherModal
       :open="sketcherOpen"
-      :initial="form.smiles || ''"
+      :initial="form.mol || form.smiles || ''"
       @close="sketcherOpen = false"
       @pick="applySketched"
     />

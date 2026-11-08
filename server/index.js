@@ -970,7 +970,7 @@ function pipeFile(res, file) {
 /* ------------------------------------------------------------ 化合物库 */
 
 const COMPOUND_COLUMNS = [
-  'code', 'name', 'kind', 'formula', 'mw', 'cas', 'appearance', 'mp', 'smiles',
+  'code', 'name', 'kind', 'formula', 'mw', 'cas', 'appearance', 'mp', 'smiles', 'mol',
   'nmr_h1', 'nmr_c13', 'nmr_other', 'hrms', 'ir', 'rotation', 'tlc_solvent', 'tlc_rf', 'procedure', 'notes',
   'standard_exp_id', 'category_id', 'project',
 ];

@@ -242,6 +242,9 @@ ensureColumn('experiments', 'sel_rt', "sel_rt TEXT NOT NULL DEFAULT ''");
 ensureColumn('compounds', 'hrms', "hrms TEXT NOT NULL DEFAULT ''");
 ensureColumn('compounds', 'ir', "ir TEXT NOT NULL DEFAULT ''");
 ensureColumn('compounds', 'rotation', "rotation TEXT NOT NULL DEFAULT ''");
+// 画板那版的 molfile（带真实坐标）：重新打开画板时喂给它，才不会又被重排一遍。
+// 只存 SMILES 的话 Ketcher / Indigo 会按自己的算法重新摆一次，用户画的样子就没了。
+ensureColumn('compounds', 'mol', "mol TEXT NOT NULL DEFAULT ''");
 
 // 分类挂在课题下：'' = 共用（每个课题都看得到），否则只在该课题里出现。
 // 老数据全是 ''，等于先都当共用，新建的分类才跟当前课题走。
