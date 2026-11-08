@@ -6704,3 +6704,12 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
   min-height: 150px;
 }
 .card-grid.is-even .drop-gap { min-height: 222px; }
+
+/* 中栏列表拖动时**原卡直接隐藏**（位置留着，列表不塌）：
+   淡掉的卡 + 占位格同时出现，看着乱（用户说「有点乱，原来的卡片可以先不显示了吗」）。 */
+.listpane .exp-card.is-dragging {
+  opacity: 0 !important;
+  visibility: hidden;
+  outline: none !important;
+  box-shadow: none !important;
+}

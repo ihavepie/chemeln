@@ -152,7 +152,19 @@ const rows = computed(() => {
    行身份用 `anchor`（这一行最早那条的 id）认，一摞的位置本来就按它算。 */
 const dragId = ref(null);
 const dropIdx = ref(-1);
-const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度（写死会看着靠上或靠下）      // 占位格插在第几行前面（= 行数 = 放最后）
+const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度（写死会看着靠上或靠下）
+
+/* 原卡在拖动时是隐藏的（位置留着），占位格要跳过它自己那一格；
+   落到它原位时不再额外画一块（洞就是它自己）。 */
+const dragIdx = computed(() => rows.value.findIndex((r) => r.anchor === dragId.value));
+const slotIdx = computed(() => {
+  const at = dropIdx.value;
+  if (at < 0) return -1;
+  const src = dragIdx.value;
+  // 原卡「隐藏但占着位置」→ 下标不用补偿；落点在它原位时不再多画一块
+  if (src >= 0 && (at === src || at === src + 1)) return -1;
+  return at;
+});      // 占位格插在第几行前面（= 行数 = 放最后）
 
 const sorter = createPointerSort({
   name: 'exp-list',
@@ -363,7 +375,7 @@ function onStackFace(row) {
       @scroll="saveScroll"
     >
       <template v-for="(row, ri) in rows" :key="row.key">
-        <div v-if="dropIdx === ri" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
+        <div v-if="slotIdx === ri" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
         <!-- 普通记录 -->
         <button
           v-if="row.one"
@@ -482,7 +494,7 @@ function onStackFace(row) {
         </div>
       </template>
 
-      <div v-if="dropIdx === rows.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
+      <div v-if="slotIdx === rows.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}
