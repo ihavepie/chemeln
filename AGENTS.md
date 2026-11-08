@@ -157,12 +157,11 @@
 - **Safari 里卡片拖不动（三轮才定案的真因）**：元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element` / 卡片图片自带的拖拽能力），真鼠标一拖就起原生拖拽会话，之后 `mousemove` 全被吞 → 「按着拖没反应」；而 `new MouseEvent()` **不会**启动原生拖拽，所以自动化测试全绿、真机全死。规矩：①一律 `-webkit-user-drag: none`、别加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`；③**只能看 `data/drag-debug.log` 验证**（`lib/draglog.js`）。本机模拟不了真鼠标（`sendEvent` 投不进、`CGEvent` 无权限）。
 - **落点标识：墙和列表都用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量卡片实测值），且必须配 ①几何快照（否则让位后光标底下换卡、落点来回翻）②`flip.js` 的 FLIP（否则瞬移一格「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下时命中的卡**（`opacity` 只影响绘制，用户选了 0.07）。
 - **`.drag-ghost` 必须 `position: fixed !important`**：`.exp-card.cmp-card{position:relative}`（0,2,0）权重高于 `.drag-ghost`（0,1,0），不加就被顶回 `relative` 跑到页面底部（墙的卡没有 `cmp-card`，所以只有墙看着正常）。另：`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖那张也还原——要用 `.grid-card.is-dragging` 同权重压回 0.07。
-- **本机没有 Chromium / 无头 Edge**（只有 Safari），别再照旧笔记去调 headless 打印。要看版式/核对页面文字，用 `swiftc` 编一个 WKWebView 小程序：加载 URL→ `takeSnapshot` 存 PNG → 看图；要读页面上的值就 `evaluateJavaScript`。注意 swiftc 必须带 `-module-cache-path .cache/clang`（否则沙箱里 ModuleCache 写不进去）。页面文字在输入框里时 `innerText` 是空的，要读 `.value`。
+- **本机只有 Safari**（没 Chromium / 无头 Edge）：看版式或读页面值就 `swiftc` 编个 WKWebView 小程序（`takeSnapshot` / `evaluateJavaScript`），编译要带 `-module-cache-path .cache/clang`；输入框文字在 `.value`（`innerText` 是空的）。
 - 依赖版本别升：Vue 3.5 / Vite 6 / Element Plus 2.8 / openchemlib 9.25 是验证过的组合。
 
 ## 8. 用户怎么干活
-- 提需求通常是一张裁剪截图 + 一句很短的中文（圈出位置），常常只有一个词或半句话。
-- 期望**直接改到看得见的效果**，然后他自己在 5173 上点、再发下一张截图验收；不喜欢解释性长文和反复确认。
-- 有明显歧义时给出 2–3 个选项让他选，他会用一两句话回，并且常在这时补充新要求。
+- 需求通常是一张裁剪截图 + 半句中文；期望**直接改到看得见的效果**，自己在 5173 上点完再发截图验收，不喜欢长解释和反复确认。
+- 有明显歧义时给 2–3 个选项让他选，他常在这时补新要求。
 - 审美偏好：极简、少文字提示、少线条、少 hover 花活、讨厌系统原生控件（下拉框、原生 select、蓝底菜单）。
 - 汇报要短：改了什么 / 在哪个文件 / 验证到什么程度 / 有什么坑；不要罗列没做的事。
