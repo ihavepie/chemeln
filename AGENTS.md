@@ -115,6 +115,7 @@
 - **本轮（小分子的结构图别撑满格子）**：用户说「小一点的化合物可以稍微小一点吗，就是放大得有点大」。`.cmp-structure img` 收到 `max-width/height: 86%`（只夹上限、小图不放大）。实测 `/#/c/59`（小）`/#/c/51`（大）都留出呼吸。
 - **本轮（结构式下面那两个链接改成真能用的）**：用户截图问「这边是干什么的，修正一下，成为有用功能」。原来一个是 `PubChem #CID`（号没用）且**只有本次会话查过才出现**、刷新就没，另一个只认 CAS。现在标签改 `PubChem ↗` / `ChemicalBook ↗`，URL 由 `lib/lookup.js` 的 `pubchemUrl()` 按「CID → CAS → 名称 → SMILES」降级（ChemicalBook 用 CAS → 名称），**不查也在、刷新也在**；`title` 说明点了给什么。CSS 从 `--ink-3` 提到 `--ink-2`、hover 连下划线一起变强调色。
 - **本轮（外部查询：补到 5 个站，改成站点表）**：用户问「还有其他的查询网站吗」。逐个**在真浏览器里**试过：能用的是 PubChem、ChemicalBook、**NIST**（CAS → `ID=C<去横线>`，IR/MS + 热力学）、**TCI**（CAS → `search/?text=`）、**CAS Common Chemistry**（`results?q=`）；不能用的：ChemSpider（CloudFront 403）、Sigma-Aldrich（区域 Access Denied）、SDBS / NMRShiftDB / Google Scholar（连不上）。**教训**：`curl` 的状态码不可信——TCI 的 curl 是 403、NIST 是 000，但浏览器里都正常（反爬 / 网络差异），所以这类链接必须用 WKWebView 截图验。实现上收成 `lib/lookup.js` 的 `LOOKUP_SITES` 表（前端 `v-for`），左栏改成竖排 + 一行「外部查询」小标题。
+- **本轮（拖动排序：卡片墙本来就有，换成能真拖 + 中栏列表补上）**：用户问「侧边栏卡片和视图这边的拖动排序被移除了吗」。查下来**卡片墙的拖动一直在**（`CmpGrid` / `ExpGrid` 的 dragstart/dragover/drop 都在，模拟拖拽能亮起落点），**中栏列表从来没做过**（连 v1 的备份里也只有投料表加料顺序能拖）。真正的问题是 **Safari 里 `<button draggable="true">` 不一定会起拖**，补 `-webkit-user-drag: element` + `cursor: grab`（卡片墙 / 中栏卡片共用）；顺带给**化合物中栏列表**加了拖动排序（落到某张卡片前面 = 插到它前面），**只允许同一分类内排顺序**（跨分类给一句提示，换分类仍走卡片视图）。实测（5173）：21 张列表卡片 `draggable` 且计算样式 `user-drag: element`，模拟 dragstart+dragover 后 `is-dragging` / `is-drop-target` 各一张，drop 发出的请求是 `POST /api/compounds/:id/move {category_id, before_id}`。**没做**：实验记录的中栏列表（那栏有平行组卡片堆，拖一摞语义要另外定）。
 - **已完成**：**v2 已构建进 `public/`、4780 跑的就是 v2**（手机适配、实验二维码在正式端口上也能用）；手机/窄屏（≤820px）基础适配（扫码看化合物档案：收起侧栏导轨和中栏列表，纸面铺满、工具栏横向滚、表格可横滑）；两页 A4 记录版式、打印（恒为 2 页）、瓶子标签 QR、投料表（组分英文缩写、从化合物库带 MW、当量/mmol/用量联动、结构卡与「移除」解绑、多步折叠）、条件行、结果块、TLC、附件上传、化合物档案（结构式 + 三栏核磁图 + TLC + 瓶签）、实验与化合物的卡片墙（缩略图优先反应式、没有则退回产物/主要底物结构式）、分类（实验与化合物**两套独立**、可拖拽换分类与换位置、落位虚线格）、ChemDraw 粘贴（SMILES/MOL → 分子式/MW + 结构图）、自动保存 + 保存/重置、锁定、搜索与筛选、**课题（侧栏切换的「空间」：列表/卡片墙/工作台统计/导出都按课题走，可给每个课题单独设编号前缀；分类与化合物都严格按课题归属）**。
 - **半成品 / 待确认**：条件筛选页仍是旧样式；「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
 - **明确不做**：多人协作、账号权限、云同步、富文本编辑。移动端只做「扫码看化合物档案」这一档（≤820px 的样式在 `eln.css` 末尾那段），不做手机上编辑记录。
@@ -157,6 +158,7 @@
 - Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
+- **Safari 里让 `<button>` 能拖**：光写 `draggable="true"` 在 WebKit 下可能拖不动（卡片墙的 `.grid-card` 就是 button），要配 `-webkit-user-drag: element`（`eln.css` 末尾那条），光标给 `grab` / `:active` 给 `grabbing` 才让人知道能拖。
 - **本机没有 Chromium / 无头 Edge**（只有 Safari），别再照旧笔记去调 headless 打印。要看版式/核对页面文字，用 `swiftc` 编一个 WKWebView 小程序：加载 URL（hash 路由可用，如 `/#/table`）→ `takeSnapshot` 存 PNG → 看图；要读页面上的值就 `evaluateJavaScript`。注意 swiftc 必须带 `-module-cache-path .cache/clang`（否则沙箱里 ModuleCache 写不进去）。页面文字在输入框里时 `innerText` 是空的，要读 `.value`。
 - 依赖版本别升：Vue 3.5 / Vite 6 / Element Plus 2.8 / openchemlib 9.25 是验证过的组合。
 

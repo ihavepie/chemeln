@@ -6596,3 +6596,33 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .scheme-head { align-items: center; }
 .scheme-head .spacer { flex: 1; }
 .scheme-head .btn-sm { padding: 2px 8px; }
+
+/* ===== 拖动排序（2026-11）=====
+   卡片是 <button>：Safari/WebKit 下光有 `draggable="true"` 不一定起拖，
+   要显式 `-webkit-user-drag: element`；光标给个 grab 暗示能拖。卡片墙和中栏列表共用。 */
+.grid-card,
+.exp-card,
+.cmp-card {
+  -webkit-user-drag: element;
+  cursor: grab;
+}
+.grid-card:active,
+.exp-card:active,
+.cmp-card:active { cursor: grabbing; }
+
+/* 拖着的那张淡下去；落点那张在顶上画一道强调色线（卡片之间本来有 12px 缝，线露得出来） */
+.grid-card.is-dragging,
+.exp-card.is-dragging,
+.cmp-card.is-dragging { opacity: 0.45; }
+
+.cmp-card.is-drop-target::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: -7px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.exp-card.cmp-card { position: relative; }

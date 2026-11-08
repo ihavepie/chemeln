@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import CatPick from './CatPick.vue';
 import { loadBoot, loadCompounds, setProject, store, recordCategories, addCategory } from '../store.js';
+import { api } from '../api.js';
 import { COMPOUND_KINDS } from '../lib/ui.js';
 import { prompt, toast } from '../lib/feedback.js';
 import { compoundMenu } from '../lib/rowmenu.js';
@@ -28,6 +29,52 @@ watch(q, (v) => {
 const filterValue = computed(
   () => store.compoundFilters.category || (store.compoundFilters.kind ? `kind:${store.compoundFilters.kind}` : '')
 );
+
+/* ---- 中栏列表拖动：拖到某张卡片上 = 插到它前面（同时换到它那个分类） ---- */
+const dragId = ref(null);
+const dropId = ref(null);
+
+function onDragStart(ev, c) {
+  dragId.value = c.id;
+  if (ev.dataTransfer) {
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', String(c.id));   // Firefox 必须要有一份数据才会真的开始拖
+  }
+}
+
+function onDragEnd() {
+  dragId.value = null;
+  dropId.value = null;
+}
+
+function onCardDragOver(ev, c) {
+  if (!dragId.value || dragId.value === c.id) return;
+  ev.preventDefault();
+  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+  dropId.value = c.id;
+}
+
+async function onDrop(ev, target) {
+  ev.preventDefault();
+  const id = Number((ev.dataTransfer && ev.dataTransfer.getData('text/plain')) || dragId.value);
+  dragId.value = null;
+  dropId.value = null;
+  if (!id || !target || target.id === id) return;
+  const c = store.compounds.find((x) => x.id === id);
+  if (!c) return;
+  // 列表里拖 = **只排顺序**：跨分类不在这条路上改归属（换分类去卡片视图里拖，那里有分组看得见）
+  if ((c.category_id ?? null) !== (target.category_id ?? null)) {
+    toast('列表里只能在同一分类内排序；换分类请到卡片视图拖', 'warn');
+    return;
+  }
+  try {
+    await api.moveCompound(id, { category_id: c.category_id ?? null, before_id: target.id });
+    await loadCompounds();
+    await loadBoot();
+  } catch (e) {
+    toast(e.message || '移动不了', 'err');
+  }
+}
 
 async function setFilter(v) {
   if (v.startsWith('kind:')) {
@@ -88,8 +135,14 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         v-for="(c, i) in store.compounds"
         :key="c.id"
         class="exp-card cmp-card"
+        :class="{ 'is-dragging': dragId === c.id, 'is-drop-target': dropId === c.id }"
         :aria-current="c.id === activeId() ? 'true' : 'false'"
         :style="{ '--i': Math.min(i, 12) }"
+        draggable="true"
+        @dragstart="onDragStart($event, c)"
+        @dragend="onDragEnd"
+        @dragover="onCardDragOver($event, c)"
+        @drop="onDrop($event, c)"
         @click="router.push(`/c/${c.id}`)"
         @contextmenu="compoundMenu($event, c, router)"
       >
