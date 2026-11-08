@@ -70,7 +70,7 @@ const sorter = createPointerSort({
 });
 
 function onCardDown(ev, c) {
-  if (!cats.value.length) return;   // 没有分类可拖进，就不折腾
+  // 不设「有分类才能拖」的门槛：未分类里也要能排顺序（下拉里还有「未分类」这一格）
   sorter.down(ev, c.id);
 }
 
@@ -144,12 +144,12 @@ async function dropCard(id, groupKey, at) {
             <div v-if="dropKey === g.key && gapAt === ci" class="drop-gap" />
             <button
               class="grid-card"
-              :class="{ 'is-dragging': dragId === c.id, 'can-drag': cats.length > 0 }"
+              :class="{ 'is-dragging': dragId === c.id, 'can-drag': true }"
               :aria-current="c.id === activeId() ? 'true' : 'false'"
               :data-drag-card="c.id"
               :data-drag-group="g.key"
               :data-drag-index="ci"
-              @pointerdown="onCardDown($event, c)"
+              @mousedown="onCardDown($event, c)"
               @click="openCard(c)"
               @contextmenu="compoundMenu($event, c, router)"
             >

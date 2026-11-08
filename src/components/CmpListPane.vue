@@ -148,7 +148,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         :data-drag-card="c.id"
         data-drag-group="list"
         :data-drag-index="i"
-        @pointerdown="onCardDown($event, c)"
+        @mousedown="onCardDown($event, c)"
         @click="openCard(c)"
         @contextmenu="compoundMenu($event, c, router)"
       >

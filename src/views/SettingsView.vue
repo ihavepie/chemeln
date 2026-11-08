@@ -607,7 +607,7 @@ async function removeProject(p) {  const ok = await confirm({
         </div>
       </section>
 
-      <p class="version-line">ELN 1.0 · 全本机运行 · 数据存自己的盘上</p>
+      <p class="version-line">ELN 1.0.1 · 全本机运行 · 数据存自己的盘上</p>
     </div>
   </div>
 </template>

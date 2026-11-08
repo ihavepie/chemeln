@@ -3,7 +3,8 @@
  *
  * **为什么不用原生拖放**：卡片都是 `<button>`，Safari/WebKit 对 button 上的 `draggable="true"`
  * 经常不起拖（`-webkit-user-drag: element` 也不一定救得回来），用户实测就是「按着拖没反应」。
- * pointer 事件是普通 JS，不依赖浏览器的拖放实现，任何浏览器行为一致，而且能自动化验证。
+ * 这里用最普通的 **mouse 事件** 自己做（mousedown / mousemove / mouseup）：不依赖拖放实现，
+ * 也不用 Pointer Events（某些 Safari 版本上 button 里的 pointer 事件会被吞），任何浏览器都一样。
  *
  * 约定（调用方给卡片挂这几个属性）：
  * - 卡片：`data-drag-card="<id>"` + `data-drag-group="<组 key>"` + `data-drag-index="<组内下标>"`
@@ -33,9 +34,9 @@ export function createPointerSort({ onStart, onTarget, onDrop, onCancel } = {}) 
   let st = null;
 
   function cleanup() {
-    window.removeEventListener('pointermove', onMove, true);
-    window.removeEventListener('pointerup', onUp, true);
-    window.removeEventListener('pointercancel', onCancel_, true);
+    window.removeEventListener('mousemove', onMove, true);
+    window.removeEventListener('mouseup', onUp, true);
+    window.removeEventListener('blur', onCancel_, true);
     document.body.classList.remove('is-pointer-dragging');
     st = null;
   }
@@ -92,7 +93,6 @@ export function createPointerSort({ onStart, onTarget, onDrop, onCancel } = {}) 
     /** 卡片上 @pointerdown="sorter.down($event, c.id)" */
     down(ev, id) {
       if (ev.button !== 0) return;
-      if (ev.pointerType && ev.pointerType !== 'mouse') return; // 触屏留给滚动
       if (id === undefined || id === null) return;
       st = {
         id,
@@ -101,9 +101,9 @@ export function createPointerSort({ onStart, onTarget, onDrop, onCancel } = {}) 
         moved: false,
         last: null,
       };
-      window.addEventListener('pointermove', onMove, true);
-      window.addEventListener('pointerup', onUp, true);
-      window.addEventListener('pointercancel', onCancel_, true);
+      window.addEventListener('mousemove', onMove, true);
+      window.addEventListener('mouseup', onUp, true);
+      window.addEventListener('blur', onCancel_, true);
     },
     /** 点击时先问一句：这次点击是不是拖动收尾？是就别跳转 */
     clickIsDrag() {
