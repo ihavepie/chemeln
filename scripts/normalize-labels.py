@@ -240,32 +240,60 @@ def pick_anchor(box, K, segs, hint):
 
 
 def plan_labels(base, target_ratio, segs):
-    """给这张图挑一个「能放得下」的倍率：从目标值往下试，直到每个标签都留出 MIN_CLEAR。
-    返回 (K, 每个标签的 (缩放中心, 位移))。"""
+    """给这张图挑一个「能放得下」的倍率，并给每个标签定缩放中心（和必要的小位移）。
+
+    三类标签分开处理：
+    - 单字原子标（N/O/S…）：绕「键端（原子位置）」缩放、绝不位移，倍率还要压到不吞键线；
+    - 多字缩写（OMe/Ph/Bn/Ts…）：在标签框 9 个候选点里挑一个当中心，标准是放大后与
+      所有键段的留白最大；还不够就整块外推；再不行就把整张图的倍率往下调。
+    返回 (整图倍率, [(ax, ay, dx, dy, k), …])。
+    """
     cap, frames = measure(base, glyph_boxes(base))
     bond = bond_of(base)
     if not (cap and bond):
         return 1.0, []
-    xs_all = [v for seg in segs for pt in seg for v in pt]
-    center = ((min(xs_all[0::2]) + max(xs_all[0::2])) / 2,
-              (min(xs_all[1::2]) + max(xs_all[1::2])) / 2) if segs else None
+    pts = [pt for seg in segs for pt in seg]
+    xs = [v for pt in pts for v in (pt[0],)]
+    ys = [v for pt in pts for v in (pt[1],)]
+    center = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2) if pts else None
+
     best = None
     K = target_ratio * bond / cap
     while K > 1.1:
         plan, worst = [], 99.0
         for (x0, y0, x1, y1), grp in zip(frames, label_groups(base)):
             by = grp['y']
-            px, py = min((pt for seg in segs for pt in seg),
-                         key=lambda p: max(x0 - p[0], 0, p[0] - x1) ** 2 + max(by - p[1], 0, p[1] - y0) ** 2) \
-                if segs else ((x0 + x1) / 2, by)
+            if len(grp['items']) == 1:                       # 原子标：原地放大
+                px, py = (min(pts, key=lambda p: (p[0] - (x0 + x1) / 2) ** 2 + (p[1] - by) ** 2)
+                          if pts else ((x0 + x1) / 2, by))
+                # 与本原子相连的键段要排除：原子本来就在键端点上，算进去永远是 0 留白
+                # 半径取 7：键端离原子被截短了 4 左右，所以「自己的键」就是这个范围里的；
+                # 只排掉自己的键，别的键（会真压上来的）仍要参与判断
+                near = lambda pt: (pt[0] - px) ** 2 + (pt[1] - py) ** 2 < 49.0
+                others = [sg for sg in segs if not (near(sg[0]) or near(sg[1]))]
+                atomK, dk = K, 99.0
+                while atomK > 1.0:
+                    box = (min(px + (x0 - px) * atomK, px), min(py + (y0 - py) * atomK, py),
+                           max(px + (x1 - px) * atomK, px), max(py + (by - py) * atomK, py))
+                    dk = min((_seg_box_dist(a, b, box) for a, b in others), default=99)
+                    if dk >= 1.0:                            # 别压到不相干的键
+                        break
+                    atomK -= 0.05
+                plan.append((px, py, 0.0, 0.0, max(atomK, 1.0)))
+                # 原子标只受「自己别压到不相干的键」约束，不参与整图倍率的判定——
+                # 它必须留在原子上，键线贴到字母边上是化学图里正常的样子
+                continue
+
+            px, py = (min(pts, key=lambda p: max(x0 - p[0], 0, p[0] - x1) ** 2 + max(by - p[1], 0, p[1] - y0) ** 2)
+                      if pts else ((x0 + x1) / 2, by))
             hint = (min(max(px, x0), x1), min(max(py, y0), by))
             ax, ay = pick_anchor((x0, y0, x1, y1), K, segs, hint)
             nb = (min(ax + (x0 - ax) * K, ax), min(ay + (y0 - ay) * K, ay),
                   max(ax + (x1 - ax) * K, ax), max(ay + (by - ay) * K, ay))
             dx, dy = nudge_for_clearance(nb, segs, center)
             nb2 = (nb[0] + dx, nb[1] + dy, nb[2] + dx, nb[3] + dy)
-            worst = min(worst, min((_seg_box_dist(p, q, nb2) for p, q in segs), default=99))
-            plan.append((ax, ay, dx, dy))
+            worst = min(worst, min((_seg_box_dist(a, b, nb2) for a, b in segs), default=99))
+            plan.append((ax, ay, dx, dy, K))
         if worst >= MIN_CLEAR:
             return K, plan
         if best is None or worst > best[0]:
@@ -274,12 +302,12 @@ def plan_labels(base, target_ratio, segs):
     return (best[1], best[2]) if best else (1.1, [])
 
 
-def wrap_planned(svg, K, plan):
+def wrap_planned(svg, plan):
     out, cursor = [], 0
-    for (ax, ay, dx, dy), g in zip(plan, label_groups(svg)):
+    for (ax, ay, dx, dy, k), g in zip(plan, label_groups(svg)):
         first, last = g['items'][0]['start'], g['items'][-1]['end']
         out.append(svg[cursor:first])
-        out.append(f'<g transform="translate({r3(ax + dx)} {r3(ay + dy)}) scale({r3(K)}) '
+        out.append(f'<g transform="translate({r3(ax + dx)} {r3(ay + dy)}) scale({r3(k)}) '
                    f'translate({r3(-ax)} {r3(-ay)})">' + svg[first:last] + '</g>')
         cursor = last
     out.append(svg[cursor:])
@@ -350,7 +378,7 @@ for f in sorted(glob.glob(os.path.join(DATA, '*/*.svg'))):
             continue
         segs = bond_segments(base)
         K, plan = plan_labels(base, TO, segs)
-        out = wrap_planned(base, K, plan)
+        out = wrap_planned(base, plan)
         note = (f'字高 {r3(cap)} / 键长 {bond} = {r3(cap / bond)} → ×{r3(K)}'
                 f'（字高比 {r3(cap * K / bond)}）') + (f'，清碎片 {junk}' if junk else '')
     elif 'font-family="Helvetica, Arial, sans-serif"' in src:
