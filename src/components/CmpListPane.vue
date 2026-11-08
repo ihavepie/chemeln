@@ -6,6 +6,7 @@ import CatPick from './CatPick.vue';
 import { loadBoot, loadCompounds, setProject, store, recordCategories, addCategory } from '../store.js';
 import { api } from '../api.js';
 import { createPointerSort } from '../lib/pointdrag.js';
+import { withFlip } from '../lib/flip.js';
 import { COMPOUND_KINDS } from '../lib/ui.js';
 import { prompt, toast } from '../lib/feedback.js';
 import { compoundMenu } from '../lib/rowmenu.js';
@@ -35,6 +36,7 @@ const filterValue = computed(
    用自己实现的 pointer 拖拽（`lib/pointdrag.js`）：卡片是 button，Safari 里原生拖放起不来。 */
 const dragId = ref(null);
 const dropIdx = ref(-1);
+const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度
 
 /* 落到它自己原位（含它后面那一格）时不再画线——没有变化，不需要提示 */
 const dragIdx = computed(() => store.compounds.findIndex((c) => c.id === dragId.value));
@@ -48,10 +50,19 @@ const slotIdx = computed(() => {
 
 const sorter = createPointerSort({
   name: 'cmp-list',
-  onStart: (id) => { dragId.value = id; },
+  onStart: (id) => {
+    dragId.value = id;
+    const el = document.querySelector(`[data-drag-card="${id}"]`);
+    if (el) dragH.value = Math.round(el.getBoundingClientRect().height);
+  },
   // 列表是一列：gap 指向「插到第几张前面」，那里画一条强调色的线
   onTarget: (id, groupKey, gap) => {
-    dropIdx.value = Math.min(gap, store.compounds.length);
+    const at = Math.min(gap, store.compounds.length);
+    if (at === dropIdx.value) return;
+    // 占位格一插进去，下面的卡片就要下移：用 FLIP 滑过去，别瞬移
+    withFlip([...document.querySelectorAll('.listpane .exp-card')], () => {
+      dropIdx.value = at;
+    });
   },
   onDrop: (id, groupKey, gap) => dropList(id, gap),
   onCancel: () => { dragId.value = null; dropIdx.value = -1; },
@@ -148,7 +159,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
 
     <div class="listpane-body" data-drag-group="list" :data-drag-count="store.compounds.length">
       <template v-for="(c, i) in store.compounds" :key="c.id">
-      <div v-if="slotIdx === i" class="list-drop-line" />
+      <div v-if="slotIdx === i" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
       <button
         class="exp-card cmp-card"
         :class="{ 'is-dragging': dragId === c.id }"
@@ -176,7 +187,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         </div>
       </button>
       </template>
-      <div v-if="slotIdx === store.compounds.length" class="list-drop-line" />
+      <div v-if="slotIdx === store.compounds.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
 
       <div v-if="!store.compounds.length" class="empty-note">
         <template v-if="store.compoundFilters.q || store.compoundFilters.kind">无匹配化合物</template>

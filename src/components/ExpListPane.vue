@@ -8,6 +8,7 @@ import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
 import { prompt, toast } from '../lib/feedback.js';
 import { createPointerSort } from '../lib/pointdrag.js';
+import { withFlip } from '../lib/flip.js';
 import { experimentMenu, groupMenu } from '../lib/rowmenu.js';
 
 const route = useRoute();
@@ -152,6 +153,7 @@ const rows = computed(() => {
    行身份用 `anchor`（这一行最早那条的 id）认，一摞的位置本来就按它算。 */
 const dragId = ref(null);
 const dropIdx = ref(-1);
+const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度
 
 /* 落到它自己原位（含它后面那一格）时不再画线 */
 const dragIdx = computed(() => rows.value.findIndex((r) => r.anchor === dragId.value));
@@ -165,10 +167,19 @@ const slotIdx = computed(() => {
 
 const sorter = createPointerSort({
   name: 'exp-list',
-  onStart: (id) => { dragId.value = id; },
-  // 列表是一列：gap 指向「插到第几行前面」，那里画一条强调色的线
+  onStart: (id) => {
+    dragId.value = id;
+    const el = document.querySelector(`[data-drag-card="${id}"]`);
+    if (el) dragH.value = Math.round(el.getBoundingClientRect().height);
+  },
+  // 列表是一列：gap 指向「插到第几行前面」，那里放一块占位格，下面的行让位
   onTarget: (id, groupKey, gap) => {
-    dropIdx.value = Math.min(gap, rows.value.length);
+    const at = Math.min(gap, rows.value.length);
+    if (at === dropIdx.value) return;
+    // 占位格一插进去，下面的卡片就要下移：用 FLIP 滑过去，别瞬移
+    withFlip([...document.querySelectorAll('.listpane .exp-card')], () => {
+      dropIdx.value = at;
+    });
   },
   onDrop: (id, groupKey, gap) => dropRow(id, gap),
   onCancel: () => { dragId.value = null; dropIdx.value = -1; },
@@ -368,7 +379,7 @@ function onStackFace(row) {
       @scroll="saveScroll"
     >
       <template v-for="(row, ri) in rows" :key="row.key">
-        <div v-if="slotIdx === ri" class="list-drop-line" />
+        <div v-if="slotIdx === ri" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
         <!-- 普通记录 -->
         <button
           v-if="row.one"
@@ -487,7 +498,7 @@ function onStackFace(row) {
         </div>
       </template>
 
-      <div v-if="slotIdx === rows.length" class="list-drop-line" />
+      <div v-if="slotIdx === rows.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}

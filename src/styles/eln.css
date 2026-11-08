@@ -6669,7 +6669,7 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 .exp-card.is-dragging,
 .cmp-card.is-dragging,
 .grid-stack.is-dragging {
-  opacity: 0.02;
+  opacity: 0.07;
   box-shadow: none;
   background: transparent;
   outline: none;
@@ -6681,24 +6681,23 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 /* 而被拿起来的那张要**压过**上面那条（它的选择器有 4 个类，光靠 `.grid-card.is-dragging` 顶不住），
    否则拖到自己组上时原卡又变回不透明，看着像没被拿起来。 */
 .grid-page.is-dragging .grid-group.is-drop .grid-card.is-dragging,
-.grid-page.is-dragging .grid-stack.is-dragging { opacity: 0.02; }
+.grid-page.is-dragging .grid-stack.is-dragging { opacity: 0.07; }
 /* 老规则 `.grid-page.is-dragging .grid-card { opacity:.4 }` 的权重比 `.grid-card.is-dragging` 高，
    所以被拿起的那张在实验页上还是 0.4。这里用同前缀、多一个类的写法把它压住。 */
 .grid-page.is-dragging .grid-card.is-dragging,
 .grid-page.is-dragging .grid-stack.is-dragging,
-.listpane .exp-card.is-dragging { opacity: 0.02; }
+.listpane .exp-card.is-dragging { opacity: 0.07; }
 
 /* 中栏列表的拖动占位格：跟卡片一样高的一块虚线空位，下面的卡片真的让位
    （以前只有一条 2px 的线，用户说「侧边栏那边没有占位」） */
-/* 中栏列表的落点：**一条强调色的线**（不占位、不推挤卡片）。
-   试过「跟卡片一样高的占位格」，但它一插进去列表就整体下移、落点又会跟着变，
-   而且要把被按下的那张卡隐藏起来（WebKit 会把隐藏掉的 mousedown 目标的后续 mousemove 掐掉 → 拖不动）。
-   线最省事、最稳。 */
-.listpane .list-drop-line {
-  height: 2px;
-  margin: 6px 12px;
-  border-radius: 2px;
-  background: var(--accent);
+/* 中栏列表的落点：跟墙一样的**流内占位格**（虚线强调色），下面的卡片让位 + FLIP 滑动。
+   高度由组件内联给（= 被拖那张卡的真实高度）。
+   **被按下的那张卡不能隐藏**（WebKit 会掐掉它后续的 `mousemove` → 拖不动），只能压到 0.07。 */
+.listpane .list-drop-slot {
+  margin-bottom: 12px;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--r);
+  background: #fbf4ee;
 }
 
 /* 卡片墙的占位格：插在网格里、跟卡片一样大小的一格虚线位，下面的卡片真的让位。
