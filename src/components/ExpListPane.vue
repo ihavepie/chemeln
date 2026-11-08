@@ -151,19 +151,17 @@ const rows = computed(() => {
    一摞（平行组）拖起来是整摞一起动——只挪面子会把同一个组拆到两个分类里。
    行身份用 `anchor`（这一行最早那条的 id）认，一摞的位置本来就按它算。 */
 const dragId = ref(null);
-const dropId = ref(null);
-const dropEnd = ref(false);   // 落点在整个列表末尾（没有「下一行」可以在它前面画线）
+const dropIdx = ref(-1);      // 占位格插在第几行前面（= 行数 = 放最后）
 
 const sorter = createPointerSort({
   name: 'exp-list',
   onStart: (id) => { dragId.value = id; },
+  // 列表是一列：gap 指向「插到第几行前面」，那里放一块跟卡片一样高的占位格
   onTarget: (id, groupKey, gap) => {
-    const next = rows.value[Math.min(gap, rows.value.length)];
-    dropId.value = next && next.anchor !== id ? next.anchor : null;
-    dropEnd.value = !next && gap >= rows.value.length;
+    dropIdx.value = Math.min(gap, rows.value.length);
   },
   onDrop: (id, groupKey, gap) => dropRow(id, gap),
-  onCancel: () => { dragId.value = null; dropId.value = null; dropEnd.value = false; },
+  onCancel: () => { dragId.value = null; dropIdx.value = -1; },
 });
 
 function onRowDown(ev, row) {
@@ -184,8 +182,7 @@ function rowCategory(row) {
 
 async function dropRow(anchor, at) {
   dragId.value = null;
-  dropId.value = null;
-  dropEnd.value = false;
+  dropIdx.value = -1;
   const list = rows.value;
   const row = list.find((r) => r.anchor === anchor);
   if (!row) return;
@@ -361,11 +358,12 @@ function onStackFace(row) {
       @scroll="saveScroll"
     >
       <template v-for="(row, ri) in rows" :key="row.key">
+        <div v-if="dropIdx === ri" class="list-drop-slot" />
         <!-- 普通记录 -->
         <button
           v-if="row.one"
           class="exp-card can-drag"
-          :class="{ 'is-dragging': dragId === row.anchor, 'is-drop-target': dropId === row.anchor }"
+          :class="{ 'is-dragging': dragId === row.anchor }"
           :aria-current="row.one.id === activeId() ? 'true' : 'false'"
           :data-drag-card="row.anchor"
           data-drag-group="list"
@@ -402,7 +400,7 @@ function onStackFace(row) {
           <div class="stack-top">
             <div
               class="exp-card is-stack can-drag"
-              :class="{ 'is-dragging': dragId === row.anchor, 'is-drop-target': dropId === row.anchor }"
+              :class="{ 'is-dragging': dragId === row.anchor }"
               :aria-current="isGroupActive(row) && !isGroupOpen(row.gid) ? 'true' : 'false'"
               role="button"
               tabindex="0"
@@ -479,7 +477,7 @@ function onStackFace(row) {
         </div>
       </template>
 
-      <div v-if="dropEnd" class="list-drop-line" />
+      <div v-if="dropIdx === rows.length" class="list-drop-slot" />
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}

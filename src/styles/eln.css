@@ -563,14 +563,7 @@ body {
 .grid-card.is-dragging { opacity: 0.45; }
 
 /* 拖到某个位置时，在这里留出一格（就是这张卡将来的位置） */
-.drop-gap {
-  border: 1px dashed var(--line-2);
-  border-radius: var(--r);
-  background: #faf9f5;
-  min-height: 150px;
-}
-
-.card-grid.is-even .drop-gap { min-height: 222px; }
+/* 卡片墙的落点不再用「插一块占位格」（会整墙重排），改用目标格描边 `.is-slot`，见文件末尾 */
 
 /* 分类分组标题 */
 .grid-group-head {
@@ -6620,16 +6613,6 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .exp-card.is-dragging,
 .cmp-card.is-dragging { opacity: 0.45; }
 
-.cmp-card.is-drop-target::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  top: -7px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--accent);
-}
 .exp-card.cmp-card { position: relative; }
 
 /* 自己实现的 pointer 拖拽（不走原生 DnD）：拖的时候别选字、光标变抓手 */
@@ -6638,25 +6621,7 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 .exp-card.can-drag, .grid-card.can-drag { cursor: grab; }
 
 /* 中栏实验列表的拖动排序（跟化合物中栏一致）：落点一道强调色短线，拖起来的那张淡下去 */
-.listpane .exp-card.is-dragging { opacity: 0.45; }
-.listpane .exp-card.is-drop-target::before {
-  content: '';
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: -7px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--accent);
-}
 
-/* 中栏列表拖到最末尾时的落点线（卡片下面没地方画「插到下一行前面」那条线） */
-.listpane .list-drop-line {
-  height: 2px;
-  margin: 5px 12px 0;
-  border-radius: 2px;
-  background: var(--accent);
-}
 
 /* 拖着卡片的时候，空分类那一行长成够大的落点（平时还是只占组头一行，不占地方） */
 .grid-drop-line.is-armed {
@@ -6717,3 +6682,22 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
 .grid-page.is-dragging .grid-card.is-dragging,
 .grid-page.is-dragging .grid-stack.is-dragging,
 .listpane .exp-card.is-dragging { opacity: 0.3; }
+
+/* 中栏列表的拖动占位格：跟卡片一样高的一块虚线空位，下面的卡片真的让位
+   （以前只有一条 2px 的线，用户说「侧边栏那边没有占位」） */
+.listpane .list-drop-slot {
+  height: 74px;
+  margin-bottom: 12px;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--r);
+  background: #fbf4ee;
+}
+
+/* 卡片墙的落点标识：**不动别的卡片**，只在目标那一格描一圈强调色。
+   以前是往网格里插一块 150/222px 高的占位格——它一插进来整面墙就重排（实测第二张卡横移 452px），
+   每过一次界就整墙跳一下，用户说「让位速度太快了，像是在左右跳动」。
+   实线 = 插到这一格前面，虚线 = 放到这一组最后。 */
+.grid-card.is-slot:not(.is-dragging),
+.grid-stack.is-slot { outline: 2px solid var(--accent); outline-offset: 3px; }
+.grid-card.is-slot-end:not(.is-dragging),
+.grid-stack.is-slot-end { outline: 2px dashed var(--accent); outline-offset: 3px; }

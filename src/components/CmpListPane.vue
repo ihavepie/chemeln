@@ -34,19 +34,17 @@ const filterValue = computed(
 /* ---- 中栏列表拖动排序 ----
    用自己实现的 pointer 拖拽（`lib/pointdrag.js`）：卡片是 button，Safari 里原生拖放起不来。 */
 const dragId = ref(null);
-const dropId = ref(null);
+const dropIdx = ref(-1);      // 占位格插在第几张卡片前面（= 长度 = 放最后）
 
 const sorter = createPointerSort({
   name: 'cmp-list',
   onStart: (id) => { dragId.value = id; },
+  // 列表是一列：gap 指向「插到第几张前面」，那里放一块跟卡片一样高的占位格，下面的卡片让位
   onTarget: (id, groupKey, gap) => {
-    // 列表是一列：gap 指向「插到第几张前面」，把落点那张卡片标出来
-    const list = store.compounds;
-    const next = list[Math.min(gap, list.length)];
-    dropId.value = next && next.id !== id ? next.id : null;
+    dropIdx.value = Math.min(gap, store.compounds.length);
   },
   onDrop: (id, groupKey, gap) => dropList(id, gap),
-  onCancel: () => { dragId.value = null; dropId.value = null; },
+  onCancel: () => { dragId.value = null; dropIdx.value = -1; },
 });
 
 function onCardDown(ev, c) {
@@ -61,7 +59,7 @@ function openCard(c) {
 
 async function dropList(id, at) {
   dragId.value = null;
-  dropId.value = null;
+  dropIdx.value = -1;
   const list = store.compounds;
   const c = list.find((x) => x.id === id);
   if (!c) return;
@@ -139,11 +137,11 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
     </div>
 
     <div class="listpane-body" data-drag-group="list" :data-drag-count="store.compounds.length">
+      <template v-for="(c, i) in store.compounds" :key="c.id">
+      <div v-if="dropIdx === i" class="list-drop-slot" />
       <button
-        v-for="(c, i) in store.compounds"
-        :key="c.id"
         class="exp-card cmp-card"
-        :class="{ 'is-dragging': dragId === c.id, 'is-drop-target': dropId === c.id }"
+        :class="{ 'is-dragging': dragId === c.id }"
         :aria-current="c.id === activeId() ? 'true' : 'false'"
         :style="{ '--i': Math.min(i, 12) }"
         :data-drag-card="c.id"
@@ -167,6 +165,8 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
           <template v-if="c.used_count"><span class="sep">·</span><span>{{ c.used_count }} 处引用</span></template>
         </div>
       </button>
+      </template>
+      <div v-if="dropIdx === store.compounds.length" class="list-drop-slot" />
 
       <div v-if="!store.compounds.length" class="empty-note">
         <template v-if="store.compoundFilters.q || store.compoundFilters.kind">无匹配化合物</template>

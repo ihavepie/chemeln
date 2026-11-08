@@ -147,10 +147,14 @@ async function dropCard(id, groupKey, at) {
           </button>
 
           <template v-for="(c, ci) in g.items" :key="c.id">
-            <div v-if="dropKey === g.key && gapAt === ci" class="drop-gap" />
             <button
               class="grid-card"
-              :class="{ 'is-dragging': dragId === c.id, 'can-drag': true }"
+              :class="{
+                'is-dragging': dragId === c.id,
+                'can-drag': true,
+                'is-slot': dropKey === g.key && gapAt === ci,
+                'is-slot-end': dropKey === g.key && gapAt === g.items.length && ci === g.items.length - 1,
+              }"
               :aria-current="c.id === activeId() ? 'true' : 'false'"
               :data-drag-card="c.id"
               :data-drag-group="g.key"
@@ -180,7 +184,6 @@ async function dropCard(id, groupKey, at) {
             </button>
           </template>
 
-          <div v-if="dropKey === g.key && gapAt === g.items.length" class="drop-gap" />
         </div>
       </section>
 

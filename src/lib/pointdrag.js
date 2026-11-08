@@ -36,6 +36,8 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
   let st = null;
   let ghost = null;      // 跟着光标走的那张虚影卡
   let raf = 0;           // 虚影的位置更新、边缘自动滚动都放在这一帧里做
+  let holdTimer = 0;     // 落点「稳定一会儿才换」的计时器
+  let pendingHit = null; // 手刚滑到、还没落定的那个落点
 
   function cleanup() {
     window.removeEventListener('mousemove', onMove, true);
@@ -44,6 +46,8 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     document.removeEventListener('dragstart', blockNative, true);
     document.body.classList.remove('is-pointer-dragging');
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = 0; }
+    pendingHit = null;
     dropGhost();
     st = null;
   }
@@ -95,6 +99,41 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     return null;
   }
 
+  /** 落点是否一样（同一个组、同一个格子） */
+  function sameHit(a, b) {
+    if (!a || !b) return a === b;
+    return a.groupKey === b.groupKey && a.gapAt === b.gapAt;
+  }
+
+  /**
+   * 落点要「稳定一小会儿」才真的换。
+   * 不然手在两张卡片交界处抖一下，占位格就左右跳一次、卡片跟着哗啦哗啦闪——
+   * 用户说「让位速度太快了，像是在左右跳动」。第一次落点立刻生效，之后换位置要有耐心。
+   */
+  const HOLD_MS = 120;
+  function considerHit(hit) {
+    if (!hit || hit.groupKey === undefined) return;
+    if (!st.last || sameHit(hit, st.last)) {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = 0; }
+      pendingHit = null;
+      if (!sameHit(hit, st.last)) {
+        st.last = hit;
+        onTarget?.(st.id, hit.groupKey, hit.gapAt);
+      }
+      return;
+    }
+    pendingHit = hit;
+    if (holdTimer) return;      // 已经在等了，等它落定再换
+    holdTimer = window.setTimeout(() => {
+      holdTimer = 0;
+      const h = pendingHit;
+      pendingHit = null;
+      if (!h || !st || sameHit(h, st.last)) return;
+      st.last = h;
+      onTarget?.(st.id, h.groupKey, h.gapAt);
+    }, HOLD_MS);
+  }
+
   function follow() {
     if (!st) return;
     const { lastX: x, lastY: y } = st;
@@ -116,8 +155,7 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
       const hit = hitTest(x, y);
       if (hit && hit.groupKey !== undefined) {
         st.hits += 1;
-        onTarget?.(st.id, hit.groupKey, hit.gapAt);
-        st.last = hit;
+        considerHit(hit);
       }
     }
     raf = requestAnimationFrame(follow);
@@ -132,7 +170,61 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     e.preventDefault();
   }
 
+  /**
+   * 落点判定用**拖起来那一刻的几何快照**，不再每帧看元素底下是什么。
+   * 因为占位格（`.drop-gap` / `.list-drop-slot`）一插进去，卡片就整体让位、
+   * 光标底下换成了另一张卡 → 目标在两张卡之间来回翻，看着就是「左右跳动」。
+   * 快照按「容器滚动了多少」做纵向补偿，所以自动滚动时仍然准。
+   */
+  function takeSnapshot() {
+    const cards = [];
+    document.querySelectorAll('[data-drag-card]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      cards.push({
+        groupKey: el.dataset.dragGroup,
+        idx: Number(el.dataset.dragIndex),
+        l: r.left,
+        t: r.top,
+        w: r.width,
+        h: r.height,
+      });
+    });
+    const groups = [];
+    document.querySelectorAll('[data-drag-group][data-drag-count]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      groups.push({ groupKey: el.dataset.dragGroup, count: Number(el.dataset.dragCount), l: r.left, t: r.top, w: r.width, h: r.height });
+    });
+    // 小的先试：`.exp-stack` 比整个列表容器小，落在组员行上要算「这一摞的后面」
+    groups.sort((a, b) => a.w * a.h - b.w * b.h);
+    return { cards, groups };
+  }
+
+  function hitTestBySnapshot(x, y) {
+    const snap = st && st.snap;
+    if (!snap) return null;
+    const adj = st.sp ? st.sp.scrollTop - st.snapScroll : 0;
+    const yy = y + adj;
+    for (const c of snap.cards) {
+      if (x >= c.l && x <= c.l + c.w && yy >= c.t && yy <= c.t + c.h) {
+        // 落在卡片哪一半：横向网格看左右、竖向列表看上下（取离中心更远的那个轴当主轴）
+        const dx = c.w > 0 ? (x - (c.l + c.w / 2)) / (c.w / 2) : 0;
+        const dy = c.h > 0 ? (yy - (c.t + c.h / 2)) / (c.h / 2) : 0;
+        const after = Math.abs(dx) >= Math.abs(dy) ? dx > 0 : dy > 0;
+        return { groupKey: c.groupKey, gapAt: c.idx + (after ? 1 : 0) };
+      }
+    }
+    for (const g of snap.groups) {
+      if (x >= g.l && x <= g.l + g.w && yy >= g.t && yy <= g.t + g.h) {
+        return { groupKey: g.groupKey, gapAt: g.count };
+      }
+    }
+    return null;
+  }
+
   function hitTest(x, y) {
+    const snapHit = hitTestBySnapshot(x, y);
+    if (snapHit) return snapHit;
+    if (st && st.snap) return null;   // 有快照就以快照为准，别混着 elementFromPoint
     const el = document.elementFromPoint(x, y);
     if (!el) return null;
     const card = el.closest('[data-drag-card]');
@@ -165,6 +257,8 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
       ghost = makeGhost(st.el);
       if (ghost) ghost.style.transform = 'rotate(1.2deg) scale(1.02)';
       st.sp = scrollParentOf(st.el);
+      st.snapScroll = st.sp ? st.sp.scrollTop : 0;
+      st.snap = takeSnapshot();
       onStart?.(st.id);
       raf = requestAnimationFrame(follow);
     }
@@ -172,11 +266,10 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     const hit = hitTest(ev.clientX, ev.clientY);
     if (hit && hit.groupKey !== undefined) {
       st.hits += 1;
-      onTarget?.(st.id, hit.groupKey, hit.gapAt);
+      considerHit(hit);
     } else {
       st.misses += 1;
     }
-    st.last = hit;
     // 每 8 次移动记一行：拖动现场不刷屏，也看得出移动事件到底有没有进来
     if (st.moves === 1 || st.moves % 8 === 0) {
       logDrag({
@@ -196,13 +289,15 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
   function onUp() {
     if (!st) return;
     const { id, moved, last, moves, hits } = st;
+    // 松手时优先用「刚滑到、还没等它落定」的那个落点：手快的人拖过去就松，不该掉回上一格
+    const target = pendingHit || last;
     if (st.lastX !== undefined && ghost) ghost.style.transform += ' rotate(0deg) scale(1)';
     cleanup();
     onCancel?.();
-    logDrag({ surface: name, phase: 'up', moved, moves, hits, drop: moved ? last || null : null });
+    logDrag({ surface: name, phase: 'up', moved, moves, hits, drop: moved ? target || null : null });
     if (moved) {
       lastDropAt = Date.now();
-      if (last && last.groupKey !== undefined) onDrop?.(Number(id), last.groupKey, last.gapAt);
+      if (target && target.groupKey !== undefined) onDrop?.(Number(id), target.groupKey, target.gapAt);
     }
   }
 
@@ -227,6 +322,8 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
         lastX: ev.clientX,
         lastY: ev.clientY,
         sp: null,
+        snap: null,
+        snapScroll: 0,
         moved: false,
         last: null,
         moves: 0,

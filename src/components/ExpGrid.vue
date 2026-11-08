@@ -206,9 +206,16 @@ async function dropCard(id, groupKey, at) {
           </button>
 
           <template v-for="(card, ci) in g.cards" :key="card.key">
-            <div v-if="dropKey === g.key && gapAt === ci" class="drop-gap" />
             <!-- 平行组：一摞纸（后面两层纸边），点开是面子那条 -->
-            <div v-if="card.members.length > 1" class="grid-stack" :class="{ 'is-dragging': card.members.some((m) => m.id === dragId) }">
+            <div
+              v-if="card.members.length > 1"
+              class="grid-stack"
+              :class="{
+                'is-dragging': card.members.some((m) => m.id === dragId),
+                'is-slot': dropKey === g.key && gapAt === ci,
+                'is-slot-end': dropKey === g.key && gapAt === g.cards.length && ci === g.cards.length - 1,
+              }"
+            >
               <button
                 class="grid-card"
                 :aria-current="card.members.some((m) => m.id === activeId()) ? 'true' : 'false'"
@@ -244,7 +251,11 @@ async function dropCard(id, groupKey, at) {
             <button
               v-else
               class="grid-card"
-              :class="{ 'is-dragging': dragId === card.it.id }"
+              :class="{
+                'is-dragging': dragId === card.it.id,
+                'is-slot': dropKey === g.key && gapAt === ci,
+                'is-slot-end': dropKey === g.key && gapAt === g.cards.length && ci === g.cards.length - 1,
+              }"
               :aria-current="card.it.id === activeId() ? 'true' : 'false'"
               :data-drag-card="card.it.id"
               :data-drag-group="g.key"
@@ -277,7 +288,6 @@ async function dropCard(id, groupKey, at) {
             </button>
           </template>
 
-          <div v-if="dropKey === g.key && gapAt === g.cards.length" class="drop-gap" />
         </div>
       </section>
 
