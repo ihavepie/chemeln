@@ -87,6 +87,20 @@ ELN/
 2. 手机连同一个 Wi-Fi，打开 `http://<本机局域网 IP>:4780`（设置页 / 启动日志里有地址）；
 3. Safari「添加到主屏幕」当 App 用；扫瓶签二维码可直接看化合物档案。
 
+## 给别人用（不用 Docker、不用 npm install）
+
+```bash
+./scripts/package.sh          # → dist-pkg/eln-<版本>-<平台>.zip（约 20 MB）
+```
+
+包里有 `public/`（前端产物）+ `server/` + `vendor/`（画板与结构渲染的静态资源）+ 启动脚本。
+对方**解压 → 双击 `start.command`（macOS）/ `start.bat`（Windows）** 就能用，
+唯一前提是装了 Node.js 22+；**运行时零依赖**（服务端只用 Node 内置模块，不需要 `node_modules`）。
+
+- Windows / Linux 上「PDF 生成、长图导出、图片文字识别」三项不可用（那是 macOS 的系统能力），其余功能正常；
+- 数据默认就在包内 `data/`；换电脑把整个文件夹搬走即可；
+- 想让多人访问，再考虑云部署（`CLOUD-DEPLOY.md`）或 Docker。
+
 ## 只在本机、只给自己用
 
 - 服务默认只监听 `127.0.0.1`；开「允许局域网访问」＝同一 Wi-Fi 的设备都能打开，请只在自己信得过的网络里开。
