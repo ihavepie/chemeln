@@ -195,7 +195,25 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
     out = out.replace('</svg>', `${textEl}\n</svg>`);
   }
 
-  return fitCanvas(out, mainSize, subSize);
+  return normalizeScale(fitCanvas(out, mainSize, subSize), Math.abs(mA));
+}
+
+/**
+ * 统一「显示尺度 + 线宽」：一个键固定 24px、线宽 0.06×键长。
+ * 为什么必须在这里做：卡片是按图片的**原始 px 尺寸**显示的，新存的图如果 px 跟着
+ * Indigo 的 bond（40/100…）走，卡片里就会大小不一、线宽也不一样（用户截过图）。
+ * 和 scripts/normalize-style.py 是同一套规则，只不过这里是「存之前」就做好。
+ */
+function normalizeScale(svg, bond) {
+  const vb = String(svg.match(/viewBox="([^"]+)"/)?.[1] || '').split(/[\s,]+/).map(Number);
+  if (vb.length !== 4 || !bond) return svg;
+  const ppu = 24 / bond;                       // 每用户单位多少 px
+  let out = svg.replace(/<svg[^>]*>/, (tag) =>
+    tag.replace(/width="[\d.]+(?:px)?"/, `width="${Math.round(vb[2] * ppu)}"`)
+       .replace(/height="[\d.]+(?:px)?"/, `height="${Math.round(vb[3] * ppu)}"`));
+  // Indigo 的 stroke-width 在 matrix 之前，所以要写成「0.06 个局部键长」
+  out = out.replace(/stroke-width="[\d.]+"/g, 'stroke-width="0.06"');
+  return out;
 }
 
 /** 去掉本函数以前加过的缩放层（重复调用要幂等，别叠倍率） */
@@ -405,8 +423,9 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
   const y0 = Math.min(...ys) - pad;
   const w = Math.max(...xs) + pad - x0;
   const h = Math.max(...ys) + pad - y0;
-  return out.replace(
+  const rebuilt = out.replace(
     /<svg[^>]*>/,
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${Math.round(w)}" height="${Math.round(h)}" viewBox="${num(x0)} ${num(y0)} ${num(w)} ${num(h)}">`,
   );
+  return normalizeScale(rebuilt, bond);
 }
