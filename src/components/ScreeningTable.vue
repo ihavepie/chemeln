@@ -38,7 +38,7 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
         <tr>
           <th class="sct-c-entry">Entry</th>
           <th class="sct-c-fix">实验编号</th>
-          <th v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num }">
+          <th v-for="f in fields" :key="f.key" class="sct-field" :class="{ 'sct-num': f.num }">
             <div class="sct-th">
               <span class="sct-th-label">{{ f.label }}</span>
               <span v-if="isManual(f)" class="sct-th-src">手动</span>
@@ -60,7 +60,7 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
             <!-- 记录页那个「实验名」多半是空的（编号才是日常叫法），有才跟在编号后面 -->
             <span v-if="r.exp && r.exp.title" class="sct-title">{{ r.exp.title }}</span>
           </td>
-          <td v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num, 'is-manual': isManual(f) }">
+          <td v-for="f in fields" :key="f.key" class="sct-field" :class="{ 'sct-num': f.num, 'is-manual': isManual(f) }">
             <input
               v-if="editable && isManual(f)"
               :value="r.cells[f.key]"

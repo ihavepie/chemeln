@@ -6988,6 +6988,11 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   white-space: normal;
 }
 .sct-table td.is-manual { background: transparent; }
+/* 数字列（产率 / 选择性…）整列居中：以前表头靠左、数字靠右，读着是错位的。
+   长文字的列（相对标准条件、备注）仍旧左对齐，居中会把长短不一的句子甩得很难看。 */
+.sct-table th.sct-num,
+.sct-table td.sct-num { text-align: center; }
+.sct-table th.sct-num .sct-th { justify-content: center; }
 /* 「标准条件」那行字：像文献表格的副标题，压在三线表顶线上面，别抢正文 */
 .sct-table .sct-cap {
   caption-side: top;
@@ -7008,17 +7013,22 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   vertical-align: 1px;
 }
 /* 标准条件的反应式：几何跟三线表一样克制，只铺一张图，不加框 */
-.sct-std { margin: 2px 0 12px; }
+/* 反应式跟表格对齐：左边缘跟表里的字齐、上下不甩开，读起来像表格的一部分 */
+.sct-std { margin: 0 0 2px; padding: 0 12px; }
 /* 条件筛选首页一页可能摊好几张表，那里的图收小一点，别把清单顶下去 */
 .sct-block .sct-std { margin: 0 0 8px; }
-.sct-block .sct-std svg { max-height: 124px; }
+.sct-block .sct-std svg { max-height: 160px; }
 .sct-std svg {
   display: block;
   width: auto;
   max-width: 100%;
-  max-height: 186px;
+  /* 图里箭头上的字是 13px，自然高 230px；压到 200px 时字约 11.5px，跟表格正文差不多大，
+     再小字就比表格里的字细一号，看着像是贴上去的 */
+  max-height: 200px;
   height: auto;
-  margin: 0 auto;
+  margin: 0;
+  /* 文献里的结构式是黑白的；彩色杂原子压在三线表上太跳，这里去色压一下（只影响这张小图） */
+  filter: grayscale(1) brightness(0.72) contrast(1.15);
 }
 
 .sct-th { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; row-gap: 1px; }
