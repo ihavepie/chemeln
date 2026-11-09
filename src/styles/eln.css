@@ -7022,3 +7022,8 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-src-chip:hover { border-color: var(--ink-4); }
 .sct-src-chip.is-on { border-color: var(--accent-ink); color: var(--accent-ink); background: #fdf6f2; }
 
+/* 条件筛选首页：每张筛选表就地摊开（标题行 + 三线表） */
+.sct-block { margin: 12px 0 20px; }
+.sct-block-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 2px; }
+.sct-block-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.sct-block-head .spacer { flex: 1 1 auto; }

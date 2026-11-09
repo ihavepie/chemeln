@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import ExpPick from '../components/ExpPick.vue';
+import ScreeningTable from '../components/ScreeningTable.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { round } from '../lib/reagent.js';
@@ -29,7 +30,9 @@ async function load() {
     const [d, t] = await Promise.all([api.groups(store.project), api.screenings()]);
     const tag = (g, source) => ({ ...g, source });
     groups.value = [...(d.items || []).map((g) => tag(g, 'manual')), ...(d.auto || []).map((g) => tag(g, 'auto'))];
-    tables.value = t || [];
+    // 首页就把每张表摊开：把它的行也一起拉回来（表不多，一次并起来）
+    const full = await Promise.all((t || []).map((x) => api.screening(x.id).catch(() => null)));
+    tables.value = full.filter(Boolean).map((f) => ({ ...f.screening, rows: f.rows || [] }));
   } finally {
     loading.value = false;
   }
@@ -114,12 +117,23 @@ async function adopt(g) {
         <span class="spacer" />
         <button class="btn btn-sm btn-ghost" @click="pickOpen = true"><Icon name="plus" :size="12" /> 新建筛选表</button>
       </div>
-      <div v-if="tables.length" class="sct-cards">
-        <button v-for="t in tables" :key="t.id" type="button" class="sct-card" @click="router.push(`/s/${t.id}`)">
-          <b>{{ t.title }}</b>
-          <span class="sct-card-meta">{{ t.entryCount }} 条 · {{ t.varCount }} 个自加字段</span>
-        </button>
-      </div>
+      <template v-if="tables.length">
+        <section v-for="t in tables" :key="t.id" class="sct-block">
+          <div class="sct-block-head">
+            <b>{{ t.title }}</b>
+            <span class="cx-meta">{{ t.rows.length }} 条 · {{ (t.vars || []).length }} 列</span>
+            <span class="spacer" />
+            <button class="btn btn-sm btn-ghost" @click="router.push(`/s/${t.id}`)">
+              <Icon name="edit" :size="12" /> 打开编辑
+            </button>
+          </div>
+          <ScreeningTable
+            :screening="t"
+            :rows="t.rows"
+            @open="(r) => router.push(`/e/${r.exp_id}`)"
+          />
+        </section>
+      </template>
       <p v-else class="empty-note" style="margin-top: 4px">
         还没有筛选表。点「新建筛选表」从记录里挑几条，或者把下面某一摞直接存成一张表。
       </p>

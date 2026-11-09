@@ -4,9 +4,10 @@ import { useRoute, useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import AppModal from '../components/AppModal.vue';
 import ExpPick from '../components/ExpPick.vue';
+import ScreeningTable from '../components/ScreeningTable.vue';
 import { api } from '../api.js';
 import { prompt, toast, confirm } from '../lib/feedback.js';
-import { SOURCES, DEFAULT_FIELDS, autoValue } from '../lib/sctfields.js';
+import { SOURCES } from '../lib/sctfields.js';
 
 /**
  * 一张条件筛选表：行 = 自己挑的实验，列 = 一串「字段」。
@@ -132,10 +133,6 @@ async function removeScreen() {
   router.push('/screenings');
 }
 
-const base = computed(() => rows.value[0]?.exp || null);
-const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value));
-const subText = (exp) =>
-  exp ? [exp.substrates, exp.product_name].filter(Boolean).join(' → ') || '—' : '记录已删';
 </script>
 
 <template>
@@ -158,50 +155,17 @@ const subText = (exp) =>
 
         <div v-if="!rows.length" class="empty-note">这张表还是空的，点右上「加实验」从记录里挑几条。</div>
 
-        <div v-else class="scope-wrap">
-          <table class="sct-table">
-            <thead>
-              <tr>
-                <th class="sct-c-entry">Entry</th>
-                <th class="sct-c-fix">编号</th>
-                <th class="sct-c-fix">底物 → 产物</th>
-                <th v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num }">
-                  <div class="sct-th">
-                    <span class="sct-th-label">{{ f.label }}</span>
-                    <span v-if="isManual(f)" class="sct-th-src">手动</span>
-                    <span class="sct-th-acts">
-                      <button class="sct-var-x" title="改名" @click="renameField(f)">改</button>
-                      <button class="sct-var-x is-del" title="删这一列" @click="removeField(f)">×</button>
-                    </span>
-                  </div>
-                </th>
-                <th class="sct-c-x"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(r, i) in rows" :key="r.exp_id" :class="{ 'is-base': i === 0 }">
-                <td class="sct-c-entry mono">{{ i + 1 }}</td>
-                <td class="sct-c-fix">
-                  <button v-if="r.exp" class="linklike mono" @click="router.push(`/e/${r.exp_id}`)">{{ r.exp.code }}</button>
-                  <span v-else class="mono muted">#{{ r.exp_id }}</span>
-                </td>
-                <td class="sct-c-fix sct-sub">{{ subText(r.exp) }}</td>
-                <td v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num, 'is-manual': isManual(f) }">
-                  <input
-                    v-if="isManual(f)"
-                    v-model="r.cells[f.key]"
-                    class="sct-cell"
-                    @input="save()"
-                  />
-                  <span v-else class="sct-auto" :class="{ 'sct-wrap': f.source === 'reagent' || f.source === 'variation' }">{{ cell(f, r) || '—' }}</span>
-                </td>
-                <td class="sct-c-x">
-                  <button class="sct-row-x" title="从表里去掉" @click="removeRow(i)">×</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <ScreeningTable
+          v-else
+          :screening="s"
+          :rows="rows"
+          editable
+          @open="(r) => router.push(`/e/${r.exp_id}`)"
+          @change="save()"
+          @rename-field="renameField"
+          @remove-field="removeField"
+          @remove-row="removeRow"
+        />
       </template>
       <div v-else class="empty-note">这张筛选表不存在。</div>
     </div>
