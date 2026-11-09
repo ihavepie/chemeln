@@ -52,8 +52,8 @@ function conditionLine(exp, reagents = []) {
   if (exp.temperature) parts.push(exp.temperature);
   if (exp.duration) parts.push(exp.duration);
   if (exp.atmosphere) parts.push(exp.atmosphere);
-  if (exp.addition) parts.push(String(exp.addition).trim().replace(/^[加投]料(方式)?[:：]?/, ''));
-  if (exp.stir_rate) parts.push(String(exp.stir_rate).trim());
+  if (exp.apparatus) parts.push(String(exp.apparatus).trim());
+  if (exp.light) parts.push(String(exp.light).trim());
   return parts.join('、');
 }
 
@@ -90,7 +90,16 @@ function reagentTable(reagents, steps = []) {
 
   // 只有一步：跟以前一样，一张表
   const multi = steps.length > 1 || rows.some((r) => (Number(r.step) || 1) > 1);
-  if (!multi) return table(rows);
+  if (!multi) {
+    // 单步也要把「这一步怎么加的 / 怎么搅的」写出来，否则记了就丢了
+    const st = steps[0] || {};
+    const notes = [];
+    if (st.condition) notes.push(`> 条件：${st.condition}`);
+    if (st.addition) notes.push(`> 加料：${st.addition}`);
+    if (st.stir) notes.push(`> 搅拌：${st.stir}`);
+    if (st.workup) notes.push(`> 之后：${st.workup}`);
+    return notes.length ? `${table(rows)}\n\n${notes.join('\n')}` : table(rows);
+  }
 
   const groups = new Map();
   for (const r of rows) {
@@ -104,6 +113,8 @@ function reagentTable(reagents, steps = []) {
     const st = steps[s - 1] || {};
     out.push(`**第 ${s} 步${st.label ? ` · ${st.label}` : ''}**`);
     if (st.condition) out.push(`> 条件：${st.condition}`);
+    if (st.addition) out.push(`> 加料：${st.addition}`);
+    if (st.stir) out.push(`> 搅拌：${st.stir}`);
     out.push('');
     const list = groups.get(s) || [];
     out.push(list.length ? table(list) : '_（本步没有投料行）_');

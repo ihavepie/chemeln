@@ -2408,7 +2408,11 @@ kbd {
 
 /* 「之后」：标签左缘对齐「第 1 步」，整体贴左、只留一点 margin */
 /* 「条件 / 之后」和标题同一行，按比例分宽度 */
+/* 步骤行东西变多了（条件/之后/加料/搅拌/起止）：显式分两行，别把「起/止」挤到纸外 */
 .step-head .step-line { gap: 6px; }
+.step-head .step-line-sub { margin-top: 2px; }
+.step-head .step-line-sub .step-tag { width: 22px; }
+.step-head .step-time { flex: 0 0 auto; }
 .step-head .step-label { flex: 1.15; }
 .step-head .step-cond { flex: 1; }
 .step-head .step-after { flex: 0.9; }
@@ -3874,8 +3878,15 @@ kbd {
 .sheet .cond-table .ct-temp { width: 20%; }
 .sheet .cond-table .ct-time { width: 20%; }
 .sheet .cond-table .ct-atm { width: 22%; }
-.sheet .cond-table .ct-add { width: 20%; }
-.sheet .cond-table .ct-stir { width: 18%; }
+.sheet .cond-table .ct-app { width: 20%; }
+.sheet .cond-table .ct-light { width: 18%; }
+/* 步骤行现在还有「加料 / 搅拌」：把两栏固定窄宽，剩下的空间让给名字和条件 */
+.step-line .step-addmode { flex: 0 1 86px; width: 86px; min-width: 56px; }
+.step-line .step-stir { flex: 0 1 100px; width: 100px; min-width: 64px; }
+.step-head .step-label { flex: 1 1 80px; min-width: 60px; }
+.step-head .step-cond { flex: 1 1 70px; min-width: 54px; }
+.step-head .step-after { flex: 0 1 76px; min-width: 48px; }
+.step-head .step-time { flex: 0 0 auto; }
 
 .sheet .cond-table td.cond-cell {
   position: relative;

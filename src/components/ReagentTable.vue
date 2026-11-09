@@ -530,7 +530,7 @@ function removeRow(r) {
 }
 
 function addStep() {
-  props.model.steps.push({ label: '', condition: '', workup: '', start: '', end: '' });
+  props.model.steps.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '' });
   props.model.rows.push({ step: props.model.steps.length, role: '试剂', eq: 1, mwText: '', amountText: '', name: '', note: '' });
   props.notify();
 }
@@ -797,6 +797,19 @@ function onDrop(ev) {
                   <input class="step-after" :value="s.workup" :disabled="locked" @change="onStepField(si, 'workup', $event.target.value)" />
                 </template>
                 <span class="step-spacer" />
+                <button type="button" class="step-add noprint" title="在这一步加一行投料" @click="addRow(si + 1)"><Icon name="plus" :size="11" /></button>
+                <button type="button" class="step-del noprint" title="删除这一步" @click="removeStep(si)"><Icon name="x" :size="11" /></button>
+              </div>
+              <div class="step-line step-line-sub noprint-wrap">
+                <template v-if="steps.length > 1 || s.addition">
+                  <span class="step-tag">加料</span>
+                  <input class="step-addmode" :value="s.addition" placeholder="滴加 / 分批" :disabled="locked" @change="onStepField(si, 'addition', $event.target.value)" />
+                </template>
+                <template v-if="steps.length > 1 || s.stir">
+                  <span class="step-tag">搅拌</span>
+                  <input class="step-stir" :value="s.stir" placeholder="500 rpm" :disabled="locked" @change="onStepField(si, 'stir', $event.target.value)" />
+                </template>
+                <span class="step-spacer" />
                 <span class="step-time">
                   <input
                     class="step-time-in"
@@ -814,8 +827,6 @@ function onDrop(ev) {
                     @input="onStepTime($event, si, 'end')"
                   />
                 </span>
-                <button type="button" class="step-add noprint" title="在这一步加一行投料" @click="addRow(si + 1)"><Icon name="plus" :size="11" /></button>
-                <button type="button" class="step-del noprint" title="删除这一步" @click="removeStep(si)"><Icon name="x" :size="11" /></button>
               </div>
             </td>
           </tr>

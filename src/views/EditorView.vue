@@ -51,7 +51,7 @@ const recipePick = ref(null);
 const fields = reactive({
   title: '', date: '', status: '进行中', operator: '', ambient_temp: '', ambient_humid: '',
   project: '', rxn_type: '', literature: '', objective: '', solvent: '', concentration: '',
-  temperature: '', duration: '', atmosphere: '', addition: '', stir_rate: '', workup: '', procedure: '', product_name: '',
+  temperature: '', duration: '', atmosphere: '', apparatus: '', light: '', workup: '', procedure: '', product_name: '',
   appearance: '', yield_pct: '', product_mass: '', product_mw: '', tlc_note: '', dr_ee: '',
   ee_pct: '', sel_method: '', sel_condition: '', sel_rt: '',
   characterization: '', notes: '', conclusion: '', product_compound_id: null, category_id: null,
@@ -96,9 +96,11 @@ function fill(e) {
     workup: s.workup || '',
     start: s.start || '',
     end: s.end || '',
+    addition: s.addition || '',
+    stir: s.stir || '',
   }));
   const need = (e.reagents || []).reduce((m, r) => Math.max(m, Number(r.step) || 1), 1);
-  while (list.length < Math.max(1, need)) list.push({ label: '', condition: '', workup: '', start: '', end: '' });
+  while (list.length < Math.max(1, need)) list.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '' });
   const rows = (e.reagents || []).map(toRow);
   // 一条试剂都还没有时，第一步给一行空行当起点；其余步骤不再自动补空行
   if (!rows.length) rows.push({ step: 1, role: '底物', eq: 1, mwText: '', amountText: '', name: '', note: '' });
@@ -686,7 +688,13 @@ async function applyRecipe() {
   recipeModal.value = false;
   if (!src) return;
   const full = await api.experiment(src.id);
-  const list = (full.steps || []).map((s) => ({ label: s.label || '', condition: s.condition || '', workup: s.workup || '' }));
+  const list = (full.steps || []).map((s) => ({
+    label: s.label || '',
+    condition: s.condition || '',
+    workup: s.workup || '',
+    addition: s.addition || '',
+    stir: s.stir || '',
+  }));
   while (!list.length) list.push({ label: '', condition: '', workup: '' });
   reagent.steps = list;
   // 套用配方 = 把这套投料方案按「当前反应规模」重新算一遍（弹窗上就是这么写的）。

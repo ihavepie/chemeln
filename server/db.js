@@ -185,9 +185,9 @@ ensureColumn('experiments', 'tlc_note', "tlc_note TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'steps_json', "steps_json TEXT NOT NULL DEFAULT '[]'");
 // 粗产物 / 中间体这类「不计产率」：只记质量，不显示也不统计产率
 ensureColumn('experiments', 'no_yield', 'no_yield INTEGER NOT NULL DEFAULT 0');
-// 条件行补两栏：怎么加的、搅多快（自由文本，导出/打印一起走）
-ensureColumn('experiments', 'addition', "addition TEXT NOT NULL DEFAULT ''");
-ensureColumn('experiments', 'stir_rate', "stir_rate TEXT NOT NULL DEFAULT ''");
+// 条件行补两栏：用什么装置、有没有光照（自由文本，导出/打印一起走）
+ensureColumn('experiments', 'apparatus', "apparatus TEXT NOT NULL DEFAULT ''");
+ensureColumn('experiments', 'light', "light TEXT NOT NULL DEFAULT ''");
 ensureColumn('reagents', 'conc', 'conc REAL');
 ensureColumn('reagents', 'step', 'step INTEGER NOT NULL DEFAULT 1');
 // 投料行可以指向化合物库里的化合物；实验产物也可以
