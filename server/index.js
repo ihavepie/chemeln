@@ -2477,7 +2477,8 @@ function listGroupTables(project) {
         ORDER BY id`
     )
     .all(...args)
-    .filter((m) => !grouped.has(m.group_id));
+    // 原料那类记录不是「同一条件下换条件」的实验，别自动匹配进条件筛选表
+    .filter((m) => !grouped.has(m.group_id) && str(m.kind) !== '原料');
 
   const sigOf = (m) => {
     const subs = db
