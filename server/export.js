@@ -52,6 +52,8 @@ function conditionLine(exp, reagents = []) {
   if (exp.temperature) parts.push(exp.temperature);
   if (exp.duration) parts.push(exp.duration);
   if (exp.atmosphere) parts.push(exp.atmosphere);
+  if (exp.addition) parts.push(String(exp.addition).trim().replace(/^[加投]料(方式)?[:：]?/, ''));
+  if (exp.stir_rate) parts.push(String(exp.stir_rate).trim());
   return parts.join('、');
 }
 

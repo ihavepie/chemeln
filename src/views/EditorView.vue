@@ -51,7 +51,7 @@ const recipePick = ref(null);
 const fields = reactive({
   title: '', date: '', status: '进行中', operator: '', ambient_temp: '', ambient_humid: '',
   project: '', rxn_type: '', literature: '', objective: '', solvent: '', concentration: '',
-  temperature: '', duration: '', atmosphere: '', workup: '', procedure: '', product_name: '',
+  temperature: '', duration: '', atmosphere: '', addition: '', stir_rate: '', workup: '', procedure: '', product_name: '',
   appearance: '', yield_pct: '', product_mass: '', product_mw: '', tlc_note: '', dr_ee: '',
   ee_pct: '', sel_method: '', sel_condition: '', sel_rt: '',
   characterization: '', notes: '', conclusion: '', product_compound_id: null, category_id: null,

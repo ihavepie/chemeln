@@ -18,6 +18,8 @@ const fields = [
   { key: 'temperature', label: '反应温度', ph: '−78 ℃', cls: 'ct-temp ct-temp-wide' },
   { key: 'duration', label: '时间节点', ph: '8:45 → 15:11', cls: 'ct-time' },
   { key: 'atmosphere', label: '气氛 / 容器', ph: 'N₂，封管', cls: 'ct-atm' },
+  { key: 'addition', label: '加料方式', ph: '滴加 / 分批 / 一锅', cls: 'ct-add' },
+  { key: 'stir_rate', label: '搅拌 / 转速', ph: '磁搅 500 rpm', cls: 'ct-stir' },
 ];
 
 const open = ref('');

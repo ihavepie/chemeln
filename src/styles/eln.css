@@ -3871,9 +3871,11 @@ kbd {
 .sheet .cond-table { margin-top: 12px; }
 
 /* 条件行现在只剩三栏（溶剂进了投料表、浓度不摆）：三等分铺满，右侧不留空格子 */
-.sheet .cond-table .ct-temp { width: 30%; }
-.sheet .cond-table .ct-time { width: 32%; }
-.sheet .cond-table .ct-atm { width: 38%; }
+.sheet .cond-table .ct-temp { width: 20%; }
+.sheet .cond-table .ct-time { width: 20%; }
+.sheet .cond-table .ct-atm { width: 22%; }
+.sheet .cond-table .ct-add { width: 20%; }
+.sheet .cond-table .ct-stir { width: 18%; }
 
 .sheet .cond-table td.cond-cell {
   position: relative;

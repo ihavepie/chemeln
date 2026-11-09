@@ -138,7 +138,7 @@ const EXP_COLUMNS = [
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
   'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles',
-  'no_yield',
+  'no_yield', 'addition', 'stir_rate',
 ];
 
 const NUMERIC_COLUMNS = new Set([
@@ -214,6 +214,7 @@ const EXP_FIELD_LABELS = {
   scheme_rxn: '反应式（画板）', scheme_smiles: '反应式（文本）', title: '标题', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
   ambient_humid: '湿度', project: '课题', rxn_type: '类型', literature: '文献', objective: '实验目的',
   solvent: '溶剂', concentration: '浓度', temperature: '温度', duration: '时间', atmosphere: '气氛',
+  addition: '加料方式', stir_rate: '搅拌 / 转速',
   workup: '后处理', procedure: '操作步骤', product_name: '产物', appearance: '性状', yield_pct: '产率',
   dr_ee: '选择性', characterization: '表征数据', notes: '实验现象', conclusion: '结论',
   base_mmol: '反应规模', product_mass: '产物质量', product_mw: '产物分子量', tlc_note: 'TLC',
