@@ -122,6 +122,7 @@ function fill(e) {
   reagent.base = e.base_mmol ?? null;
   reagent.steps = list;
   reagent.rows = rows;
+  ensureSolventRow();     // 老记录：溶剂还在字段里 → 补成投料表的一行
   markLoaded();
 }
 
@@ -867,12 +868,27 @@ const concFromTable = computed(() => {
 });
 
 // 算出来就写回字段，导出 / 打印 / 搜索都跟得上；算不出来时保留原来填的内容
-watch([solventFromTable, concFromTable], ([s, c]) => {
-  if (s && fields.solvent !== s) fields.solvent = s;
+// 溶剂行被删干净时，把条件里的溶剂一起清掉（否则下次打开又会被补回来）
+watch(solventFromTable, (s, old) => {
+  if (s) {
+    if (fields.solvent !== s) fields.solvent = s;
+  } else if (old) {
+    fields.solvent = '';
+  }
+});
+watch(concFromTable, (c) => {
   if (c && fields.concentration !== c) fields.concentration = c;
 });
 
 // 投料表里算得出来才锁成只读文字；算不出来（比如没标「溶剂」行）就保留手填
+/** 老记录把溶剂存在字段里：打开时补成投料表的一行（保存后就是表里的溶剂行了） */
+function ensureSolventRow() {
+  const s = String(fields.solvent || '').trim();
+  if (!s) return;
+  if (reagent.rows.some((r) => r.role === '溶剂' && String(r.name || '').trim())) return;
+  reagent.rows.push({ step: Math.max(1, reagent.steps.length), role: '溶剂', eq: '', mwText: '', amountText: '', name: s, note: '' });
+}
+
 const condFixed = computed(() => {
   const fixed = {};
   if (solventFromTable.value) fixed.solvent = solventFromTable.value;

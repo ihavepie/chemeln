@@ -514,6 +514,12 @@ function addRow(step) {
   props.notify();
 }
 
+/** 溶剂也是投料表的一行（以前单独摆在「条件」里，用户想直接在这里加） */
+function addSolvent() {
+  props.model.rows.push({ step: steps.value.length, role: '溶剂', eq: '', mwText: '', amountText: '', name: '', note: '' });
+  props.notify();
+}
+
 function removeRow(r) {
   const i = props.model.rows.indexOf(r);
   if (i < 0) return;
@@ -979,6 +985,7 @@ function onDrop(ev) {
           <td colspan="9">
             <div class="add-cell">
               <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
+              <button class="add-row" @click="addSolvent"><Icon name="plus" :size="12" /> 加溶剂</button>
               <button class="add-row" @click="addStep"><Icon name="plus" :size="12" /> 加一步</button>
               <span class="spacer" />
               <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>

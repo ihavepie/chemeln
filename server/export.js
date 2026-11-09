@@ -43,9 +43,11 @@ const CELL_CATEGORY = {
   other: '其他附件',
 };
 
-function conditionLine(exp) {
+function conditionLine(exp, reagents = []) {
   const parts = [];
-  if (exp.solvent) parts.push(exp.solvent);
+  // 投料表里已经有「溶剂」行时，溶剂名就不再在条件里重复一遍
+  const solventInTable = reagents.some((r) => r.role === '溶剂' && String(r.name || '').trim());
+  if (exp.solvent && !solventInTable) parts.push(exp.solvent);
   if (exp.concentration) parts.push(exp.concentration);
   if (exp.temperature) parts.push(exp.temperature);
   if (exp.duration) parts.push(exp.duration);
@@ -159,7 +161,7 @@ function experimentToMarkdown(exp, { reagents = [], attachments = [], settings =
 
   L.push('## 反应条件');
   L.push('');
-  L.push(`- 溶剂 / 条件：${conditionLine(exp) || '—'}`);
+  L.push(`- 溶剂 / 条件：${conditionLine(exp, reagents) || '—'}`);
   if (exp.base_mmol) L.push(`- 反应规模：${num(exp.base_mmol, 3)} mmol（以底物计）`);
   const stepCount = Math.max((exp.steps || []).length, ...reagents.map((r) => Number(r.step) || 1), 1);
   if (stepCount > 1) L.push(`- 步骤：${stepCount} 步（步骤之间做了后处理，属两步连开）`);

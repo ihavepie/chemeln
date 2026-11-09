@@ -1,7 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from './Icon.vue';
-import { applyNumeric } from '../lib/numinput.js';
 import { QUICK } from '../lib/ui.js';
 
 const props = defineProps({
@@ -13,10 +12,10 @@ const props = defineProps({
 });
 
 /** 和下面「结果」那张表同款：一行表头 + 一行值 */
+// 溶剂已经挪进投料表（作为「溶剂」行），浓度不常用就不摆了；
+// 两个字段还在（导出/打印读得到，投料表里有溶剂行时会自动算出来）
 const fields = [
-  { key: 'solvent', label: '溶剂', ph: 'THF', cls: 'ct-solvent' },
-  { key: 'concentration', label: '浓度', ph: '0.1 M', cls: 'ct-conc' },
-  { key: 'temperature', label: '反应温度', ph: '−78 ℃', cls: 'ct-temp' },
+  { key: 'temperature', label: '反应温度', ph: '−78 ℃', cls: 'ct-temp ct-temp-wide' },
   { key: 'duration', label: '时间节点', ph: '8:45 → 15:11', cls: 'ct-time' },
   { key: 'atmosphere', label: '气氛 / 容器', ph: 'N₂，封管', cls: 'ct-atm' },
 ];
@@ -24,9 +23,8 @@ const fields = [
 const open = ref('');
 const optionsFor = (key) => QUICK[`f-${key}`] || [];
 
-/** 浓度是数字 + M，其他栏（THF、−78 ℃、16 h、N₂）保持自由输入 */
+/** 这几栏都是自由输入（−78 ℃、16 h、N₂） */
 function onInput(ev, f) {
-  if (f.key === 'concentration') applyNumeric(ev.target, 'Mm');
   props.model[f.key] = ev.target.value;
 }
 
