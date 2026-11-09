@@ -1907,8 +1907,82 @@ route('DELETE', '/api/compound-files/:id', async (req, res, params) => {
 route('GET', '/api/experiments', async (req, res, params, url) => {
   const q = Object.fromEntries(url.searchParams.entries());
   const { items, total } = listExperiments(q);
+  annotateGroupDiff(items);
   ok(res, { items, total });
 });
+
+/**
+ * 组内成员「相对基准改了什么」——卡片上就靠这一行看出差异：
+ *   · 什么都没改 = 重复
+ *   · 改一项     = 筛条件里的一个点
+ *   · 改多项     = 如实写「改 温度＋配体」
+ * 比较的是条件和投料（等量/名字），不比质量、产率这些结果字段。
+ */
+const DIFF_FIELDS = [
+  ['temperature', '温度'],
+  ['solvent', '溶剂'],
+  ['duration', '时间'],
+  ['atmosphere', '气氛'],
+  ['addition', '加料'],
+];
+
+/** 投料表签名：role+名字 → 当量（同名同角色只算一项，方便判断「只是改了当量」） */
+function reagentMap(expId) {
+  const out = new Map();
+  for (const r of db
+    .prepare("SELECT role, name, IFNULL(eq,'') AS eq FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY role, name")
+    .all(expId)) {
+    out.set(`${r.role}:${r.name}`, String(r.eq));
+  }
+  return out;
+}
+
+function annotateGroupDiff(items) {
+  const groups = new Map();
+  for (const it of items) {
+    const gid = it.group_id || '';
+    if (!gid || !(it.group_size > 1)) continue;
+    if (!groups.has(gid)) groups.set(gid, []);
+    groups.get(gid).push(it);
+  }
+  for (const [, members] of groups) {
+    const ids = members.map((m) => m.id);
+    const rows = db
+      .prepare(`SELECT id, temperature, solvent, duration, atmosphere, addition FROM experiments WHERE id IN (${ids.map(() => '?').join(',')})`)
+      .all(...ids);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const base = members.find((m) => String(m.variant || '').includes('基准')) || members[0];
+    const baseRow = byId.get(base.id) || {};
+    const baseMap = reagentMap(base.id);
+    for (const m of members) {
+      if (m.id === base.id) {
+        m.group_diff = '基准';
+        continue;
+      }
+      const row = byId.get(m.id) || {};
+      const diffs = [];
+      for (const [key, label] of DIFF_FIELDS) {
+        const a = str(baseRow[key]).trim();
+        const b = str(row[key]).trim();
+        if (a !== b) diffs.push(`${label} ${b || '空'}`);
+      }
+      const map = reagentMap(m.id);
+      for (const [key, eq] of map) {
+        const [role, name] = key.split(':');
+        if (!baseMap.has(key)) diffs.push(`${role} +${name}${eq ? ` ${eq} eq` : ''}`);
+        else if (String(baseMap.get(key)) !== String(eq)) diffs.push(`${name} ${eq || '—'} eq`);
+      }
+      for (const [key] of baseMap) if (!map.has(key)) diffs.push(`去掉 ${key.split(':')[1]}`);
+      // 一项就是「筛条件的那个点」；改多了也如实写，但卡片上只留前两项 + 总数，免得撑爆一行
+      m.group_diff = diffs.length
+        ? diffs.length > 2
+          ? `改 ${diffs.slice(0, 2).join('、')} 等 ${diffs.length} 项`
+          : `改 ${diffs.join('、')}`
+        : '重复';
+      m.group_diff_count = diffs.length;
+    }
+  }
+}
 
 /** 下一个排在最前面的 sort_index */
 function topSortIndex(table) {

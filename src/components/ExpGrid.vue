@@ -7,7 +7,6 @@ import { store, loadBoot, loadList, recordCategories, createExperiment } from '.
 import { createPointerSort } from '../lib/pointdrag.js';
 import { withFlip } from '../lib/flip.js';
 import { STATUS_TONE } from '../lib/ui.js';
-import { KIND_TONE } from '../lib/kind.js';
 import { toast } from '../lib/feedback.js';
 import { experimentMenu } from '../lib/rowmenu.js';
 
@@ -230,11 +229,11 @@ async function dropCard(id, groupKey, at) {
                 @click="openCard(card)"
                 @contextmenu="experimentMenu($event, card.it, router, { groupSize: card.members.length })"
               >
-                <div class="grid-thumb" :data-kind="KIND_TONE[card.it.kind] || ''">
+                <div class="grid-thumb">
                   <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
                   <Icon v-else name="flask" :size="20" class="i-empty" />
                   <span class="stack-badge is-corner" :title="card.members.map((m) => `${m.code} ${m.status}`).join(' / ')">
-                    <template v-if="card.it.kind">{{ card.it.kind }} · </template>平行 ×{{ card.members.length }}
+                    平行 ×{{ card.members.length }}
                   </span>
                 </div>
                 <div class="grid-body">
@@ -247,7 +246,10 @@ async function dropCard(id, groupKey, at) {
                   <div class="exp-meta">
                     <span v-if="card.it.category_name" class="cat-tag">{{ card.it.category_name }}</span>
                     <span v-if="card.it.project">{{ card.it.project }}</span>
-                    <template v-if="card.it.rxn_type"><span v-if="card.it.project" class="sep">·</span><span>{{ card.it.rxn_type }}</span></template>
+                    <template v-if="card.it.group_diff && card.it.group_diff !== '基准'">
+                    <span class="sep">·</span><span class="exp-diff">{{ card.it.group_diff }}</span>
+                  </template>
+                  <template v-else-if="card.it.rxn_type"><span v-if="card.it.project" class="sep">·</span><span>{{ card.it.rxn_type }}</span></template>
                     <template v-if="card.it.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ card.it.yield_pct }}%</span></template>
                     <template v-if="card.it.reagent_count"><span class="sep">·</span><span>{{ card.it.reagent_count }} 投料</span></template>
                   </div>
@@ -266,12 +268,10 @@ async function dropCard(id, groupKey, at) {
               @click="openCard(card)"
               @contextmenu="experimentMenu($event, card.it, router)"
             >
-              <div class="grid-thumb" :data-kind="KIND_TONE[card.it.kind] || ''">
+              <div class="grid-thumb">
                 <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
                 <Icon v-else name="flask" :size="20" class="i-empty" />
                 <!-- 平行组标记钉在缩略图角上：塞进下面那行会把编号/日期挤出去 -->
-                <!-- 记录类型：一个角落小标签，不占正文位置 -->
-                <span v-if="card.it.kind" class="kind-badge is-corner">{{ card.it.kind }}</span>
                 <span v-if="card.it.group_size > 1" class="stack-badge is-corner" :class="{ 'is-below': card.it.kind }" :title="`属于一个平行组（共 ${card.it.group_size} 条，筛出来的只有这一条）`">平行 ×{{ card.it.group_size }}</span>
               </div>
               <div class="grid-body">
@@ -284,7 +284,10 @@ async function dropCard(id, groupKey, at) {
                 <div class="exp-meta">
                   <span v-if="card.it.category_name" class="cat-tag">{{ card.it.category_name }}</span>
                   <span v-if="card.it.project">{{ card.it.project }}</span>
-                  <template v-if="card.it.rxn_type"><span v-if="card.it.project" class="sep">·</span><span>{{ card.it.rxn_type }}</span></template>
+                  <template v-if="card.it.group_diff && card.it.group_diff !== '基准'">
+                    <span class="sep">·</span><span class="exp-diff">{{ card.it.group_diff }}</span>
+                  </template>
+                  <template v-else-if="card.it.rxn_type"><span v-if="card.it.project" class="sep">·</span><span>{{ card.it.rxn_type }}</span></template>
                   <template v-if="card.it.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ card.it.yield_pct }}%</span></template>
                   <template v-if="card.it.reagent_count"><span class="sep">·</span><span>{{ card.it.reagent_count }} 投料</span></template>
                 </div>

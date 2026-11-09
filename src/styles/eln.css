@@ -1176,20 +1176,8 @@ body {
   border: 1px solid var(--line-2); background: rgba(255, 255, 255, 0.9); color: var(--ink-3);
   font-size: 11px; line-height: 1; -webkit-tap-highlight-color: transparent;
 }
-/* 记录类型：卡片缩略图左边一条竖色条 + 角落小标签 */
-.grid-thumb[data-kind] { box-shadow: inset 3px 0 0 var(--line-2); }
-.grid-thumb[data-kind="material"] { box-shadow: inset 3px 0 0 #c9a227; }
-.grid-thumb[data-kind="trial"]    { box-shadow: inset 3px 0 0 #6f8fb5; }
-.grid-thumb[data-kind="screen"]   { box-shadow: inset 3px 0 0 #b87a5a; }
-.grid-thumb[data-kind="scope"]    { box-shadow: inset 3px 0 0 #7f9a6a; }
-.kind-badge {
-  position: absolute; left: 6px; top: 6px;
-  font-size: 9px; letter-spacing: 0.02em; line-height: 1;
-  padding: 3px 6px; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92); color: var(--ink-2);
-  border: 1px solid var(--line-2);
-}
-.stack-badge.is-below { left: 6px; top: 26px; }
+/* 组内「相对基准改了什么」：一行小字，太长就省略 */
+.exp-diff { color: var(--ink-3); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 手机端返回列表的小链接 */
 .phone-back { color: var(--ink-3); text-decoration: none; font-size: 12.5px; }
 .phone-back-top { display: inline-block; margin-bottom: 8px; }
