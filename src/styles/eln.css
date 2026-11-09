@@ -7009,6 +7009,9 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 /* 标准条件的反应式：几何跟三线表一样克制，只铺一张图，不加框 */
 .sct-std { margin: 2px 0 12px; }
+/* 条件筛选首页一页可能摊好几张表，那里的图收小一点，别把清单顶下去 */
+.sct-block .sct-std { margin: 0 0 8px; }
+.sct-block .sct-std svg { max-height: 124px; }
 .sct-std svg {
   display: block;
   width: auto;

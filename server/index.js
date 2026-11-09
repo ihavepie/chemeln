@@ -2595,7 +2595,10 @@ route('GET', '/api/screenings/:id', async (req, res, params) => {
                                  (SELECT group_concat(r.name, ' + ') FROM reagents r
                                    WHERE r.exp_id = e.id AND r.role = '底物' AND trim(r.name) <> '') AS substrates
                             FROM experiments e WHERE e.id = ?`);
-  const reagents = db.prepare("SELECT role, name, eq FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id");
+  // 带上 compound_id：筛选表要按结构画「标准条件」的反应式，光有名字匹配不到（同名/错字就废了）
+  const reagents = db.prepare(
+    "SELECT role, name, eq, compound_id FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id"
+  );
   const rows = s.entries.map((e) => {
     const exp = one.get(Number(e.exp_id));
     return {

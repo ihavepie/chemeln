@@ -190,11 +190,10 @@ async function removeScreen() {
 
         <template v-else>
           <!-- 能画出结构就把标准条件画出来（箭头上下已经写着试剂 / 溶剂 / 温度），画不出来退回一行字 -->
-          <div v-if="stdSvg" class="sct-std" v-html="stdSvg" />
-
           <ScreeningTable
             :screening="s"
             :rows="rows"
+            :scheme="stdSvg"
             :standard="stdSvg ? '' : stdLine"
             editable
             @open="(r) => router.push(`/e/${r.exp_id}`)"

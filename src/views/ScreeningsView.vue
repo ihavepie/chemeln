@@ -9,7 +9,7 @@ import { store } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { toast } from '../lib/feedback.js';
 import { DEFAULT_FIELDS } from '../lib/sctfields.js';
-import { standardLine } from '../lib/expScheme.js';
+import { schemeParts, standardLine } from '../lib/expScheme.js';
 
 /**
  * 条件筛选 = 一摞平行实验里「跟基准不一样」的那些，摊成一张清单。
@@ -34,8 +34,43 @@ async function load() {
     // 首页就把每张表摊开：把它的行也一起拉回来（表不多，一次并起来）
     const full = await Promise.all((t || []).map((x) => api.screening(x.id).catch(() => null)));
     tables.value = full.filter(Boolean).map((f) => ({ ...f.screening, rows: f.rows || [] }));
+    void buildSchemes();
   } finally {
     loading.value = false;
+  }
+}
+
+/* 每张表顶上那张「标准条件」反应式：基准那条的底物 / 产物在化合物库里就画，画不出来退回一行字 */
+const schemes = ref({});
+let cmpsCache = null;
+
+async function buildSchemes() {
+  let lib = [];
+  try {
+    if (!cmpsCache) cmpsCache = await api.compounds();
+    lib = cmpsCache;
+  } catch {
+    return;
+  }
+  const out = {};
+  for (const t of tables.value) {
+    const base = t.rows && t.rows[0] && t.rows[0].exp;
+    if (!base) continue;
+    const parts = schemeParts(base, lib);
+    if (!parts.reactants.length || !parts.product) continue;
+    try {
+      const { composeSchemeSvg } = await import('../lib/scheme.js');
+      out[t.id] = await composeSchemeSvg({
+        reactants: parts.reactants,
+        product: parts.product,
+        above: parts.above,
+        below: parts.below,
+        background: false,
+      });
+      schemes.value = { ...schemes.value, [t.id]: out[t.id] };
+    } catch {
+      /* 这张画不出来就只留那行字 */
+    }
   }
 }
 
@@ -131,7 +166,8 @@ async function adopt(g) {
           <ScreeningTable
             :screening="t"
             :rows="t.rows"
-            :standard="standardLine(t.rows[0] && t.rows[0].exp)"
+            :scheme="schemes[t.id]"
+            :standard="schemes[t.id] ? '' : standardLine(t.rows[0] && t.rows[0].exp)"
             @open="(r) => router.push(`/e/${r.exp_id}`)"
           />
         </section>

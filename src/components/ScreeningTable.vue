@@ -15,6 +15,8 @@ const props = defineProps({
   editable: { type: Boolean, default: false },
   // 「标准条件」一行字（基准那条记录的投料 + 溶剂 / 温度 / 时间），像文献表格的副标题
   standard: { type: String, default: '' },
+  // 能画出结构时给一段反应式 SVG（不带白底），画在表格上方；给了它就不用再给 standard
+  scheme: { type: String, default: '' },
 });
 const emit = defineEmits(['open', 'change', 'rename-field', 'remove-field', 'remove-row']);
 
@@ -27,6 +29,7 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
 
 <template>
   <div class="scope-wrap">
+    <div v-if="scheme" class="sct-std" v-html="scheme" />
     <table class="sct-table">
       <caption v-if="standard" class="sct-cap">
         <span class="sct-cap-lbl">标准条件</span>{{ standard }}
