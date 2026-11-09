@@ -151,10 +151,10 @@
 - **缩写基团的键会被渲染器截短**：给标签留位、截掉约 0.28 键长，**只跟标签字号有关**（放大图 / 调 bond-length 都没用），补法见 `lib/abbrevspread.js`；改 SVG 必须重算 `viewBox`，否则外移的标签被裁。
 - **标签字高 = `chemdraw.js` 的 `LABEL_RATIO`（字高/键长，现 0.40）**，已存结构图靠三个幂等脚本对齐、别手工乘倍数：①`normalize-labels.py` 按当前文件反算倍率；放大**不能绕中心**（朝键一侧会涨 3–9 单位、压到键线 → 看着「偏离」），要在标签框候选点里挑「与所有键段留白最大」的中心，留白不够先外推（≤8 单位）再降这张图的倍率；**单字原子标必须绕原子原地放大、不位移**。②`fit-canvas.py` 按真实渲染外框重算 viewBox，**量外框必须一张一页**（Indigo 的 `#glyph-*` id 是文档级的，多图同页会互相引错，踩过一次以为文件坏了）。③`normalize-style.py` 把 px 归一到「一个键 24px」、线宽 0.06×键长——卡片按图片原始 px 显示，不归一化同一面墙就粗细不一。
 - **新存的图也要放大**：`chemdrawLabels` 认不准就原样返回 Indigo 小字 → `SketcherModal` 再兜底 `scaleGlyphLabels`（同 ratio、幂等）。
-- molfile 解析**不能 trim**（首行空行是格式的一部分），SMILES 才 trim。
-- Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
+- molfile 解析**不能 trim**（首行空行是格式的一部分）。
+- 切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
-- **溶剂是投料表的一行**（role=`溶剂`，「＋ 加溶剂」插入），`CondRow` 只剩温度/时间/气氛。老记录的 `fields.solvent` 由 `fill()` 末尾 `ensureSolventRow()` 补成表行；溶剂行删光时 `watch(solventFromTable)` 清掉字段，免得下次又补回来。两个字段仍由表算出写回（导出/搜索用）。
+- **溶剂是投料表的一行**（role=`溶剂`，「＋ 加溶剂」插入），`CondRow` 只剩温度/时间/气氛。老记录的 `fields.solvent` 由 `fill()` 末尾 `ensureSolventRow()` 补成表行；溶剂行删光时 `watch(solventFromTable)` 清掉字段，免得下次又补回来。两个字段仍由表算出写回。
 - 结果区（`ResultBlock`）：`.row-del` 清空整行并解绑化合物；产率表头 `∅` 切「不计产率」（`experiments.no_yield`，粗品用）。新列走 `server/db.js` 的 `ensureColumn`。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
 - **Safari 拖不动的真因**：元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element` / 卡片图片自带的拖拽能力），真鼠标一拖就起原生拖拽会话，之后 `mousemove` 全被吞 → 「按着拖没反应」；而 `new MouseEvent()` **不会**启动原生拖拽，所以自动化测试全绿、真机全死。规矩：①一律 `-webkit-user-drag: none`、别加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`；③**只能看 `data/drag-debug.log` 验证**（`lib/draglog.js`）。本机模拟不了真鼠标（`CGEvent` 无权限）。
