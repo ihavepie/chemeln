@@ -132,7 +132,8 @@ async function removeScreen() {
   router.push('/screenings');
 }
 
-const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp));
+const base = computed(() => rows.value[0]?.exp || null);
+const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value));
 const subText = (exp) =>
   exp ? [exp.substrates, exp.product_name].filter(Boolean).join(' → ') || '—' : '记录已删';
 </script>
@@ -161,6 +162,7 @@ const subText = (exp) =>
           <table class="sct-table">
             <thead>
               <tr>
+                <th class="sct-c-entry">Entry</th>
                 <th class="sct-c-fix">编号</th>
                 <th class="sct-c-fix">底物 → 产物</th>
                 <th v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num }">
@@ -177,7 +179,8 @@ const subText = (exp) =>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(r, i) in rows" :key="r.exp_id">
+              <tr v-for="(r, i) in rows" :key="r.exp_id" :class="{ 'is-base': i === 0 }">
+                <td class="sct-c-entry mono">{{ i + 1 }}</td>
                 <td class="sct-c-fix">
                   <button v-if="r.exp" class="linklike mono" @click="router.push(`/e/${r.exp_id}`)">{{ r.exp.code }}</button>
                   <span v-else class="mono muted">#{{ r.exp_id }}</span>

@@ -6975,6 +6975,11 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 .sct-table tbody tr:hover td { background: #fbfaf7; }
 .sct-table .sct-c-fix { background: #fbfaf7; white-space: nowrap; }
+/* 文献里的优化表：Entry 序号一列 + 基准那一行整行淡底 */
+.sct-table .sct-c-entry { width: 1%; text-align: right; color: var(--ink-3); }
+.sct-table tbody tr.is-base td { background: #f3f1ec; }
+.sct-table tbody tr.is-base .sct-c-entry { color: var(--ink-2); font-weight: 600; }
+.sct-table tbody tr.is-base .sct-c-fix { background: #efece5; }
 .sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 190px; max-width: 260px; }
 .sct-table .sct-c-x { width: 1%; }
 .sct-table .sct-num { text-align: right; }
