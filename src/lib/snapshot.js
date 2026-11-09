@@ -95,6 +95,34 @@ export async function exportSnapshotHtml(name = '记录') {
   downloadBlob(new Blob([doc], { type: 'text/html;charset=utf-8' }), `${name}.html`);
 }
 
+/**
+ * 打包导出（.zip）：自包含网页 + 原始附件 + 原始 JSON。
+ * 想要「一个文件拿走、里面什么都有」时用这个——网页里图是内联的，
+ * 附件目录里放的是原图/原始数据（不重采样、不转码）。
+ */
+export async function exportSnapshotBundle(name = '记录', expId = null) {
+  const { html, css } = buildSnapshotDoc();
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  await inlineImages(box);      // 网页里那几张图也内联，单看网页也不缺图
+  const doc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${name}</title><style>${css}</style></head><body>${box.innerHTML}</body></html>`;
+  const res = await fetch('/api/export/bundle', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ html: doc, expId, filename: name }),
+  });
+  if (!res.ok) {
+    let msg = '打包失败';
+    try {
+      msg = (await res.json()).error || msg;
+    } catch {
+      /* 保持默认提示 */
+    }
+    throw new Error(msg);
+  }
+  downloadBlob(await res.blob(), `${name}.zip`);
+}
+
 /** 整页长图：交给服务端用系统 WebKit 截图（保留 retina 清晰度，不分页不裁切） */
 export async function exportSnapshotPng(name = '记录') {
   const { html, css } = buildSnapshotDoc();

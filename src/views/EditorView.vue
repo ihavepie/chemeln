@@ -26,7 +26,7 @@ import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
 import { flattenTextareas } from '../lib/autogrow.js';
-import { exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
+import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
 import { canonicalSmiles } from '../lib/chem.js';
 import { composeSchemeSvg } from '../lib/scheme.js';
@@ -959,6 +959,15 @@ async function snapshotPng() {
   }
 }
 
+async function snapshotBundle() {
+  if (dirty.value) await flush();
+  try {
+    await exportSnapshotBundle(exp.value.code || '记录', exp.value.id);
+  } catch (e) {
+    toast(e.message || '打包失败', 'err');
+  }
+}
+
 async function snapshotHtml() {
   if (dirty.value) await flush();
   try {
@@ -1042,6 +1051,7 @@ const openAttachment = (id) => {
             <button @click="exportAll(); moreMenu = false"><Icon name="download" :size="13" /> 导出整本记录</button>
             <button @click="snapshotPng(); moreMenu = false"><Icon name="image" :size="13" /> 导出长图（PNG，不分页）</button>
             <button @click="snapshotHtml(); moreMenu = false"><Icon name="file" :size="13" /> 导出单文件网页（.html）</button>
+            <button @click="snapshotBundle(); moreMenu = false"><Icon name="folder" :size="13" /> 导出打包（.zip：网页 + 原图）</button>
             <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制这条实验</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验（重复 / 改一个变量）</button>
             <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存入化合物库</button>

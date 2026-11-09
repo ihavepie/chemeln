@@ -2921,6 +2921,102 @@ route('POST', '/api/snapshot/png', async (req, res) => {
   }
 });
 
+/**
+ * 给 zip 里中文文件名补上「UTF-8 名字」标志位（bit 11）。
+ * macOS 的 zip / ditto 都把名字按 UTF-8 写进去却不置位，Windows 的解压工具就会按
+ * cp437 解成乱码。这里扫一遍中央目录，名字是非 ASCII 又恰好是合法 UTF-8 的，就把标志位补上。
+ */
+function fixZipUtf8Names(buf) {
+  const out = Buffer.from(buf);
+  // 从尾部找 EOCD（0x06054b50）
+  let eocd = -1;
+  for (let i = out.length - 22; i >= 0 && i > out.length - 70000; i -= 1) {
+    if (out.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) return out;
+  const count = out.readUInt16LE(eocd + 10);
+  let p = out.readUInt32LE(eocd + 16);
+  for (let n = 0; n < count && p + 46 <= out.length; n += 1) {
+    if (out.readUInt32LE(p) !== 0x02014b50) break;
+    const flagPos = p + 8;
+    const nameLen = out.readUInt16LE(p + 28);
+    const name = out.subarray(p + 46, p + 46 + nameLen);
+    const localAt = out.readUInt32LE(p + 42);
+    const ascii = name.every((c) => c < 0x80);
+    if (!ascii && !(out.readUInt16LE(flagPos) & 0x800)) {
+      const text = name.toString('utf8');
+      // 解回来再编码一致 = 真的是合法 UTF-8，才敢改标志位
+      if (Buffer.from(text, 'utf8').equals(name)) {
+        out.writeUInt16LE(out.readUInt16LE(flagPos) | 0x800, flagPos);
+        if (localAt + 8 <= out.length) {
+          out.writeUInt16LE(out.readUInt16LE(localAt + 6) | 0x800, localAt + 6);
+        }
+      }
+    }
+    p += 46 + nameLen + out.readUInt16LE(p + 30) + out.readUInt16LE(p + 32);
+  }
+  return out;
+}
+
+/**
+ * 导出「打包」：一个 zip，里面是
+ *   记录.html —— 自包含网页（CSS 内嵌、图片内联），双击就能看
+ *   附件/      —— 原始文件（谱图、谱图原始数据、TLC 照片……一份不少）
+ *   数据.json  —— 这条记录的原始数据（想二次处理/迁移时用）
+ * 用系统自带的 zip 打，不引依赖。
+ */
+route('POST', '/api/export/bundle', async (req, res) => {
+  const body = await readJson(req);
+  const html = str(body.html);
+  const id = Number(body.expId);
+  const exp = id ? getExperiment(id) : null;
+  if (!html || !exp) return fail(res, 400, '没有可导出的内容');
+
+  const name = safeName(str(body.filename) || `${exp.code || '记录'}`).replace(/\.zip$/i, '');
+  let dir;
+  try {
+    dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'eln-bundle-'));
+    const root = path.join(dir, name);
+    await fsp.mkdir(path.join(root, '附件'), { recursive: true });
+    await fsp.writeFile(path.join(root, '记录.html'), html, 'utf8');
+    await fsp.writeFile(path.join(root, '数据.json'), JSON.stringify(exp, null, 2), 'utf8');
+    for (const a of exp.attachments || []) {
+      const src = path.join(ATTACH_DIR, String(exp.id), a.filename);
+      try {
+        const dest = path.join(root, '附件', safeName(a.original_name || a.filename));
+        await fsp.copyFile(src, dest);
+      } catch {
+        /* 文件不在了就跳过，别让整包失败 */
+      }
+    }
+    const zipPath = path.join(dir, `${name}.zip`);
+    // 用 ditto 而不是 zip：macOS 的 zip 不写 UTF-8 名字标志位，中文文件名在
+    // Windows / 别的解压工具里会变乱码；ditto 会正确打上 0x800
+    await new Promise((resolve, reject) => {
+      const p = spawn('ditto', ['-c', '-k', '--keepParent', root, zipPath], { stdio: ['ignore', 'ignore', 'pipe'] });
+      let err = '';
+      p.stderr.on('data', (d) => (err += String(d)));
+      p.on('error', reject);
+      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`打包失败：${err.trim().slice(0, 200) || code}`))));
+    });
+    const data = fixZipUtf8Names(await fsp.readFile(zipPath));
+    res.writeHead(200, {
+      'content-type': 'application/zip',
+      'content-length': data.length,
+      'cache-control': 'no-store',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${name}.zip`)}`,
+    });
+    res.end(data);
+  } catch (e) {
+    fail(res, 500, e.message || '打包失败');
+  } finally {
+    if (dir) fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 /* ------------------------------------- 结构信息查询（PubChem；联网 + 本地缓存） */
 
 /**
