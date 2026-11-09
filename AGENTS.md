@@ -150,7 +150,7 @@
 - SQLite 子查询的 `ORDER BY` 里引用不到外层表的列 → 拆成「主查询 + 一条补数据查询」。
 - **缩写基团的键会被渲染器截短**：给标签留位、截掉约 0.28 键长，**只跟标签字号有关**（放大图 / 调 bond-length 都没用），补法见 `lib/abbrevspread.js`；改 SVG 必须重算 `viewBox`，否则外移的标签被裁。
 - **标签字高 = `chemdraw.js` 的 `LABEL_RATIO`（字高/键长，现 0.40）**，已存结构图靠三个幂等脚本对齐、别手工乘倍数：①`normalize-labels.py` 按当前文件反算倍率；放大**不能绕中心**（朝键一侧会涨 3–9 单位、压到键线 → 看着「偏离」），要在标签框候选点里挑「与所有键段留白最大」的中心，留白不够先外推（≤8 单位）再降这张图的倍率；**单字原子标必须绕原子原地放大、不位移**。②`fit-canvas.py` 按真实渲染外框重算 viewBox，**量外框必须一张一页**（Indigo 的 `#glyph-*` id 是文档级的，多图同页会互相引错，踩过一次以为文件坏了）。③`normalize-style.py` 把 px 归一到「一个键 24px」、线宽 0.06×键长——卡片按图片原始 px 显示，不归一化同一面墙就粗细不一。
-- **新存的图也要走一遍放大**：`chemdrawLabels` 是「全对或原样返回」，`M  SMT` 对不上字形组就返回 Indigo 原始小字（`44/172` 就这么存进来的）→ `SketcherModal` 换字体后再兜底 `scaleGlyphLabels`（同 `LABEL_RATIO`、幂等、先剥旧缩放层）。
+- **新存的图也要放大**：`chemdrawLabels` 认不准就原样返回 Indigo 小字 → `SketcherModal` 再兜底 `scaleGlyphLabels`（同 ratio、幂等）。
 - molfile 解析**不能 trim**（首行空行是格式的一部分），SMILES 才 trim。
 - Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
@@ -160,7 +160,7 @@
 - **Safari 拖不动的真因**：元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element` / 卡片图片自带的拖拽能力），真鼠标一拖就起原生拖拽会话，之后 `mousemove` 全被吞 → 「按着拖没反应」；而 `new MouseEvent()` **不会**启动原生拖拽，所以自动化测试全绿、真机全死。规矩：①一律 `-webkit-user-drag: none`、别加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`；③**只能看 `data/drag-debug.log` 验证**（`lib/draglog.js`）。本机模拟不了真鼠标（`CGEvent` 无权限）。
 - **落点标识用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量实测），必须配①几何快照（否则让位后落点来回翻）②`flip.js` 的 FLIP（否则瞬移「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下的卡**（`opacity` 只影响绘制，0.07）。
 - **`.drag-ghost` 必须 `position: fixed !important`**（`.exp-card.cmp-card{position:relative}` 权重 0,2,0 会把它顶回 `relative`、跑到页面底部）；`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖那张还原，要再用 `.grid-card.is-dragging` 同权重压回 0.07。
-- **本机只有 Safari**：看版式/读页面值用 `swiftc` 编的 WKWebView 小程序（`.cache/snap`、`.cache/evaljs`、`.cache/jssnap <url> <out> <w> <h> <seed> [post秒]`），编译带 `-module-cache-path .cache/clang`；输入框文字在 `.value`。
+- **本机只有 Safari**：看版式/读值用 `.cache/` 里 `swiftc` 编的 WKWebView 小工具（`snap`、`evaljs`、`jssnap`），编译带 `-module-cache-path .cache/clang`；输入框读 `.value`。
 - 依赖别升：Vue 3.5 / Vite 6 / Element Plus 2.8 / openchemlib 9.25。
 
 ## 8. 用户怎么干活
