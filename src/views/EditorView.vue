@@ -646,7 +646,11 @@ async function schemeFromTable() {
     // 顺手记一份反应式文本，这样还能用「从反应式填表」跟投料表对一遍
     fields.scheme_smiles = `${reactants.join('.')}>>${prod.smiles}`;
     await refreshAttachments();
-    toast('反应式图按投料表重画好了');
+    toast(
+      loose.length
+        ? `反应式重画好了；${loose.length} 个底物没挂结构，名字放在箭头上方（要画成结构就双击试剂名挂个化合物）`
+        : '反应式图按投料表重画好了'
+    );
   } catch (e) {
     toast(e.message || '反应式没存上', 'err');
   }
