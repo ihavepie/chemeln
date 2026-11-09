@@ -1940,6 +1940,23 @@ function reagentMap(expId) {
   return out;
 }
 
+/** 一条记录相对基准改了什么：条件字段 + 投料表（加减试剂 / 改当量）。返回 ['温度 -40 °C', 'LDA 1.2 eq'] */
+function diffItems(baseRow, baseMap, row, map) {
+  const out = [];
+  for (const [key, label] of DIFF_FIELDS) {
+    const a = str(baseRow[key]).trim();
+    const b = str(row[key]).trim();
+    if (a !== b) out.push(`${label} ${b || '空'}`);
+  }
+  for (const [key, eq] of map) {
+    const [role, name] = key.split(':');
+    if (!baseMap.has(key)) out.push(`${role} +${name}${eq ? ` ${eq} eq` : ''}`);
+    else if (String(baseMap.get(key)) !== String(eq)) out.push(`${name} ${eq || '—'} eq`);
+  }
+  for (const [key] of baseMap) if (!map.has(key)) out.push(`去掉 ${key.split(':')[1]}`);
+  return out;
+}
+
 function annotateGroupDiff(items) {
   const groups = new Map();
   for (const it of items) {
@@ -1963,19 +1980,7 @@ function annotateGroupDiff(items) {
         continue;
       }
       const row = byId.get(m.id) || {};
-      const diffs = [];
-      for (const [key, label] of DIFF_FIELDS) {
-        const a = str(baseRow[key]).trim();
-        const b = str(row[key]).trim();
-        if (a !== b) diffs.push(`${label} ${b || '空'}`);
-      }
-      const map = reagentMap(m.id);
-      for (const [key, eq] of map) {
-        const [role, name] = key.split(':');
-        if (!baseMap.has(key)) diffs.push(`${role} +${name}${eq ? ` ${eq} eq` : ''}`);
-        else if (String(baseMap.get(key)) !== String(eq)) diffs.push(`${name} ${eq || '—'} eq`);
-      }
-      for (const [key] of baseMap) if (!map.has(key)) diffs.push(`去掉 ${key.split(':')[1]}`);
+      const diffs = diffItems(baseRow, baseMap, row, reagentMap(m.id));
       // 一项就是「筛条件的那个点」；改多了也如实写，但卡片上只留前两项 + 总数，免得撑爆一行
       m.group_diff = diffs.length
         ? diffs.length > 2
@@ -2433,21 +2438,39 @@ function listGroupTables(project) {
   const reagentSql = "SELECT role, name, eq, mmol FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id";
   const eg = db.prepare('SELECT kind, title FROM exp_groups WHERE id = ?');
 
-  const items = heads.map((h) => {
-    const members = db.prepare(memberSql).all(h.id).map((m) => ({
-      ...m,
-      reagents: db.prepare(reagentSql).all(m.id),
-    }));
-    const meta = eg.get(h.id) || {};
-    return { id: h.id, kind: meta.kind || '', title: meta.title || '', count: members.length, members };
-  });
+  const mapOf = (m) => new Map((m.reagents || []).map((r) => [`${r.role}:${r.name}`, r.eq == null ? '' : String(r.eq)]));
+  /** 每条记录算出「相对基准改了什么」；整摞只有重复 / 全是原料的，不进条件筛选 */
+  const annotate = (members) => {
+    const base = members[0];
+    const baseMap = mapOf(base);
+    for (const m of members) {
+      m.changes = m.id === base.id ? [] : diffItems(base, baseMap, m, mapOf(m));
+      m.changed = m.changes.length;
+    }
+    return members;
+  };
+  const worthShowing = (members) =>
+    members.some((m) => m.changed > 0) && members.some((m) => str(m.kind) !== '原料');
+
+  const items = heads
+    .map((h) => {
+      const members = annotate(
+        db.prepare(memberSql).all(h.id).map((m) => ({
+          ...m,
+          reagents: db.prepare(reagentSql).all(m.id),
+        }))
+      );
+      const meta = eg.get(h.id) || {};
+      return { id: h.id, kind: meta.kind || '', title: meta.title || '', count: members.length, members };
+    })
+    .filter((g) => worthShowing(g.members));
 
   /* 自动匹配：不在任何 ≥2 条组里的记录（含 group_id 空、以及只剩一条的孤儿），
      底物集合 + 产物一样就算一摞。没有这一步，只有手动点过「＋」的才进对照表。 */
   const grouped = new Set(heads.map((h) => h.id));
   const loose = db
     .prepare(
-      `SELECT id, group_id, code, date, status, yield_pct, dr_ee, ee_pct, no_yield, solvent, temperature,
+      `SELECT id, group_id, code, date, status, kind, yield_pct, dr_ee, ee_pct, no_yield, solvent, temperature,
               duration, atmosphere, addition, product_name, project
          FROM experiments e
         WHERE 1 = 1 ${where}
@@ -2476,13 +2499,15 @@ function listGroupTables(project) {
   }
   const auto = [...buckets.entries()]
     .filter(([, ms]) => ms.length > 1)
-    .map(([sig, ms]) => ({
+    .map(([sig, ms]) => ({ sig, members: annotate(ms) }))
+    .filter(({ members }) => worthShowing(members))
+    .map(({ sig, members }) => ({
       id: `auto:${sig}`,
       kind: 'auto',
       title: '',
-      subject: ms[0].reagents.find((r) => r.role === '底物')?.name || sig,
-      count: ms.length,
-      members: ms,
+      subject: members[0].reagents.find((r) => r.role === '底物')?.name || sig,
+      count: members.length,
+      members,
     }))
     .sort((a, b) => b.count - a.count);
 

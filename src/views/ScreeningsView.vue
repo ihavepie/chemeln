@@ -1,35 +1,30 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { compareMembers, memberDiffs } from '../lib/matrix.js';
+import { round } from '../lib/reagent.js';
+import { toast } from '../lib/feedback.js';
 
 /**
- * 条件筛选页 = 条件对照表。
+ * 条件筛选 = 一摞平行实验里「跟基准不一样」的那些，摊成一张清单。
  *
- * 一摞平行实验（同 group_id）摊成一张表：一行一个条件项、一列一条记录，第一列是基准，
- * 跟基准不一样的格子标出来。以前这里是手填的「筛选表」，跟记录里的数据是两份、容易对不上，
- * 现在直接读记录本身（`/api/groups`），不另存一份。
+ * 只列表、不铺矩阵：一个组员一行，行里只写它相对基准改了什么（`温度 -40 °C` / `LDA 1.2 eq`），
+ * 没改的写「重复 / 平行」。**整摞全是重复 / 平行、或者全是原料的，不进这个页面**（后端就滤掉了）。
  */
 const router = useRouter();
 
 const groups = ref([]);
-const autos = ref([]);
 const loading = ref(true);
-
-const prep = (g) => {
-  const rows = compareMembers(g.members);
-  return { ...g, rows, diffs: memberDiffs(g.members, rows) };
-};
+const rows = computed(() => groups.value);
 
 async function load() {
   loading.value = true;
   try {
     const d = await api.groups(store.project);
-    groups.value = (d.items || []).map(prep);
-    autos.value = (d.auto || []).map(prep);
+    const tag = (g, source) => ({ ...g, source });
+    groups.value = [...(d.items || []).map((g) => tag(g, 'manual')), ...(d.auto || []).map((g) => tag(g, 'auto'))];
   } finally {
     loading.value = false;
   }
@@ -39,31 +34,38 @@ onMounted(load);
 watch(() => store.project, load);
 
 const open = (m) => router.push(`/e/${m.id}`);
+const isBase = (g, m) => m.id === g.members[0].id;
+const isEmpty = (v) => v === null || v === undefined || v === '';
+const yieldText = (m) => (m.no_yield ? '不计产率' : isEmpty(m.yield_pct) ? '' : `${round(m.yield_pct, 1)}%`);
+const selText = (m) => String(m.dr_ee || '').trim() || (isEmpty(m.ee_pct) ? '' : `${m.ee_pct}% ee`);
 
-/** 列头的「改 X、Y」：两处以上写「改 X 等 N 项」，免得把表头撑爆 */
+/** 组名：优先手动组的名字，其次「底物 → 产物」，最后退到底物名 */
+const headOf = (g) => {
+  if (g.title) return g.title;
+  const base = g.members[0];
+  const sub = String(base.substrates || g.subject || '').trim();
+  const prod = String(base.product_name || '').trim();
+  if (sub && prod) return `${sub} → ${prod}`;
+  return sub || prod || '平行组';
+};
+
 /** 这一摞是不是「只差一个变量」——筛条件时最想看到的那种 */
 const singleVar = (g) => {
-  const ds = g.diffs.filter((d) => !d.base);
-  if (!ds.length) return '';
-  if (!ds.every((d) => d.labels.length === 1)) return '';
-  const set = new Set(ds.map((d) => d.labels[0]));
+  const rest = g.members.filter((m) => !isBase(g, m));
+  if (!rest.length || rest.some((m) => m.changed !== 1)) return '';
+  const set = new Set(rest.map((m) => String(m.changes[0]).split(' ')[0]));
   return set.size === 1 ? [...set][0] : '';
 };
 
 async function adopt(g) {
   try {
-    await api.adoptGroup(g.members.map((m) => m.id), g.subject || '');
+    await api.adoptGroup(g.members.map((m) => m.id), headOf(g));
     await load();
-    toast('收成平行组了，以后它就固定在这张表里');
+    toast('收成平行组了，以后它就固定在这一段');
   } catch (e) {
     toast(e.message || '收不了', 'err');
   }
 }
-
-const diffText = (d) =>
-  d.base ? '基准' : d.labels.length ? `改 ${d.labels[0]}${d.labels.length > 1 ? ` 等 ${d.labels.length} 项` : ''}` : '重复';
-
-const SECTION = { cond: '条件', reagent: '投料', result: '结果' };
 </script>
 
 <template>
@@ -72,129 +74,51 @@ const SECTION = { cond: '条件', reagent: '投料', result: '结果' };
       <header class="page-head">
         <h1 class="page-title">条件筛选</h1>
         <p class="page-desc">
-          同一摞平行实验摊成一张表：一行一个条件项、一列一条记录，第一列是基准，跟基准不一样的格子标出来了。想看某一条的原始记录，点列头。
+          一摞平行实验里，只把「跟基准不一样」的那几条列出来，改了什么一目了然。整摞都是重复 / 平行、或者都是原料的，不占地方。
         </p>
       </header>
 
       <div v-if="loading" class="empty-note">正在整理…</div>
-      <div v-else-if="!groups.length && !autos.length" class="empty-note">
-        还没有平行实验。到某条记录里点左侧「＋」，从它再建一条（改温度 / 换溶剂 / 重复一次都算），这里就会出现一张对照表。
+      <div v-else-if="!rows.length" class="empty-note">
+        还没有可以筛的东西。一摞平行实验里至少要有一条跟基准不一样（改了条件 / 加减了试剂），重复或平行的那种不会进来；原料记录也不算。
       </div>
 
-      <section v-for="g in groups" :key="g.id" class="mx-group">
-        <div class="mx-head">
-          <b>{{ g.title || '平行组' }}</b>
-          <span class="mx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>
+      <section v-for="g in rows" :key="g.id" class="cx-group">
+        <div class="cx-head">
+          <b>{{ headOf(g) }}</b>
+          <span class="cx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>
           <span v-if="singleVar(g)" class="mx-var">单变量 · {{ singleVar(g) }}</span>
+          <span v-if="g.source === 'auto'" class="cx-src">自动匹配</span>
           <span class="spacer" />
+          <button v-if="g.source === 'auto'" class="btn btn-sm btn-ghost" title="把这几条收成正式平行组" @click="adopt(g)">
+            <Icon name="check" :size="12" /> 收成平行组
+          </button>
           <button class="btn btn-sm btn-ghost" @click="open(g.members[0])">
             <Icon name="file" :size="12" /> 打开基准
           </button>
         </div>
 
-        <p v-if="!g.rows.some((r) => r.section !== 'result')" class="mx-blank">
-          这一组几条的条件和投料都还没填，先在记录页把温度 / 溶剂 / 投料补上，这里就有得比了。
-        </p>
-        <div v-else class="scope-wrap">
-          <table class="mx-table">
-            <thead>
-              <tr>
-                <th class="mx-rowhead">条件项</th>
-                <th v-for="(m, i) in g.members" :key="m.id" class="mx-col" :class="{ 'is-base': i === 0 }">
-                  <button type="button" class="linklike mono" @click="open(m)">{{ m.code }}</button>
-                  <span
-                    class="mx-tag"
-                    :class="g.diffs[i].base ? 'is-base' : g.diffs[i].labels.length ? 'is-diff' : ''"
-                  >
-                    {{ diffText(g.diffs[i]) }}
-                  </span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-for="(row, ri) in g.rows" :key="row.key">
-                <tr v-if="!ri || g.rows[ri - 1].section !== row.section" class="mx-sep">
-                  <td :colspan="g.members.length + 1">{{ SECTION[row.section] }}</td>
-                </tr>
-                <tr>
-                  <th class="mx-rowhead" :class="{ 'is-role': row.section === 'reagent' }">
-                    <span v-if="row.role" class="mx-role">{{ row.role }}</span>{{ row.label }}
-                  </th>
-                  <td
-                    v-for="(c, i) in row.cells"
-                    :key="i"
-                    class="mono"
-                    :class="{ 'is-diff': row.diff && i > 0 && c !== row.cells[0], 'is-empty': !c }"
-                  >
-                    {{ c || '—' }}
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section v-if="autos.length" class="mx-auto">
-        <h2 class="mx-auto-head">自动匹配（没成组，但底物 / 产物一样）</h2>
-        <p class="mx-blank">
-          这几摞没点过「＋」成组，但底物完全一样，就当一摞给你摊开了。想把它们收成正式的一摞，在记录页点左侧「＋」再建一条就行。
-        </p>
-        <div v-for="g in autos" :key="g.id" class="mx-group">
-          <div class="mx-head">
-            <b>{{ g.subject }}</b>
-            <span class="mx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>
-            <span v-if="singleVar(g)" class="mx-var">单变量 · {{ singleVar(g) }}</span>
-            <span class="spacer" />
-            <button class="btn btn-sm btn-ghost" title="把这几条收成正式平行组" @click="adopt(g)">
-              <Icon name="check" :size="12" /> 收成平行组
-            </button>
-            <button class="btn btn-sm btn-ghost" @click="open(g.members[0])">
-              <Icon name="file" :size="12" /> 打开基准
-            </button>
-          </div>
-          <p v-if="!g.rows.some((r) => r.section !== 'result')" class="mx-blank">
-            这几条的条件和投料都还没填，先在记录页补上，这里就有得比了。
-          </p>
-          <div v-else class="scope-wrap">
-            <table class="mx-table">
-              <thead>
-                <tr>
-                  <th class="mx-rowhead">条件项</th>
-                  <th v-for="(m, i) in g.members" :key="m.id" class="mx-col" :class="{ 'is-base': i === 0 }">
-                    <button type="button" class="linklike mono" @click="open(m)">{{ m.code }}</button>
-                    <span
-                      class="mx-tag"
-                      :class="g.diffs[i].base ? 'is-base' : g.diffs[i].labels.length ? 'is-diff' : ''"
-                    >
-                      {{ diffText(g.diffs[i]) }}
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <template v-for="(row, ri) in g.rows" :key="row.key">
-                  <tr v-if="!ri || g.rows[ri - 1].section !== row.section" class="mx-sep">
-                    <td :colspan="g.members.length + 1">{{ SECTION[row.section] }}</td>
-                  </tr>
-                  <tr>
-                    <th class="mx-rowhead" :class="{ 'is-role': row.section === 'reagent' }">
-                      <span v-if="row.role" class="mx-role">{{ row.role }}</span>{{ row.label }}
-                    </th>
-                    <td
-                      v-for="(c, i) in row.cells"
-                      :key="i"
-                      class="mono"
-                      :class="{ 'is-diff': row.diff && i > 0 && c !== row.cells[0], 'is-empty': !c }"
-                    >
-                      {{ c || '—' }}
-                    </td>
-                  </tr>
+        <ul class="cx-list">
+          <li v-for="m in g.members" :key="m.id">
+            <button type="button" class="cx-row" :class="{ 'is-base': isBase(g, m) }" @click="open(m)">
+              <span class="cx-code mono">{{ m.code }}</span>
+              <span class="cx-tags">
+                <template v-if="isBase(g, m)">
+                  <span class="cx-tag is-base">基准</span>
                 </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
+                <template v-else-if="!m.changed">
+                  <span class="cx-tag">重复 / 平行</span>
+                </template>
+                <template v-else>
+                  <span v-for="c in m.changes" :key="c" class="cx-tag is-diff">{{ c }}</span>
+                </template>
+              </span>
+              <span class="spacer" />
+              <span class="cx-res mono">{{ yieldText(m) }}</span>
+              <span class="cx-sel mono">{{ selText(m) }}</span>
+            </button>
+          </li>
+        </ul>
       </section>
     </div>
   </div>

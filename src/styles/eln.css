@@ -6867,93 +6867,44 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .scope-table th:last-child .col-grip { right: 0; }
 
 /* ================================================================
-   条件筛选页：一摞平行实验摊成一张对照表
-   行 = 条件项（条件 / 投料 / 结果三段），列 = 一条记录，第一列是基准，
-   跟基准不一样的格子用极淡强调色调标出来（不要红框、不要整列描边）。
+   条件筛选页：一摞平行实验 = 一张清单
+   组头一行（组名 · 条数 · 基准 + 单变量/自动匹配小标），
+   下面一个组员一行：编号 · 「改了什么」小标（没改就是「重复 / 平行」）· 产率 · 选择性。
    ================================================================ */
-.mx-group { margin-top: 22px; }
-.mx-group:first-of-type { margin-top: 14px; }
-.mx-head {
-  display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px;
+.cx-group { margin-top: 22px; }
+.cx-group:first-of-type { margin-top: 12px; }
+.cx-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.cx-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.cx-meta { font-size: 11px; color: var(--ink-3); }
+.cx-src {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em;
+  color: var(--ink-4); border: 1px solid var(--line-2); border-radius: 3px; padding: 1px 5px;
 }
-.mx-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
-.mx-meta { font-size: 11px; color: var(--ink-3); }
 
-.mx-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  table-layout: auto;
-}
-.mx-table th,
-.mx-table td {
-  padding: 5px 8px;
-  text-align: left;
-  vertical-align: middle;
+.cx-list { list-style: none; margin: 0; padding: 0; }
+.cx-row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 6px 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--ink-2); font: inherit; text-align: left; cursor: pointer;
   border-bottom: 1px solid var(--line);
-  white-space: nowrap;
 }
-.mx-table thead th {
-  border-bottom: 1px solid var(--line-2);
-  vertical-align: bottom;
-  padding-bottom: 6px;
+.cx-row:hover { background: #faf9f6; }
+.cx-row:last-child { border-bottom: none; }
+.cx-row.is-base { color: var(--ink-3); }
+.cx-code { flex: 0 0 auto; font-size: 12px; color: var(--ink-2); min-width: 62px; }
+.cx-row.is-base .cx-code { color: var(--ink-3); }
+.cx-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.cx-tag {
+  display: inline-block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 10px; line-height: 1.6;
+  color: var(--ink-3); background: #f5f3ee; border-radius: 3px; padding: 0 6px;
 }
-.mx-table .mx-rowhead {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--ink-3);
-  font-weight: 400;
-  /* 窄一点、但不能窄到把「底物 · 甲氧基环丁烷」折成两行（折了就成两行乱码，踩过） */
-  width: 1%;
-  min-width: 150px;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mx-table .mx-rowhead.is-role { padding-left: 8px; }
-.mx-role {
-  display: inline-block; margin-right: 5px; padding: 0 4px;
-  font-size: 9px; line-height: 1.5; color: var(--ink-4);
-  background: #f4f1ea; border-radius: 3px;
-}
-.mx-table .mx-col { min-width: 96px; }
-.mx-table .mx-col .linklike { font-size: 12px; }
-.mx-table .mx-tag {
-  display: block; margin-top: 1px;
-  font-family: var(--mono); font-size: 9px; line-height: 1.3;
-  color: var(--ink-4);
-}
-.mx-table .mx-tag.is-base { color: var(--ink-3); }
-.mx-table .mx-tag.is-diff { color: var(--accent-ink); opacity: 0.85; }
-/* 分段标题行：条件 / 投料 / 结果 */
-.mx-table tr.mx-sep td {
-  padding: 12px 8px 4px;
-  border-bottom: none;
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--ink-4);
-  text-transform: uppercase;
-  background: transparent;
-}
-.mx-table td.is-diff { background: #fdf6f2; color: var(--accent-ink); }
-.mx-table td.is-empty { color: var(--ink-4); }
-/* 基准那列（第一列数据）留一道很淡的底色，方便对齐着看 */
-.mx-table .mx-col.is-base { background: #faf9f6; }
-/* 对照表：一组里条件/投料全空时的那句提示 */
-.mx-blank { font-size: 12px; color: var(--ink-3); margin: 2px 0 0; }
-/* 条件筛选页底部的「自动匹配（同一底物）」小节 */
-.mx-auto { margin-top: 34px; }
-.mx-auto-head {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--ink-4);
-  font-weight: 400;
-  text-transform: uppercase;
-  margin: 0 0 6px;
-}
+.cx-tag.is-base { background: transparent; color: var(--ink-4); padding: 0; }
+/* 改动：极淡强调色底，跟「重复 / 基准」拉开，但不要描边 */
+.cx-tag.is-diff { color: var(--accent-ink); background: #fbf2ec; }
+.cx-res, .cx-sel { flex: 0 0 auto; font-size: 11.5px; color: var(--ink-3); min-width: 52px; text-align: right; }
+.cx-sel { color: var(--ink-4); font-size: 10.5px; }
+
 /* 自动匹配那节：标题旁的「单变量 · 温度」小标 */
 .mx-var {
   font-family: var(--mono);
@@ -6964,3 +6915,5 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   border-radius: 3px;
   padding: 1px 5px;
 }
+/* 条件筛选清单：`.spacer` 在这个容器里也要撑开，不然产率会紧贴在「改了什么」后面 */
+.cx-head .spacer, .cx-row .spacer { flex: 1 1 auto; }
