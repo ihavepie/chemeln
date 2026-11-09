@@ -41,6 +41,25 @@ watch(() => store.project, load);
 const open = (m) => router.push(`/e/${m.id}`);
 
 /** 列头的「改 X、Y」：两处以上写「改 X 等 N 项」，免得把表头撑爆 */
+/** 这一摞是不是「只差一个变量」——筛条件时最想看到的那种 */
+const singleVar = (g) => {
+  const ds = g.diffs.filter((d) => !d.base);
+  if (!ds.length) return '';
+  if (!ds.every((d) => d.labels.length === 1)) return '';
+  const set = new Set(ds.map((d) => d.labels[0]));
+  return set.size === 1 ? [...set][0] : '';
+};
+
+async function adopt(g) {
+  try {
+    await api.adoptGroup(g.members.map((m) => m.id), g.subject || '');
+    await load();
+    toast('收成平行组了，以后它就固定在这张表里');
+  } catch (e) {
+    toast(e.message || '收不了', 'err');
+  }
+}
+
 const diffText = (d) =>
   d.base ? '基准' : d.labels.length ? `改 ${d.labels[0]}${d.labels.length > 1 ? ` 等 ${d.labels.length} 项` : ''}` : '重复';
 
@@ -66,6 +85,7 @@ const SECTION = { cond: '条件', reagent: '投料', result: '结果' };
         <div class="mx-head">
           <b>{{ g.title || '平行组' }}</b>
           <span class="mx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>
+          <span v-if="singleVar(g)" class="mx-var">单变量 · {{ singleVar(g) }}</span>
           <span class="spacer" />
           <button class="btn btn-sm btn-ghost" @click="open(g.members[0])">
             <Icon name="file" :size="12" /> 打开基准
@@ -116,7 +136,7 @@ const SECTION = { cond: '条件', reagent: '投料', result: '结果' };
       </section>
 
       <section v-if="autos.length" class="mx-auto">
-        <h2 class="mx-auto-head">自动匹配 · 同一底物</h2>
+        <h2 class="mx-auto-head">自动匹配（没成组，但底物 / 产物一样）</h2>
         <p class="mx-blank">
           这几摞没点过「＋」成组，但底物完全一样，就当一摞给你摊开了。想把它们收成正式的一摞，在记录页点左侧「＋」再建一条就行。
         </p>
@@ -124,7 +144,11 @@ const SECTION = { cond: '条件', reagent: '投料', result: '结果' };
           <div class="mx-head">
             <b>{{ g.subject }}</b>
             <span class="mx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>
+            <span v-if="singleVar(g)" class="mx-var">单变量 · {{ singleVar(g) }}</span>
             <span class="spacer" />
+            <button class="btn btn-sm btn-ghost" title="把这几条收成正式平行组" @click="adopt(g)">
+              <Icon name="check" :size="12" /> 收成平行组
+            </button>
             <button class="btn btn-sm btn-ghost" @click="open(g.members[0])">
               <Icon name="file" :size="12" /> 打开基准
             </button>

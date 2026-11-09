@@ -6954,3 +6954,13 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   text-transform: uppercase;
   margin: 0 0 6px;
 }
+/* 自动匹配那节：标题旁的「单变量 · 温度」小标 */
+.mx-var {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+  background: #faf1ec;
+  border-radius: 3px;
+  padding: 1px 5px;
+}

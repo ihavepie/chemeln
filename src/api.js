@@ -148,6 +148,8 @@ export const api = {
   purgeTrash: (id) => request(`/api/trash/${id}`, { method: 'DELETE' }),
   clearTrash: () => request('/api/trash', { method: 'DELETE' }),
 
+  adoptGroup: (ids, title = '') =>
+    request('/api/groups/adopt', { method: 'POST', body: { ids, title } }),
   groups: (project = '') =>
     request(`/api/groups${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d),
   screenings: () => request('/api/screenings').then((d) => d.items || []),

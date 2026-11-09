@@ -704,14 +704,8 @@ function bootstrap(query = {}) {
     )
     .get(...pjArgs, ...pjArgs, ...pjArgs);
   // 侧栏那一项的计数现在是「平行组有几摞」，不是老手填筛选表的条数
-  const groupCount = db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM (
-         SELECT group_id FROM experiments e
-          WHERE trim(e.group_id) <> '' ${onExp}
-          GROUP BY group_id HAVING COUNT(*) > 1)`
-    )
-    .get(...pjArgs).n;
+  const groupTables = listGroupTables(project);
+  const groupCount = groupTables.items.length + groupTables.auto.length;
   const month = new Date().toISOString().slice(0, 7);
   const thisMonth = db
     .prepare(`SELECT COUNT(*) AS n FROM experiments WHERE date LIKE ? ${onProject}`)
@@ -2408,9 +2402,11 @@ route('GET', '/api/export/notebook.md', async (req, res, params, url) => {
 /* --- 平行组：条件对照表用 ---
    一摞（同 group_id 且 ≥2 条）连每条的投料表一起给出来，
    前端拿第一条当基准，一行一个条件项、一列一条实验，谁改了哪儿一眼能看出来。 */
-route('GET', '/api/groups', async (req, res, params, url) => {
-  const q = Object.fromEntries(url.searchParams.entries());
-  const project = str(q.project);
+/**
+ * 条件对照表的原料：手动平行组（同 group_id、≥2 条）+ 自动匹配（散记录按「底物 + 产物」归堆）。
+ * 抽成函数是为了 bootstrap 里那个侧栏计数也能用同一份逻辑，不要在两处各写一遍。
+ */
+function listGroupTables(project) {
   const where = project ? 'AND e.project = ?' : '';
   const args = project ? [project] : [];
   const heads = db
@@ -2446,9 +2442,8 @@ route('GET', '/api/groups', async (req, res, params, url) => {
     return { id: h.id, kind: meta.kind || '', title: meta.title || '', count: members.length, members };
   });
 
-  /* 自动匹配：没进过平行组（group_id 为空）的记录，如果底物完全一样，就按「同一底物」归一堆。
-     没有这一步的话，只有手动点过「＋」的才会出现在对照表里，而多数人其实是各记各的。 */
-  // 「散着的」= 不在任何 ≥2 条的平行组里（含 group_id 空、以及只剩一条的孤儿组）
+  /* 自动匹配：不在任何 ≥2 条组里的记录（含 group_id 空、以及只剩一条的孤儿），
+     底物集合 + 产物一样就算一摞。没有这一步，只有手动点过「＋」的才进对照表。 */
   const grouped = new Set(heads.map((h) => h.id));
   const loose = db
     .prepare(
@@ -2460,18 +2455,22 @@ route('GET', '/api/groups', async (req, res, params, url) => {
     )
     .all(...args)
     .filter((m) => !grouped.has(m.group_id));
-  const sigOf = (id) => {
-    const rows = db
+
+  const sigOf = (m) => {
+    const subs = db
       .prepare("SELECT name FROM reagents WHERE exp_id = ? AND role = '底物' AND trim(name) <> '' ORDER BY name")
-      .all(id)
+      .all(m.id)
       .map((r) => r.name.trim().toLowerCase());
-    return rows.length ? rows.join(' + ') : '';
+    if (!subs.length) return '';
+    const prod = str(m.product_name).trim().toLowerCase();
+    return prod ? `${subs.join(' + ')}|→|${prod}` : subs.join(' + ');
   };
+
   const looseFull = loose.map((m) => ({ ...m, reagents: db.prepare(reagentSql).all(m.id) }));
   const buckets = new Map();
   for (const m of looseFull) {
-    const sig = sigOf(m.id);
-    if (!sig) continue;                     // 底物都没填，自动匹配不了
+    const sig = sigOf(m);
+    if (!sig) continue;
     if (!buckets.has(sig)) buckets.set(sig, []);
     buckets.get(sig).push(m);
   }
@@ -2487,7 +2486,35 @@ route('GET', '/api/groups', async (req, res, params, url) => {
     }))
     .sort((a, b) => b.count - a.count);
 
+  return { items, auto };
+}
+
+route('GET', '/api/groups', async (req, res, params, url) => {
+  const q = Object.fromEntries(url.searchParams.entries());
+  const { items, auto } = listGroupTables(str(q.project));
   ok(res, { items, auto, total: items.length });
+});
+
+/* 把自动匹配出来的一堆「收成」正式的平行组：从此它们有 group_id，走手动组那一套 */
+route('POST', '/api/groups/adopt', async (req, res) => {
+  const body = await readJson(req);
+  const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter((n) => Number.isFinite(n));
+  if (ids.length < 2) return fail(res, 400, '至少要两条才能成一组');
+  const groupId = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const ts = nowISO();
+  db.exec('BEGIN');
+  try {
+    const upd = db.prepare('UPDATE experiments SET group_id = ?, updated_at = ? WHERE id = ?');
+    for (const id of ids) upd.run(groupId, ts, id);
+    db.prepare(
+      `INSERT INTO exp_groups(id, kind, title, created_at, updated_at) VALUES (?, 'screen', ?, ?, ?)`
+    ).run(groupId, str(body.title), ts, ts);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  ok(res, { group_id: groupId, count: ids.length });
 });
 
 /* --- screenings --- */

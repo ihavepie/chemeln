@@ -3,6 +3,7 @@
 > 从 `AGENTS.md` 的「当前进度」里按顺序搬出来的旧条目，逐字保留、没有删改。
 > 最新的几轮在 `AGENTS.md`；要回溯某次改动，也可以直接 `git log --oneline`。
 
+- **导出长图 / 单文件网页**：`src/lib/snapshot.js` 克隆 `.editor .sheet`（同步输入值 + `flattenTextareas`）→ `POST /api/snapshot/png`，`server/shot.swift` 用系统 WebKit 截整页（按 `.snap` 高度，不分页不裁切）；HTML 版把图内联成 data:。PDF 是 A4 分页、多了会裁，用户不要那种。
 - **打印 / 存的文本域**：`.sheet-text` 是固定 rows 的 textarea，纸上只印自己那几行；屏幕还比纸面宽，按屏幕高度算照样截。两条路都要 `flattenTextareas()`（系统打印在 `runPrint`、PDF 在 `PrintPanel.buildPages`），改完仍要 `--print-to-pdf` 数页数：内容长现在会自然排到 3 页，那是「不丢内容」的代价，别再拿「恒 2 页」当硬指标。
 - **`.spacer` 只在几个容器里有 `flex: 1`**（`.cat-item` / `.editor-bar` / `.card-head` / `.trash-head` / `.scope-head` / `.scope-foot`）。新写一个 flex 容器想让后半段靠右，必须自己补一条 `<容器> .spacer { flex: 1 }` —— **踩过一次**：`.tree-head` 漏了，课题组头的「改名/编号前缀/删除课题」粘在元信息后面而不是贴右边。
 - **课题改名必须一次搬干净**（`renameProject()`，在一个事务里）：`experiments.project`、`compounds.project`、**`categories.project`**、`projects_json`、`prefix:<旧>`、`proj:<旧>:*`。少搬一样就会凭空多出一个同名空课题。**`categories.project` 漏搬的后果最阴**：分类按新课题名筛不到，挂在这些分类下的记录在卡片墙里一个组都落不进（中栏列表还看得见），看着像丢了。两个入口：`PUT /api/projects/:name`，和 `PUT /api/settings` 带 `project` + 不同的 `lab_heading`（响应里的 `renamedTo` 告诉前端切到新名字）。启动时有个一次性迁移，把老的 `proj:<p>:lab_heading` 覆盖值当作新课题名搬过去。已知边角：改名时如果正好有一条实验开着编辑，那条的自动保存会把旧课题名写回去，需要把那页重开一下。
