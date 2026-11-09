@@ -58,9 +58,9 @@
 - `src/components/TlcStrip.vue` — TLC 板图片条。
 - `src/components/AttachmentsBlock.vue` — 谱图/其它附件分组。
 - `src/views/CompoundDetail.vue` — 化合物档案（结构式、三栏核磁图、TLC、纯化、瓶签）。结构图在 148px 虚线框里**最多占 86%**（`.cmp-structure img`，顶满会显得「放太大了」，小图按自身尺寸显示）。**画板拿回来的结构图用画板那张**（`applySketched({svg})` 有就用它），但**分子式 / MW 必须用 SMILES 算**——Ketcher 存的 molfile 芳香环键级写法 openchemlib 读出来会多算 6 个氢（实测同一结构 SMILES→C9H12O4S/216.26、molfile→C9H18O4S/222.3）；工具栏跟实验页一个排法：已保存 / 保存 / 重置 / **⋯ 菜单（打印瓶子标签 / ── / 删除这个化合物）**，恒定有「课题」格（清空 = 共用课题）。
-- `src/components/ExpTable.vue` — **实验记录的表格视图**（`/list` 右边切过去）：一行一条记录（勾选 / 结构缩略图 / 底物 → 产物 / 条件 / 产率 / 选择性 / 日期），点列头排序（空值永远沉底），底部是「N 条 · 有产率条数与平均产率 + 导出表格(MD) / 导出 CSV」。**数据直接用 `store.items`**（中栏列表搜什么筛什么它就跟着变，不另发请求）；底物名来自 `/api/experiments` 的 `substrates`（投料表里 role=底物 的名字），结构图是产物挂库后的那张结构式。原来的独立页 `/table`「底物拓展」（`ScopeTableView.vue`）已经删掉，只剩这个视图。
+- `src/components/ExpTable.vue` — **实验记录的表格视图**（`/list` 右边切过去）：一行一条记录（勾选 / 结构缩略图 / 底物 → 产物 / 条件 / 产率 / 选择性 / 日期），点列头排序（空值永远沉底），底部是「N 条 · 有产率条数与平均产率 + 导出表格(MD) / 导出 CSV」。**整行可点进去**（勾选格 `@click.stop`，不然勾一下跳走了）、行悬停淡底 `#f7f5f0`、**表头右边界可拖改列宽**（`lib/colresize.js`：拖的那列变宽、旁边那列等量变窄，总和不变所以 1:1；内部按 px 记、渲染时换成百分比，窗口变窄不会顶出横向滚动条；宽度存 localStorage `eln:colw:exp`）。**数据直接用 `store.items`**（中栏列表搜什么筛什么它就跟着变，不另发请求）；底物名来自 `/api/experiments` 的 `substrates`（投料表里 role=底物 的名字），结构图是产物挂库后的那张结构式。原来的独立页 `/table`「底物拓展」（`ScopeTableView.vue`）已经删掉，只剩这个视图。
 - 化合物列表接口（`/api/compounds`）**现在也带 `smiles`**：反应式 ↔ 投料表互认要按结构对化合物，列表里没有 SMILES 就对不上（踩过）。
-- `src/components/CmpTable.vue` — **化合物库的表格视图**（`/compounds` 右边切过去）：结构 / 编号 / 名称 / 类型 / 分子式 / MW / Rf / 分类 / 引用，排序同上，导出 CSV / Markdown。数据用 `store.compounds`。
+- `src/components/CmpTable.vue` — **化合物库的表格视图**（`/compounds` 右边切过去），**整行可点、表头可拖列宽**（跟实验表同一个 `lib/colresize.js`，key `eln:colw:cmp`）：结构 / 编号 / 名称 / 类型 / 分子式 / MW / Rf / 分类 / 引用，排序同上，导出 CSV / Markdown。数据用 `store.compounds`。
 - `src/views/TrashView.vue` — **回收站页**（`/trash`）：列出删掉的实验 / 化合物（类型 · 名称 · 删除时间），逐条「恢复」/「彻底删除」，右上「清空回收站」。恢复后编号、投料表、附件都回来（编号被占自动加后缀）；彻底删除才真删磁盘文件。数据来自 `/api/trash`。
 - `src/views/DashboardView.vue` — 工作台（统计 + 近期记录）。
 - `src/views/ScreeningsView.vue` / `ScreeningView.vue` — 条件筛选（**仍是旧版样式，未做卡片墙**）。
@@ -87,6 +87,7 @@
   走 `/api/lookup`（服务端问 PubChem、带缓存），拿 IUPAC 名 / CAS / 分子式 / MW；网络失败一律返回 null，不让主流程受影响。
 - `src/lib/sheetprefs.js` — 「记录页显示哪几块」的前端偏好（`sheetPrefs` / `setSheetPref` / `showAllSheetBlocks` / `SHEET_BLOCKS`，存 localStorage `eln:sheet`，默认全开）；`EditorView` 用 `v-if` 挂着，关掉的块页面和打印都没有。
 - `src/lib/peek.js` — 「书签悬停预览显示哪些块」的前端偏好（`peekPrefs` / `setPeekPref` / `PEEK_LABELS`，存 localStorage `eln:peek`；默认条件 / 底物 / 结果 / 结论开，备注关）。
+- `src/lib/colresize.js` — `useColResize(name, defaults)`：表格视图表头拖拽改列宽。**拖出来的增量在「这一列」和「它旁边那列」之间搬**（最后一列吃左边那列），所以所有列宽度和不变、整张表不跳；内部按 px 记、`colStyle()` 渲染成百分比（px 会顶出横向滚动条）。宽度存 `eln:colw:<表名>`；只吃 mouse 事件（WebKit 里表格上的 pointer 事件常被拖选文字吞掉）。拖动中 `body` 挂 `is-col-resizing`（整页 col-resize 光标）。
 - `src/lib/pagemenu.js` — **空白处右键的页面菜单**：`openPageMenu()` 给一份「新建实验 / 新建化合物 / 新建分类 / 刷新 / 四个导航页」；`keepNativeMenu()` 判断这一下要不要让给系统（输入框、文本域、`contenteditable`、**选中了文字** → 让给系统，否则「复制粘贴」就没了）。挂在 `ContextMenu.vue` 的**冒泡**阶段 `document` contextmenu 上——卡片 / 组头 / 列表行自己会 `preventDefault + stopPropagation`，轮不到它，所以两者的菜单不会打架。
 - `src/lib/feedback.js` — `toast` / `confirm` / `prompt`（Element Plus 封装）。
 - `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量（`STATUSES` / `STATUS_TONE` / 窄地方用的 `STATUS_SHORT`）、瓶子标签、内联 SVG 图标。**`COMPOUND_KINDS`**（化合物的类型）按一条路线的顺序排：底物 / 试剂 / 中间体 / 粗产物 / 纯化产物 / 产物 / 催化剂 / 配体 / 添加剂 / 标准品 / 其他 ——「中间体」就是「中间产物」，别再塞一个同义项进去；老数据里的「试剂」原本不在列表里，这次补上了。
@@ -105,7 +106,7 @@
 ## 5. 我们的约定
 - **界面语言**：全中文，术语按化学系口语（「投料表」「组分」「当量」「展开剂」「收率」）。不要出现英文按钮。
 - **配色与质感**：纸白 `#fff` 卡片、画布 `#f5f4f1`、极淡描边 `#eaeaea/#dcdcd7`、强调色 `#a8471f`；不加渐变。**卡片墙是例外**：要「亚克力感」——不描边、用柔和投影分层（见 `ExpGrid.vue` 那条）。**中栏列表的卡片（`.exp-card` / `.cmp-card`）也是投影分层**（白卡浮在 `--bone` 底上，卡片间 12px 缝；当前条用**卡片内套一圈 1px 强调色虚线 + 极淡强调色调底 `#fcf7f4` + 强调色编号 + 稍深投影**表示（**暖黄底都别用**：`#fffcf1` / `#fffdf5` 都被否了，用户说「不要黄色」；**虚线是用户明确点名要的**），**不要红框 / 描边 / 左边竖条**）；其余地方（表单项、弹窗、表格）仍用极淡描边，别一股脑全改成投影。标题用 serif（Iowan Old Style），数字/编号用 mono。
-- **版式克制**：块与块之间尽量少分割线；表格不要行 hover；聚焦格用 `#f8f7f2` 淡底、不要下划线；不搞「太敏感」的悬停弹层。
+- **版式克制**：块与块之间尽量少分割线；表格默认不要行 hover（**例外**：`/list`、`/compounds` 的表格视图整行可点，所以行 hover 淡底 `#f7f5f0` 是用户点名要的）；聚焦格用 `#f8f7f2` 淡底、不要下划线；不搞「太敏感」的悬停弹层。
 - **代码风格**：Vue `<script setup>`；不引入 TypeScript；注释用中文、一两句话说明「为什么」；组件逻辑就地写，别为复用而过度抽象。
 - **样式放哪**：新规则追加到 `src/styles/eln.css` 末尾并加一行注释说明作用域；改完用 grep 确认规则没插错位置（踩过坑）。
 - **新功能往哪写**：交互在组件内、纯逻辑进 `src/lib/*`、数据字段走 `server/db.js` 的 `ensureColumn` 迁移 + `server/index.js` 路由 + `api.js` + `store.js`。
@@ -128,7 +129,6 @@
 - **`recordCategories` 是「筛选」用的、`categoriesOfProject` 是「归类」用的，别混**：筛选（中栏列表、卡片墙）在「全部课题」下必须全给，否则别的课题的分类不在列表里，那些卡片会落不进任何组、直接看不见；而记录页给一条记录选分类时只能用**它自己那个课题**的分类（`categoriesOfProject(scope, project)`）——不然会造出「记录在共用课题、分类在别的课题」的隐形错位。服务端 `liveCategoryId(value, scope, project)` 兜底：scope 不对、或分类属于别的课题（非共用分类），一律当悬空引用置 null。
 - **换课题要顺手清掉不兼容的分类**：记录页/化合物页的 `ProjPick` 走 `onProjectChange`，新课题里没有那个分类就把 `category_id` 置空（服务端保存时也会置空，但那样用户看不到「分类被丢了」）。
 - **删除是软删除**：`DELETE /api/experiments/:id`（和化合物同构）只把快照塞进 `trash`、再把行删掉，**附件 / 化合物目录的文件不动**；只有 `DELETE /api/trash/:id`（彻底删除）才 `rm` 文件。清理测试数据时别忘了「彻底删除」那一步。
-- **恢复的边界**：按原 `id` 写回，`id` 被占报 409；`experiments.code` 是 UNIQUE，原号被占会自动改成 `<code>-恢复N`（响应里带真正用的 code）。附件行按原 id 写回，所以 `{文件行id}__文件名` 这套命名不用动。**恢复的列只能取快照里有的**（`cols.filter((k) => k in e)`）：新字段都走 `ensureColumn`，老快照缺 `sel_method` 这类 `NOT NULL DEFAULT ''` 的列，写显式 NULL 会撞 NOT NULL → 500，那条就永远恢复不了（曾经踩过：回收站里唯一一条一直恢复失败）。
 - **`.editor` 是滚动容器，会把伸出纸外的书签裁掉**（`overflow-y:auto` 等于两轴都 auto）：书签 / 预览卡这种要「漂在纸外」的东西一律 `Teleport to="body"` + `position: fixed`，位置由 `getBoundingClientRect()` 算，并在 `.editor` 的 `scroll`、`window.resize`、切记录/切页时重算。
 - **编辑页的异步响应必须校验 id**：`load()` / `saveNow()` / `refreshAttachments()` 都是「发请求 → 等回来 → 写进 `exp`」，等待期间用户可能已经切到别的记录。回来时先比 `route.params.id` / `exp.id` 还是不是发请求时那一条，不是就整份丢弃——否则旧记录的附件会显示到新记录上，此时点 TLC 的 × 删的是那条旧记录的附件行和磁盘文件。**savedLabel / autosave 也是对同一个坑**：`flush()` 里 `lastSaved` 要记「请求发出那一刻」的快照，不能用返回时的（返回时可能已经又改了）。
 - **记录页第 1 页现在多了一行**：结果表格下面是 `.res-sel`（选择性测定），在 `.sec-tight` 里跟着结果块一起打印。加别的行之前先想想页面还有多少余量——第 1 页本来就塞满了（反应式 + 投料表 + 条件 + 结果 + TLC）。
@@ -159,8 +159,6 @@
 - 结果区（`ResultBlock`）：`.row-del` 清空整行；产率表头 `∅` 切「不计产率」（`experiments.no_yield`，粗品用）。新列走 `ensureColumn`。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
 - **Safari 拖不动**：元素被 WebKit 当成可原生拖拽（`-webkit-user-drag: element`）时，真鼠标一拖就起原生会话、`mousemove` 全被吞；`new MouseEvent()` 不会触发原生拖拽 → 测试全绿真机全死。规矩：`-webkit-user-drag: none`、别加 `draggable`、按住时拦 `dragstart`，验证只看 `data/drag-debug.log`。
-- **落点标识用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量实测），必须配①几何快照（否则让位后落点来回翻）②`flip.js` 的 FLIP（否则瞬移「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下的卡**（`opacity` 只影响绘制，0.07）。
-- **`.drag-ghost` 必须 `position: fixed !important`**（`.exp-card.cmp-card{position:relative}` 权重 0,2,0 会把它顶回 `relative`、跑到页面底部）；`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖那张还原，要再用 `.grid-card.is-dragging` 同权重压回 0.07。
 - **本机只有 Safari**：看版式/读值用 `.cache/` 里 `swiftc` 编的 WKWebView 小工具（`snap`、`evaljs`、`jssnap`），编译带 `-module-cache-path .cache/clang`；输入框读 `.value`。
 - 依赖别升：Vue 3.5 / Vite 6 / EP 2.8 / openchemlib 9.25。
 

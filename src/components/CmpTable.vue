@@ -6,6 +6,7 @@ import { store } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { downloadBlob } from '../lib/print.js';
 import { toast } from '../lib/feedback.js';
+import { useColResize } from '../lib/colresize.js';
 
 /**
  * 化合物库的表格视图（卡片墙的另一种看法）：一行 = 一个化合物。
@@ -32,6 +33,24 @@ const COLS = [
   { key: 'category_name', label: '分类' },
   { key: 'used_count', label: '引用', align: 'right' },
 ];
+
+/* 表头拖拽改列宽：弹性列是「名称」那列；宽度按表存浏览器 */
+const COLDEFS = [
+  { key: 'pick', w: 30 },
+  { key: 'structure', w: 76 },
+  { key: 'code', w: 80 },
+  { key: 'name', w: 300 },
+  { key: 'kind', w: 62 },
+  { key: 'formula', w: 96 },
+  { key: 'mw', w: 72 },
+  { key: 'tlc_rf', w: 52 },
+  { key: 'category_name', w: 90 },
+  { key: 'used_count', w: 54 },
+];
+const { tableEl, start: startResize, colStyle } = useColResize(
+  'cmp',
+  Object.fromEntries(COLDEFS.map((c) => [c.key, c.w]))
+);
 
 const sorted = computed(() => {
   const key = sortKey.value;
@@ -147,18 +166,9 @@ function exportMd() {
     }}
   </div>
   <div v-else class="scope-wrap">
-    <table class="scope-table cmp-table">
+    <table ref="tableEl" class="scope-table cmp-table">
       <colgroup>
-        <col style="width: 26px" />
-        <col style="width: 68px" />
-        <col style="width: 70px" />
-        <col />
-        <col style="width: 58px" />
-        <col style="width: 92px" />
-        <col style="width: 68px" />
-        <col style="width: 46px" />
-        <col style="width: 84px" />
-        <col style="width: 46px" />
+        <col v-for="c in COLDEFS" :key="c.key" :style="colStyle(c.key)" />
       </colgroup>
       <thead>
         <tr>
@@ -170,18 +180,25 @@ function exportMd() {
           <th
             v-for="c in COLS"
             :key="c.key"
+            :data-col="c.key"
             :class="[`c-${c.key}`, c.align === 'right' ? 'is-right' : '', c.nosort ? '' : 'is-sortable']"
             @click="c.nosort ? null : setSort(c.key)"
           >
             {{ c.label }}
             <span v-if="!c.nosort && sortKey === c.key" class="sort-mark">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+            <span
+              class="col-grip"
+              :title="'拖动改「' + c.label + '」的列宽'"
+              @mousedown="startResize($event, c.key)"
+              @click.stop
+            />
           </th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="c in sorted" :key="c.id" :class="{ 'is-picked': picked[c.id] }">
-          <td class="c-pick">
-            <button type="button" class="pick-one" :aria-pressed="picked[c.id] ? 'true' : 'false'" @click="toggle(c.id)">
+        <tr v-for="c in sorted" :key="c.id" :class="{ 'is-picked': picked[c.id] }" @click="open(c.id)">
+          <td class="c-pick" @click.stop>
+            <button type="button" class="pick-one" :aria-pressed="picked[c.id] ? 'true' : 'false'" @click.stop="toggle(c.id)">
               {{ picked[c.id] ? '✓' : '' }}
             </button>
           </td>
@@ -189,7 +206,7 @@ function exportMd() {
             <img v-if="thumbUrl(c)" :src="thumbUrl(c)" alt="" loading="lazy" />
             <span v-else class="no-struct">—</span>
           </td>
-          <td class="c-code"><button type="button" class="linklike mono" @click="open(c.id)">{{ c.code || '—' }}</button></td>
+          <td class="c-code"><button type="button" class="linklike mono">{{ c.code || '—' }}</button></td>
           <td class="c-name">
             <div class="sub-line"><span class="sub-name">{{ c.name || '（未命名）' }}</span></div>
             <div v-if="c.standard_code" class="sub-title">标准实验 {{ c.standard_code }}</div>

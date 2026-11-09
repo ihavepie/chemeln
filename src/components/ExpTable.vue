@@ -5,6 +5,7 @@ import Icon from './Icon.vue';
 import { store } from '../store.js';
 import { downloadBlob } from '../lib/print.js';
 import { toast } from '../lib/feedback.js';
+import { useColResize } from '../lib/colresize.js';
 
 /**
  * 实验记录的表格视图（卡片墙的另一种看法）：一行 = 一条记录。
@@ -32,6 +33,22 @@ const COLS = [
   { key: 'ee', label: '选择性', align: 'right' },
   { key: 'date', label: '日期' },
 ];
+
+/* 表头拖拽改列宽：弹性列是「底物 → 产物」那列；宽度按表存浏览器 */
+const COLDEFS = [
+  { key: 'pick', w: 30 },
+  { key: 'code', w: 86 },
+  { key: 'structure', w: 76 },
+  { key: 'subject', w: 400 },
+  { key: 'condition', w: 320 },
+  { key: 'yield_pct', w: 62 },
+  { key: 'ee', w: 84 },
+  { key: 'date', w: 94 },
+];
+const { tableEl, start: startResize, colStyle } = useColResize(
+  'exp',
+  Object.fromEntries(COLDEFS.map((c) => [c.key, c.w]))
+);
 
 const numOf = (v) => {
   const m = String(v ?? '').match(/-?\d+(?:\.\d+)?/);
@@ -181,16 +198,9 @@ function exportMd() {
     {{ store.filters.q || store.filters.status || store.filters.category ? '无匹配记录。' : '暂无实验记录。点右上角「新建实验」。' }}
   </div>
   <div v-else class="scope-wrap">
-    <table class="scope-table">
+    <table ref="tableEl" class="scope-table">
       <colgroup>
-        <col style="width: 26px" />
-        <col style="width: 78px" />
-        <col style="width: 70px" />
-        <col />
-        <col style="width: 22%" />
-        <col style="width: 58px" />
-        <col style="width: 78px" />
-        <col style="width: 76px" />
+        <col v-for="c in COLDEFS" :key="c.key" :style="colStyle(c.key)" />
       </colgroup>
       <thead>
         <tr>
@@ -202,22 +212,30 @@ function exportMd() {
           <th
             v-for="c in COLS"
             :key="c.key"
+            :data-col="c.key"
             :class="[`c-${c.key}`, c.align === 'right' ? 'is-right' : '', c.nosort ? '' : 'is-sortable']"
             @click="c.nosort ? null : setSort(c.key)"
           >
             {{ c.label }}
             <span v-if="!c.nosort && sortKey === c.key" class="sort-mark">{{ sortDir === 'asc' ? '↑' : '↓' }}</span>
+            <!-- 右边界那一条：按住横拖改列宽（跟旁边那列换空间） -->
+            <span
+              class="col-grip"
+              :title="'拖动改「' + c.label + '」的列宽'"
+              @mousedown="startResize($event, c.key)"
+              @click.stop
+            />
           </th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="r in sorted" :key="r.id" :class="{ 'is-picked': picked[r.id] }">
-          <td class="c-pick">
-            <button type="button" class="pick-one" :aria-pressed="picked[r.id] ? 'true' : 'false'" @click="toggle(r.id)">
+        <tr v-for="r in sorted" :key="r.id" :class="{ 'is-picked': picked[r.id] }" @click="open(r.id)">
+          <td class="c-pick" @click.stop>
+            <button type="button" class="pick-one" :aria-pressed="picked[r.id] ? 'true' : 'false'" @click.stop="toggle(r.id)">
               {{ picked[r.id] ? '✓' : '' }}
             </button>
           </td>
-          <td class="c-code"><button type="button" class="linklike mono" @click="open(r.id)">{{ r.code }}</button></td>
+          <td class="c-code"><button type="button" class="linklike mono">{{ r.code }}</button></td>
           <td class="c-structure">
             <img v-if="thumbUrl(r)" :src="thumbUrl(r)" alt="" loading="lazy" />
             <span v-else class="no-struct">—</span>

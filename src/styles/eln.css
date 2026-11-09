@@ -6841,3 +6841,23 @@ body.is-pointer-dragging * { cursor: grabbing !important; }
   min-height: 150px;
 }
 .card-grid.is-even .drop-gap { min-height: 222px; }
+
+/* 表格视图（实验 / 化合物）：整行可点进去 + 行悬停 + 表头右边界拖列宽 */
+.scope-table tbody tr { cursor: pointer; }
+.scope-table tbody tr:hover td { background: #f7f5f0; }
+.scope-table tbody tr.is-picked:hover td { background: #f3efe9; }
+/* 表头右边界那一条：不拖看不见，悬停才浮出一道细线 */
+.scope-table th { position: relative; }
+.col-grip {
+  position: absolute; top: 0; right: -3px; width: 7px; height: 100%;
+  cursor: col-resize; z-index: 2; -webkit-user-drag: none;
+}
+.col-grip::after {
+  content: ''; position: absolute; top: 4px; bottom: 4px; right: 3px; width: 1px;
+  background: transparent; transition: background 120ms;
+}
+.col-grip:hover::after { background: var(--accent-ink); }
+/* 拖动中：整页保持 col-resize 光标，不然经过单元格就变回箭头 */
+body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; user-select: none !important; }
+/* 最后一列的把手指向内侧，别顶出表格右边缘（会多一条横向滚动条） */
+.scope-table th:last-child .col-grip { right: 0; }
