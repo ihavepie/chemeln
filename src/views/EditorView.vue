@@ -570,17 +570,25 @@ async function schemeFromTable() {
 
   const reactants = [];
   const others = [];   // 试剂 / 催化剂 / 碱……先攒着，能塞进箭头上方就塞，塞不下挪到下方
+  const loose = [];    // 写了名字但没挂化合物库的底物：放不进反应物，改放箭头上，别默默吞掉
   for (const r of reagent.rows) {
     if (r.role === '溶剂') continue;
     const c = r.compound_id ? byId.get(Number(r.compound_id)) : null;
-    if (r.role === '底物') {
-      if (c && c.smiles) reactants.push(c.smiles);
+    const name = String(r.name || (c && (c.name || c.code)) || '').trim();
+    const eq = num(r.eq);
+    const label = eq != null && eq !== 1 ? `${name} (${round(eq, 2)} eq)` : name;
+    if (r.role === '底物' && c && c.smiles) {
+      reactants.push(c.smiles);
       continue;
     }
-    const name = String(r.name || (c && (c.name || c.code)) || '').trim();
+    if (r.role === '底物') {
+      // 底物没结构（或没挂库里）时画不出结构式，但名字该出现在箭头上，
+      // 否则反应式看着像少了原料，用户会以为「按投料表生成」没生效
+      if (name) loose.push(label);
+      continue;
+    }
     if (!name) continue;
-    const eq = num(r.eq);
-    others.push(eq != null && eq !== 1 ? `${name} (${round(eq, 2)} eq)` : name);
+    others.push(label);
   }
   if (!reactants.length) {
     return toast(
@@ -588,6 +596,7 @@ async function schemeFromTable() {
       'warn'
     );
   }
+  if (loose.length) others.unshift(...loose);
   const prod = fields.product_compound_id ? byId.get(Number(fields.product_compound_id)) : null;
   if (!prod || !prod.smiles) return toast('产物还没挂化合物库——先在结果块里选上', 'warn');
 
