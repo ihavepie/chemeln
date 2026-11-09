@@ -89,7 +89,7 @@
 - `src/lib/peek.js` — 「书签悬停预览显示哪些块」的前端偏好（`peekPrefs` / `setPeekPref` / `PEEK_LABELS`，存 localStorage `eln:peek`；默认条件 / 底物 / 结果 / 结论开，备注关）。
 - `src/lib/colresize.js` — `useColResize(name, defaults)`：表格视图表头拖拽改列宽。**拖出来的增量在「这一列」和「它旁边那列」之间搬**（最后一列吃左边那列），所以所有列宽度和不变、整张表不跳；内部按 px 记、`colStyle()` 渲染成百分比（px 会顶出横向滚动条）。宽度存 `eln:colw:<表名>`；只吃 mouse 事件（WebKit 里表格上的 pointer 事件常被拖选文字吞掉）。拖动中 `body` 挂 `is-col-resizing`（整页 col-resize 光标）。
 - `src/lib/matrix.js` — `compareMembers(members)` / `memberDiffs(members)`：把一摞平行实验摊成对照表的行。**整列都没填的条件项不占行**（不然全是「—」）；投料按「角色:名字」并集、按第一次出现的顺序排；结果段是产率 / 选择性 / 产物。每行带 `diff`（跟基准不同就要标色），列头的差异只数条件和投料、不数产率——产率不同是结果不是改条件。
-- `src/lib/pagemenu.js` — **空白处右键的页面菜单**：`openPageMenu()` 给一份「新建实验 / 新建化合物 / 新建分类 / 刷新 / 四个导航页」；`keepNativeMenu()` 判断这一下要不要让给系统（输入框、文本域、`contenteditable`、**选中了文字** → 让给系统，否则「复制粘贴」就没了）。挂在 `ContextMenu.vue` 的**冒泡**阶段 `document` contextmenu 上——卡片 / 组头 / 列表行自己会 `preventDefault + stopPropagation`，轮不到它，所以两者的菜单不会打架。
+- `src/lib/pagemenu.js` — **空白处右键的页面菜单**：`openPageMenu()` 的第一项是**刷新当前列表**，然后四个导航页，**「新建…」收进子菜单放最底下**（右键十次有九次是想刷新，新建顶着最上面太容易点错——用户报过）；`keepNativeMenu()` 判断这一下要不要让给系统（输入框、文本域、`contenteditable`、**选中了文字** → 让给系统，否则「复制粘贴」就没了）。挂在 `ContextMenu.vue` 的**冒泡**阶段 `document` contextmenu 上——卡片 / 组头 / 列表行自己会 `preventDefault + stopPropagation`，轮不到它，所以两者的菜单不会打架。
 - `src/lib/feedback.js` — `toast` / `confirm` / `prompt`（Element Plus 封装）。
 - `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量（`STATUSES` / `STATUS_TONE` / 窄地方用的 `STATUS_SHORT`）、瓶子标签、内联 SVG 图标。**`COMPOUND_KINDS`**（化合物的类型）按一条路线的顺序排：底物 / 试剂 / 中间体 / 粗产物 / 纯化产物 / 产物 / 催化剂 / 配体 / 添加剂 / 标准品 / 其他 ——「中间体」就是「中间产物」，别再塞一个同义项进去；老数据里的「试剂」原本不在列表里，这次补上了。
 - `src/styles/eln.css` — 全站样式（v1 规则在前，v2 新增追加在文件末尾并写注释）。

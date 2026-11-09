@@ -10,19 +10,28 @@ import { prompt, toast } from './feedback.js';
  */
 export function openPageMenu(ev) {
   const onCompounds = router.currentRoute.value.path.startsWith('/c');
+  // 「新建」这类会落数据的动作**收进子菜单、放最底下**：右键十次有九次是想刷新或跳页，
+  // 一打开就顶着「新建实验」太容易点错（用户报过）。
   openCtxMenu(
     ev,
     [
-      { key: 'new-exp', label: '新建实验', icon: 'plus' },
-      { key: 'new-cmp', label: '新建化合物', icon: 'plus' },
-      { key: 'new-cat', label: onCompounds ? '新建化合物分类' : '新建实验分类', icon: 'folder' },
-      CTX_SEP,
       { key: 'reload', label: '刷新当前列表', icon: 'down' },
       CTX_SEP,
       { key: 'home', label: '工作台', icon: 'flask' },
       { key: 'list', label: '实验记录', icon: 'file' },
       { key: 'compounds', label: '化合物库', icon: 'molecule' },
       { key: 'settings', label: '设置', icon: 'settings' },
+      CTX_SEP,
+      {
+        key: 'new',
+        label: '新建…',
+        icon: 'plus',
+        sub: [
+          { key: 'new-exp', label: '新建实验', icon: 'plus' },
+          { key: 'new-cmp', label: '新建化合物', icon: 'plus' },
+          { key: 'new-cat', label: onCompounds ? '新建化合物分类' : '新建实验分类', icon: 'folder' },
+        ],
+      },
     ],
     async (key) => {
       try {
