@@ -370,6 +370,7 @@ function onNameInput(ev, r) {
 function onMwInput(ev, r) {
   applyNumeric(ev.target, 'Mmg/ol');
   r.mwText = ev.target.value;
+  r._mwManual = true;          // 手填过的 MW 不再被「换名字→自动带 MW」覆盖
   const v = parseMwCell(r.mwText);
   r.mw = v.mw;
   r.conc = v.conc;
@@ -418,15 +419,15 @@ function onAmountInput(ev, r) {
  * 库里、词典里都没有的试剂：拿名字去 PubChem 查一次（服务端代查 + 本地缓存）。
  * 查到了就把 MW / 密度填进空着的格子；查不到什么都不做，绝不能挡住录数据。
  */
-async function lookupName(r) {
-  const key = String(r.name || '').trim();
+async function lookupName(r, key0) {
+  const key = String(key0 || r.name || '').trim();
   if (!key || r.compound_id) return;
-  if (String(r.mwText || '').trim()) return;      // 手填过就不动
+  if (r._mwManual) return;                         // 手填过就不动
   if (r._looked === key) return;                   // 同一个名字只查一次
   r._looked = key;
   const info = await nameInfo(key);
   if (!info || !info.found) return;
-  if (String(r.mwText || '').trim()) return;      // 查的时候用户自己填了
+  if (r._mwManual) return;                         // 查的时候用户自己填了
   if (num(info.mw) !== null) {
     r.mwText = round(Number(info.mw), 2);
     onMw(r);
@@ -436,6 +437,30 @@ async function lookupName(r) {
     if (d > 0) r.density = d;
   }
   props.notify();
+}
+
+/** 手动重查（MW 格右侧的小放大镜）：以 PubChem 为准，覆盖手填值和词典里的旧值 */
+async function recheck(r) {
+  const key = String(r.name || '').trim();
+  if (!key) return toast('先填试剂名', 'warn');
+  const info = await nameInfo(key);
+  if (!info || !info.found) return toast(`PubChem 里查不到「${key}」`, 'warn');
+  const changed = [];
+  if (num(info.mw) !== null) {
+    r.mwText = round(Number(info.mw), 2);
+    r._mwManual = false;
+    onMw(r);
+    changed.push(`MW ${round(Number(info.mw), 2)}`);
+  }
+  if (info.props && info.props.density) {
+    const d = Number(String(info.props.density).replace(/[^\d.]/g, ''));
+    if (d > 0) {
+      r.density = d;
+      changed.push(`密度 ${round(d, 3)}`);
+    }
+  }
+  props.notify();
+  toast(changed.length ? `已按 PubChem 更新：${changed.join(' · ')}` : '查到了，但没有 MW/密度', changed.length ? 'ok' : 'warn');
 }
 
 /** 试剂名填的是化合物库里的编号 / 名称 → 带出 MW 并记下关联 */
@@ -449,20 +474,20 @@ function onName(r) {
   const hit = compoundDict().find((c) => (c.code || '').toLowerCase() === key || (c.name || '').toLowerCase() === key);
   if (hit) {
     r.compound_id = hit.id;
-    if (!String(r.mwText || '').trim() && hit.mw) {
+    if (!r._mwManual && hit.mw) {
       r.mwText = round(hit.mw, 2);
       onMw(r);
       return;
     }
-  } else if (!String(r.mwText || '').trim()) {
+  } else {
     // 化合物库里没有 → 先查自己用过的试剂词典，再退到 PubChem
     const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key);
-    if (d && (num(d.mw) !== null || num(d.conc))) {
+    if (d && !r._mwManual && (num(d.mw) !== null || num(d.conc))) {
       r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : round(d.mw, 2);
       onMw(r);
       return;
     }
-    void lookupName(r);
+    if (!r._mwManual) void lookupName(r, key);
   }
   props.notify();
 }
@@ -891,8 +916,17 @@ function onDrop(ev) {
                   <div v-if="!picker.items.length" class="cmp-pick-empty">化合物库和「用过的试剂」里都没有「{{ picker.q }}」</div>
                 </div>
               </td>
-              <td>
+              <td class="mw-td">
                 <input class="n mw-cell" data-f="mwcell" :value="r.mwText" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="focusHint(r, 'mwcell')" @blur="blurHint" @keydown="onKeydown($event, r, 'mwcell')" />
+                <button
+                  v-if="!locked && String(r.name || '').trim()"
+                  type="button"
+                  class="mw-lookup noprint"
+                  title="按名字去 PubChem 重查 MW / 密度"
+                  @click.stop="recheck(r)"
+                >
+                  <Icon name="search" :size="10" />
+                </button>
               </td>
               <td>
                 <input class="n" data-f="eq" inputmode="decimal" :value="r.eq ?? ''" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="focusHint(r, 'eq')" @blur="blurHint" @keydown="onKeydown($event, r, 'eq')" />

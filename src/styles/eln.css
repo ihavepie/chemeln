@@ -1964,6 +1964,14 @@ kbd {
 .sheet .res-table .r-yield { width: 78px; }
 .sheet .res-table .r-dr { width: 96px; }
 .sheet .res-table .r-del { width: 26px; }
+/* 投料表 MW 格右侧的「按名字重查」：平时很淡，免得和数字抢眼睛 */
+.rtable .mw-td { position: relative; }
+.mw-lookup {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: #cdc8bf; cursor: pointer; padding: 0;
+}
+.mw-lookup:hover { color: #6f665c; background: #f1ece4; }
 /* 结果行右侧的清空按钮 / 产率表头的「不计」开关：默认很淡，不抢正文 */
 .sheet .res-table .del-cell { padding: 1px 2px !important; }
 .row-del {
