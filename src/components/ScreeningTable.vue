@@ -21,7 +21,6 @@ const isManual = (f) => !f.source || f.source === 'manual';
 const base = computed(() => props.rows[0]?.exp || null);
 
 const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value));
-const subText = (exp) => (exp ? [exp.substrates, exp.product_name].filter(Boolean).join(' → ') || '—' : '记录已删');
 </script>
 
 <template>
@@ -31,7 +30,6 @@ const subText = (exp) => (exp ? [exp.substrates, exp.product_name].filter(Boolea
         <tr>
           <th class="sct-c-entry">Entry</th>
           <th class="sct-c-fix">编号</th>
-          <th class="sct-c-fix">底物 → 产物</th>
           <th v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num }">
             <div class="sct-th">
               <span class="sct-th-label">{{ f.label }}</span>
@@ -48,11 +46,12 @@ const subText = (exp) => (exp ? [exp.substrates, exp.product_name].filter(Boolea
       <tbody>
         <tr v-for="(r, i) in rows" :key="r.exp_id" :class="{ 'is-base': i === 0 }">
           <td class="sct-c-entry">{{ i + 1 }}</td>
-          <td class="sct-c-fix">
+          <td class="sct-c-fix sct-sub">
             <button v-if="r.exp" class="linklike mono" @click="emit('open', r)">{{ r.exp.code }}</button>
             <span v-else class="mono muted">#{{ r.exp_id }}</span>
+            <!-- 记录页那个「实验名」多半是空的（编号才是日常叫法），有才跟在编号后面 -->
+            <span v-if="r.exp && r.exp.title" class="sct-title">{{ r.exp.title }}</span>
           </td>
-          <td class="sct-c-fix sct-sub">{{ subText(r.exp) }}</td>
           <td v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num, 'is-manual': isManual(f) }">
             <input
               v-if="editable && isManual(f)"

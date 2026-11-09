@@ -6978,7 +6978,13 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 .sct-table tbody tr.is-base .sct-c-entry { color: var(--ink); font-weight: 600; }
 .sct-table .sct-c-x { width: 1%; }
-.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 190px; max-width: 260px; }
+.sct-table .sct-c-fix { white-space: nowrap; }
+.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 92px; max-width: 240px; }
+/* 编号后面跟的一句实验名（有才出现），别把它也做成等宽/强调色 */
+.sct-table .sct-title {
+  margin-left: 8px; font-size: 12px; color: var(--ink-3);
+  white-space: normal;
+}
 .sct-table td.is-manual { background: transparent; }
 
 .sct-th { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; row-gap: 1px; }
