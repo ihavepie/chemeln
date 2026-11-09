@@ -1155,6 +1155,8 @@ body {
 .rtable tr:hover .del { opacity: 1; }
 .rtable .del:hover { color: var(--bad); background: var(--bad-soft); }
 
+/* 合计行最后一段「用什么瓶 / 多大磁子」：淡一点，是提示不是数据 */
+.tot-vessel { color: var(--ink-3); }
 .rtable-foot {
   display: flex;
   align-items: center;

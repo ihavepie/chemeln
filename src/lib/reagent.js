@@ -136,6 +136,29 @@ export function totals(rows) {
   return { count, solidMg, liquidUl, solventUl };
 }
 
+/**
+ * 按体系总体积给一句「用什么瓶、多大磁子、大概多少转」的建议。
+ * 经验：瓶容积 ≈ 2.2 倍液体体积（留搅拌和回流空间）；磁子长约瓶内径的 0.6–0.7。
+ * 只是提示，不参与计算，也不用改任何数据。
+ */
+const FLASKS = [10, 25, 50, 100, 250, 500, 1000, 2000, 3000];
+const BAR_BY_FLASK = { 10: '10 mm', 25: '10–15 mm', 50: '15 mm', 100: '20 mm', 250: '25 mm', 500: '30 mm', 1000: '40 mm', 2000: '50 mm', 3000: '机械搅拌' };
+const RPM_BY_FLASK = { 10: '800–1000', 25: '700–900', 50: '600–800', 100: '500–700', 250: '400–600', 500: '300–450', 1000: '250–350', 2000: '机械搅拌', 3000: '机械搅拌' };
+
+export function vesselHint({ liquidUl = 0, solventUl = 0 } = {}) {
+  const ml = (num(liquidUl) || 0) / 1000 + (num(solventUl) || 0) / 1000;
+  if (!ml) return null;
+  const need = ml * 1.6;     // 装量别超过瓶子的六成，留搅拌和回流空间
+  const flask = FLASKS.find((v) => v >= need) || FLASKS[FLASKS.length - 1];
+  return {
+    ml: Math.round(ml * 10) / 10,
+    flask,
+    bar: BAR_BY_FLASK[flask] || '30 mm',
+    rpm: RPM_BY_FLASK[flask] || '300–450',
+    tight: ml > 2500,   // 再大就别用单口瓶了
+  };
+}
+
 /** 理论产量 / 实测产率 */
 export function yieldInfo({ base_mmol, product_mw, product_mass, yield_pct }) {
   const base = num(base_mmol);

@@ -66,7 +66,8 @@ const reagent = reactive({ base: null, steps: [], rows: [] });
 const FIELD_KEYS = Object.keys(fields);
 
 function toRow(r) {
-  return {
+  // 老数据里溶剂那一行的用量可能还是「30」（没单位、当时解析失败）→ 按 mL 认回来
+  const row = {
     step: Math.max(1, Number(r.step) || 1),
     role: r.role || '',
     name: r.name || '',
@@ -82,6 +83,19 @@ function toRow(r) {
     mwText: mwText(r),
     amountText: amountText(r),
   };
+  if (row.role === '溶剂' && row.volume_ul === null) {
+    const m = /^\s*([\d.]+)\s*(ml|l|µl|ul)?\s*$/i.exec(String(r.amountText || '').trim());
+    if (m) {
+      const v = Number(m[1]);
+      const unit = (m[2] || 'ml').toLowerCase();
+      const ul = unit === 'l' ? v * 1e6 : unit === 'µl' || unit === 'ul' ? v : v * 1000;
+      if (ul > 0) {
+        row.volume_ul = ul;
+        row.amountText = `${Math.round((ul / 1000) * 100) / 100} mL`;
+      }
+    }
+  }
+  return row;
 }
 
 function fill(e) {

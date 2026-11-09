@@ -5,7 +5,7 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, num, parseMwCell, roleTone, round, rowKind, totals } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, num, parseMwCell, roleTone, round, rowKind, totals, vesselHint } from '../lib/reagent.js';
 import { compoundDict, reagentDict } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 
@@ -217,6 +217,8 @@ const collapsed = ref(new Set());
 const rows = computed(() => props.model.rows);
 const steps = computed(() => props.model.steps);
 const sum = computed(() => totals(rows.value));
+/** 体系总体积 → 建议的瓶 / 磁子 / 转速（只是提示） */
+const vessel = computed(() => vesselHint({ liquidUl: sum.value.liquidUl, solventUl: sum.value.solventUl }));
 
 const rowsOf = (i) => rows.value.filter((r) => r.step === i + 1);
 
@@ -315,6 +317,17 @@ function applyAmount(r, { rewrite = true } = {}) {
   const m = /^\s*([\d.]+)\s*(mg|g|ml|l|µl|ul)?\s*$/i.exec(r.amountText || '');
   if (!m) return false;
   const v = Number(m[1]);
+  // 溶剂按体积量：写「30」或「30 mL」都当 30 mL（以前没单位就被当成克、还判失败）
+  if (r.role === '溶剂' && (!m[2] || /^(ml|l|µl|ul)$/i.test(m[2]))) {
+    const ul = /^l$/i.test(m[2] || '') ? v * 1e6 : /^(µl|ul)$/i.test(m[2] || '') ? v : v * 1000;
+    r.volume_ul = ul;
+    r.mass_mg = null;
+    r.mmol = null;
+    r.eq = '';
+    r.amountText = `${round(ul / 1000, 2)} mL`;
+    props.notify();
+    return true;
+  }
   const unit = (m[2] || 'g').toLowerCase();
   let mmol = null;
   if (unit === 'g' && num(r.mw)) {
@@ -987,6 +1000,12 @@ function onDrop(ev) {
                 <template v-if="sum.solidMg"><span class="tot-sep">·</span><span class="tot">固体 {{ round(sum.solidMg / 1000, 4) }} g</span></template>
                 <template v-if="sum.liquidUl"><span class="tot-sep">·</span><span class="tot">液体 / 溶液 {{ round(sum.liquidUl / 1000, 2) }} mL</span></template>
                 <template v-if="sum.solventUl"><span class="tot-sep">·</span><span class="tot">溶剂 {{ round(sum.solventUl / 1000, 2) }} mL</span></template>
+                <template v-if="vessel">
+                  <span class="tot-sep">·</span>
+                  <span class="tot tot-vessel" :title="`体系约 ${vessel.ml} mL；按「装量不超过瓶子六成」选瓶，磁子按瓶内径的 0.6–0.7 估`">
+                    {{ vessel.tight ? '超过 3 L，分釜做' : `${vessel.flask} mL 瓶 · ${vessel.bar} 磁子` }}
+                  </span>
+                </template>
               </div>
               <div class="calc-hint">{{ footInfo }}</div>
             </div>
