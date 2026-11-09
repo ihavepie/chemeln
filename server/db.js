@@ -183,6 +183,8 @@ ensureColumn('experiments', 'product_mass', 'product_mass REAL');
 ensureColumn('experiments', 'product_mw', 'product_mw REAL');
 ensureColumn('experiments', 'tlc_note', "tlc_note TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'steps_json', "steps_json TEXT NOT NULL DEFAULT '[]'");
+// 粗产物 / 中间体这类「不计产率」：只记质量，不显示也不统计产率
+ensureColumn('experiments', 'no_yield', 'no_yield INTEGER NOT NULL DEFAULT 0');
 ensureColumn('reagents', 'conc', 'conc REAL');
 ensureColumn('reagents', 'step', 'step INTEGER NOT NULL DEFAULT 1');
 // 投料行可以指向化合物库里的化合物；实验产物也可以

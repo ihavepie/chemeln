@@ -1963,6 +1963,22 @@ kbd {
 .sheet .res-table .r-mass { width: 92px; }
 .sheet .res-table .r-yield { width: 78px; }
 .sheet .res-table .r-dr { width: 96px; }
+.sheet .res-table .r-del { width: 26px; }
+/* 结果行右侧的清空按钮 / 产率表头的「不计」开关：默认很淡，不抢正文 */
+.sheet .res-table .del-cell { padding: 1px 2px !important; }
+.row-del {
+  width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: #c8c4bb; border-radius: 4px; cursor: pointer; padding: 0;
+}
+.row-del:hover { color: #b4442e; background: #f6ece9; }
+.del-cell:empty { width: 0; }
+.th-with-btn { display: inline-flex; align-items: center; gap: 4px; }
+.th-mini {
+  border: 0; background: transparent; color: #bdb8ae; font: inherit; font-size: 10px; line-height: 1;
+  padding: 1px 3px; border-radius: 4px; cursor: pointer;
+}
+.th-mini:hover { color: #8a7f72; background: #f1ece4; }
+.th-mini.on { color: #8a5a3a; background: #f3e7dc; }
 
 .sheet .res-table td { padding: 1px 3px; }
 .sheet .res-table th.n { text-align: right; }

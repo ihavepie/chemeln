@@ -138,10 +138,12 @@ const EXP_COLUMNS = [
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
   'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles',
+  'no_yield',
 ];
 
 const NUMERIC_COLUMNS = new Set([
   'yield_pct', 'base_mmol', 'product_mass', 'product_mw', 'product_compound_id', 'category_id', 'ee_pct',
+  'no_yield',
 ]);
 
 /** 反应步骤：一条记录里可以有多个阶段，阶段之间夹着后处理就是「两步连开」。 */
@@ -173,6 +175,10 @@ function normalizeExperiment(input) {
       const steps = normalizeSteps(input.steps);
       if (steps) out.steps_json = JSON.stringify(steps);
       else if (typeof input.steps_json === 'string') out.steps_json = input.steps_json;
+      continue;
+    }
+    if (key === 'no_yield') {
+      out.no_yield = Number(input.no_yield) === 1 ? 1 : 0;   // 0/1 开关，NOT NULL
       continue;
     }
     out[key] = NUMERIC_COLUMNS.has(key) ? numOrNull(input[key]) : str(input[key]);
@@ -1916,6 +1922,7 @@ route('POST', '/api/experiments', async (req, res) => {
     if (k === 'status') return data.status || '进行中';
     if (k === 'operator') return data.operator || settingsFor(projectName).owner_name || '';
     if (k === 'steps_json') return data.steps_json ?? '[]';
+    if (k === 'no_yield') return Number(data.no_yield) === 1 ? 1 : 0;   // NOT NULL 的 0/1 开关
     if (NUMERIC_COLUMNS.has(k)) return data[k] ?? null;
     return data[k] ?? '';
   });

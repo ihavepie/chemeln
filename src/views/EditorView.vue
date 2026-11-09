@@ -55,6 +55,7 @@ const fields = reactive({
   appearance: '', yield_pct: '', product_mass: '', product_mw: '', tlc_note: '', dr_ee: '',
   ee_pct: '', sel_method: '', sel_condition: '', sel_rt: '',
   characterization: '', notes: '', conclusion: '', product_compound_id: null, category_id: null,
+  no_yield: 0,
   scheme_rxn: '',
   scheme_smiles: '',
 });
@@ -85,6 +86,7 @@ function toRow(r) {
 function fill(e) {
   exp.value = e;
   for (const k of FIELD_KEYS) if (k in e) fields[k] = e[k] ?? (typeof fields[k] === 'number' ? null : '');
+  fields.no_yield = Number(e.no_yield) === 1 ? 1 : 0;   // 0/1 开关，别让它变成 null
   fields.product_compound_id = e.product_compound_id ?? null;
 
   const raw = Array.isArray(e.steps) ? e.steps : [];

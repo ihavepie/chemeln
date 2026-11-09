@@ -20,6 +20,39 @@ const list = ref([]);
 const picked = ref(null);
 /** 产率格用户手填过没有：手填过就不再自动覆盖（和「手填过就不动」的约定一致） */
 const yieldTyped = ref(num(props.model.yield_pct) !== null);
+/** 粗产物 / 中间体：只记质量，不算也不显示产率（存到 experiments.no_yield） */
+const noYield = computed(() => Number(props.model.no_yield) === 1);
+
+function toggleNoYield() {
+  if (props.locked) return;
+  const next = noYield.value ? 0 : 1;
+  props.model.no_yield = next;
+  if (next) {
+    props.model.yield_pct = '';
+    yieldTyped.value = false;
+  }
+  props.notify();
+}
+
+/** 清空这一行结果（连化合物关联一起解掉），方便换产物或重填 */
+function clearResult() {
+  if (props.locked) return;
+  const m = props.model;
+  m.product_name = '';
+  m.appearance = '';
+  m.product_mw = '';
+  m.product_mass = '';
+  m.yield_pct = '';
+  m.dr_ee = '';
+  m.ee_pct = '';
+  m.sel_method = '';
+  m.sel_condition = '';
+  m.sel_rt = '';
+  m.product_compound_id = null;
+  m.no_yield = 0;
+  yieldTyped.value = false;
+  props.notify();
+}
 const baseMmol = computed(() => props.base ?? props.model.base);
 const info = computed(() => yieldInfo({
   base_mmol: baseMmol.value,
@@ -34,7 +67,7 @@ const info = computed(() => yieldInfo({
  * 后面补全质量时条件已经不成立，产率就永远停在半截值上。
  */
 function syncYield() {
-  if (yieldTyped.value) return;
+  if (yieldTyped.value || noYield.value) return;
   const i = info.value;
   if (i.calc === null || i.over) return;
   props.model.yield_pct = round(i.calc, 1);
@@ -98,12 +131,28 @@ function onYieldInput(ev) {
     <div class="block-head"><span class="lbl">结果</span></div>
     <table class="rtable res-table">
       <colgroup>
-        <col class="r-name" /><col class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col class="r-dr" />
+        <col class="r-name" /><col class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col class="r-dr" /><col class="r-del" />
       </colgroup>
       <thead>
         <tr>
           <th>产物名称</th><th>性状</th><th class="n">产物 MW</th>
-          <th class="n">质量 / g</th><th class="n">产率 / %</th><th class="n">dr / ee</th>
+          <th class="n">质量 / g</th>
+          <th class="n">
+            <span class="th-with-btn"
+              >产率 / %<button
+                type="button"
+                class="th-mini noprint"
+                :class="{ on: noYield }"
+                :disabled="locked"
+                :title="noYield ? '恢复自动算产率' : '粗产物/中间体：不计产率'"
+                @click.stop="toggleNoYield"
+              >
+                {{ noYield ? '不计' : '∅' }}
+              </button></span
+            >
+          </th>
+          <th class="n">dr / ee</th>
+          <th />
         </tr>
       </thead>
       <tbody>
@@ -121,8 +170,20 @@ function onYieldInput(ev) {
           <td><input :value="model.appearance" placeholder="白色固体" :disabled="locked" @input="model.appearance = $event.target.value; notify()" @change="notify()" /></td>
           <td><input class="n" inputmode="decimal" :value="model.product_mw ?? ''" placeholder="自动" :disabled="locked" @input="onNumInput($event, 'product_mw')" /></td>
           <td><input class="n" inputmode="decimal" :value="model.product_mass ?? ''" placeholder="2.3975" :disabled="locked" @input="onMassInput($event)" @change="afterMass()" /></td>
-          <td><input class="n" inputmode="decimal" :value="model.yield_pct ?? ''" placeholder="自动" :disabled="locked" @input="onYieldInput($event)" /></td>
+          <td>
+            <input
+              class="n"
+              inputmode="decimal"
+              :value="noYield ? '' : (model.yield_pct ?? '')"
+              :placeholder="noYield ? '—' : '自动'"
+              :disabled="locked || noYield"
+              @input="onYieldInput($event)"
+            />
+          </td>
           <td><input class="n" :value="model.dr_ee" placeholder="> 20:1" :disabled="locked" @input="model.dr_ee = $event.target.value; notify()" @change="notify()" /></td>
+          <td class="del-cell">
+            <button v-if="!locked" type="button" class="row-del noprint" title="清空这行结果" @click.stop="clearResult"><Icon name="x" :size="10" /></button>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -146,7 +207,8 @@ function onYieldInput(ev) {
       </label>
     </div>
 
-    <div v-if="info.theo" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="info.calc !== null">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　实测产率 <b>{{ round(info.calc, 1) }}%</b></template><template v-else>理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template></div>
+    <div v-if="info.theo" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>
+      <template v-else-if="info.calc !== null">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　实测产率 <b>{{ round(info.calc, 1) }}%</b></template><template v-else>理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template></div>
 
     <AppModal v-if="picking" title="产物是库里的哪个化合物" confirm-text="选它" @close="picking = false" @confirm="applyPick">
       <div class="recipe-list">
