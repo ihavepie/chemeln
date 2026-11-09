@@ -6947,10 +6947,11 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-table {
   width: 100%;
   border-collapse: collapse;
-  /* 西文/数字走衬线（书卷气、跟文献一致），中文落给 PingFang——
-     宋体在 13px 下笔画发虚、字距也散，用户说「看着有点奇怪」。 */
-  font-family: Georgia, 'Times New Roman', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
-  font-size: 13px;
+  /* 整张表走衬线（文献表的字全是衬线体），数字用 tabular-nums 对齐；
+     之前中文用 PingFang、数字用等宽，看着像网页表格而不是论文里的表。 */
+  font-family: 'Iowan Old Style', Georgia, 'Songti SC', 'STSong', serif;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 .sct-table th,
@@ -6973,14 +6974,17 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 .sct-table tbody tr:last-child td { border-bottom: 2px solid var(--ink-2); }
 .sct-table tbody tr.is-base td { background: #f6f4ee; }
-.sct-table td.sct-num { text-align: right; font-family: var(--mono); font-size: 12px; }
+.sct-table td.sct-num { text-align: right; font-size: 13px; }
 .sct-table .sct-c-entry {
   width: 1%; text-align: center; padding-right: 14px;
-  font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+  font-size: 13px; color: var(--ink-3);
 }
 .sct-table tbody tr.is-base .sct-c-entry { color: var(--ink); font-weight: 600; }
 .sct-table .sct-c-x { width: 1%; }
 .sct-table .sct-c-fix { white-space: nowrap; }
+/* 编号也是正文的字（不要等宽 / 强调色那种 app 观感） */
+.sct-table .sct-c-fix .linklike { font: inherit; color: var(--ink); }
+.sct-table .sct-c-fix .linklike:hover { color: var(--accent-ink); }
 .sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 140px; max-width: 240px; }
 /* 编号后面跟的一句实验名（有才出现），别把它也做成等宽/强调色 */
 .sct-table .sct-title {
@@ -6995,6 +6999,15 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   vertical-align: bottom;
 }
 .sct-table td.is-manual { background: transparent; }
+/* 表下面那行脚注：论文里的 ᵃ 注 */
+.sct-note {
+  margin: 7px 0 2px;
+  padding: 0 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-4);
+}
+.sct-note sup { font-size: 8px; margin-right: 1px; }
 /* 数字列（产率 / 选择性…）整列居中：以前表头靠左、数字靠右，读着是错位的。
    长文字的列（相对标准条件、备注）仍旧左对齐，居中会把长短不一的句子甩得很难看。
    数字列给个宽度上限，不然表头一带上「(%)」它们就把文字列挤成两行。 */
@@ -7066,10 +7079,10 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 /* 改名 / 删列只在悬停表头时露出来，平时别占地方 */
 .sct-th-acts { display: inline-flex; gap: 1px; opacity: 0; transition: opacity 0.1s; }
 .sct-table thead th:hover .sct-th-acts { opacity: 1; }
-.sct-th-label { color: var(--ink-2); font-size: 11.5px; letter-spacing: 0.01em; }
+.sct-th-label { color: var(--ink-2); font-size: 12.5px; letter-spacing: 0.01em; }
 .sct-th-src {
-  font-size: 9px; color: var(--ink-4); border: 1px solid var(--line-2);
-  border-radius: 3px; padding: 0 3px; line-height: 1.4;
+  font-size: 8.5px; color: var(--ink-4); line-height: 1.4;
+  letter-spacing: 0.02em;
 }
 .sct-var-x {
   border: 0; background: transparent; color: var(--ink-4);

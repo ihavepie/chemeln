@@ -71,7 +71,7 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
         <tr v-for="(r, i) in rows" :key="r.exp_id" :class="{ 'is-base': i === 0 }">
           <td class="sct-c-entry">{{ i + 1 }}</td>
           <td class="sct-c-fix sct-sub">
-            <button v-if="r.exp" class="linklike mono" @click="emit('open', r)">{{ r.exp.code }}</button>
+            <button v-if="r.exp" class="linklike" @click="emit('open', r)">{{ r.exp.code }}</button>
             <span v-else class="mono muted">#{{ r.exp_id }}</span>
             <!-- 记录页那个「实验名」多半是空的（编号才是日常叫法），有才跟在编号后面 -->
             <span v-if="r.exp && r.exp.title" class="sct-title">{{ r.exp.title }}</span>
@@ -102,5 +102,9 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
         </tr>
       </tbody>
     </table>
+    <!-- 文献表下面那行小字脚注 -->
+    <p v-if="rows.length > 1" class="sct-note">
+      <sup>a</sup> 标「标准条件」的一行为基准，其余为相对基准的单变量改动；产率 / 选择性取记录里填的值。
+    </p>
   </div>
 </template>
