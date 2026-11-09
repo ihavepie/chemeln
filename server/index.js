@@ -703,6 +703,15 @@ function bootstrap(query = {}) {
               (SELECT COUNT(*) FROM screenings s JOIN experiments e ON e.id = s.exp_id WHERE 1 = 1 ${onExp}) AS screenings`
     )
     .get(...pjArgs, ...pjArgs, ...pjArgs);
+  // 侧栏那一项的计数现在是「平行组有几摞」，不是老手填筛选表的条数
+  const groupCount = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM (
+         SELECT group_id FROM experiments e
+          WHERE trim(e.group_id) <> '' ${onExp}
+          GROUP BY group_id HAVING COUNT(*) > 1)`
+    )
+    .get(...pjArgs).n;
   const month = new Date().toISOString().slice(0, 7);
   const thisMonth = db
     .prepare(`SELECT COUNT(*) AS n FROM experiments WHERE date LIKE ? ${onProject}`)
@@ -776,7 +785,7 @@ function bootstrap(query = {}) {
     projects,
     currentProject: project,
     rxnTypes,
-    totals,
+    totals: { ...totals, groups: groupCount },
     thisMonth,
     avgYield: withYield.avg_yield,
     yieldCount: withYield.n,
@@ -2394,6 +2403,49 @@ route('GET', '/api/export/notebook.md', async (req, res, params, url) => {
   }
   const filename = project ? `实验记录本-${project}.md` : '实验记录本.md';
   sendText(res, 200, parts.join('\n'), 'text/markdown; charset=utf-8', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+});
+
+/* --- 平行组：条件对照表用 ---
+   一摞（同 group_id 且 ≥2 条）连每条的投料表一起给出来，
+   前端拿第一条当基准，一行一个条件项、一列一条实验，谁改了哪儿一眼能看出来。 */
+route('GET', '/api/groups', async (req, res, params, url) => {
+  const q = Object.fromEntries(url.searchParams.entries());
+  const project = str(q.project);
+  const where = project ? 'AND e.project = ?' : '';
+  const args = project ? [project] : [];
+  const heads = db
+    .prepare(
+      `SELECT e.group_id AS id, COUNT(*) AS n, MIN(e.id) AS first_id
+         FROM experiments e
+        WHERE trim(e.group_id) <> '' ${where}
+        GROUP BY e.group_id
+       HAVING COUNT(*) > 1
+        ORDER BY MAX(e.id) DESC`
+    )
+    .all(...args);
+
+  const memberSql = `SELECT e.id, e.code, e.title, e.date, e.status, e.kind, e.project,
+                            e.yield_pct, e.dr_ee, e.ee_pct, e.no_yield,
+                            e.solvent, e.concentration, e.temperature, e.duration,
+                            e.atmosphere, e.addition, e.product_name, e.product_mass,
+                            e.base_mmol, e.group_id,
+                            (SELECT group_concat(r.name, ' + ') FROM reagents r
+                              WHERE r.exp_id = e.id AND r.role = '底物' AND trim(r.name) <> '') AS substrates
+                       FROM experiments e
+                      WHERE e.group_id = ?
+                      ORDER BY e.id`;
+  const reagentSql = "SELECT role, name, eq, mmol FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id";
+  const eg = db.prepare('SELECT kind, title FROM exp_groups WHERE id = ?');
+
+  const items = heads.map((h) => {
+    const members = db.prepare(memberSql).all(h.id).map((m) => ({
+      ...m,
+      reagents: db.prepare(reagentSql).all(m.id),
+    }));
+    const meta = eg.get(h.id) || {};
+    return { id: h.id, kind: meta.kind || '', title: meta.title || '', count: members.length, members };
+  });
+  ok(res, { items, total: items.length });
 });
 
 /* --- screenings --- */
