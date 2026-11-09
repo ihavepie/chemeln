@@ -792,6 +792,8 @@ function bootstrap(query = {}) {
     sharedCounts,
     lanUrl: lanUrl(),
     lanAccess: HOST !== '127.0.0.1' && HOST !== 'localhost',
+    syncLastAt: getSetting('sync_last_at') || '',
+    canSync: fs.existsSync(path.join(__dirname, '..', 'scripts', 'sync-server.sh')),
     dataDir: DATA_DIR,
   };
 }
@@ -1489,6 +1491,10 @@ route('PUT', '/api/settings', async (req, res) => {
 
   // 手机/局域网访问是全局开关（跟课题无关）
   if ('lan_access' in body) setSetting('lan_access', body.lan_access ? '1' : '0');
+  if ('auto_sync' in body) {
+    setSetting('auto_sync', body.auto_sync ? '1' : '0');
+    if (typeof scheduleAutoSync === 'function') scheduleAutoSync();
+  }
   for (const key of ['code_prefix', 'lab_heading', 'owner_name', 'group_name', 'label_base_url']) {
     if (!(key in body)) continue;
     const value = str(body[key]);
@@ -3116,6 +3122,83 @@ route('POST', '/api/export/bundle', async (req, res) => {
   }
 });
 
+/* ------------------------------------------------- 本机 → 服务器 单向同步 */
+
+/**
+ * 为什么放在服务里而不是 launchd/cron：macOS 的后台任务访问不了外置卷
+ * （/Volumes/...），实测 launchd 起来就 EX_CONFIG。而本机服务是用户在终端里启动的，
+ * 权限和 Finder 里双击时一样，能正常读 data/、跑 ssh。
+ * 服务器那份没有这个脚本 → 直接 501，避免误会。
+ */
+const SYNC_SCRIPT = path.join(__dirname, '..', 'scripts', 'sync-server.sh');
+let syncRunning = false;
+
+route('POST', '/api/sync/server', async (req, res) => {
+  if (!fs.existsSync(SYNC_SCRIPT)) {
+    return fail(res, 501, '这台机器不是主库（没有同步脚本）');
+  }
+  if (syncRunning) return fail(res, 409, '上一次同步还没结束');
+  syncRunning = true;
+  try {
+    const out = await new Promise((resolve, reject) => {
+      const p = spawn('/bin/bash', [SYNC_SCRIPT], {
+        cwd: path.dirname(SYNC_SCRIPT),
+        env: { ...process.env, PATH: process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let log = '';
+      const timer = setTimeout(() => {
+        p.kill('SIGKILL');
+        reject(new Error('同步超时（10 分钟）'));
+      }, 600_000);
+      p.stdout.on('data', (d) => (log += String(d)));
+      p.stderr.on('data', (d) => (log += String(d)));
+      p.on('error', (e) => {
+        clearTimeout(timer);
+        reject(e);
+      });
+      p.on('exit', (code) => {
+        clearTimeout(timer);
+        if (code === 0) resolve(log);
+        else reject(new Error(log.trim().split('\n').slice(-3).join(' ') || `退出码 ${code}`));
+      });
+    });
+    setSetting('sync_last_at', nowISO());
+    ok(res, { log: out.slice(-4000), at: nowISO() });
+  } catch (e) {
+    fail(res, 500, e.message || '同步失败');
+  } finally {
+    syncRunning = false;
+  }
+});
+
+/** 自动同步：服务开着的时候按间隔跑（没开服务就不跑，这是本机应用的正常状态） */
+let autoSyncTimer = null;
+function scheduleAutoSync() {
+  if (autoSyncTimer) {
+    clearInterval(autoSyncTimer);
+    autoSyncTimer = null;
+  }
+  if (getSetting('auto_sync') !== '1' || !fs.existsSync(SYNC_SCRIPT)) return;
+  autoSyncTimer = setInterval(async () => {
+    if (syncRunning) return;
+    syncRunning = true;
+    try {
+      await new Promise((resolve, reject) => {
+        const p = spawn('/bin/bash', [SYNC_SCRIPT], { cwd: path.dirname(SYNC_SCRIPT), stdio: 'ignore' });
+        p.on('error', reject);
+        p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`退出码 ${code}`))));
+      });
+      setSetting('sync_last_at', nowISO());
+      console.log('  自动同步      →  已推送到服务器');
+    } catch (e) {
+      console.log('  自动同步      →  失败：' + (e.message || e));
+    } finally {
+      syncRunning = false;
+    }
+  }, 6 * 3600 * 1000);          // 每 6 小时；同步脚本自己会做一致性快照
+}
+
 /* ------------------------------------- 结构信息查询（PubChem；联网 + 本地缓存） */
 
 /**
@@ -3479,4 +3562,5 @@ ensurePrintRenderer()
   .then(() => console.log('  打印渲染器      →  就绪（自己生成 A4 PDF）'))
   .catch((e) => console.log('  打印渲染器      →  不可用，只能用系统打印：' + e.message));
 
+scheduleAutoSync();
 listen(PORT);

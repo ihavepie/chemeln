@@ -10,7 +10,9 @@ import { confirm, prompt, toast } from '../lib/feedback.js';
 
 const saving = ref(false);
 
-const form = reactive({ lab_heading: '', code_prefix: 'EXP', owner_name: '', group_name: '', label_base_url: '', lan_access: false });
+const form = reactive({ lab_heading: '', code_prefix: 'EXP', owner_name: '', group_name: '', label_base_url: '', lan_access: false, auto_sync: false });
+const syncing = ref(false);
+const syncLog = ref('');
 
 /** 全局那套：课题里编辑时当占位符，让人看得见「留空会用成什么」 */
 const globalSettings = computed(() => store.boot?.settingsGlobal || {});
@@ -40,6 +42,7 @@ function fill() {
     form.group_name = ov.group_name || '';
     form.label_base_url = ov.label_base_url || '';
     form.lan_access = !!store.boot?.lanAccess;
+    form.auto_sync = String(settings().auto_sync || '') === '1';
   } else {
     form.lab_heading = g.lab_heading || '';
     form.code_prefix = g.code_prefix || 'EXP';
@@ -47,8 +50,33 @@ function fill() {
     form.group_name = g.group_name || '';
     form.label_base_url = g.label_base_url || '';
     form.lan_access = !!store.boot?.lanAccess;
+    form.auto_sync = String(g.auto_sync || '') === '1';
   }
   filledSig = JSON.stringify(form);
+}
+
+/** 服务器存的是 UTC ISO，显示成本地时间 */
+function fmtTime(v) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+async function runSync() {
+  syncing.value = true;
+  syncLog.value = '';
+  try {
+    const r = await api.syncServer();
+    syncLog.value = (r.log || '').trim().split('\n').slice(-6).join('\n') || '同步完成';
+    toast('已同步到服务器');
+    await loadBoot();
+  } catch (e) {
+    syncLog.value = e.message || '同步失败';
+    toast(e.message || '同步失败', 'err');
+  } finally {
+    syncing.value = false;
+  }
 }
 
 /** 01 卡有没有没保存的改动 */
@@ -145,6 +173,7 @@ async function save() {
       group_name: form.group_name,
       label_base_url: form.label_base_url.trim(),
       lan_access: !!form.lan_access,
+      auto_sync: !!form.auto_sync,
     });
     if (res?.renamedTo) {
       // 标题改了 = 课题改名，前端当前课题跟着切过去
@@ -401,6 +430,23 @@ async function removeProject(p) {  const ok = await confirm({
               当前：<b>{{ store.boot?.lanAccess ? '已允许' : '仅本机' }}</b>；本机局域网地址
               <span class="mono">{{ store.boot?.lanUrl || '（没检测到网卡）' }}</span>。
               <b>改完要重启服务</b>才生效（<span class="mono">node server/index.js</span>）；只在自己信得过的网络里开。
+            </p>
+          </div>
+          <div class="field" style="grid-column: 1/-1">
+            <label>同步到服务器（单向：本机 → 服务器）</label>
+            <div class="row" style="gap: 10px; align-items: center">
+              <button class="btn btn-sm" :disabled="syncing" @click="runSync">
+                {{ syncing ? '同步中…' : '立即同步一次' }}
+              </button>
+              <label class="check-row">
+                <input type="checkbox" v-model="form.auto_sync" />
+                <span>开着服务时每 6 小时自动推一次</span>
+              </label>
+              <span class="hint" v-if="store.boot?.syncLastAt">上次：{{ fmtTime(store.boot.syncLastAt) }}</span>
+            </div>
+            <p class="hint mt8" v-if="syncLog" style="white-space: pre-wrap">{{ syncLog }}</p>
+            <p class="hint mt8">
+              本机是主库，服务器只是副本（手机查看用）。服务器上的改动会被下次同步覆盖，别在服务器上改数据。
             </p>
           </div>
           <div class="field" style="grid-column: 1/-1">
