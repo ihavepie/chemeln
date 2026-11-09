@@ -7018,18 +7018,17 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 /* 手动列（备注之类）别被数字列挤没 */
 .sct-table .sct-field.is-manual { min-width: 120px; }
 .sct-table th.sct-num .sct-th { justify-content: center; }
-/* 整张筛选表（反应式 + 三线表）是一张纸卡：白底 + 两段柔和投影，**不描边**
-   （用户要「包裹表格和反应式，白底加阴影，像卡片」）。注意别改公共的 `.scope-wrap`——
-   记录 / 化合物的表格视图也用它，那两处不需要卡。 */
-.sct-sheet {
-  padding: 14px 18px 10px;
-  background: var(--paper);
-  border-radius: 4px;
-  box-shadow:
-    0 1px 2px rgba(20, 18, 14, 0.03),
-    0 4px 12px -8px rgba(20, 18, 14, 0.12);
-  margin-bottom: 16px;
+/* 筛选表不套卡片：论文里的表就是直接铺在纸面上的三线表（用户要的就是这个）。
+   `.sct-plain` 只是留白用的壳，别给白底 / 投影 / 圆角。 */
+.sct-plain { padding: 0; margin-bottom: 22px; background: transparent; box-shadow: none; }
+/* 表标题：`表 1　条件优化`，衬线、左对齐，压在表格顶上 */
+.sct-cap {
+  margin: 0 0 10px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--ink);
 }
+.sct-cap-no { font-weight: 600; margin-right: 0.9em; }
 /* 卡里面的反应式不再单独套卡（卡片里套卡片），就一块普通内容，压在三线表顶线上面 */
 .sct-std {
   display: flex;
@@ -7059,7 +7058,6 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   color: var(--ink-4);
 }
 /* 条件筛选首页一页可能摊好几张表，那里的图收小一点，别把清单顶下去 */
-.sct-block .sct-sheet { padding: 10px 14px 10px; }
 .sct-block .sct-std { margin: 0 0 8px; }
 .sct-block .sct-std svg { max-height: 160px; }
 .sct-std svg {

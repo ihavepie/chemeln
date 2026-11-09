@@ -113,5 +113,7 @@ export function standardLine(exp) {
     .filter(Boolean)
     .join('，');
   const prod = str(exp.product_name);
-  return [[...sub, ...re].join('，'), tail].filter(Boolean).join('，') + (prod ? ` → ${prod}` : '');
+  const line = [[...sub, ...re].join('，'), tail].filter(Boolean).join('，') + (prod ? ` → ${prod}` : '');
+  // 数值和单位之间用不断行空格：窄一点的时候不会把「-78 °C」「1.2 eq」从中间断开
+  return line.replace(/(\d)\s(°C|℃|h|eq|mL|mol)/g, '$1\u00A0$2');
 }

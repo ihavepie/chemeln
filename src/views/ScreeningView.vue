@@ -193,6 +193,8 @@ async function removeScreen() {
           <ScreeningTable
             :screening="s"
             :rows="rows"
+            :index="1"
+            :caption="'条件优化'"
             :scheme="stdSvg"
             :standard="stdLine"
             editable

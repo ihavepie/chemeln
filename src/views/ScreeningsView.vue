@@ -154,9 +154,9 @@ async function adopt(g) {
         <button class="btn btn-sm btn-ghost" @click="pickOpen = true"><Icon name="plus" :size="12" /> 新建筛选表</button>
       </div>
       <template v-if="tables.length">
-        <section v-for="t in tables" :key="t.id" class="sct-block">
+        <section v-for="(t, i) in tables" :key="t.id" class="sct-block">
           <div class="sct-block-head">
-            <b>{{ t.title }}</b>
+            <b><span class="sct-cap-no">表 {{ i + 1 }}</span>{{ t.title }}</b>
             <span class="cx-meta">{{ t.rows.length }} 条 · {{ (t.vars || []).length }} 列</span>
             <span class="spacer" />
             <button class="btn btn-sm btn-ghost" @click="router.push(`/s/${t.id}`)">

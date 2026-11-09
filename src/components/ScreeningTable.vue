@@ -15,8 +15,11 @@ const props = defineProps({
   editable: { type: Boolean, default: false },
   // 「标准条件」一行字（基准那条记录的投料 + 溶剂 / 温度 / 时间），像文献表格的副标题
   standard: { type: String, default: '' },
-  // 能画出结构时给一段反应式 SVG（不带白底），画在表格上方的纸卡里
+  // 能画出结构时给一段反应式 SVG（不带白底），画在表格上方
   scheme: { type: String, default: '' },
+  // 文献表的表标题：`表 1　条件优化`（index 是这张表在本页的序号）
+  index: { type: Number, default: 0 },
+  caption: { type: String, default: '' },
 });
 const emit = defineEmits(['open', 'change', 'rename-field', 'remove-field', 'remove-row']);
 
@@ -33,9 +36,11 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
 </script>
 
 <template>
-  <div class="scope-wrap sct-sheet">
-    <!-- 反应式 + 条件文字包一张纸卡（只有投影、不描边）：跟全站的卡片一个观感，
-         也让这张图跟下面的三线表分开，不至于浮在纸面上没着落 -->
+  <div class="scope-wrap sct-plain">
+    <p v-if="index || caption" class="sct-cap">
+      <span v-if="index" class="sct-cap-no">表 {{ index }}</span><span v-if="caption" class="sct-cap-ti">{{ caption }}</span>
+    </p>
+    <!-- 反应式 + 条件文字并排一行（像论文里表格上方那张示意图 + 条件说明） -->
     <div v-if="scheme" class="sct-std">
       <div class="sct-std-scheme" v-html="scheme" />
       <p v-if="standard" class="sct-std-line"><span class="sct-std-lbl">标准条件：</span>{{ standard }}</p>
