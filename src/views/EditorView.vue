@@ -1241,7 +1241,11 @@ const openAttachment = (id) => {
                 <span class="op-cap">操作</span>
                 <textarea class="sheet-text mono" rows="3" v-autogrow v-model="fields.procedure" :disabled="exp.locked" placeholder="加料、换气、升温、取样…" />
               </div>
-              <!-- 照片贴在「操作」右边这一栏（相机图、TLC 板、反应液颜色），不用翻到最下面 -->
+              <label class="op-cell">
+                <span class="op-cap">现象</span>
+                <textarea class="sheet-text" rows="3" v-autogrow v-model="fields.notes" :disabled="exp.locked" placeholder="颜色、放热、气体、析出…" />
+              </label>
+              <!-- 照片放在最右边一栏（相机图、TLC 板、反应液颜色）：操作和现象挨在一起读，图单独一列 -->
               <div class="op-shots">
                 <span class="op-cap">照片</span>
                 <div class="sec-shots" @mouseenter="onHover('photo')" @mouseleave="onHover('')">
@@ -1259,10 +1263,6 @@ const openAttachment = (id) => {
                   />
                 </div>
               </div>
-              <label class="op-cell">
-                <span class="op-cap">现象</span>
-                <textarea class="sheet-text" rows="3" v-autogrow v-model="fields.notes" :disabled="exp.locked" placeholder="颜色、放热、气体、析出…" />
-              </label>
             </div>
           </section>
           <section v-if="sheetPrefs.workup" class="sec">

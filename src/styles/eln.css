@@ -3884,7 +3884,7 @@ kbd {
 .sheet .cond-table .ct-time { width: 20%; }
 .sheet .cond-table .ct-atm { width: 22%; }
 /* 实验操作 / 现象并排：左边按时间记操作，右边记看到的 */
-.op-grid { display: grid; grid-template-columns: 1fr 138px 1fr; gap: 10px; margin-bottom: 6px; align-items: start; }
+.op-grid { display: grid; grid-template-columns: 1fr 1fr 138px; gap: 10px; margin-bottom: 6px; align-items: start; }
 /* 两栏各自留出三行高度，空记录时也像一块区域，不会缩成一条线 */
 .op-grid .sheet-text { min-height: 54px; }
 .op-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
