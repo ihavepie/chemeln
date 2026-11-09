@@ -156,7 +156,6 @@
 - **溶剂是投料表的一行**（role=`溶剂`，「＋ 加溶剂」），`CondRow` 只剩温度/时间/气氛/装置/光照。老记录的 `fields.solvent` 由 `ensureSolventRow()` 补成表行；删光溶剂行时 `watch(solventFromTable)` 清字段。
 - 结果区（`ResultBlock`）：`.row-del` 清空整行；产率表头 `∅` 切「不计产率」（`experiments.no_yield`，粗品用）。新列走 `ensureColumn`。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
-- **Safari 拖不动**：元素被 WebKit 当成可原生拖拽（`-webkit-user-drag: element`）时，真鼠标一拖就起原生会话、`mousemove` 全被吞；`new MouseEvent()` 不会触发原生拖拽 → 测试全绿真机全死。规矩：`-webkit-user-drag: none`、别加 `draggable`、按住时拦 `dragstart`，验证只看 `data/drag-debug.log`。
 - **本机只有 Safari**：看版式/读值用 `.cache/` 里 `swiftc` 编的 WKWebView 小工具（`snap`、`evaljs`、`jssnap`），编译带 `-module-cache-path .cache/clang`；输入框读 `.value`。
 - 依赖别升：Vue 3.5 / Vite 6 / EP 2.8 / openchemlib 9.25。
 
