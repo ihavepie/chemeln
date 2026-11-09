@@ -3889,11 +3889,14 @@ kbd {
 .op-grid .sheet-text { min-height: 54px; }
 .op-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .op-cap { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-4); }
-/* 操作/现象下面的照片条：比 TLC 矮一点，不抢版面；照片下面留一行写图注 */
-.sec-shots .tlc-strip { height: 112px; margin-top: 4px; }
-.sec-shots .tlc-shot { height: 106px; width: 128px; flex-direction: column; }
-.sec-shots .tlc-shot img { height: 84px; }
-.sec-shots .tlc-empty { height: 106px; width: 128px; }
+/* 照片条挂在「操作」这一栏下面：宽度跟着栏走，图一律 contain（宁可留白也不裁） */
+.sec-shots { margin-top: 6px; }
+.sec-shots .tlc-strip { height: auto; min-height: 100px; flex-wrap: wrap; gap: 6px; align-content: flex-start; align-items: flex-start; }
+.sec-shots .tlc-shot,
+.sec-shots .tlc-empty { width: 100px; height: 100px; flex: 0 0 auto; }
+.sec-shots .tlc-shot { flex-direction: column; }
+.sec-shots .tlc-shot img { height: 78px; object-fit: contain; background: #fbfaf7; }
+.sec-shots .tlc-cap { height: 18px; }
 .tlc-cap {
   width: 100%; margin-top: 3px; border: none; border-bottom: 1px dashed var(--line-2);
   background: transparent; font-size: 10px; color: var(--ink-2); padding: 1px 2px; text-align: center;
