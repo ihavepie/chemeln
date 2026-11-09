@@ -1965,13 +1965,18 @@ kbd {
 .sheet .res-table .r-dr { width: 96px; }
 .sheet .res-table .r-del { width: 26px; }
 /* 投料表 MW 格右侧的「按名字重查」：平时很淡，免得和数字抢眼睛 */
-.rtable .mw-td { position: relative; }
-.mw-lookup {
-  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
-  width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 4px; background: transparent; color: #cdc8bf; cursor: pointer; padding: 0;
+.rtable .name-cell { position: relative; }
+/* 右侧留出放大镜的位置，长名字别压在图标上 */
+.rtable .name-cell input { padding-right: 22px; }
+/* 试剂名右侧的「去 PubChem 查」：平时几乎看不见，hover 才显形，不抢正文 */
+.name-lookup {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: #d2cdc4;
+  cursor: pointer; padding: 0; opacity: 0; transition: opacity .12s;
 }
-.mw-lookup:hover { color: #6f665c; background: #f1ece4; }
+.rtable tr:hover .name-lookup, .name-lookup:focus-visible { opacity: 1; }
+.name-lookup:hover { color: #6f665c; background: #f1ece4; }
 /* 结果行右侧的清空按钮 / 产率表头的「不计」开关：默认很淡，不抢正文 */
 .sheet .res-table .del-cell { padding: 1px 2px !important; }
 .row-del {

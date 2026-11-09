@@ -426,8 +426,18 @@ async function lookupName(r, key0) {
   if (r._looked === key) return;                   // 同一个名字只查一次
   r._looked = key;
   const info = await nameInfo(key);
-  if (!info || !info.found) return;
   if (r._mwManual) return;                         // 查的时候用户自己填了
+  if (String(r.name || '').trim().toLowerCase() !== key.toLowerCase()) return;   // 名字又改了，这次结果作废
+  if (!info || !info.found) {
+    // 查不到（断网/自造缩写）→ 退回「用过的试剂」词典
+    const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key.toLowerCase());
+    if (d && (num(d.conc) !== null || num(d.mw) !== null)) {
+      r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : round(d.mw, 2);
+      onMw(r);
+      props.notify();
+    }
+    return;
+  }
   if (num(info.mw) !== null) {
     r.mwText = round(Number(info.mw), 2);
     onMw(r);
@@ -439,7 +449,14 @@ async function lookupName(r, key0) {
   props.notify();
 }
 
-/** 手动重查（MW 格右侧的小放大镜）：以 PubChem 为准，覆盖手填值和词典里的旧值 */
+/** 名字格失焦：没手填过 MW 就按名字核对一次（缓存命中很快，不会每次都发请求） */
+function verifyName(r) {
+  const key = String(r.name || '').trim();
+  if (!key || r.compound_id || r._mwManual) return;
+  void lookupName(r, key);
+}
+
+/** 手动重查（名字格右侧的小放大镜）：以 PubChem 为准，覆盖手填值和词典里的旧值 */
 async function recheck(r) {
   const key = String(r.name || '').trim();
   if (!key) return toast('先填试剂名', 'warn');
@@ -479,15 +496,9 @@ function onName(r) {
       onMw(r);
       return;
     }
-  } else {
-    // 化合物库里没有 → 先查自己用过的试剂词典，再退到 PubChem
-    const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key);
-    if (d && !r._mwManual && (num(d.mw) !== null || num(d.conc))) {
-      r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : round(d.mw, 2);
-      onMw(r);
-      return;
-    }
-    if (!r._mwManual) void lookupName(r, key);
+  } else if (!r._mwManual) {
+    // 化合物库里没有 → PubChem 优先（词典里的旧值可能已经错了），查不到才退回词典
+    void lookupName(r, key);
   }
   props.notify();
 }
@@ -861,8 +872,18 @@ function onDrop(ev) {
                   @input="onNameInput($event, r)"
                   @change="onName(r)"
                   @keydown="onKeydown($event, r, 'name')"
+                  @blur="verifyName(r)"
                   @dblclick.prevent="openBrowse(r)"
                 />
+                <button
+                  v-if="!locked && String(r.name || '').trim() && !r.compound_id"
+                  type="button"
+                  class="name-lookup noprint"
+                  title="按名字去 PubChem 查 MW / 密度"
+                  @click.stop="recheck(r)"
+                >
+                  <Icon name="search" :size="10" />
+                </button>
 
                 <!-- 结构式预览：这一行链了库里的化合物，鼠标移上来就显示 -->
                 <div
@@ -916,17 +937,8 @@ function onDrop(ev) {
                   <div v-if="!picker.items.length" class="cmp-pick-empty">化合物库和「用过的试剂」里都没有「{{ picker.q }}」</div>
                 </div>
               </td>
-              <td class="mw-td">
+              <td>
                 <input class="n mw-cell" data-f="mwcell" :value="r.mwText" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="focusHint(r, 'mwcell')" @blur="blurHint" @keydown="onKeydown($event, r, 'mwcell')" />
-                <button
-                  v-if="!locked && String(r.name || '').trim()"
-                  type="button"
-                  class="mw-lookup noprint"
-                  title="按名字去 PubChem 重查 MW / 密度"
-                  @click.stop="recheck(r)"
-                >
-                  <Icon name="search" :size="10" />
-                </button>
               </td>
               <td>
                 <input class="n" data-f="eq" inputmode="decimal" :value="r.eq ?? ''" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="focusHint(r, 'eq')" @blur="blurHint" @keydown="onKeydown($event, r, 'eq')" />
