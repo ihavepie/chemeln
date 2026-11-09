@@ -3463,8 +3463,13 @@ function listen(port, attempt = 0) {
     console.log('  关闭窗口或 Ctrl+C 停止。');
     console.log('');
     if (process.env.ELN_OPEN === '1') {
+      // 三个平台各自的开浏览器方式（Windows 是 start，Linux 是 xdg-open）
       const { exec } = require('node:child_process');
-      exec(`open "${url}"`);
+      const cmd =
+        process.platform === 'darwin' ? `open "${url}"`
+        : process.platform === 'win32' ? `start "" "${url}"`
+        : `xdg-open "${url}"`;
+      exec(cmd, () => {});
     }
   });
 }

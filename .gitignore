@@ -18,6 +18,9 @@ node_modules/
 # public/ 是构建产物，但要跟代码一起进仓库：
 # 4780 发的就是它，回退代码时不重新 build 也要能回到对应版本。
 
+# 绿色包产物（scripts/package.sh 打的 zip，太大不进仓库）
+dist-pkg/
+
 # 数据快照（scripts/backup.js 写的，里面是 eln.db + 谱图，同样不进仓库）
 .backups/
 
