@@ -310,6 +310,8 @@ const DEFAULT_SETTINGS = {
   group_name: '',
   // 瓶子标签上二维码指向哪里；留空就自动用本机局域网地址
   label_base_url: '',
+  // 允许手机/局域网访问（0/1）：改了要重启服务才生效
+  lan_access: '0',
 };
 
 function getSetting(key) {

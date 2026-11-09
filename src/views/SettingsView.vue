@@ -10,7 +10,7 @@ import { confirm, prompt, toast } from '../lib/feedback.js';
 
 const saving = ref(false);
 
-const form = reactive({ lab_heading: '', code_prefix: 'EXP', owner_name: '', group_name: '', label_base_url: '' });
+const form = reactive({ lab_heading: '', code_prefix: 'EXP', owner_name: '', group_name: '', label_base_url: '', lan_access: false });
 
 /** 全局那套：课题里编辑时当占位符，让人看得见「留空会用成什么」 */
 const globalSettings = computed(() => store.boot?.settingsGlobal || {});
@@ -39,12 +39,14 @@ function fill() {
     form.owner_name = ov.owner_name || '';
     form.group_name = ov.group_name || '';
     form.label_base_url = ov.label_base_url || '';
+    form.lan_access = !!store.boot?.lanAccess;
   } else {
     form.lab_heading = g.lab_heading || '';
     form.code_prefix = g.code_prefix || 'EXP';
     form.owner_name = g.owner_name || '';
     form.group_name = g.group_name || '';
     form.label_base_url = g.label_base_url || '';
+    form.lan_access = !!store.boot?.lanAccess;
   }
   filledSig = JSON.stringify(form);
 }
@@ -142,6 +144,7 @@ async function save() {
       owner_name: form.owner_name,
       group_name: form.group_name,
       label_base_url: form.label_base_url.trim(),
+      lan_access: !!form.lan_access,
     });
     if (res?.renamedTo) {
       // 标题改了 = 课题改名，前端当前课题跟着切过去
@@ -389,13 +392,23 @@ async function removeProject(p) {  const ok = await confirm({
           <div class="field"><label>记录人</label><input class="input" v-model="form.owner_name" :placeholder="ph.owner_name" /></div>
           <div class="field"><label>课题组</label><input class="input" v-model="form.group_name" :placeholder="ph.group_name" /></div>
           <div class="field" style="grid-column: 1/-1">
+            <label>手机 / 局域网访问</label>
+            <label class="check-row">
+              <input type="checkbox" v-model="form.lan_access" />
+              <span>允许同一 Wi-Fi 下的手机打开（监听 0.0.0.0）</span>
+            </label>
+            <p class="hint mt8">
+              当前：<b>{{ store.boot?.lanAccess ? '已允许' : '仅本机' }}</b>；本机局域网地址
+              <span class="mono">{{ store.boot?.lanUrl || '（没检测到网卡）' }}</span>。
+              <b>改完要重启服务</b>才生效（<span class="mono">node server/index.js</span>）；只在自己信得过的网络里开。
+            </p>
+          </div>
+          <div class="field" style="grid-column: 1/-1">
             <label>瓶子标签的二维码地址</label>
             <input class="input mono" v-model="form.label_base_url" :placeholder="ph.label_base_url" />
             <p class="hint mt8">
-              留空则使用本机局域网地址（当前 <span class="mono">{{ store.boot?.lanUrl || '' }}</span>）。若需手机扫码可访问，服务须监听局域网：<span
-                class="mono"
-                >HOST=0.0.0.0 node server/index.js</span
-              >；默认只听 127.0.0.1。
+              留空则使用本机局域网地址（当前 <span class="mono">{{ store.boot?.lanUrl || '' }}</span>）。
+              手机扫码要能打开，得先在上面勾上「允许手机 / 局域网访问」并重启服务（默认只听 127.0.0.1）。
             </p>
           </div>
         </div>

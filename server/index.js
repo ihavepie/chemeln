@@ -22,7 +22,8 @@ const VENDOR_DIR = path.join(__dirname, '..', 'vendor');
 // 端口占用了会自动往后找（见 listen()），所以这里的 PORT 要能被改；
 // 二维码 base 和 PDF 渲染地址都读它，不同步就会出现「码指 4780、服务其实在 4781」。
 let PORT = Number(process.env.PORT || 4780);
-const HOST = process.env.HOST || '127.0.0.1';
+// 默认只听本机；设置里打开「允许手机访问」后改用 0.0.0.0（重启生效）
+const HOST = process.env.HOST || (getSetting('lan_access') === '1' ? '0.0.0.0' : '127.0.0.1');
 const MAX_BODY = 320 * 1024 * 1024;
 
 /* ---------------------------------------------------------------- utils */
@@ -790,6 +791,7 @@ function bootstrap(query = {}) {
     compoundUnassigned: sharedCounts.cmp,
     sharedCounts,
     lanUrl: lanUrl(),
+    lanAccess: HOST !== '127.0.0.1' && HOST !== 'localhost',
     dataDir: DATA_DIR,
   };
 }
@@ -1485,6 +1487,8 @@ route('PUT', '/api/settings', async (req, res) => {
     }
   }
 
+  // 手机/局域网访问是全局开关（跟课题无关）
+  if ('lan_access' in body) setSetting('lan_access', body.lan_access ? '1' : '0');
   for (const key of ['code_prefix', 'lab_heading', 'owner_name', 'group_name', 'label_base_url']) {
     if (!(key in body)) continue;
     const value = str(body[key]);

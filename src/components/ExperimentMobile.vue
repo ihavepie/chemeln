@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { api } from '../api.js';
+import { toast } from '../lib/feedback.js';
 import { STATUS_TONE } from '../lib/ui.js';
 import { amountText, num, round } from '../lib/reagent.js';
 
@@ -24,6 +25,78 @@ onMounted(async () => {
 const scheme = computed(
   () => (e.value?.attachments || []).find((a) => a.category === 'scheme') || null
 );
+
+/* ---------------- 手机上唯一要「写」的事：拍照上传 ---------------- */
+const busy = ref('');
+const fileInput = ref(null);
+const pendingCategory = ref('photo');
+
+/** 手机拍的照片动辄 4–8 MB，先缩到长边 1600、JPEG 0.85 再传（快、也省盘） */
+async function shrink(file) {
+  if (!String(file.type || '').startsWith('image/')) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    if (scale >= 1 && file.size < 1_200_000) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.85));
+    if (!blob) return file;
+    return new File([blob], `${String(file.name || '照片').replace(/\.[^.]+$/, '')}.jpg`, { type: 'image/jpeg' });
+  } catch {
+    return file;            // 缩不了就原样传，别把上传卡死
+  }
+}
+
+function pickShot(category) {
+  pendingCategory.value = category;
+  const el = fileInput.value;
+  if (!el) return;
+  el.value = '';
+  el.click();
+}
+
+async function onShotPicked(ev) {
+  const files = Array.from(ev.target.files || []);
+  if (!files.length) return;
+  busy.value = '上传中…';
+  try {
+    for (const raw of files) {
+      const f = await shrink(raw);
+      const fd = new FormData();
+      fd.append('file', f, f.name || '照片.jpg');
+      fd.append('category', pendingCategory.value);
+      await api.upload(props.id, fd);
+    }
+    const fresh = await api.experiment(props.id);
+    e.value = { ...e.value, attachments: fresh.attachments };
+    toast(`已上传 ${files.length} 张`);
+  } catch (err) {
+    toast(err.message || '上传失败', 'err');
+  } finally {
+    busy.value = '';
+    ev.target.value = '';
+  }
+}
+
+const SHOT_LABEL = { tlc: 'TLC', photo: '照片', nmr_other: '谱图' };
+const shots = computed(() =>
+  (e.value?.attachments || []).filter(
+    (a) => SHOT_LABEL[a.category] && /\.(png|jpe?g|gif|webp)$/i.test(a.original_name || a.filename)
+  )
+);
+
+async function removeShot(a) {
+  try {
+    await api.deleteAttachment(a.id);
+    const fresh = await api.experiment(props.id);
+    e.value = { ...e.value, attachments: fresh.attachments };
+  } catch (err) {
+    toast(err.message || '删不掉', 'err');
+  }
+}
 
 const rows = computed(() => (e.value?.reagents || []).filter((r) => String(r.name || '').trim()));
 
@@ -106,7 +179,36 @@ const amount = (r) => amountText(r) || (num(r.amount_ul) ? `${round(num(r.amount
         <p class="phone-text">{{ e.characterization }}</p>
       </div>
 
-      <p class="phone-foot">只读 · 扫码查看</p>
+      <div class="phone-block">
+        <div class="phone-label">拍照 / 上传</div>
+        <div class="phone-shoot">
+          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('tlc')">拍 TLC</button>
+          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('photo')">拍实验照片</button>
+          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('nmr_other')">拍谱图</button>
+        </div>
+        <input
+          ref="fileInput"
+          class="phone-file"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          @change="onShotPicked"
+        />
+        <p v-if="busy" class="phone-hint">{{ busy }}</p>
+        <div v-if="shots.length" class="phone-shots">
+          <figure v-for="a in shots" :key="a.id" class="phone-shot">
+            <img :src="`/api/files/${a.id}`" :alt="a.note || a.original_name || ''" />
+            <figcaption>{{ SHOT_LABEL[a.category] }}</figcaption>
+            <button type="button" class="phone-shot-x" title="删除" @click="removeShot(a)">✕</button>
+          </figure>
+        </div>
+        <p class="phone-hint">
+          <template v-if="!shots.length">拍完自动缩到长边 1600 再上传，回电脑上能直接用。</template>
+        </p>
+      </div>
+
+      <p class="phone-foot">画结构式请到电脑上；手机上只做查看与拍照上传</p>
     </template>
   </div>
 </template>

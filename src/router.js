@@ -8,12 +8,14 @@ import ScreeningsView from './views/ScreeningsView.vue';
 import ScreeningView from './views/ScreeningView.vue';
 import SettingsView from './views/SettingsView.vue';
 import TrashView from './views/TrashView.vue';
+import MobileHome from './components/MobileHome.vue';
 
 export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', name: 'home', component: DashboardView },
     { path: '/list', name: 'list', component: EmptyEditor },
+    { path: '/m', name: 'mobile', component: MobileHome },
     { path: '/e/:id', name: 'editor', component: EditorView },
     { path: '/compounds', name: 'compounds', component: CompoundsView },
     {
