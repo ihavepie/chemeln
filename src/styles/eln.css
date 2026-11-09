@@ -6940,51 +6940,46 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .scr-save { font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
 .scr-del { color: var(--bad); }
 
-/* 筛选表：就按真表格来——表头有底色、格子之间有细网格线，
-   固定两列（编号 / 底物→产物）浅底，手动列再淡一层，自动列不加底 */
+/* 筛选表：照文献里那种「三线表」（booktabs）——
+   顶上一条粗线、表头下一条细线、表尾一条粗线，中间**不加竖线也不加行线**，
+   只留基准那一行的淡底。正文用衬线，数字和 Entry 用等宽。
+   用户贴的就是这种表，别又加回网格线 / 表格外框 / 列底色。 */
 .sct-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 12px;
-  border: 1px solid var(--line-2);
-  border-radius: 6px;
-  background: #fff;
+  border-collapse: collapse;
+  font-family: 'Iowan Old Style', 'Songti SC', Georgia, serif;
+  font-size: 13px;
+  color: var(--ink);
 }
 .sct-table th,
 .sct-table td {
-  padding: 5px 9px;
+  padding: 6px 12px;
   text-align: left;
   vertical-align: middle;
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  border: 0;
 }
-.sct-table th:last-child,
-.sct-table td:last-child { border-right: 0; }
-.sct-table tbody tr:last-child td { border-bottom: 0; }
 .sct-table thead th {
-  background: #f6f4ef;
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.05em;
-  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 400;
+  color: var(--ink-2);
   white-space: nowrap;
   vertical-align: bottom;
-  border-bottom: 1px solid var(--line-2);
+  border-top: 2px solid var(--ink-2);
+  border-bottom: 1px solid var(--ink-3);
+  padding-bottom: 7px;
 }
-.sct-table tbody tr:hover td { background: #fbfaf7; }
-.sct-table .sct-c-fix { background: #fbfaf7; white-space: nowrap; }
-/* 文献里的优化表：Entry 序号一列 + 基准那一行整行淡底 */
-.sct-table .sct-c-entry { width: 1%; text-align: right; color: var(--ink-3); }
-.sct-table tbody tr.is-base td { background: #f3f1ec; }
-.sct-table tbody tr.is-base .sct-c-entry { color: var(--ink-2); font-weight: 600; }
-.sct-table tbody tr.is-base .sct-c-fix { background: #efece5; }
-.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 190px; max-width: 260px; }
+.sct-table tbody tr:last-child td { border-bottom: 2px solid var(--ink-2); }
+.sct-table tbody tr.is-base td { background: #f2f0ea; }
+.sct-table td.sct-num { text-align: right; font-family: var(--mono); font-size: 12px; }
+.sct-table .sct-c-entry {
+  width: 1%; text-align: right; padding-right: 16px;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+}
+.sct-table tbody tr.is-base .sct-c-entry { color: var(--ink); font-weight: 600; }
 .sct-table .sct-c-x { width: 1%; }
-.sct-table .sct-num { text-align: right; }
-.sct-table td.sct-num { font-family: var(--mono); }
-.sct-table td.is-manual { background: #fdfaf6; }
+.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 190px; max-width: 260px; }
+.sct-table td.is-manual { background: transparent; }
 
 .sct-th { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; row-gap: 1px; }
 /* 改名 / 删列只在悬停表头时露出来，平时别占地方 */

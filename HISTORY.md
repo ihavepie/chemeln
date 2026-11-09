@@ -3,6 +3,7 @@
 > 从 `AGENTS.md` 的「当前进度」里按顺序搬出来的旧条目，逐字保留、没有删改。
 > 最新的几轮在 `AGENTS.md`；要回溯某次改动，也可以直接 `git log --oneline`。
 
+- **自绘下拉一律单列、不许横向滚**：`.qmenu` 的 `flex-wrap: wrap` 撞上 `max-height` 会把 `.cat-menu` 折成**第二列**，看着就是「菜单被切了一半、底下还能横向拖」（用户报过两次：类型下拉、课题下拉）。现在 `eln.css` 末尾有 `.qmenu.cat-menu { flex-direction: column; flex-wrap: nowrap; overflow-x: hidden; }`，`.cat-menu-kinds`（类型小节的两列排布）是另一层、不受影响。**另外下拉菜单不要出现滚动条**：`.qmenu.cat-menu` / `.kind-menu` 都写了 `scrollbar-width: none` + `::-webkit-scrollbar { width:0; display:none }`（多了仍能滚轮滚，只是不画杠）；「类型」菜单 `max-height: none`（直接铺开）。 **fixed 定位的下拉（侧栏课题切换器、`ProjPick`）必须加 `.cat-menu--fixed`**（`.cat-menu` 自带 `min-width:100%`，fixed 下会按整屏算、菜单变巨长；宽度交给 JS 量触发器后内联写）——细节在 `HISTORY.md`。
 - **化合物库的课题归属**：`compounds.project` 一直写值，过滤是**严格 `project = 当前课题`**；「全部课题」不筛，所以没归课题的化合物（`project = ''`，即共用课题的）只在「全部课题」里看得到。化合物库列表头会提示「另有 N 个在共用课题」（bootstrap 的 `sharedCounts.cmp` / `compoundUnassigned`），化合物页**现在恒定有「课题」格**（`ProjPick`，清空 = 共用课题）可以补归属。
 - **主从关系**：**本机 `data/` 是主库**，服务器 `/var/lib/eln` 是同步上去的副本，**只允许 本机 → 服务器 单向覆盖**；服务器上的改动下次同步会被冲掉。
 - **二维码**：化合物 `/api/compounds/:id/qr.svg` → `/#/c/<id>`；实验 `/api/experiments/:id/qr.svg` → `/#/e/<id>`。base 的优先级：URL 参数 > **`ELN_LABEL_BASE_URL` 环境变量** > 设置页「瓶子标签的二维码地址」> `lanUrl()`。服务器上靠环境变量指定（数据同步会冲掉设置页里的值），详见 `CLOUD-DEPLOY.md`。
