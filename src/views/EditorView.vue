@@ -444,6 +444,17 @@ function pickFile(category) {
   input.click();
 }
 
+/** 图片下面那行说明：存到附件的 note，刷新后还在 */
+async function saveCaption(id, note) {
+  const hit = (exp.value.attachments || []).find((a) => Number(a.id) === Number(id));
+  if (hit) hit.note = note;                 // 先就地更新，别等刷新闪一下
+  try {
+    await api.updateAttachment(id, { note });
+  } catch (e) {
+    toast(e.message || '图注没存上', 'err');
+  }
+}
+
 async function onPaste(ev) {
   if (route.name !== 'editor' || !exp.value || exp.value.locked) return;
   const items = Array.from(ev.clipboardData?.items || []).filter((i) => i.kind === 'file' && String(i.type).startsWith('image/'));
@@ -1203,12 +1214,14 @@ const openAttachment = (id) => {
             <div class="sec-shots" @mouseenter="onHover('photo')" @mouseleave="onHover('')">
               <TlcStrip
                 category="photo"
+                captions
                 :attachments="exp.attachments || []"
                 :locked="exp.locked"
                 :hovered="hovered"
                 :on-hover="onHover"
                 :on-pick="pickFile"
                 :on-open="openAttachment"
+                :on-caption="saveCaption"
                 :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
               />
             </div>

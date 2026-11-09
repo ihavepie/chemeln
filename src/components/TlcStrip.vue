@@ -12,6 +12,9 @@ const props = defineProps({
   onPick: Function,
   onOpen: Function,
   onDelete: Function,
+  /** 图片下面给不给写一行说明（实验照片用；TLC 不写） */
+  captions: Boolean,
+  onCaption: Function,
 });
 
 const shots = computed(() =>
@@ -23,9 +26,18 @@ const shots = computed(() =>
 
 <template>
   <div class="tlc-strip" :data-state="shots.length ? 'has' : 'empty'" @mouseenter="onHover('tlc')" @mouseleave="onHover('')">
-    <figure v-for="s in shots" :key="s.id" class="tlc-shot">
+    <figure v-for="s in shots" :key="s.id" class="tlc-shot" :class="{ 'has-cap': captions }">
       <img :src="`/api/files/${s.id}`" alt="" @click="onOpen(s.id)" />
       <button v-if="!locked" class="tlc-x" title="删除" @click.stop="onDelete(s.id)"><Icon name="x" :size="11" /></button>
+      <input
+        v-if="captions"
+        class="tlc-cap"
+        :value="s.note || ''"
+        placeholder="图注，如：滴加 10 min 后"
+        :disabled="locked"
+        @click.stop
+        @change="onCaption && onCaption(s.id, $event.target.value)"
+      />
     </figure>
     <template v-if="!locked">
       <div v-for="n in (shots.length ? 1 : 2)" :key="`add-${n}`" class="tlc-empty" @click="onPick(category)">

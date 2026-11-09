@@ -2923,6 +2923,9 @@ kbd {
    ================================================================ */
 
 @media print {
+  /* 图注印成纯文字，不要输入框的下划线 */
+  .tlc-cap { border: none !important; background: transparent !important; color: #444 !important; }
+
   @page { size: A4; margin: 16mm 15mm; }
 
   html, body { background: #fff !important; }
@@ -3884,10 +3887,17 @@ kbd {
 .op-grid .sheet-text { min-height: 54px; }
 .op-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .op-cap { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-4); }
-/* 操作/现象下面的照片条：比 TLC 矮一点，不抢版面 */
-.sec-shots .tlc-strip { height: 92px; margin-top: 4px; }
-.sec-shots .tlc-shot,
-.sec-shots .tlc-empty { height: 88px; width: 118px; }
+/* 操作/现象下面的照片条：比 TLC 矮一点，不抢版面；照片下面留一行写图注 */
+.sec-shots .tlc-strip { height: 112px; margin-top: 4px; }
+.sec-shots .tlc-shot { height: 106px; width: 128px; flex-direction: column; }
+.sec-shots .tlc-shot img { height: 84px; }
+.sec-shots .tlc-empty { height: 106px; width: 128px; }
+.tlc-cap {
+  width: 100%; margin-top: 3px; border: none; border-bottom: 1px dashed var(--line-2);
+  background: transparent; font-size: 10px; color: var(--ink-2); padding: 1px 2px; text-align: center;
+}
+.tlc-cap::placeholder { color: var(--ink-4); }
+.tlc-cap:focus { outline: none; border-bottom-color: var(--ink-3); }
 .sheet .cond-table .ct-app { width: 20%; }
 .sheet .cond-table .ct-light { width: 18%; }
 /* 步骤行现在还有「加料 / 搅拌」：把两栏固定窄宽，剩下的空间让给名字和条件 */
