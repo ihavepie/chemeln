@@ -3884,19 +3884,19 @@ kbd {
 .sheet .cond-table .ct-time { width: 20%; }
 .sheet .cond-table .ct-atm { width: 22%; }
 /* 实验操作 / 现象并排：左边按时间记操作，右边记看到的 */
-.op-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+.op-grid { display: grid; grid-template-columns: 1fr 138px 1fr; gap: 10px; margin-bottom: 6px; align-items: start; }
 /* 两栏各自留出三行高度，空记录时也像一块区域，不会缩成一条线 */
 .op-grid .sheet-text { min-height: 54px; }
 .op-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .op-cap { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-4); }
-/* 照片条挂在「操作」这一栏下面：宽度跟着栏走，图一律 contain（宁可留白也不裁） */
-.sec-shots { margin-top: 6px; }
-.sec-shots .tlc-strip { height: auto; min-height: 100px; flex-wrap: wrap; gap: 6px; align-content: flex-start; align-items: flex-start; }
+/* 照片单独一窄栏，夹在「操作」和「现象」中间；图一律 contain（宁可留白也不裁） */
+.op-shots { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sec-shots .tlc-strip { height: auto; flex-direction: column; gap: 6px; align-items: stretch; }
 .sec-shots .tlc-shot,
-.sec-shots .tlc-empty { width: 100px; height: 100px; flex: 0 0 auto; }
+.sec-shots .tlc-empty { width: 100%; height: 96px; flex: 0 0 auto; }
 .sec-shots .tlc-shot { flex-direction: column; }
-.sec-shots .tlc-shot img { height: 78px; object-fit: contain; background: #fbfaf7; }
-.sec-shots .tlc-cap { height: 18px; }
+.sec-shots .tlc-shot img { height: 72px; object-fit: contain; background: #fbfaf7; }
+.sec-shots .tlc-cap { height: 18px; font-size: 9px; }
 .tlc-cap {
   width: 100%; margin-top: 3px; border: none; border-bottom: 1px dashed var(--line-2);
   background: transparent; font-size: 10px; color: var(--ink-2); padding: 1px 2px; text-align: center;

@@ -1240,7 +1240,10 @@ const openAttachment = (id) => {
               <div class="op-cell">
                 <span class="op-cap">操作</span>
                 <textarea class="sheet-text mono" rows="3" v-autogrow v-model="fields.procedure" :disabled="exp.locked" placeholder="加料、换气、升温、取样…" />
-                <!-- 照片就贴在操作下面这一栏里（相机图、TLC 板、反应液颜色），不用翻到最下面 -->
+              </div>
+              <!-- 照片贴在「操作」右边这一栏（相机图、TLC 板、反应液颜色），不用翻到最下面 -->
+              <div class="op-shots">
+                <span class="op-cap">照片</span>
                 <div class="sec-shots" @mouseenter="onHover('photo')" @mouseleave="onHover('')">
                   <TlcStrip
                     category="photo"
