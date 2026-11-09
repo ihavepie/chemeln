@@ -13,6 +13,8 @@ const props = defineProps({
   screening: { type: Object, required: true },
   rows: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
+  // 「标准条件」一行字（基准那条记录的投料 + 溶剂 / 温度 / 时间），像文献表格的副标题
+  standard: { type: String, default: '' },
 });
 const emit = defineEmits(['open', 'change', 'rename-field', 'remove-field', 'remove-row']);
 
@@ -26,6 +28,9 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
 <template>
   <div class="scope-wrap">
     <table class="sct-table">
+      <caption v-if="standard" class="sct-cap">
+        <span class="sct-cap-lbl">标准条件</span>{{ standard }}
+      </caption>
       <thead>
         <tr>
           <th class="sct-c-entry">Entry</th>

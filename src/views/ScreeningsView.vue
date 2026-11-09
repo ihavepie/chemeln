@@ -9,6 +9,7 @@ import { store } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { toast } from '../lib/feedback.js';
 import { DEFAULT_FIELDS } from '../lib/sctfields.js';
+import { standardLine } from '../lib/expScheme.js';
 
 /**
  * 条件筛选 = 一摞平行实验里「跟基准不一样」的那些，摊成一张清单。
@@ -130,6 +131,7 @@ async function adopt(g) {
           <ScreeningTable
             :screening="t"
             :rows="t.rows"
+            :standard="standardLine(t.rows[0] && t.rows[0].exp)"
             @open="(r) => router.push(`/e/${r.exp_id}`)"
           />
         </section>

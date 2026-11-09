@@ -129,7 +129,12 @@ async function molSvg(smiles, id) {
  * @param {string[]} p.above     箭头上方的几行字（试剂 / 催化剂）
  * @param {string[]} p.below     箭头下方的几行字（溶剂 / 温度 / 时间、放不下的试剂）
  */
-export async function composeSchemeSvg({ reactants = [], product = '', above = [], below = [] } = {}) {
+/**
+ * @param {object} o
+ * @param {boolean} [o.background] 铺一层白底（存成附件 / 打印时要用）；
+ *   直接贴在纸面上看（比如筛选表表头那张）就传 false，不然纸面会多出一块白方块。
+ */
+export async function composeSchemeSvg({ reactants = [], product = '', above = [], below = [], background = true } = {}) {
   const rs = [];
   for (let i = 0; i < reactants.length; i++) {
     if (!String(reactants[i] || '').trim()) continue;
@@ -223,7 +228,7 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
     // 根节点没声明这个前缀，内联进 HTML 里看不出来（HTML 解析器容忍），但存成文件用 <img> 加载
     // 就是致命的 XML 错误——整张图空白（踩过）
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
-    `<rect width="100%" height="100%" fill="#ffffff"/>` +
+    (background ? `<rect width="100%" height="100%" fill="#ffffff"/>` : '') +
     placed.map(molTag).join('') +
     pluses +
     arrow +

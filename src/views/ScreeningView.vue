@@ -8,6 +8,7 @@ import ScreeningTable from '../components/ScreeningTable.vue';
 import { api } from '../api.js';
 import { prompt, toast, confirm } from '../lib/feedback.js';
 import { SOURCES } from '../lib/sctfields.js';
+import { schemeParts, standardLine } from '../lib/expScheme.js';
 
 /**
  * 一张条件筛选表：行 = 自己挑的实验，列 = 一串「字段」。
@@ -40,6 +41,7 @@ async function load() {
       typeof f === 'string' ? { key: `old${i}`, label: f, source: 'manual' } : { ...f, source: f.source || 'manual' }
     );
     rows.value = (d.rows || []).map((r) => ({ ...r, cells: { ...(r.cells || {}) } }));
+    void buildStandard();
   } finally {
     loading.value = false;
   }
@@ -47,6 +49,37 @@ async function load() {
 
 onMounted(load);
 watch(id, load);
+
+/* ---- 标准条件（基准那条）----
+   有结构就照记录页那套拼一张反应式（箭头上写试剂、下面写溶剂温度时间），
+   拼不出来（化合物库里没有底物 / 产物）就退回一行字。 */
+const stdSvg = ref('');
+const stdLine = computed(() => standardLine(rows.value[0]?.exp));
+
+let cmpsCache = null;
+async function buildStandard() {
+  stdSvg.value = '';
+  const base = rows.value[0]?.exp;
+  if (!base) return;
+  try {
+    if (!cmpsCache) cmpsCache = await api.compounds();
+    const parts = schemeParts(base, cmpsCache);
+    if (!parts.reactants.length || !parts.product) return;
+    const { composeSchemeSvg } = await import('../lib/scheme.js');
+    // 不铺白底：这张图是直接贴在纸面上的，白底会把三线表托成一块方格
+    const svg = await composeSchemeSvg({
+      reactants: parts.reactants,
+      product: parts.product,
+      above: parts.above,
+      below: parts.below,
+      background: false,
+    });
+    // 换表途中旧表的结果别糊到新表上
+    if (rows.value[0]?.exp === base) stdSvg.value = svg;
+  } catch {
+    /* 画不出来就只用那行字 */
+  }
+}
 
 let timer = 0;
 /** 改一下就存（防抖 600ms）：这张表就几行，别让用户找保存按钮 */
@@ -155,17 +188,22 @@ async function removeScreen() {
 
         <div v-if="!rows.length" class="empty-note">这张表还是空的，点右上「加实验」从记录里挑几条。</div>
 
-        <ScreeningTable
-          v-else
-          :screening="s"
-          :rows="rows"
-          editable
-          @open="(r) => router.push(`/e/${r.exp_id}`)"
-          @change="save()"
-          @rename-field="renameField"
-          @remove-field="removeField"
-          @remove-row="removeRow"
-        />
+        <template v-else>
+          <!-- 能画出结构就把标准条件画出来（箭头上下已经写着试剂 / 溶剂 / 温度），画不出来退回一行字 -->
+          <div v-if="stdSvg" class="sct-std" v-html="stdSvg" />
+
+          <ScreeningTable
+            :screening="s"
+            :rows="rows"
+            :standard="stdSvg ? '' : stdLine"
+            editable
+            @open="(r) => router.push(`/e/${r.exp_id}`)"
+            @change="save()"
+            @rename-field="renameField"
+            @remove-field="removeField"
+            @remove-row="removeRow"
+          />
+        </template>
       </template>
       <div v-else class="empty-note">这张筛选表不存在。</div>
     </div>

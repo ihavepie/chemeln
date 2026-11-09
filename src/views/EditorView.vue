@@ -26,6 +26,7 @@ import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
+import { schemeParts } from '../lib/expScheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
@@ -596,67 +597,24 @@ async function schemeFromTable() {
   } catch (e) {
     return toast(e.message || '化合物库没读出来', 'err');
   }
-  const lib = store.compounds || [];
-  const byId = new Map(lib.map((c) => [Number(c.id), c]));
-
-  const reactants = [];
-  const others = [];   // 试剂 / 催化剂 / 碱……先攒着，能塞进箭头上方就塞，塞不下挪到下方
-  const loose = [];    // 写了名字但没挂化合物库的底物：放不进反应物，改放箭头上，别默默吞掉
-  for (const r of reagent.rows) {
-    if (r.role === '溶剂') continue;
-    const c = r.compound_id ? byId.get(Number(r.compound_id)) : null;
-    const name = String(r.name || (c && (c.name || c.code)) || '').trim();
-    const eq = num(r.eq);
-    const label = eq != null && eq !== 1 ? `${name} (${round(eq, 2)} eq)` : name;
-    if (r.role === '底物' && c && c.smiles) {
-      reactants.push(c.smiles);
-      continue;
-    }
-    if (r.role === '底物') {
-      // 底物没结构（或没挂库里）时画不出结构式，但名字该出现在箭头上，
-      // 否则反应式看着像少了原料，用户会以为「按投料表生成」没生效
-      if (name) loose.push(label);
-      continue;
-    }
-    if (!name) continue;
-    others.push(label);
-  }
-  if (!reactants.length) {
+  // 构件（反应物 / 产物 / 箭头上下的字）跟筛选表共用一份，见 lib/expScheme.js
+  const parts = schemeParts({ ...fields, reagents: reagent.rows }, store.compounds || []);
+  if (!parts.reactants.length) {
     return toast(
       reactantHint() || '投料表里还没有挂化合物库的底物——双击试剂名选一个',
       'warn'
     );
   }
-  if (loose.length) others.unshift(...loose);
-  const prod = fields.product_compound_id ? byId.get(Number(fields.product_compound_id)) : null;
-  if (!prod || !prod.smiles) return toast('产物还没挂化合物库——先在结果块里选上', 'warn');
-
-  const cond = [fields.solvent, fields.concentration, fields.temperature, fields.duration]
-    .map((v) => String(v || '').trim())
-    .filter(Boolean)
-    .join('，');
-
-  // 箭头上方一行大约放得下 34 个字（中文按 1、西文按 0.55 估），剩下的挪到箭头下方
-  const MAX_ABOVE = 34;
-  const widthOf = (t) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0);
-  const fit = [];
-  const over = [];
-  let used = 0;
-  for (const name of others) {
-    const need = (fit.length ? 1 : 0) + widthOf(name);
-    if (used + need <= MAX_ABOVE) {
-      fit.push(name);
-      used += need;
-    } else {
-      over.push(name);
-    }
-  }
-  const above = fit.length ? [fit.join('，')] : [];
-  const below = [over.join('，'), cond].filter(Boolean);
+  if (!parts.product) return toast('产物还没挂化合物库——先在结果块里选上', 'warn');
 
   let svg;
   try {
-    svg = await composeSchemeSvg({ reactants, product: prod.smiles, above, below });
+    svg = await composeSchemeSvg({
+      reactants: parts.reactants,
+      product: parts.product,
+      above: parts.above,
+      below: parts.below,
+    });
   } catch (e) {
     return toast(e.message || '反应式没拼出来', 'err');
   }
@@ -675,11 +633,11 @@ async function schemeFromTable() {
     fd.append('category', 'scheme');
     await api.upload(exp.value.id, fd);
     // 顺手记一份反应式文本，这样还能用「从反应式填表」跟投料表对一遍
-    fields.scheme_smiles = `${reactants.join('.')}>>${prod.smiles}`;
+    fields.scheme_smiles = `${parts.reactants.join('.')}>>${parts.product}`;
     await refreshAttachments();
     toast(
-      loose.length
-        ? `反应式重画好了；${loose.length} 个底物没挂结构，名字放在箭头上方（要画成结构就双击试剂名挂个化合物）`
+      parts.loose
+        ? `反应式重画好了；${parts.loose} 个底物没挂结构，名字放在箭头上方（要画成结构就双击试剂名挂个化合物）`
         : '反应式图按投料表重画好了'
     );
   } catch (e) {
