@@ -22,6 +22,11 @@ const emit = defineEmits(['open', 'change', 'rename-field', 'remove-field', 'rem
 
 const fields = computed(() => (Array.isArray(props.screening?.vars) ? props.screening.vars : []));
 const isManual = (f) => !f.source || f.source === 'manual';
+// 文献表的表头带单位（`Yield (%)`）；只有明确是百分比的来源才标，别的列不猜
+const unitOf = (f) => (f.source === 'yield' || f.source === 'sel' ? '%' : '');
+// 长文字的列要占宽，不然表头一带上「(%)」它们就被挤成两行
+const WIDE = new Set(['variation', 'reagent', 'substrates', 'product', 'appearance', 'tlc_note', 'conclusion', 'notes']);
+const isWide = (f) => WIDE.has(f.source);
 const base = computed(() => props.rows[0]?.exp || null);
 
 const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value));
@@ -33,20 +38,25 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
          也让这张图跟下面的三线表分开，不至于浮在纸面上没着落 -->
     <div v-if="scheme" class="sct-std">
       <div class="sct-std-scheme" v-html="scheme" />
-      <p v-if="standard" class="sct-std-line"><span class="sct-std-lbl">标准条件</span>{{ standard }}</p>
+      <p v-if="standard" class="sct-std-line"><span class="sct-std-lbl">标准条件：</span>{{ standard }}</p>
     </div>
     <!-- 画不出结构时只有一行字：不套卡片（一行字的白盒子看着像半个按钮），就压在表顶上 -->
     <p v-else-if="standard" class="sct-std-line sct-std-line--bare">
-      <span class="sct-std-lbl">标准条件</span>{{ standard }}
+      <span class="sct-std-lbl">标准条件：</span>{{ standard }}
     </p>
     <table class="sct-table">
       <thead>
         <tr>
           <th class="sct-c-entry">Entry</th>
           <th class="sct-c-fix">实验编号</th>
-          <th v-for="f in fields" :key="f.key" class="sct-field" :class="{ 'sct-num': f.num }">
+          <th
+            v-for="f in fields"
+            :key="f.key"
+            class="sct-field"
+            :class="{ 'sct-num': f.num, 'sct-wide': isWide(f) }"
+          >
             <div class="sct-th">
-              <span class="sct-th-label">{{ f.label }}</span>
+              <span class="sct-th-label">{{ f.label }}<template v-if="unitOf(f)"> ({{ unitOf(f) }})</template></span>
               <span v-if="isManual(f)" class="sct-th-src">手动</span>
               <span v-if="editable" class="sct-th-acts">
                 <button class="sct-var-x" title="改名" @click="emit('rename-field', f)">改</button>
@@ -66,7 +76,12 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
             <!-- 记录页那个「实验名」多半是空的（编号才是日常叫法），有才跟在编号后面 -->
             <span v-if="r.exp && r.exp.title" class="sct-title">{{ r.exp.title }}</span>
           </td>
-          <td v-for="f in fields" :key="f.key" class="sct-field" :class="{ 'sct-num': f.num, 'is-manual': isManual(f) }">
+          <td
+            v-for="f in fields"
+            :key="f.key"
+            class="sct-field"
+            :class="{ 'sct-num': f.num, 'sct-wide': isWide(f), 'is-manual': isManual(f) }"
+          >
             <input
               v-if="editable && isManual(f)"
               :value="r.cells[f.key]"

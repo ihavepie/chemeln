@@ -6955,7 +6955,7 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 .sct-table th,
 .sct-table td {
-  padding: 6px 12px;
+  padding: 5px 12px;
   text-align: left;
   vertical-align: middle;
   border: 0;
@@ -6972,48 +6972,66 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   padding-bottom: 7px;
 }
 .sct-table tbody tr:last-child td { border-bottom: 2px solid var(--ink-2); }
-.sct-table tbody tr.is-base td { background: #f2f0ea; }
+.sct-table tbody tr.is-base td { background: #f6f4ee; }
 .sct-table td.sct-num { text-align: right; font-family: var(--mono); font-size: 12px; }
 .sct-table .sct-c-entry {
-  width: 1%; text-align: right; padding-right: 16px;
+  width: 1%; text-align: center; padding-right: 14px;
   font-family: var(--mono); font-size: 12px; color: var(--ink-3);
 }
 .sct-table tbody tr.is-base .sct-c-entry { color: var(--ink); font-weight: 600; }
 .sct-table .sct-c-x { width: 1%; }
 .sct-table .sct-c-fix { white-space: nowrap; }
-.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 92px; max-width: 240px; }
+.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 140px; max-width: 240px; }
 /* 编号后面跟的一句实验名（有才出现），别把它也做成等宽/强调色 */
 .sct-table .sct-title {
-  margin-left: 8px; font-size: 12px; color: var(--ink-3);
-  white-space: normal;
+  display: inline-block;
+  max-width: 118px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 .sct-table td.is-manual { background: transparent; }
 /* 数字列（产率 / 选择性…）整列居中：以前表头靠左、数字靠右，读着是错位的。
-   长文字的列（相对标准条件、备注）仍旧左对齐，居中会把长短不一的句子甩得很难看。 */
+   长文字的列（相对标准条件、备注）仍旧左对齐，居中会把长短不一的句子甩得很难看。
+   数字列给个宽度上限，不然表头一带上「(%)」它们就把文字列挤成两行。 */
 .sct-table th.sct-num,
-.sct-table td.sct-num { text-align: center; }
+.sct-table td.sct-num { text-align: center; width: 84px; }
+/* 长文字的列保底宽度，句子尽量不折行 */
+.sct-table .sct-wide { min-width: 240px; }
+/* 手动列（备注之类）别被数字列挤没 */
+.sct-table .sct-field.is-manual { min-width: 120px; }
 .sct-table th.sct-num .sct-th { justify-content: center; }
 /* 整张筛选表（反应式 + 三线表）是一张纸卡：白底 + 两段柔和投影，**不描边**
    （用户要「包裹表格和反应式，白底加阴影，像卡片」）。注意别改公共的 `.scope-wrap`——
    记录 / 化合物的表格视图也用它，那两处不需要卡。 */
 .sct-sheet {
-  padding: 12px 16px 12px;
+  padding: 14px 18px 10px;
   background: var(--paper);
-  border-radius: var(--r);
+  border-radius: 4px;
   box-shadow:
-    0 1px 2px rgba(20, 18, 14, 0.04),
-    0 6px 16px -10px rgba(20, 18, 14, 0.18);
-  margin-bottom: 14px;
+    0 1px 2px rgba(20, 18, 14, 0.03),
+    0 4px 12px -8px rgba(20, 18, 14, 0.12);
+  margin-bottom: 16px;
 }
 /* 卡里面的反应式不再单独套卡（卡片里套卡片），就一块普通内容，压在三线表顶线上面 */
 .sct-std {
-  display: inline-block;
-  max-width: 100%;
-  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  margin: 0 0 4px;
+  padding: 0 2px;
 }
+.sct-std:has(.sct-std-line) .sct-std-scheme { flex: 0 1 auto; }
+.sct-std .sct-std-line { flex: 1 1 260px; min-width: 220px; margin: 0; }
 .sct-std-scheme { display: block; }
+.sct-std > .sct-std-scheme { min-width: 0; }
 .sct-std-line {
   margin: 7px 0 0;
+  text-align: left;
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--ink-3);
@@ -7022,14 +7040,10 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 /* 没有反应式时只有那行字，直接压在表顶上 */
 .sct-std-line--bare { padding: 0; margin: 0 0 8px; }
 .sct-std-lbl {
-  margin-right: 6px;
-  font-size: 9.5px;
-  letter-spacing: 0.04em;
+  margin-right: 2px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
   color: var(--ink-4);
-  border: 1px solid var(--line-2);
-  border-radius: 3px;
-  padding: 0 4px;
-  vertical-align: 1px;
 }
 /* 条件筛选首页一页可能摊好几张表，那里的图收小一点，别把清单顶下去 */
 .sct-block .sct-sheet { padding: 10px 14px 10px; }
@@ -7052,7 +7066,7 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 /* 改名 / 删列只在悬停表头时露出来，平时别占地方 */
 .sct-th-acts { display: inline-flex; gap: 1px; opacity: 0; transition: opacity 0.1s; }
 .sct-table thead th:hover .sct-th-acts { opacity: 1; }
-.sct-th-label { color: var(--ink-2); font-size: 10.5px; }
+.sct-th-label { color: var(--ink-2); font-size: 11.5px; letter-spacing: 0.01em; }
 .sct-th-src {
   font-size: 9px; color: var(--ink-4); border: 1px solid var(--line-2);
   border-radius: 3px; padding: 0 3px; line-height: 1.4;
