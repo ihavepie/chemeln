@@ -6947,7 +6947,9 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Iowan Old Style', 'Songti SC', Georgia, serif;
+  /* 西文/数字走衬线（书卷气、跟文献一致），中文落给 PingFang——
+     宋体在 13px 下笔画发虚、字距也散，用户说「看着有点奇怪」。 */
+  font-family: Georgia, 'Times New Roman', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
   font-size: 13px;
   color: var(--ink);
 }

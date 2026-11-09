@@ -29,7 +29,7 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
       <thead>
         <tr>
           <th class="sct-c-entry">Entry</th>
-          <th class="sct-c-fix">编号</th>
+          <th class="sct-c-fix">实验编号</th>
           <th v-for="f in fields" :key="f.key" :class="{ 'sct-num': f.num }">
             <div class="sct-th">
               <span class="sct-th-label">{{ f.label }}</span>
