@@ -193,7 +193,7 @@ const subText = (exp) =>
                     class="sct-cell"
                     @input="save()"
                   />
-                  <span v-else class="sct-auto" :class="{ 'sct-wrap': f.source === 'reagent' }">{{ cell(f, r) || '—' }}</span>
+                  <span v-else class="sct-auto" :class="{ 'sct-wrap': f.source === 'reagent' || f.source === 'variation' }">{{ cell(f, r) || '—' }}</span>
                 </td>
                 <td class="sct-c-x">
                   <button class="sct-row-x" title="从表里去掉" @click="removeRow(i)">×</button>
