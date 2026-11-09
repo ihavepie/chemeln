@@ -5,7 +5,8 @@ import Icon from './Icon.vue';
 import { api } from '../api.js';
 import { store, loadBoot, loadCompounds, recordCategories, createCompound } from '../store.js';
 import { round } from '../lib/reagent.js';
-import { toast } from '../lib/feedback.js';
+import { confirm, prompt, toast } from '../lib/feedback.js';
+import { openCtxMenu } from '../lib/ctxmenu.js';
 import { compoundMenu } from '../lib/rowmenu.js';
 import { createPointerSort } from '../lib/pointdrag.js';
 import { withFlip } from '../lib/flip.js';
@@ -113,7 +114,49 @@ async function dropCard(id, groupKey, at) {
     toast(e.message || '移动不了', 'err');
   }
 }
-</script>
+
+/** 分类组头右键：就地改名 / 删除。分类管理就挂在这个分类自己身上，不往一级侧栏塞东西 */
+function groupMenu(ev, g) {
+  if (g.id == null) return; // 「未分类」是固定桶，没有动作
+  openCtxMenu(
+    ev,
+    [
+      { key: 'rename', label: '重命名分类', icon: 'edit' },
+      { key: 'delete', label: '删除分类', icon: 'trash', danger: true },
+    ],
+    async (key) => {
+      if (key === 'rename') {
+        const name = await prompt({ title: '重命名分类', value: g.name, confirmText: '改名' });
+        if (!name || name === g.name) return;
+        try {
+          await api.saveCategory(g.id, { name });
+          await loadBoot();
+          await loadCompounds();
+        } catch (e) {
+          toast(e.message || '改不了', 'err');
+        }
+        return;
+      }
+      const ok2 = await confirm({
+        title: `删除「${g.name}」这个分类？`,
+        body: '分类里的记录会变成「未分类」，记录本身不会被删掉。',
+        confirmText: '删除',
+        danger: true,
+      });
+      if (!ok2) return;
+      try {
+        await api.deleteCategory(g.id);
+        if (String(store.compoundFilters.category) === String(g.id)) store.compoundFilters.category = '';
+        await loadBoot();
+        await loadCompounds();
+        toast('分类已删除');
+      } catch (e) {
+        toast(e.message || '删不掉', 'err');
+      }
+    }
+  );
+}
+    </script>
 
 <template>
   <div class="grid-page" :class="{ 'is-dragging': !!dragId }">
@@ -125,7 +168,7 @@ async function dropCard(id, groupKey, at) {
         :data-drag-group="g.key"
         :data-drag-count="g.items.length"
       >
-        <div v-if="showHeads" class="grid-group-head">
+        <div v-if="showHeads" class="grid-group-head" @contextmenu="groupMenu($event, g)">
           <span class="grid-group-name">{{ g.name }}</span>
           <span class="grid-group-n">{{ g.items.length }}</span>
           <span v-if="!store.project && g.project" class="grid-group-proj">{{ g.project }}</span>

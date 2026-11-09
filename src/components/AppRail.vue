@@ -2,10 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
-import { store, loadBoot, loadList, setProject, addProject, createCompound, addCategory } from '../store.js';
+import { store, loadBoot, loadList, setProject, addProject, createCompound } from '../store.js';
 import { api } from '../api.js';
-import { confirm, prompt, toast } from '../lib/feedback.js';
-import { openCtxMenu } from '../lib/ctxmenu.js';
+import { prompt, toast } from '../lib/feedback.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -13,80 +12,6 @@ const router = useRouter();
 onMounted(() => {
   if (!store.boot) void loadBoot();
 });
-
-/** 实验记录的分类（带条数）：侧边栏直接点着筛 */
-const expCats = computed(() =>
-  (store.boot?.recordCategories || [])
-    .filter((g) => g.scope === 'experiment')
-    .filter((g) => !store.project || !g.project || g.project === store.project)
-);
-
-const catTotal = computed(() => (store.boot?.totals?.experiments ?? 0));
-
-/** 未分类条数：总实验数 − 各分类 exp_count 之和 */
-const uncatCount = computed(() => {
-  const used = expCats.value.reduce((n, g) => n + (g.exp_count || 0), 0);
-  return Math.max(0, catTotal.value - used);
-});
-
-async function pickCategory(value) {
-  store.filters.category = value === '' ? '' : value;
-  if (route.path !== '/list') router.push('/list');
-  await loadList();
-}
-
-/** 分类上的右键菜单：重命名 / 删除 */
-function catMenu(ev, g) {
-  openCtxMenu(
-    ev,
-    [
-      { key: 'rename', label: '重命名分类', icon: 'edit' },
-      { key: 'delete', label: '删除分类', icon: 'trash', danger: true },
-    ],
-    async (key) => {
-      if (key === 'rename') {
-        const name = await prompt({ title: '重命名分类', value: g.name, confirmText: '改名' });
-        if (!name) return;
-        try {
-          await api.saveCategory(g.id, { name });
-          await loadBoot();
-          toast('改好了');
-        } catch (e) {
-          toast(e.message || '改不了', 'err');
-        }
-        return;
-      }
-      const ok = await confirm({
-        title: '删除这个分类？',
-        body: `「${g.name}」里的记录会变成未分类，不会被删掉。`,
-        confirmText: '删除',
-        danger: true,
-      });
-      if (!ok) return;
-      try {
-        await api.deleteCategory(g.id);
-        if (String(store.filters.category) === String(g.id)) store.filters.category = '';
-        await loadBoot();
-        await loadList();
-        toast('分类已删除');
-      } catch (e) {
-        toast(e.message || '删不掉', 'err');
-      }
-    }
-  );
-}
-
-async function newCategoryFromRail() {
-  const name = await prompt({ title: '新建分类', placeholder: '比如：方法学 A、手性配体库', confirmText: '建' });
-  if (!name) return;
-  try {
-    await addCategory(name, 'experiment');
-    await loadBoot();
-    toast(`建好了「${name}」`);
-  } catch (e) {
-    toast(e.message || '建不了这个分类', 'err');
-  }
-}
 
 const nav = computed(() => {
   const b = store.boot;
@@ -256,39 +181,6 @@ async function newCompound() {
         <Icon name="plus" :size="14" /> {{ onCompounds ? '新建化合物' : '新建实验' }}
       </button>
     </div>
-
-    <!-- 实验分类：就放在导航下面，「全部」一行，其余按分类点着筛 -->
-    <nav v-if="!onCompounds" class="rail-cats">
-      <button
-        class="rail-cat"
-        :aria-current="!store.filters.category ? 'true' : 'false'"
-        @click="pickCategory('')"
-      >
-        <span class="label">全部</span>
-        <span class="count">{{ catTotal }}</span>
-      </button>
-      <button
-        v-for="g in expCats"
-        :key="g.id"
-        class="rail-cat"
-        :aria-current="String(store.filters.category) === String(g.id) ? 'true' : 'false'"
-        @click="pickCategory(g.id)"
-        @contextmenu="catMenu($event, g)"
-      >
-        <span class="label">{{ g.name }}</span>
-        <span v-if="g.exp_count" class="count">{{ g.exp_count }}</span>
-      </button>
-      <button
-        v-if="uncatCount"
-        class="rail-cat"
-        :aria-current="store.filters.category === 'none' ? 'true' : 'false'"
-        @click="pickCategory('none')"
-      >
-        <span class="label">未分类</span>
-        <span class="count">{{ uncatCount }}</span>
-      </button>
-      <button class="rail-cat is-add" @click="newCategoryFromRail"><Icon name="plus" :size="12" /> 新建分类</button>
-    </nav>
 
     <nav class="nav">
       <button
