@@ -6,7 +6,7 @@ import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, num, parseMwCell, roleTone, round, rowKind, totals } from '../lib/reagent.js';
-import { compoundDict } from '../store.js';
+import { compoundDict, reagentDict } from '../store.js';
 
 const props = defineProps({
   model: { type: Object, required: true },
@@ -66,7 +66,20 @@ function onBrowseInput() {
 /** 行内候选里用鼠标点：列表刚刷新过（可能只是手抖点到）就不响应 */
 function pickInline(r, c) {
   if (tooSoon(picker.updatedAt)) return;
+  if (c._dict) return applyDict(r, c);
   applyCompound(r, c);
+}
+
+/** 从「用过的试剂」里选：只填名字和 MW/浓度，不建化合物关联 */
+function applyDict(r, d) {
+  r.name = d.name || '';
+  if (!String(r.mwText || '').trim()) {
+    if (num(d.conc)) r.mwText = `${round(d.conc, 2)}M`;
+    else if (num(d.mw) !== null) r.mwText = round(d.mw, 2);
+    if (String(r.mwText || '').trim()) onMw(r);
+  }
+  pickerClose();
+  props.notify();
 }
 
 function browsePick(c) {
@@ -112,17 +125,30 @@ function pickerClose() {
 /** 列表刚刚刷新过（用户可能只是想点一下）时，短暂忽略点击 */
 const tooSoon = (t) => Date.now() - t < 220;
 
+/** 化合物库之外的「用过的试剂」：库里搜不到的临时试剂，靠这份词典下次还能带出 MW */
+function dictHits(q) {
+  const k = String(q || '').trim().toLowerCase();
+  if (!k) return [];
+  return reagentDict()
+    .filter((d) => d && d.name && d.name.toLowerCase().includes(k))
+    .map((d) => ({ _dict: true, name: d.name, mw: d.mw, conc: d.conc }));
+}
+
 async function pickerSearch(q) {
+  let items = [];
   try {
-    const items = await api.compounds({ q });
+    items = await api.compounds({ q });
     mergeCompounds(items);
-    picker.items = items.slice(0, 8);
-    picker.index = 0;
-    picker.updatedAt = Date.now();
-    picker.open = true;
   } catch {
-    picker.items = [];
+    items = [];
   }
+  // 化合物库优先，后面补上词典里那些「只在这本记录里出现过」的试剂
+  const names = new Set(items.map((c) => String(c.name || '').trim().toLowerCase()));
+  const extra = dictHits(q).filter((d) => !names.has(d.name.trim().toLowerCase()));
+  picker.items = items.slice(0, 8).concat(extra).slice(0, 8);
+  picker.index = 0;
+  picker.updatedAt = Date.now();
+  picker.open = true;
 }
 
 /** 化合物库里的类型 → 投料表的组分（底物行固定是底物） */
@@ -400,6 +426,14 @@ function onName(r) {
     r.compound_id = hit.id;
     if (!String(r.mwText || '').trim() && hit.mw) {
       r.mwText = round(hit.mw, 2);
+      onMw(r);
+      return;
+    }
+  } else if (!String(r.mwText || '').trim()) {
+    // 化合物库里没有 → 查自己用过的试剂词典，把上次填的 MW / 浓度带出来
+    const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key);
+    if (d && (num(d.mw) !== null || num(d.conc))) {
+      r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : round(d.mw, 2);
       onMw(r);
       return;
     }
@@ -816,7 +850,7 @@ function onDrop(ev) {
                 <div v-if="picker.open && picker.row === r" class="cmp-pick" @mousedown.prevent>
                   <button
                     v-for="(c, ci) in picker.items"
-                    :key="c.id"
+                    :key="c._dict ? `d:${c.name}` : c.id"
                     type="button"
                     :class="{ on: ci === picker.index }"
                     @click.stop="pickInline(r, c)"
@@ -824,11 +858,11 @@ function onDrop(ev) {
                   >
                     <img v-if="c.structure_id" class="cmp-pick-fig" :src="`/api/compound-files/${c.structure_id}`" alt="" />
                     <span v-else class="cmp-pick-fig cmp-pick-fig-empty" />
-                    <span class="cmp-pick-code mono">{{ c.code || '—' }}</span>
+                    <span class="cmp-pick-code mono">{{ c._dict ? '用过' : (c.code || '—') }}</span>
                     <span class="cmp-pick-name">{{ c.name || '（未命名）' }}</span>
-                    <span class="cmp-pick-meta mono">{{ c.formula || '' }}<template v-if="c.mw"> · {{ round(c.mw, 2) }}</template></span>
+                    <span class="cmp-pick-meta mono">{{ c.formula || '' }}<template v-if="c.mw"> · {{ round(c.mw, 2) }}</template><template v-else-if="c.conc"> · {{ round(c.conc, 2) }}M</template></span>
                   </button>
-                  <div v-if="!picker.items.length" class="cmp-pick-empty">化合物库里没有「{{ picker.q }}」</div>
+                  <div v-if="!picker.items.length" class="cmp-pick-empty">化合物库和「用过的试剂」里都没有「{{ picker.q }}」</div>
                 </div>
               </td>
               <td>

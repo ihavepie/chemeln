@@ -176,6 +176,8 @@ export async function addCategory(name, scope, project = undefined) {
 
 export const settings = () => store.boot?.settings || {};
 export const compoundDict = () => store.boot?.compoundDict || [];
+/** 自己记录本里用过的试剂（名字 / MW / 浓度），服务端从历史行汇总好的 */
+export const reagentDict = () => store.boot?.reagentDict || [];
 
 /**
  * 自己建的分类：实验、化合物各一套，取的时候要说清是哪边。
