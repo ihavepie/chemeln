@@ -167,7 +167,7 @@ async function adopt(g) {
             :screening="t"
             :rows="t.rows"
             :scheme="schemes[t.id]"
-            :standard="schemes[t.id] ? '' : standardLine(t.rows[0] && t.rows[0].exp)"
+            :standard="standardLine(t.rows[0] && t.rows[0].exp)"
             @open="(r) => router.push(`/e/${r.exp_id}`)"
           />
         </section>

@@ -15,7 +15,7 @@ const props = defineProps({
   editable: { type: Boolean, default: false },
   // 「标准条件」一行字（基准那条记录的投料 + 溶剂 / 温度 / 时间），像文献表格的副标题
   standard: { type: String, default: '' },
-  // 能画出结构时给一段反应式 SVG（不带白底），画在表格上方；给了它就不用再给 standard
+  // 能画出结构时给一段反应式 SVG（不带白底），画在表格上方的纸卡里
   scheme: { type: String, default: '' },
 });
 const emit = defineEmits(['open', 'change', 'rename-field', 'remove-field', 'remove-row']);
@@ -29,11 +29,17 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
 
 <template>
   <div class="scope-wrap">
-    <div v-if="scheme" class="sct-std" v-html="scheme" />
+    <!-- 反应式 + 条件文字包一张纸卡（只有投影、不描边）：跟全站的卡片一个观感，
+         也让这张图跟下面的三线表分开，不至于浮在纸面上没着落 -->
+    <div v-if="scheme" class="sct-std">
+      <div class="sct-std-scheme" v-html="scheme" />
+      <p v-if="standard" class="sct-std-line"><span class="sct-std-lbl">标准条件</span>{{ standard }}</p>
+    </div>
+    <!-- 画不出结构时只有一行字：不套卡片（一行字的白盒子看着像半个按钮），就压在表顶上 -->
+    <p v-else-if="standard" class="sct-std-line sct-std-line--bare">
+      <span class="sct-std-lbl">标准条件</span>{{ standard }}
+    </p>
     <table class="sct-table">
-      <caption v-if="standard" class="sct-cap">
-        <span class="sct-cap-lbl">标准条件</span>{{ standard }}
-      </caption>
       <thead>
         <tr>
           <th class="sct-c-entry">Entry</th>

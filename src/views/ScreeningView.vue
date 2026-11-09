@@ -194,7 +194,7 @@ async function removeScreen() {
             :screening="s"
             :rows="rows"
             :scheme="stdSvg"
-            :standard="stdSvg ? '' : stdLine"
+            :standard="stdLine"
             editable
             @open="(r) => router.push(`/e/${r.exp_id}`)"
             @change="save()"
