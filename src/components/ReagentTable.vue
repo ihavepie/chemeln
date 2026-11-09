@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, num, parseMwCell, roleTone, round, rowKind, totals } from '../lib/reagent.js';
 import { compoundDict, reagentDict } from '../store.js';
+import { nameInfo } from '../lib/lookup.js';
 
 const props = defineProps({
   model: { type: Object, required: true },
@@ -413,6 +414,30 @@ function onAmountInput(ev, r) {
   props.notify();
 }
 
+/**
+ * 库里、词典里都没有的试剂：拿名字去 PubChem 查一次（服务端代查 + 本地缓存）。
+ * 查到了就把 MW / 密度填进空着的格子；查不到什么都不做，绝不能挡住录数据。
+ */
+async function lookupName(r) {
+  const key = String(r.name || '').trim();
+  if (!key || r.compound_id) return;
+  if (String(r.mwText || '').trim()) return;      // 手填过就不动
+  if (r._looked === key) return;                   // 同一个名字只查一次
+  r._looked = key;
+  const info = await nameInfo(key);
+  if (!info || !info.found) return;
+  if (String(r.mwText || '').trim()) return;      // 查的时候用户自己填了
+  if (num(info.mw) !== null) {
+    r.mwText = round(Number(info.mw), 2);
+    onMw(r);
+  }
+  if (num(r.density) === null && info.props && info.props.density) {
+    const d = Number(String(info.props.density).replace(/[^\d.]/g, ''));
+    if (d > 0) r.density = d;
+  }
+  props.notify();
+}
+
 /** 试剂名填的是化合物库里的编号 / 名称 → 带出 MW 并记下关联 */
 function onName(r) {
   const key = String(r.name || '').trim().toLowerCase();
@@ -430,13 +455,14 @@ function onName(r) {
       return;
     }
   } else if (!String(r.mwText || '').trim()) {
-    // 化合物库里没有 → 查自己用过的试剂词典，把上次填的 MW / 浓度带出来
+    // 化合物库里没有 → 先查自己用过的试剂词典，再退到 PubChem
     const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key);
     if (d && (num(d.mw) !== null || num(d.conc))) {
       r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : round(d.mw, 2);
       onMw(r);
       return;
     }
+    void lookupName(r);
   }
   props.notify();
 }
