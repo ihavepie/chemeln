@@ -156,8 +156,8 @@
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
 - 结果区（`ResultBlock`）：`.row-del` 一键清空整行并解绑化合物；产率表头的 `∅` 切「不计产率」（`experiments.no_yield`，粗品用），开了清空并禁填产率、也不显示实测产率。新列走 `server/db.js` 的 `ensureColumn`。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
-- **Safari 拖不动的真因**：元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element` / 卡片图片自带的拖拽能力），真鼠标一拖就起原生拖拽会话，之后 `mousemove` 全被吞 → 「按着拖没反应」；而 `new MouseEvent()` **不会**启动原生拖拽，所以自动化测试全绿、真机全死。规矩：①一律 `-webkit-user-drag: none`、别加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`；③**只能看 `data/drag-debug.log` 验证**（`lib/draglog.js`）。本机模拟不了真鼠标（`sendEvent` 投不进、`CGEvent` 无权限）。
-- **落点标识用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量实测），必须配①几何快照（否则让位后落点来回翻）②`flip.js` 的 FLIP（否则瞬移「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下的卡**（`opacity` 只影响绘制，用户选 0.07）。
+- **Safari 拖不动的真因**：元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element` / 卡片图片自带的拖拽能力），真鼠标一拖就起原生拖拽会话，之后 `mousemove` 全被吞 → 「按着拖没反应」；而 `new MouseEvent()` **不会**启动原生拖拽，所以自动化测试全绿、真机全死。规矩：①一律 `-webkit-user-drag: none`、别加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`；③**只能看 `data/drag-debug.log` 验证**（`lib/draglog.js`）。本机模拟不了真鼠标（`CGEvent` 无权限）。
+- **落点标识用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量实测），必须配①几何快照（否则让位后落点来回翻）②`flip.js` 的 FLIP（否则瞬移「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下的卡**（`opacity` 只影响绘制，0.07）。
 - **`.drag-ghost` 必须 `position: fixed !important`**（`.exp-card.cmp-card{position:relative}` 权重 0,2,0 会把它顶回 `relative`、跑到页面底部）；`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖那张还原，要再用 `.grid-card.is-dragging` 同权重压回 0.07。
 - **本机只有 Safari**（没 Chromium / 无头 Edge）：看版式或读页面值就 `swiftc` 编个 WKWebView 小程序（`takeSnapshot` / `evaluateJavaScript`），编译要带 `-module-cache-path .cache/clang`；输入框文字在 `.value`（`innerText` 是空的）。
 - 依赖版本别升：Vue 3.5 / Vite 6 / Element Plus 2.8 / openchemlib 9.25 是验证过的组合。
