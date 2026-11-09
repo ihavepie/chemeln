@@ -816,9 +816,12 @@ const peekPos = ref({});
 const peekEl = ref(null);
 function showPeek(s, ev) {
   const r = ev.currentTarget.getBoundingClientRect();
+  // 卡片贴的是「整排放书签」的左边缘，不是鼠标底下那一块——两列方块时按块算会左右跳
+  const rail = ev.currentTarget.closest('.pgroup') || ev.currentTarget;
+  const railLeft = rail.getBoundingClientRect().left;
   const width = 300;
   // 卡片右边贴在书签左边（留 9px 给箭头尖）；左边不够就尽量靠左，别出屏幕
-  const left = Math.max(8, r.left - width - 9);
+  const left = Math.max(8, railLeft - width - 9);
   const top = Math.max(8, Math.min(window.innerHeight - 152, r.top - 6));
   peekPos.value = { left: `${left}px`, top: `${top}px`, width: `${width}px` };
   peek.value = s;
@@ -866,6 +869,16 @@ const peekMetrics = computed(() => {
 function sibMeta(s) {
   const y = num(s.yield_pct);
   return y !== null ? `${round(y, 1)}%` : s.status || '';
+}
+
+/** 方块第二行：基准 / 改了哪一项（筛条件时最重要），没有差异就看产率或状态 */
+function sibSub(s) {
+  if (s.variant === '基准') return { text: '基准', cls: 'pgroup-diff' };
+  const d = Array.isArray(s.diffs) ? s.diffs.filter(Boolean) : [];
+  if (s.variant === '重复' || !d.length) return { text: s.variant === '重复' ? '重复' : sibMeta(s), cls: 'pgroup-meta' };
+  // 「投料（LDA 当量）」这种括号里的才是真变量，方块上只留括号里那段，省得被截成半截
+  const first = String(d[0]).replace(/^[^（]*（(.+)）$/, '$1');
+  return { text: d.length > 1 ? `改 ${first} +${d.length - 1}` : `改 ${first}`, cls: 'pgroup-diff' };
 }
 
 async function removeExperiment() {
@@ -1186,25 +1199,27 @@ const openAttachment = (id) => {
           <!-- 平行组书签：从纸面左边凸出去的一排纸签（重复实验 / 控制变量实验）。
                悬停先看一眼，点下去才切记录。 -->
           <nav v-if="siblings.length > 1 && page === 1" class="pgroup pgroup--float noprint" :style="railStyle" aria-label="平行实验">
-            <span class="pgroup-cap">平行</span>
-            <button
-              v-for="s in siblings"
-              :key="s.id"
-              type="button"
-              class="pgroup-tab"
-              :class="{ 'is-on': String(s.id) === String(exp.id) }"
-              :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
-              @mouseenter="showPeek(s, $event)"
-              @mouseleave="hidePeek()"
-              @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
-            >
-              <span class="pgroup-row">
-                <i class="pgroup-dot" :class="`tone-${STATUS_TONE[s.status] || 'plain'}`" />
-                <span class="pgroup-code">{{ s.code }}</span>
-              </span>
-              <span class="pgroup-meta">{{ sibMeta(s) }}</span>
-            </button>
-            <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
+            <span class="pgroup-cap">平行 ×{{ siblings.length }}</span>
+            <div class="pgroup-grid">
+              <button
+                v-for="s in siblings"
+                :key="s.id"
+                type="button"
+                class="pgroup-tab"
+                :class="{ 'is-on': String(s.id) === String(exp.id) }"
+                :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
+                @mouseenter="showPeek(s, $event)"
+                @mouseleave="hidePeek()"
+                @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
+              >
+                <span class="pgroup-row">
+                  <i class="pgroup-dot" :class="`tone-${STATUS_TONE[s.status] || 'plain'}`" />
+                  <span class="pgroup-code">{{ s.code }}</span>
+                </span>
+                <span :class="sibSub(s).cls">{{ sibSub(s).text }}</span>
+              </button>
+              <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
+            </div>
           </nav>
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
           <Teleport to="body">
