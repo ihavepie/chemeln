@@ -155,7 +155,7 @@
 - Vue 路由组件复用：切 `/e/:id`、`/c/:id` 必须 `watch` 参数重新加载，并先 flush 待保存内容。
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
 - **溶剂是投料表的一行**（role=`溶剂`，「＋ 加溶剂」插入），`CondRow` 只剩温度/时间/气氛。老记录的 `fields.solvent` 由 `fill()` 末尾 `ensureSolventRow()` 补成表行；溶剂行删光时 `watch(solventFromTable)` 清掉字段，免得下次又补回来。两个字段仍由表算出写回（导出/搜索用）。
-- 结果区（`ResultBlock`）：`.row-del` 一键清空整行并解绑化合物；产率表头的 `∅` 切「不计产率」（`experiments.no_yield`，粗品用），开了清空并禁填产率、也不显示实测产率。新列走 `server/db.js` 的 `ensureColumn`。
+- 结果区（`ResultBlock`）：`.row-del` 清空整行并解绑化合物；产率表头 `∅` 切「不计产率」（`experiments.no_yield`，粗品用）。新列走 `server/db.js` 的 `ensureColumn`。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
 - **Safari 拖不动的真因**：元素只要被 WebKit 当成可原生拖拽（`-webkit-user-drag: element` / 卡片图片自带的拖拽能力），真鼠标一拖就起原生拖拽会话，之后 `mousemove` 全被吞 → 「按着拖没反应」；而 `new MouseEvent()` **不会**启动原生拖拽，所以自动化测试全绿、真机全死。规矩：①一律 `-webkit-user-drag: none`、别加 `draggable`；②`lib/pointdrag.js` 按住期间直接拦 `dragstart`；③**只能看 `data/drag-debug.log` 验证**（`lib/draglog.js`）。本机模拟不了真鼠标（`CGEvent` 无权限）。
 - **落点标识用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量实测），必须配①几何快照（否则让位后落点来回翻）②`flip.js` 的 FLIP（否则瞬移「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下的卡**（`opacity` 只影响绘制，0.07）。
