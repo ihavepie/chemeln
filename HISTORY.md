@@ -3,6 +3,7 @@
 > 从 `AGENTS.md` 的「当前进度」里按顺序搬出来的旧条目，逐字保留、没有删改。
 > 最新的几轮在 `AGENTS.md`；要回溯某次改动，也可以直接 `git log --oneline`。
 
+- **本轮（拖动排序，五轮才收稳）**：真机「完全拖不动」的真因是 `eln.css` 的 **`-webkit-user-drag: element`**（WebKit 起原生拖拽会话、吞掉所有 `mousemove`，而合成事件不会启动原生拖拽 → 测试全绿、真机全死），改 `none` + 按住期间拦 `dragstart`。实验那两处也接上（`ExpGrid` 换掉原生拖放、`ExpListPane` 原本没有），一摞整组挪、只在同分类内排序。手感：虚影卡跟手 + 原卡淡下去 + 贴边自动滚；落点判定用**几何快照 + 120ms 延时**，墙用**占位格 + FLIP 滑动**、列表用**一条线**。视图页工具行加「新建分类」。四个面验证 `POST /move` 全对；真鼠标本机模拟不了，故有 `data/drag-debug.log` 诊断渠道。版本行 **1.0.2**。
 - **本轮（小分子的结构图别撑满格子）**：用户说「小一点的化合物可以稍微小一点吗，就是放大得有点大」。`.cmp-structure img` 收到 `max-width/height: 86%`（只夹上限、小图不放大）。实测 `/#/c/59`（小）`/#/c/51`（大）都留出呼吸。
 - **本轮（结构式下面那两个链接改成真能用的）**：用户截图问「这边是干什么的，修正一下，成为有用功能」。原来一个是 `PubChem #CID`（号没用）且**只有本次会话查过才出现**、刷新就没，另一个只认 CAS。现在标签改 `PubChem ↗` / `ChemicalBook ↗`，URL 由 `lib/lookup.js` 的 `pubchemUrl()` 按「CID → CAS → 名称 → SMILES」降级（ChemicalBook 用 CAS → 名称），**不查也在、刷新也在**；`title` 说明点了给什么。CSS 从 `--ink-3` 提到 `--ink-2`、hover 连下划线一起变强调色。
 - **本轮（外部查询：补到 5 个站，改成站点表）**：用户问「还有其他的查询网站吗」。逐个**在真浏览器里**试过：能用的是 PubChem、ChemicalBook、**NIST**（CAS → `ID=C<去横线>`，IR/MS + 热力学）、**TCI**（CAS → `search/?text=`）、**CAS Common Chemistry**（`results?q=`）；不能用的：ChemSpider（CloudFront 403）、Sigma-Aldrich（区域 Access Denied）、SDBS / NMRShiftDB / Google Scholar（连不上）。**教训**：`curl` 的状态码不可信——TCI 的 curl 是 403、NIST 是 000，但浏览器里都正常（反爬 / 网络差异），所以这类链接必须用 WKWebView 截图验。实现上收成 `lib/lookup.js` 的 `LOOKUP_SITES` 表（前端 `v-for`），左栏改成竖排 + 一行「外部查询」小标题。
