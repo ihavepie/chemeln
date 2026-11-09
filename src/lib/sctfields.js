@@ -99,11 +99,41 @@ export function variations(base, cur) {
   }
   const bm = reagentMapOf(base);
   const cm = reagentMapOf(cur);
-  for (const [k, eq] of cm) {
-    const name = k.split(':')[1];
-    if (!bm.has(k)) out.push(`加 ${name}${eqText(eq) ? ` ${eqText(eq)}` : ''}`);
-    else if (String(bm.get(k) ?? '') !== String(eq ?? '')) out.push(`${name} ${eqText(eq) || '—'} 代替 ${eqText(bm.get(k)) || '—'}`);
+  const nameOf = (k) => k.split(':')[1];
+  const added = [...cm.keys()].filter((k) => !bm.has(k));
+  const removed = [...bm.keys()].filter((k) => !cm.has(k));
+
+  // 一进一出、而且**角色相同**（配体换配体、催化剂换催化剂）就写成「B 代替 A」，
+  // 跟文献里的 `P(Cy)3 instead of DTMBPP` 一个意思；对不上才写「加 / 去掉」。
+  const takenDel = new Set();
+  for (const a of added) {
+    const role = a.split(':')[0];
+    const d = removed.find((k) => !takenDel.has(k) && k.split(':')[0] === role);
+    if (!d) continue;
+    takenDel.add(d);
+    const eqA = cm.get(a);
+    const eqD = bm.get(d);
+    // 当量一样就只写名字（文献里 `P(Cy)3 instead of DTMBPP` 那样），不一样才把 eq 带上
+    const sameEq = String(eqText(eqA)) === String(eqText(eqD));
+    const left = sameEq ? nameOf(a) : [nameOf(a), eqText(eqA)].filter(Boolean).join(' ');
+    const right = sameEq ? nameOf(d) : [nameOf(d), eqText(eqD)].filter(Boolean).join(' ');
+    out.push(`${left} 代替 ${right}`);
   }
-  for (const [k] of bm) if (!cm.has(k)) out.push(`去掉 ${k.split(':')[1]}`);
+  for (const a of added) {
+    if (out.some((x) => x.includes(`代替`) && x.startsWith(nameOf(a)))) continue;
+    out.push(`加 ${nameOf(a)}${eqText(cm.get(a)) ? ` ${eqText(cm.get(a))}` : ''}`);
+  }
+  for (const d of removed) {
+    if (takenDel.has(d)) continue;
+    if (out.some((x) => x.includes(`代替 ${nameOf(d)}`))) continue;
+    out.push(`去掉 ${nameOf(d)}`);
+  }
+  // 同一个试剂只改了当量
+  for (const [k, eq] of cm) {
+    if (!bm.has(k)) continue;
+    if (String(bm.get(k) ?? '') !== String(eq ?? '')) {
+      out.push(`${nameOf(k)} ${eqText(eq) || '—'} 代替 ${eqText(bm.get(k)) || '—'}`);
+    }
+  }
   return out;
 }
