@@ -139,7 +139,7 @@ const EXP_COLUMNS = [
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
   'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles',
-  'no_yield', 'apparatus', 'light',
+  'no_yield', 'apparatus', 'light', 'kind',
 ];
 
 const NUMERIC_COLUMNS = new Set([
@@ -217,7 +217,7 @@ const EXP_FIELD_LABELS = {
   scheme_rxn: '反应式（画板）', scheme_smiles: '反应式（文本）', title: '标题', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
   ambient_humid: '湿度', project: '课题', rxn_type: '类型', literature: '文献', objective: '实验目的',
   solvent: '溶剂', concentration: '浓度', temperature: '温度', duration: '时间', atmosphere: '气氛',
-  apparatus: '装置 / 器皿', light: '光照 / 波长',
+  apparatus: '装置 / 器皿', light: '光照 / 波长', kind: '记录类型',
   workup: '后处理', procedure: '操作步骤', product_name: '产物', appearance: '性状', yield_pct: '产率',
   dr_ee: '选择性', characterization: '表征数据', notes: '实验现象', conclusion: '结论',
   base_mmol: '反应规模', product_mass: '产物质量', product_mw: '产物分子量', tlc_note: 'TLC',
@@ -511,7 +511,9 @@ function listExperiments(query) {
              ORDER BY f.id LIMIT 1) AS product_structure_id,
            -- 平行组：中栏列表要把同组的几条叠成一张卡片；
            -- reagent_sig 是「角色:名字:当量」串起来的签名，列表靠它判断这条是不是真重复
-           e.group_id,
+           e.group_id, e.kind,
+           (SELECT kind FROM exp_groups eg WHERE eg.id = e.group_id) AS group_kind,
+           (SELECT title FROM exp_groups eg WHERE eg.id = e.group_id) AS group_title,
            (SELECT COUNT(*) FROM experiments g WHERE g.group_id = e.group_id AND e.group_id <> '') AS group_size,
            (SELECT group_concat(x.sig, '|') FROM (
               SELECT r.role || ':' || r.name || ':' || IFNULL(r.eq, '') AS sig

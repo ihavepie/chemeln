@@ -21,6 +21,7 @@ import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
 import { sheetPrefs } from '../lib/sheetprefs.js';
+import { KINDS } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -59,6 +60,7 @@ const fields = reactive({
   no_yield: 0,
   scheme_rxn: '',
   scheme_smiles: '',
+  kind: '',
 });
 
 const reagent = reactive({ base: null, steps: [], rows: [] });
@@ -1101,7 +1103,13 @@ const openAttachment = (id) => {
                 <th>课题</th>
                 <td class="proj-cell"><ProjPick :model-value="fields.project" :projects="projectList" :disabled="exp.locked" @update:model-value="onProjectChange" /></td>
                 <th>类型</th>
-                <td><input v-model="fields.rxn_type" placeholder="C–H 活化" :disabled="exp.locked" /></td>
+                <td class="kind-cell">
+                  <select class="kind-pick" v-model="fields.kind" :disabled="exp.locked" title="记录类型（原料/试反应/条件筛选/底物扩展，并行存在）">
+                    <option value="">通用</option>
+                    <option v-for="k in KINDS" :key="k.key" :value="k.key">{{ k.key }}</option>
+                  </select>
+                  <input class="kind-rxn" v-model="fields.rxn_type" placeholder="C–H 活化" :disabled="exp.locked" title="化学类型" />
+                </td>
                 <th>状态</th>
                 <td class="tight status-cell">
                   <div class="status-wrap">

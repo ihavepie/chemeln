@@ -113,6 +113,17 @@ CREATE TABLE IF NOT EXISTS screenings (
   updated_at TEXT    NOT NULL
 );
 
+/* 实验的「容器」：一个组装若干条实验。
+   kind = repeat（同一条件重复/平行）| screen（筛条件）| scope（扩底物）
+   以前只有一个 group_id 字符串，语义全靠 variant 文字，无法区分「重复」和「筛选」。 */
+CREATE TABLE IF NOT EXISTS exp_groups (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL DEFAULT 'repeat',
+  title      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS events (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
   exp_id    INTEGER,
@@ -185,6 +196,8 @@ ensureColumn('experiments', 'tlc_note', "tlc_note TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'steps_json', "steps_json TEXT NOT NULL DEFAULT '[]'");
 // 粗产物 / 中间体这类「不计产率」：只记质量，不显示也不统计产率
 ensureColumn('experiments', 'no_yield', 'no_yield INTEGER NOT NULL DEFAULT 0');
+// 记录类型：原料 / 试反应 / 条件筛选 / 底物扩展（并行，不是阶段）；空 = 通用版式
+ensureColumn('experiments', 'kind', "kind TEXT NOT NULL DEFAULT ''");
 // 条件行补两栏：用什么装置、有没有光照（自由文本，导出/打印一起走）
 ensureColumn('experiments', 'apparatus', "apparatus TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'light', "light TEXT NOT NULL DEFAULT ''");
