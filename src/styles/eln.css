@@ -3878,6 +3878,16 @@ kbd {
 .sheet .cond-table .ct-temp { width: 20%; }
 .sheet .cond-table .ct-time { width: 20%; }
 .sheet .cond-table .ct-atm { width: 22%; }
+/* 实验操作 / 现象并排：左边按时间记操作，右边记看到的 */
+.op-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+/* 两栏各自留出三行高度，空记录时也像一块区域，不会缩成一条线 */
+.op-grid .sheet-text { min-height: 54px; }
+.op-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.op-cap { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-4); }
+/* 操作/现象下面的照片条：比 TLC 矮一点，不抢版面 */
+.sec-shots .tlc-strip { height: 92px; margin-top: 4px; }
+.sec-shots .tlc-shot,
+.sec-shots .tlc-empty { height: 88px; width: 118px; }
 .sheet .cond-table .ct-app { width: 20%; }
 .sheet .cond-table .ct-light { width: 18%; }
 /* 步骤行现在还有「加料 / 搅拌」：把两栏固定窄宽，剩下的空间让给名字和条件 */

@@ -15,12 +15,10 @@ export const SHEET_BLOCKS = {
   reagents: '投料表 + 条件',
   result: '结果与选择性',
   tlc: 'TLC',
-  objective: '一 · 实验目的',
-  procedure: '二 · 实验操作',
-  notes: '三 · 实验现象',
-  workup: '四 · 后处理',
-  characterization: '五 · 表征数据',
-  conclusion: '六 · 讨论与结论',
+  procedure: '一 · 实验操作与现象',
+  workup: '二 · 后处理',
+  characterization: '三 · 表征数据',
+  conclusion: '四 · 讨论与结论',
   attachments: '附件',
 };
 

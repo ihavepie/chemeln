@@ -1187,31 +1187,45 @@ const openAttachment = (id) => {
             <span>{{ exp.code }}</span>
           </div>
 
-          <section v-if="sheetPrefs.objective" class="sec">
-            <h2 class="sec-title"><span class="num">一</span>实验目的</h2>
-            <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.objective" :disabled="exp.locked" placeholder="实验目的与预期结果" />
-          </section>
           <section v-if="sheetPrefs.procedure" class="sec">
-            <h2 class="sec-title"><span class="num">二</span>实验操作</h2>
-            <textarea class="sheet-text mono" rows="3" v-autogrow v-model="fields.procedure" :disabled="exp.locked" placeholder="按时间顺序记录加料、换气、升温、取样等操作节点" />
-          </section>
-          <section v-if="sheetPrefs.notes" class="sec">
-            <h2 class="sec-title"><span class="num">三</span>实验现象</h2>
-            <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.notes" :disabled="exp.locked" placeholder="颜色、溶解性、放热、气体、析出、TLC 变化" />
+            <h2 class="sec-title"><span class="num">一</span>实验操作与现象</h2>
+            <div class="op-grid">
+              <label class="op-cell">
+                <span class="op-cap">操作</span>
+                <textarea class="sheet-text mono" rows="3" v-autogrow v-model="fields.procedure" :disabled="exp.locked" placeholder="加料、换气、升温、取样…" />
+              </label>
+              <label class="op-cell">
+                <span class="op-cap">现象</span>
+                <textarea class="sheet-text" rows="3" v-autogrow v-model="fields.notes" :disabled="exp.locked" placeholder="颜色、放热、气体、析出…" />
+              </label>
+            </div>
+            <!-- 操作和现象旁边就能贴实验照片（相机图、TLC 板、反应液颜色），不用翻到最下面的附件 -->
+            <div class="sec-shots" @mouseenter="onHover('photo')" @mouseleave="onHover('')">
+              <TlcStrip
+                category="photo"
+                :attachments="exp.attachments || []"
+                :locked="exp.locked"
+                :hovered="hovered"
+                :on-hover="onHover"
+                :on-pick="pickFile"
+                :on-open="openAttachment"
+                :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
+              />
+            </div>
           </section>
           <section v-if="sheetPrefs.workup" class="sec">
-            <h2 class="sec-title"><span class="num">四</span>后处理</h2>
+            <h2 class="sec-title"><span class="num">二</span>后处理</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.workup" :disabled="exp.locked" placeholder="淬灭、萃取、干燥、柱层析（洗脱剂配比、Rf）" />
           </section>
           <section v-if="sheetPrefs.characterization" class="sec">
-            <h2 class="sec-title"><span class="num">五</span>表征数据</h2>
+            <h2 class="sec-title"><span class="num">三</span>表征数据</h2>
             <textarea class="sheet-text mono" rows="4" v-autogrow v-model="fields.characterization" :disabled="exp.locked" />
             <div class="chips noprint">
               <button v-for="c in chips" :key="c" class="chip" type="button" @click="insertChip(c)">{{ c }}</button>
             </div>
           </section>
           <section v-if="sheetPrefs.conclusion" class="sec">
-            <h2 class="sec-title"><span class="num">六</span>讨论与结论</h2>
+            <h2 class="sec-title"><span class="num">四</span>讨论与结论</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.conclusion" :disabled="exp.locked" placeholder="本组条件的结论与下一轮拟考察的变量" />
           </section>
 

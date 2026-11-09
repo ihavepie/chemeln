@@ -3,6 +3,8 @@ import { computed } from 'vue';
 import Icon from './Icon.vue';
 
 const props = defineProps({
+  /** 只看这个类别的图片：tlc / photo 都用这套 */
+  category: { type: String, default: 'tlc' },
   attachments: { type: Array, default: () => [] },
   locked: Boolean,
   hovered: String,
@@ -12,7 +14,11 @@ const props = defineProps({
   onDelete: Function,
 });
 
-const shots = computed(() => props.attachments.filter((a) => a.category === 'tlc' && /\.(png|jpe?g|gif|webp)$/i.test(a.original_name || a.filename)));
+const shots = computed(() =>
+  props.attachments.filter(
+    (a) => a.category === props.category && /\.(png|jpe?g|gif|webp)$/i.test(a.original_name || a.filename)
+  )
+);
 </script>
 
 <template>
@@ -22,7 +28,7 @@ const shots = computed(() => props.attachments.filter((a) => a.category === 'tlc
       <button v-if="!locked" class="tlc-x" title="删除" @click.stop="onDelete(s.id)"><Icon name="x" :size="11" /></button>
     </figure>
     <template v-if="!locked">
-      <div v-for="n in (shots.length ? 1 : 2)" :key="`add-${n}`" class="tlc-empty" @click="onPick('tlc')">
+      <div v-for="n in (shots.length ? 1 : 2)" :key="`add-${n}`" class="tlc-empty" @click="onPick(category)">
         <span class="plus">+</span>
         <span class="cap">粘贴 / 选择</span>
       </div>
