@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
+import ExpPick from '../components/ExpPick.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { round } from '../lib/reagent.js';
@@ -16,17 +17,45 @@ import { toast } from '../lib/feedback.js';
 const router = useRouter();
 
 const groups = ref([]);
+const tables = ref([]);
 const loading = ref(true);
 const rows = computed(() => groups.value);
+const pickOpen = ref(false);
 
 async function load() {
   loading.value = true;
   try {
-    const d = await api.groups(store.project);
+    const [d, t] = await Promise.all([api.groups(store.project), api.screenings()]);
     const tag = (g, source) => ({ ...g, source });
     groups.value = [...(d.items || []).map((g) => tag(g, 'manual')), ...(d.auto || []).map((g) => tag(g, 'auto'))];
+    tables.value = t || [];
   } finally {
     loading.value = false;
+  }
+}
+
+/* --- 自己的筛选表 --- */
+async function createTable(picked) {
+  pickOpen.value = false;
+  try {
+    const sc = await api.createScreening({ title: '未命名条件筛选', exp_ids: picked, vars: [] });
+    router.push(`/s/${sc.id}`);
+  } catch (e) {
+    toast(e.message || '建不了', 'err');
+  }
+}
+
+/** 把清单里的这一摞直接存成一张筛选表（行就是这几条） */
+async function asTable(g) {
+  try {
+    const sc = await api.createScreening({
+      title: headOf(g),
+      exp_ids: g.members.map((m) => m.id),
+      vars: [],
+    });
+    router.push(`/s/${sc.id}`);
+  } catch (e) {
+    toast(e.message || '存不了', 'err');
   }
 }
 
@@ -78,6 +107,22 @@ async function adopt(g) {
         </p>
       </header>
 
+      <div class="sct-head">
+        <h2 class="sct-head-title">我的筛选表</h2>
+        <span class="cx-meta">{{ tables.length }} 张</span>
+        <span class="spacer" />
+        <button class="btn btn-sm btn-ghost" @click="pickOpen = true"><Icon name="plus" :size="12" /> 新建筛选表</button>
+      </div>
+      <div v-if="tables.length" class="sct-cards">
+        <button v-for="t in tables" :key="t.id" type="button" class="sct-card" @click="router.push(`/s/${t.id}`)">
+          <b>{{ t.title }}</b>
+          <span class="sct-card-meta">{{ t.entryCount }} 条 · {{ t.varCount }} 个自加字段</span>
+        </button>
+      </div>
+      <p v-else class="empty-note" style="margin-top: 4px">
+        还没有筛选表。点「新建筛选表」从记录里挑几条，或者把下面某一摞直接存成一张表。
+      </p>
+
       <div v-if="loading" class="empty-note">正在整理…</div>
       <div v-else-if="!rows.length" class="empty-note">
         还没有可以筛的东西。一摞平行实验里至少要有一条跟基准不一样（改了条件 / 加减了试剂），重复或平行的那种不会进来；原料记录也不算。
@@ -92,6 +137,9 @@ async function adopt(g) {
           <span class="spacer" />
           <button v-if="g.source === 'auto'" class="btn btn-sm btn-ghost" title="把这几条收成正式平行组" @click="adopt(g)">
             <Icon name="check" :size="12" /> 收成平行组
+          </button>
+          <button class="btn btn-sm btn-ghost" title="把这一摞存成一张筛选表" @click="asTable(g)">
+            <Icon name="plus" :size="12" /> 存成筛选表
           </button>
           <button class="btn btn-sm btn-ghost" @click="open(g.members[0])">
             <Icon name="file" :size="12" /> 打开基准
@@ -121,5 +169,12 @@ async function adopt(g) {
         </ul>
       </section>
     </div>
+
+    <ExpPick
+      :model-value="pickOpen"
+      title="挑几条实验做一张筛选表"
+      @close="pickOpen = false"
+      @confirm="createTable"
+    />
   </div>
 </template>

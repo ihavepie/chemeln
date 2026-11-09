@@ -6917,3 +6917,58 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 /* 条件筛选清单：`.spacer` 在这个容器里也要撑开，不然产率会紧贴在「改了什么」后面 */
 .cx-head .spacer, .cx-row .spacer { flex: 1 1 auto; }
+
+/* ================================================================
+   条件筛选页顶部的「我的筛选表」+ 筛选表详情页（.sct-*）
+   ================================================================ */
+.sct-head { display: flex; align-items: baseline; gap: 9px; margin: 18px 0 8px; }
+.sct-head-title { font-size: 13.5px; font-weight: 600; color: var(--ink); margin: 0; }
+.sct-head .spacer { flex: 1 1 auto; }
+.sct-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.sct-card {
+  display: flex; flex-direction: column; gap: 2px; min-width: 170px; padding: 8px 11px;
+  text-align: left; background: #fff; border: 1px solid var(--line-2); border-radius: 7px;
+  font: inherit; color: var(--ink); cursor: pointer;
+}
+.sct-card:hover { border-color: var(--ink-4); }
+.sct-card b { font-size: 12.5px; font-weight: 600; }
+.sct-card-meta { font-size: 10.5px; color: var(--ink-3); }
+
+/* 详情页 */
+.scr-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.scr-head .spacer { flex: 1 1 auto; }
+.scr-save { font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
+.scr-del { color: var(--bad); }
+
+.sct-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sct-table th, .sct-table td {
+  padding: 5px 8px; text-align: left; vertical-align: middle;
+  border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.sct-table thead th {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em; color: var(--ink-3);
+  font-weight: 400; border-bottom: 1px solid var(--line-2); vertical-align: bottom;
+}
+.sct-table .sct-col-code { width: 1%; }
+.sct-table .sct-num { text-align: right; }
+.sct-table .sct-var { min-width: 108px; }
+.sct-var-x {
+  margin-left: 5px; border: 0; background: transparent; color: var(--ink-4);
+  font: inherit; font-size: 9.5px; cursor: pointer; padding: 0 1px;
+}
+.sct-var-x:hover { color: var(--ink-2); }
+.sct-var-x.is-del:hover { color: var(--bad); }
+.sct-cell {
+  width: 100%; box-sizing: border-box; padding: 3px 5px;
+  border: 1px solid transparent; border-radius: 4px; background: transparent;
+  font: inherit; font-size: 11.5px; color: var(--ink-2);
+}
+.sct-cell:hover { border-color: var(--line-2); }
+.sct-cell:focus { outline: none; border-color: var(--line-2); background: #f8f7f2; }
+.sct-reagent { white-space: normal; max-width: 300px; font-size: 11px; color: var(--ink-3); }
+.sct-col-x { width: 1%; }
+.sct-row-x {
+  border: 0; background: transparent; color: var(--ink-4); font-size: 13px; line-height: 1;
+  cursor: pointer; padding: 2px 4px;
+}
+.sct-row-x:hover { color: var(--bad); }

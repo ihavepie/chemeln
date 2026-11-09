@@ -2570,8 +2570,13 @@ route('POST', '/api/screenings', async (req, res) => {
       numOrNull(body.exp_id),
       str(body.title) || '未命名条件筛选',
       str(body.note),
-      JSON.stringify(Array.isArray(body.vars) ? body.vars.map(String) : ['催化剂', '溶剂', '温度']),
-      JSON.stringify([]),
+      JSON.stringify(Array.isArray(body.vars) ? body.vars : []),
+      JSON.stringify(
+        (Array.isArray(body.exp_ids) ? body.exp_ids : [])
+          .map(Number)
+          .filter((n) => Number.isFinite(n))
+          .map((id) => ({ exp_id: id, cells: {} }))
+      ),
       ts,
       ts
     );
@@ -2581,7 +2586,23 @@ route('POST', '/api/screenings', async (req, res) => {
 route('GET', '/api/screenings/:id', async (req, res, params) => {
   const s = parseScreening(db.prepare('SELECT * FROM screenings WHERE id = ?').get(Number(params.id)));
   if (!s) return fail(res, 404, '筛选表不存在');
-  ok(res, { screening: s });
+  // 表里只存「选了哪些实验 + 每格手填的文本」；编号 / 条件 / 产率这些一直读记录本身，不会跟记录脱节
+  const one = db.prepare(`SELECT e.id, e.code, e.title, e.date, e.status, e.kind, e.yield_pct, e.dr_ee, e.ee_pct,
+                                 e.no_yield, e.solvent, e.temperature, e.duration, e.atmosphere, e.addition,
+                                 e.product_name, e.product_mass, e.base_mmol,
+                                 (SELECT group_concat(r.name, ' + ') FROM reagents r
+                                   WHERE r.exp_id = e.id AND r.role = '底物' AND trim(r.name) <> '') AS substrates
+                            FROM experiments e WHERE e.id = ?`);
+  const reagents = db.prepare("SELECT role, name, eq FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id");
+  const rows = s.entries.map((e) => {
+    const exp = one.get(Number(e.exp_id));
+    return {
+      exp_id: Number(e.exp_id),
+      cells: e.cells || {},
+      exp: exp ? { ...exp, reagents: reagents.all(exp.id) } : null,
+    };
+  });
+  ok(res, { screening: s, rows });
 });
 
 route('PUT', '/api/screenings/:id', async (req, res, params) => {
@@ -2604,7 +2625,7 @@ route('PUT', '/api/screenings/:id', async (req, res, params) => {
   }
   if ('vars' in body) {
     fields.push('vars_json = ?');
-    values.push(JSON.stringify(Array.isArray(body.vars) ? body.vars.map(String) : []));
+    values.push(JSON.stringify(Array.isArray(body.vars) ? body.vars : []));
   }
   if ('entries' in body) {
     fields.push('entries_json = ?');
