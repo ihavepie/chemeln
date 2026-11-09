@@ -3,6 +3,7 @@
 > 从 `AGENTS.md` 的「当前进度」里按顺序搬出来的旧条目，逐字保留、没有删改。
 > 最新的几轮在 `AGENTS.md`；要回溯某次改动，也可以直接 `git log --oneline`。
 
+- **二维码**：化合物 `/api/compounds/:id/qr.svg` → `/#/c/<id>`；实验 `/api/experiments/:id/qr.svg` → `/#/e/<id>`。base 的优先级：URL 参数 > **`ELN_LABEL_BASE_URL` 环境变量** > 设置页「瓶子标签的二维码地址」> `lanUrl()`。服务器上靠环境变量指定（数据同步会冲掉设置页里的值），详见 `CLOUD-DEPLOY.md`。
 - **Safari 拖不动**：元素被 WebKit 当成可原生拖拽（`-webkit-user-drag: element`）时，真鼠标一拖就起原生会话、`mousemove` 全被吞；`new MouseEvent()` 不会触发原生拖拽 → 测试全绿真机全死。规矩：`-webkit-user-drag: none`、别加 `draggable`、按住时拦 `dragstart`，验证只看 `data/drag-debug.log`。
 - **导出长图 / 单文件网页**：`src/lib/snapshot.js` 克隆 `.editor .sheet`（同步输入值 + `flattenTextareas`）→ `POST /api/snapshot/png`，`server/shot.swift` 用系统 WebKit 截整页（按 `.snap` 高度，不分页不裁切）；HTML 版把图内联成 data:。PDF 是 A4 分页、多了会裁，用户不要那种。
 - **打印 / 存的文本域**：`.sheet-text` 是固定 rows 的 textarea，纸上只印自己那几行；屏幕还比纸面宽，按屏幕高度算照样截。两条路都要 `flattenTextareas()`（系统打印在 `runPrint`、PDF 在 `PrintPanel.buildPages`），改完仍要 `--print-to-pdf` 数页数：内容长现在会自然排到 3 页，那是「不丢内容」的代价，别再拿「恒 2 页」当硬指标。

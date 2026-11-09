@@ -2590,6 +2590,7 @@ route('GET', '/api/screenings/:id', async (req, res, params) => {
   const one = db.prepare(`SELECT e.id, e.code, e.title, e.date, e.status, e.kind, e.yield_pct, e.dr_ee, e.ee_pct,
                                  e.no_yield, e.solvent, e.temperature, e.duration, e.atmosphere, e.addition,
                                  e.product_name, e.product_mass, e.base_mmol,
+                                 e.notes, e.conclusion, e.appearance, e.tlc_note,
                                  (SELECT group_concat(r.name, ' + ') FROM reagents r
                                    WHERE r.exp_id = e.id AND r.role = '底物' AND trim(r.name) <> '') AS substrates
                             FROM experiments e WHERE e.id = ?`);

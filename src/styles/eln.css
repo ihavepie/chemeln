@@ -6940,35 +6940,85 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .scr-save { font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
 .scr-del { color: var(--bad); }
 
-.sct-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.sct-table th, .sct-table td {
-  padding: 5px 8px; text-align: left; vertical-align: middle;
-  border-bottom: 1px solid var(--line); white-space: nowrap;
+/* 筛选表：就按真表格来——表头有底色、格子之间有细网格线，
+   固定两列（编号 / 底物→产物）浅底，手动列再淡一层，自动列不加底 */
+.sct-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: #fff;
 }
+.sct-table th,
+.sct-table td {
+  padding: 5px 9px;
+  text-align: left;
+  vertical-align: middle;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.sct-table th:last-child,
+.sct-table td:last-child { border-right: 0; }
+.sct-table tbody tr:last-child td { border-bottom: 0; }
 .sct-table thead th {
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em; color: var(--ink-3);
-  font-weight: 400; border-bottom: 1px solid var(--line-2); vertical-align: bottom;
+  background: #f6f4ef;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  font-weight: 400;
+  white-space: nowrap;
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--line-2);
 }
-.sct-table .sct-col-code { width: 1%; }
+.sct-table tbody tr:hover td { background: #fbfaf7; }
+.sct-table .sct-c-fix { background: #fbfaf7; white-space: nowrap; }
+.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 190px; max-width: 260px; }
+.sct-table .sct-c-x { width: 1%; }
 .sct-table .sct-num { text-align: right; }
-.sct-table .sct-var { min-width: 108px; }
+.sct-table td.sct-num { font-family: var(--mono); }
+.sct-table td.is-manual { background: #fdfaf6; }
+
+.sct-th { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; row-gap: 1px; }
+/* 改名 / 删列只在悬停表头时露出来，平时别占地方 */
+.sct-th-acts { display: inline-flex; gap: 1px; opacity: 0; transition: opacity 0.1s; }
+.sct-table thead th:hover .sct-th-acts { opacity: 1; }
+.sct-th-label { color: var(--ink-2); font-size: 10.5px; }
+.sct-th-src {
+  font-size: 9px; color: var(--ink-4); border: 1px solid var(--line-2);
+  border-radius: 3px; padding: 0 3px; line-height: 1.4;
+}
 .sct-var-x {
-  margin-left: 5px; border: 0; background: transparent; color: var(--ink-4);
+  border: 0; background: transparent; color: var(--ink-4);
   font: inherit; font-size: 9.5px; cursor: pointer; padding: 0 1px;
 }
 .sct-var-x:hover { color: var(--ink-2); }
 .sct-var-x.is-del:hover { color: var(--bad); }
+.sct-auto { display: inline-block; white-space: nowrap; }
+.sct-auto.sct-wrap { white-space: normal; max-width: 320px; font-size: 11px; color: var(--ink-2); }
 .sct-cell {
   width: 100%; box-sizing: border-box; padding: 3px 5px;
   border: 1px solid transparent; border-radius: 4px; background: transparent;
   font: inherit; font-size: 11.5px; color: var(--ink-2);
 }
 .sct-cell:hover { border-color: var(--line-2); }
-.sct-cell:focus { outline: none; border-color: var(--line-2); background: #f8f7f2; }
-.sct-reagent { white-space: normal; max-width: 300px; font-size: 11px; color: var(--ink-3); }
-.sct-col-x { width: 1%; }
+.sct-cell:focus { outline: none; border-color: var(--line-2); background: #fffdf9; }
 .sct-row-x {
   border: 0; background: transparent; color: var(--ink-4); font-size: 13px; line-height: 1;
   cursor: pointer; padding: 2px 4px;
 }
 .sct-row-x:hover { color: var(--bad); }
+
+/* 「加一个字段」弹窗 */
+.sct-form { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.sct-form-label { flex: 0 0 54px; font-size: 11px; color: var(--ink-3); padding-top: 7px; }
+.sct-src { display: flex; flex-wrap: wrap; gap: 5px; }
+.sct-src-chip {
+  padding: 3px 9px; border: 1px solid var(--line-2); border-radius: 999px;
+  background: #fff; color: var(--ink-2); font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.sct-src-chip:hover { border-color: var(--ink-4); }
+.sct-src-chip.is-on { border-color: var(--accent-ink); color: var(--accent-ink); background: #fdf6f2; }
+

@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { store } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { toast } from '../lib/feedback.js';
+import { DEFAULT_FIELDS } from '../lib/sctfields.js';
 
 /**
  * 条件筛选 = 一摞平行实验里「跟基准不一样」的那些，摊成一张清单。
@@ -38,7 +39,7 @@ async function load() {
 async function createTable(picked) {
   pickOpen.value = false;
   try {
-    const sc = await api.createScreening({ title: '未命名条件筛选', exp_ids: picked, vars: [] });
+    const sc = await api.createScreening({ title: '未命名条件筛选', exp_ids: picked, vars: DEFAULT_FIELDS });
     router.push(`/s/${sc.id}`);
   } catch (e) {
     toast(e.message || '建不了', 'err');
@@ -51,7 +52,7 @@ async function asTable(g) {
     const sc = await api.createScreening({
       title: headOf(g),
       exp_ids: g.members.map((m) => m.id),
-      vars: [],
+      vars: DEFAULT_FIELDS,
     });
     router.push(`/s/${sc.id}`);
   } catch (e) {
