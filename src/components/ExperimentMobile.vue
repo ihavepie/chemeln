@@ -129,6 +129,7 @@ const amount = (r) => amountText(r) || (num(r.amount_ul) ? `${round(num(r.amount
 
 <template>
   <div class="phone-cmp">
+    <a class="phone-back phone-back-top" href="#/m">← 最近记录</a>
     <div v-if="error" class="phone-note">{{ error }}</div>
     <div v-else-if="!e" class="phone-note">读取中…</div>
 

@@ -1176,6 +1176,21 @@ body {
   border: 1px solid var(--line-2); background: rgba(255, 255, 255, 0.9); color: var(--ink-3);
   font-size: 11px; line-height: 1; -webkit-tap-highlight-color: transparent;
 }
+/* 手机端返回列表的小链接 */
+.phone-back { color: var(--ink-3); text-decoration: none; font-size: 12.5px; }
+.phone-back-top { display: inline-block; margin-bottom: 8px; }
+.phone-back:active { color: var(--ink); }
+/* 手机端：实验 / 化合物 切换 + 搜索 */
+.phone-seg { display: flex; gap: 6px; margin: 10px 0 8px; }
+.phone-seg button {
+  flex: 1; min-height: 38px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff;
+  color: var(--ink-3); font: inherit; font-size: 14px; -webkit-tap-highlight-color: transparent;
+}
+.phone-seg button.on { border-color: var(--ink-3); color: var(--ink); background: #f7f5f0; }
+.phone-search {
+  width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px;
+  border: 1px solid var(--line-2); border-radius: 8px; background: #fff; font-size: 16px;
+}
 /* 手机端「最近实验」列表 */
 .phone-list { list-style: none; margin: 10px 0 0; padding: 0; }
 .phone-item {
@@ -1187,6 +1202,10 @@ body {
 .phone-item-top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); }
 .phone-item-title { font-size: 15px; color: var(--ink); }
 .phone-item-sub { font-size: 11.5px; color: var(--ink-4); }
+.phone-item-cmp { flex-direction: row; align-items: center; gap: 10px; }
+.phone-item-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.phone-cmp-fig { width: 56px; height: 56px; flex: 0 0 56px; object-fit: contain; background: #fbfaf7; border: 1px solid var(--line-1); border-radius: 6px; }
+.phone-cmp-fig.is-empty { border: 1px dashed var(--line-2); }
 /* 手机上不要让输入框被 iOS 自动放大 */
 @media (max-width: 820px) {
   input, textarea, select { font-size: 16px !important; }

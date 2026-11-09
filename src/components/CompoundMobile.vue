@@ -47,6 +47,7 @@ const rows = computed(() => {
 
 <template>
   <div class="phone-cmp">
+    <a class="phone-back phone-back-top" href="#/m">← 最近记录</a>
     <div v-if="error" class="phone-note">{{ error }}</div>
     <div v-else-if="!c" class="phone-note">读取中…</div>
 
@@ -80,7 +81,7 @@ const rows = computed(() => {
         </figure>
       </div>
 
-      <p class="phone-foot">只读 · 扫码查看</p>
+      <p class="phone-foot"><a class="phone-back" href="#/m">← 回到化合物列表</a></p>
     </template>
   </div>
 </template>
