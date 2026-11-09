@@ -40,6 +40,8 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
+    // 走 Tailscale/反代时 Host 不是 localhost，Vite 默认会 403；这几个域名放行
+    allowedHosts: ['.<tailnet>.ts.net', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': { target: 'http://127.0.0.1:4780', changeOrigin: false },
     },
