@@ -119,7 +119,7 @@
 > 更早的轮次记录（同一套写法，逐字搬走、没删内容）在 **`HISTORY.md`**；这个文件有 **64 KB 注入上限**，所以最近几轮留在下面，再早的按顺序往下搬。加新内容前先看看体积。
 - **本轮（试验分支 `try/record-kind`，`main` 仍停在 6e229d3，回退 = `git checkout main`）**：记录「类型」`experiments.kind`（原料/试反应/条件筛选/底物扩展，**并行、不是阶段**）+ `exp_groups` 分组（卡片那行写「相对基准改了什么」，服务端 `annotateGroupDiff()`）+ 分类管理挂在卡片墙的**分类组头**上（右键 → 重命名 / 删除，`ExpGrid`/`CmpGrid` 的 `groupMenu()`）。**别往一级侧栏加分类列表**——用户看过一版「全部」下面那串分类，明确说「不要污染一级侧栏」。卡片上加类型角标/色条同样被否掉。之后又补了：化合物墙的「按类型分组」视角、空白处右键接管成页面菜单、表格视图整行可点 + 表头拖列宽、**条件筛选页改成读记录的条件对照表**。
 - **已完成**：v2 全功能已构建进 `public/`（4780 跑的就是 v2）；逐项清单在 `HISTORY.md`。
-- **半成品 / 待确认**：条件筛选页仍是旧样式；「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
+- **半成品 / 待确认**：「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
 - **明确不做**：多人协作、账号权限、云同步、富文本编辑。移动端只做「扫码看化合物档案」这一档（≤820px 的样式在 `eln.css` 末尾那段），不做手机上编辑记录。
 
 ## 7. 踩过的坑与硬限制
@@ -135,13 +135,11 @@
 - **记录页第 1 页现在多了一行**：结果表格下面是 `.res-sel`（选择性测定），在 `.sec-tight` 里跟着结果块一起打印。加别的行之前先想想页面还有多少余量——第 1 页本来就塞满了（反应式 + 投料表 + 条件 + 结果 + TLC）。
 - **化合物编号**：新建时留空会由服务端 `nextCompoundCode()` 自动给号（库里最大的纯数字 + 1）；`POST /api/compounds` 带显式编号撞号仍然报 409（别改成自动加后缀，用户填的就该报错）；只有「产物存库」走 `uniqueCompoundCode()` 自动加 `-2`。**曾经踩过**：产物存库直接用实验编号当化合物编号，加了唯一索引后会撞号 500。
 - **`events` 是所有留痕的唯一来源**：新签名 `logEvent(entity, entityId, kind, { detail, fields, changes })`，老签名 `logEvent(expId, kind, detail)` 已废弃；`kind='edit'` 一定走 `logEdit(changes)`（`[{f,o,n}]`，服务端 5 分钟内合并，界面用 `fields` + `EXP_FIELD_LABELS/CMP_FIELD_LABELS` 拼中文、用 `changes` 展开改前改后）。**加新字段记得往这两个 label 表里补**，否则历史里显示英文字段名。
-- **打印 / 存的文本域**：`.sheet-text` 是固定 rows 的 textarea，纸上只印自己那几行；屏幕还比纸面宽，按屏幕高度算照样截。两条路都要 `flattenTextareas()`（系统打印在 `runPrint`、PDF 在 `PrintPanel.buildPages`），改完仍要 `--print-to-pdf` 数页数：内容长现在会自然排到 3 页，那是「不丢内容」的代价，别再拿「恒 2 页」当硬指标。
 - `node:sqlite` 需要 Node ≥ 22 且是实验特性，启动带 `NODE_OPTIONS=--disable-warning=ExperimentalWarning`。
 - 服务端 `listen` 失败会自动换下一个端口 → 见到多余 node 进程先用 `lsof -nP -iTCP:4780 -sTCP:LISTEN` 查，别乱杀。
 - **「课题」和「分类」不是一回事**：课题是 `experiments.project` 文本字段，决定了**全站空间**（侧栏切换，统计/列表/导出跟着走），课题表本身不存在——清单来自 `GROUP BY project` 加 settings 里的 `projects_json`（用来记还没写记录的课题），每个课题的编号前缀存 `prefix:<课题>`（没设就按课题名自动生成，见 `derivedPrefix()`；实验编号按课题分开数）。分类是卡片墙里的分组，仍按分类走，两者叠加。
 - **化合物库的课题归属**：`compounds.project` 一直写值，过滤是**严格 `project = 当前课题`**；「全部课题」不筛，所以没归课题的化合物（`project = ''`，即共用课题的）只在「全部课题」里看得到。化合物库列表头会提示「另有 N 个在共用课题」（bootstrap 的 `sharedCounts.cmp` / `compoundUnassigned`），化合物页**现在恒定有「课题」格**（`ProjPick`，清空 = 共用课题）可以补归属。
 - **课题级设置覆盖**：01 记录本信息里，**课题名就是「标题」**——在课题里改标题等于改名（会走 `renameProject` 把记录一起搬），标题不再单独存覆盖值；编号前缀/记录人/课题组/二维码地址可以每个课题覆盖。存法：`prefix:<课题>`（编号前缀）+ `proj:<课题>:<字段>`（其余三项），空值就不落盘（= 跟着全局）。服务端 `settingsFor(project)` 做合并，bootstrap 同时返回 `settings`（已合并）、`settingsGlobal`（占位符用）、`projectOverrides`（表单编辑用）；`PUT /api/settings` 带 `project` 才写课题级（共用开关已经不存在了）。删课题时会把这两个前缀的键一起清掉。
-- **`.spacer` 只在几个容器里有 `flex: 1`**（`.cat-item` / `.editor-bar` / `.card-head` / `.trash-head` / `.scope-head` / `.scope-foot`）。新写一个 flex 容器想让后半段靠右，必须自己补一条 `<容器> .spacer { flex: 1 }` —— **踩过一次**：`.tree-head` 漏了，课题组头的「改名/编号前缀/删除课题」粘在元信息后面而不是贴右边。
 - **自绘下拉一律单列、不许横向滚**：`.qmenu` 的 `flex-wrap: wrap` 撞上 `max-height` 会把 `.cat-menu` 折成**第二列**，看着就是「菜单被切了一半、底下还能横向拖」（用户报过两次：类型下拉、课题下拉）。现在 `eln.css` 末尾有 `.qmenu.cat-menu { flex-direction: column; flex-wrap: nowrap; overflow-x: hidden; }`，`.cat-menu-kinds`（类型小节的两列排布）是另一层、不受影响。**另外下拉菜单不要出现滚动条**：`.qmenu.cat-menu` / `.kind-menu` 都写了 `scrollbar-width: none` + `::-webkit-scrollbar { width:0; display:none }`（多了仍能滚轮滚，只是不画杠）；「类型」菜单 `max-height: none`（直接铺开）。 **fixed 定位的下拉（侧栏课题切换器、`ProjPick`）必须加 `.cat-menu--fixed`**（`.cat-menu` 自带 `min-width:100%`，fixed 下会按整屏算、菜单变巨长；宽度交给 JS 量触发器后内联写）——细节在 `HISTORY.md`。
 - **二维码**：化合物 `/api/compounds/:id/qr.svg` → `/#/c/<id>`；实验 `/api/experiments/:id/qr.svg` → `/#/e/<id>`。base 的优先级：URL 参数 > **`ELN_LABEL_BASE_URL` 环境变量** > 设置页「瓶子标签的二维码地址」> `lanUrl()`。服务器上靠环境变量指定（数据同步会冲掉设置页里的值），详见 `CLOUD-DEPLOY.md`。
 - **主从关系**：**本机 `data/` 是主库**，服务器 `/var/lib/eln` 是同步上去的副本，**只允许 本机 → 服务器 单向覆盖**；服务器上的改动下次同步会被冲掉。
