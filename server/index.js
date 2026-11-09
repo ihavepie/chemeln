@@ -2677,7 +2677,10 @@ function serveStatic(req, res, url) {
  * 前端把两页 DOM 序列化 + 全部 CSS 发过来，服务端存成临时网页、用 swift 渲染、合并成多页 PDF。
  * 渲染器第一次用时才编译，编好缓存在 .cache/print-render。
  */
-const CACHE_DIR = path.join(__dirname, '..', '.cache');
+// 原生小工具的编译缓存：本机放仓库里的 .cache/；服务器上 /opt/eln 是只读的，放到临时目录
+const CACHE_DIR =
+  process.env.ELN_CACHE_DIR ||
+  (process.platform === 'darwin' ? path.join(__dirname, '..', '.cache') : path.join(os.tmpdir(), 'eln-native'));
 const PRINT_TOKENS = new Map(); // token -> 临时目录，只在校验/清理期间存在
 let printRendererPromise = null;
 
@@ -2925,6 +2928,87 @@ route('POST', '/api/snapshot/png', async (req, res) => {
   }
 });
 
+/* 自己写一个「不压缩」的 zip：Linux/Windows 上没有 ditto，也不一定有 zip 命令，
+   这里用 Node 直接拼 zip 结构（store 方式），文件名一律按 UTF-8 + bit 11 写。 */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i += 1) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+async function zipStore(entryDir, rootName) {
+  const parts = [];      // 本地文件头 + 数据
+  const central = [];
+  let offset = 0;
+  const files = [];
+  const walk = async (dir, prefix) => {
+    for (const ent of await fsp.readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      const name = `${prefix}${ent.name}`;
+      if (ent.isDirectory()) {
+        await walk(full, `${name}/`);
+        files.push({ name: `${name}/`, data: Buffer.alloc(0), dir: true });
+      } else {
+        files.push({ name, data: await fsp.readFile(full) });
+      }
+    }
+  };
+  await walk(entryDir, `${rootName}/`);
+
+  for (const f of files) {
+    const nameBuf = Buffer.from(f.name, 'utf8');
+    const crc = crc32(f.data);
+    const flags = 0x0800;                     // bit 11：文件名是 UTF-8
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);               // version needed
+    local.writeUInt16LE(flags, 6);
+    local.writeUInt16LE(0, 8);                // store
+    local.writeUInt32LE(0, 10);               // time/date 留 0
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(f.data.length, 18);
+    local.writeUInt32LE(f.data.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(0, 28);
+    parts.push(local, nameBuf, f.data);
+
+    const cen = Buffer.alloc(46);
+    cen.writeUInt32LE(0x02014b50, 0);
+    cen.writeUInt16LE(20, 4);
+    cen.writeUInt16LE(20, 6);
+    cen.writeUInt16LE(flags, 8);
+    cen.writeUInt16LE(0, 10);
+    cen.writeUInt32LE(0, 12);
+    cen.writeUInt32LE(crc, 16);
+    cen.writeUInt32LE(f.data.length, 20);
+    cen.writeUInt32LE(f.data.length, 24);
+    cen.writeUInt16LE(nameBuf.length, 28);
+    cen.writeUInt32LE(f.dir ? 0x10 : 0, 38);  // 外部属性：目录
+    cen.writeUInt32LE(offset, 42);
+    central.push(cen, nameBuf);
+    offset += local.length + nameBuf.length + f.data.length;
+  }
+
+  const cenBuf = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(cenBuf.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, cenBuf, end]);
+}
+
 /**
  * 给 zip 里中文文件名补上「UTF-8 名字」标志位（bit 11）。
  * macOS 的 zip / ditto 都把名字按 UTF-8 写进去却不置位，Windows 的解压工具就会按
@@ -2997,16 +3081,27 @@ route('POST', '/api/export/bundle', async (req, res) => {
       }
     }
     const zipPath = path.join(dir, `${name}.zip`);
-    // 用 ditto 而不是 zip：macOS 的 zip 不写 UTF-8 名字标志位，中文文件名在
-    // Windows / 别的解压工具里会变乱码；ditto 会正确打上 0x800
-    await new Promise((resolve, reject) => {
-      const p = spawn('ditto', ['-c', '-k', '--keepParent', root, zipPath], { stdio: ['ignore', 'ignore', 'pipe'] });
-      let err = '';
-      p.stderr.on('data', (d) => (err += String(d)));
-      p.on('error', reject);
-      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`打包失败：${err.trim().slice(0, 200) || code}`))));
-    });
-    const data = fixZipUtf8Names(await fsp.readFile(zipPath));
+    // 优先 ditto（macOS）；没有就用 zip 命令；都没有（或都失败）就用内置的 store 打包。
+    // 目标只有一个：中文文件名在每个解压工具里都不乱码（UTF-8 标志位）。
+    let data = null;
+    for (const cmd of ['ditto', 'zip']) {
+      const args = cmd === 'ditto'
+        ? ['-c', '-k', '--keepParent', root, zipPath]
+        : ['-r', '-q', zipPath, name];
+      try {
+        await new Promise((resolve, reject) => {
+          const p = spawn(cmd, args, { cwd: dir, stdio: ['ignore', 'ignore', 'pipe'] });
+          p.stderr.on('data', () => {});
+          p.on('error', reject);
+          p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
+        });
+        data = fixZipUtf8Names(await fsp.readFile(zipPath));
+        break;
+      } catch {
+        data = null;
+      }
+    }
+    if (!data) data = await zipStore(root, name);
     res.writeHead(200, {
       'content-type': 'application/zip',
       'content-length': data.length,
