@@ -6993,18 +6993,23 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-table th.sct-num,
 .sct-table td.sct-num { text-align: center; }
 .sct-table th.sct-num .sct-th { justify-content: center; }
-/* 标准条件那块：反应式 + 一行条件字，包一张纸卡——只给三道柔和投影、不描边，
-   跟全站的卡片一个观感（用户要「包裹起来，就用阴影」）。宽度跟着内容走，不铺满整行。 */
-.sct-std {
-  display: inline-block;
-  max-width: 100%;
-  margin: 0 0 12px;
-  padding: 10px 14px 9px;
+/* 整张筛选表（反应式 + 三线表）是一张纸卡：白底 + 两段柔和投影，**不描边**
+   （用户要「包裹表格和反应式，白底加阴影，像卡片」）。注意别改公共的 `.scope-wrap`——
+   记录 / 化合物的表格视图也用它，那两处不需要卡。 */
+.sct-sheet {
+  padding: 12px 16px 12px;
   background: var(--paper);
   border-radius: var(--r);
   box-shadow:
     0 1px 2px rgba(20, 18, 14, 0.04),
-    0 6px 14px -9px rgba(20, 18, 14, 0.16);
+    0 6px 16px -10px rgba(20, 18, 14, 0.18);
+  margin-bottom: 14px;
+}
+/* 卡里面的反应式不再单独套卡（卡片里套卡片），就一块普通内容，压在三线表顶线上面 */
+.sct-std {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0 10px;
 }
 .sct-std-scheme { display: block; }
 .sct-std-line {
@@ -7014,8 +7019,8 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   color: var(--ink-3);
 }
 .sct-std-scheme + .sct-std-line { margin-top: 9px; }
-/* 没有反应式、只有那行字的场合不套卡片，直接压在三线表顶线上面 */
-.sct-std-line--bare { padding: 0 12px; margin: 0 0 7px; }
+/* 没有反应式时只有那行字，直接压在表顶上 */
+.sct-std-line--bare { padding: 0; margin: 0 0 8px; }
 .sct-std-lbl {
   margin-right: 6px;
   font-size: 9.5px;
@@ -7026,8 +7031,9 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   padding: 0 4px;
   vertical-align: 1px;
 }
-/* 条件筛选首页一页可能摊好几张表，那里的图和卡都收小一点，别把清单顶下去 */
-.sct-block .sct-std { margin: 0 0 10px; padding: 8px 11px 7px; }
+/* 条件筛选首页一页可能摊好几张表，那里的图收小一点，别把清单顶下去 */
+.sct-block .sct-sheet { padding: 10px 14px 10px; }
+.sct-block .sct-std { margin: 0 0 8px; }
 .sct-block .sct-std svg { max-height: 160px; }
 .sct-std svg {
   display: block;

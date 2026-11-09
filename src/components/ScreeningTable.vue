@@ -28,7 +28,7 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
 </script>
 
 <template>
-  <div class="scope-wrap">
+  <div class="scope-wrap sct-sheet">
     <!-- 反应式 + 条件文字包一张纸卡（只有投影、不描边）：跟全站的卡片一个观感，
          也让这张图跟下面的三线表分开，不至于浮在纸面上没着落 -->
     <div v-if="scheme" class="sct-std">
