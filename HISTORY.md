@@ -3,6 +3,7 @@
 > 从 `AGENTS.md` 的「当前进度」里按顺序搬出来的旧条目，逐字保留、没有删改。
 > 最新的几轮在 `AGENTS.md`；要回溯某次改动，也可以直接 `git log --oneline`。
 
+- **课题改名必须一次搬干净**（`renameProject()`，在一个事务里）：`experiments.project`、`compounds.project`、**`categories.project`**、`projects_json`、`prefix:<旧>`、`proj:<旧>:*`。少搬一样就会凭空多出一个同名空课题。**`categories.project` 漏搬的后果最阴**：分类按新课题名筛不到，挂在这些分类下的记录在卡片墙里一个组都落不进（中栏列表还看得见），看着像丢了。两个入口：`PUT /api/projects/:name`，和 `PUT /api/settings` 带 `project` + 不同的 `lab_heading`（响应里的 `renamedTo` 告诉前端切到新名字）。启动时有个一次性迁移，把老的 `proj:<p>:lab_heading` 覆盖值当作新课题名搬过去。已知边角：改名时如果正好有一条实验开着编辑，那条的自动保存会把旧课题名写回去，需要把那页重开一下。
 - **恢复的边界**：按原 `id` 写回，`id` 被占报 409；`experiments.code` 是 UNIQUE，原号被占会自动改成 `<code>-恢复N`（响应里带真正用的 code）。附件行按原 id 写回，所以 `{文件行id}__文件名` 这套命名不用动。**恢复的列只能取快照里有的**（`cols.filter((k) => k in e)`）：新字段都走 `ensureColumn`，老快照缺 `sel_method` 这类 `NOT NULL DEFAULT ''` 的列，写显式 NULL 会撞 NOT NULL → 500，那条就永远恢复不了（曾经踩过：回收站里唯一一条一直恢复失败）。
 - **落点标识用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量实测），必须配①几何快照（否则让位后落点来回翻）②`flip.js` 的 FLIP（否则瞬移「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下的卡**（`opacity` 只影响绘制，0.07）。
 - **`.drag-ghost` 必须 `position: fixed !important`**（`.exp-card.cmp-card{position:relative}` 权重 0,2,0 会把它顶回 `relative`、跑到页面底部）；`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖那张还原，要再用 `.grid-card.is-dragging` 同权重压回 0.07。
