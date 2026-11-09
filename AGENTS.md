@@ -158,7 +158,7 @@
 - **溶剂是投料表的一行**（role=`溶剂`，「＋ 加溶剂」），`CondRow` 只剩温度/时间/气氛/装置/光照。老记录的 `fields.solvent` 由 `ensureSolventRow()` 补成表行；删光溶剂行时 `watch(solventFromTable)` 清字段。
 - 结果区（`ResultBlock`）：`.row-del` 清空整行；产率表头 `∅` 切「不计产率」（`experiments.no_yield`，粗品用）。新列走 `ensureColumn`。
 - Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
-- **Safari 拖不动**：元素被 WebKit 当成可原生拖拽（`-webkit-user-drag: element`）时，真鼠标一拖就起原生会话、`mousemove` 全被吞；`new MouseEvent()` 不会触发原生拖拽 → 测试全绿真机全死。规矩：`-webkit-user-drag: none`、别加 `draggable`、按住时拦 `dragstart`，验证只看 `data/drag-debug.log`（`CGEvent` 无权限模拟真鼠标）。
+- **Safari 拖不动**：元素被 WebKit 当成可原生拖拽（`-webkit-user-drag: element`）时，真鼠标一拖就起原生会话、`mousemove` 全被吞；`new MouseEvent()` 不会触发原生拖拽 → 测试全绿真机全死。规矩：`-webkit-user-drag: none`、别加 `draggable`、按住时拦 `dragstart`，验证只看 `data/drag-debug.log`。
 - **落点标识用「流内占位格」**（`.drop-gap` / `.list-drop-slot`，高度量实测），必须配①几何快照（否则让位后落点来回翻）②`flip.js` 的 FLIP（否则瞬移「咔」一下）。**铁律：拖动中绝不能隐藏 / `display:none` 掉按下的卡**（`opacity` 只影响绘制，0.07）。
 - **`.drag-ghost` 必须 `position: fixed !important`**（`.exp-card.cmp-card{position:relative}` 权重 0,2,0 会把它顶回 `relative`、跑到页面底部）；`.grid-page.is-dragging .grid-group.is-drop .grid-card{opacity:1}` 会把被拖那张还原，要再用 `.grid-card.is-dragging` 同权重压回 0.07。
 - **本机只有 Safari**：看版式/读值用 `.cache/` 里 `swiftc` 编的 WKWebView 小工具（`snap`、`evaljs`、`jssnap`），编译带 `-module-cache-path .cache/clang`；输入框读 `.value`。
