@@ -3,11 +3,12 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import { api } from '../api.js';
-import { store, loadBoot, loadCompounds, recordCategories, createCompound } from '../store.js';
+import { store, loadBoot, loadCompounds, recordCategories, createCompound, groupOf } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { openCtxMenu } from '../lib/ctxmenu.js';
 import { compoundMenu } from '../lib/rowmenu.js';
+import { COMPOUND_KINDS } from '../lib/ui.js';
 import { createPointerSort } from '../lib/pointdrag.js';
 import { withFlip } from '../lib/flip.js';
 
@@ -28,11 +29,31 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
 
 const cats = computed(() => recordCategories('compound'));
 
+/** 按类型分组：底物 / 中间体 / 产物 / 配体…本身就是「库」，不用用户再建一遍分类 */
+const kindMode = computed(() => groupOf('cmp') === 'kind');
+
 /** 分组跟着筛选走：筛了某类就只留那一组 */
 const groups = computed(() => {
   const all = store.compounds;
   const filter = store.compoundFilters.category;   // '' 全部 / 'none' 未分类 / id
   const out = [];
+
+  if (kindMode.value) {
+    // 类型的先后照 COMPOUND_KINDS 那条路线的顺序来；老数据里表外的值（「试剂」之类）排最后
+    const rank = (k) => {
+      const i = COMPOUND_KINDS.indexOf(k);
+      return i < 0 ? 99 : i;
+    };
+    const buckets = new Map();
+    for (const c of all) {
+      const k = String(c.kind || '').trim() || '未分类';
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k).push(c);
+    }
+    return [...buckets.keys()]
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'zh'))
+      .map((k) => ({ key: `k:${k}`, id: null, kind: k, name: k, project: '', items: buckets.get(k) }));
+  }
   for (const g of cats.value) {
     if (filter && filter !== String(g.id)) continue;
     out.push({
@@ -49,7 +70,9 @@ const groups = computed(() => {
   return out;
 });
 
-const showHeads = computed(() => !store.compoundFilters.category && groups.value.length > 1);
+const showHeads = computed(() =>
+  kindMode.value ? groups.value.length > 0 : !store.compoundFilters.category && groups.value.length > 1
+);
 
 /* ---- 拖卡片换分类 / 换位置 ----
    自己实现（`lib/pointdrag.js`）：卡片是 <button>，Safari 里原生 `draggable` 经常起不了拖。 */
@@ -77,6 +100,8 @@ const sorter = createPointerSort({
 });
 
 function onCardDown(ev, c) {
+  // 按类型看着的时候不给拖：拖进另一组其实是「改类型」，那是另一种语义，先不开
+  if (kindMode.value) return;
   // 不设「有分类才能拖」的门槛：未分类里也要能排顺序（下拉里还有「未分类」这一格）
   sorter.down(ev, c.id);
 }
@@ -168,7 +193,7 @@ function groupMenu(ev, g) {
         :data-drag-group="g.key"
         :data-drag-count="g.items.length"
       >
-        <div v-if="showHeads" class="grid-group-head" @contextmenu="groupMenu($event, g)">
+        <div v-if="showHeads" class="grid-group-head" @contextmenu="kindMode ? null : groupMenu($event, g)">
           <span class="grid-group-name">{{ g.name }}</span>
           <span class="grid-group-n">{{ g.items.length }}</span>
           <span v-if="!store.project && g.project" class="grid-group-proj">{{ g.project }}</span>
@@ -200,7 +225,7 @@ function groupMenu(ev, g) {
               class="grid-card"
               :class="{
                 'is-dragging': dragId === c.id,
-                'can-drag': true }"
+                'can-drag': !kindMode }"
               :aria-current="c.id === activeId() ? 'true' : 'false'"
               :data-drag-card="c.id"
               :data-drag-group="g.key"

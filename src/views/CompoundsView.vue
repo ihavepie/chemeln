@@ -6,7 +6,7 @@ import CmpListPane from '../components/CmpListPane.vue';
 import CmpGrid from '../components/CmpGrid.vue';
 import CmpTable from '../components/CmpTable.vue';
 import LabelBatchPanel from '../components/LabelBatchPanel.vue';
-import { store, viewOf, setView, createCompound, addCategory } from '../store.js';
+import { store, viewOf, setView, groupOf, setGroup, createCompound, addCategory } from '../store.js';
 import { prompt, toast } from '../lib/feedback.js';
 
 /**
@@ -17,6 +17,10 @@ const table = computed(() => viewOf('cmp') === 'table');
 const batchOpen = ref(false);
 
 const toggleView = () => setView('cmp', table.value ? 'card' : 'table');
+
+/** 卡片墙按什么分组：分类（自己建的分桶）还是类型（底物/中间体/产物/配体…本身就等于一个个库） */
+const kindMode = computed(() => groupOf('cmp') === 'kind');
+const toggleGroup = () => setGroup('cmp', kindMode.value ? 'cat' : 'kind');
 
 /** 卡片墙上直接建一个化合物分类：空分类会在墙上占一格，接着就能往里拖卡片 */
 async function newCategory() {
@@ -47,6 +51,14 @@ async function create() {
       <div class="grid-tools">
         <button class="btn btn-sm btn-ghost" :title="table ? '切成卡片墙' : '切成一行一条的表格'" @click="toggleView">
           <Icon name="grid" :size="12" /> {{ table ? '卡片视图' : '表格视图' }}
+        </button>
+        <button
+          v-if="!table"
+          class="btn btn-sm btn-ghost"
+          :title="kindMode ? '按分类分组（你自己建的桶）' : '按类型分组：底物 / 中间体 / 产物 / 配体 各成一组'"
+          @click="toggleGroup"
+        >
+          <Icon name="molecule" :size="12" /> {{ kindMode ? '按分类分组' : '按类型分组' }}
         </button>
         <button class="btn btn-sm btn-ghost" title="批量打印标签（当前列表里的化合物）" @click="batchOpen = true">
           <Icon name="qr" :size="12" /> 批量标签

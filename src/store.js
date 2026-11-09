@@ -28,6 +28,17 @@ const readViews = () => {
   }
 };
 
+/** 卡片墙按什么分组：'cat' 按分类（默认）/ 'kind' 按类型（化合物的底物/产物/配体…） */
+const GROUP_KEY = 'eln:group';
+const readGroups = () => {
+  try {
+    const v = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+};
+
 /** 一份全局状态：跟 v1 的 S 对象对应 */
 export const store = reactive({
   boot: null,
@@ -40,6 +51,7 @@ export const store = reactive({
   listTotal: 0,       // 符合筛选的全部条数（items 可能被服务端 LIMIT 截断）
   compoundTotal: 0,
   views: readViews(),   // { exp: 'card' | 'table', cmp: ... }
+  groups: readGroups(), // { cmp: 'cat' | 'kind' }：化合物墙按分类还是按类型分组
   /* 中栏列表「正在怎么看」的状态：哪些卡片堆展开着、滚到哪儿了。
      放全局而不是组件里——/list 和 /e/:id 是两个页面，点一条记录 ExpListPane 会整个重建，
      组件内的 ref 一重建就归零，表现出来就是「点一下组员或卡片，卡片堆自己收起了」。 */
@@ -54,6 +66,15 @@ export function setView(kind, mode) {
   store.views = { ...store.views, [kind]: mode === 'table' ? 'table' : 'card' };
   try {
     localStorage.setItem(VIEW_KEY, JSON.stringify(store.views));
+  } catch {}
+}
+
+export const groupOf = (kind) => (store.groups?.[kind] === 'kind' ? 'kind' : 'cat');
+
+export function setGroup(kind, mode) {
+  store.groups = { ...store.groups, [kind]: mode === 'kind' ? 'kind' : 'cat' };
+  try {
+    localStorage.setItem(GROUP_KEY, JSON.stringify(store.groups));
   } catch {}
 }
 

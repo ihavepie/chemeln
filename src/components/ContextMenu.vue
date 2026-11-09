@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { keepNativeMenu, openPageMenu } from '../lib/pagemenu.js';
 import Icon from './Icon.vue';
 import { closeCtxMenu, ctxMenu } from '../lib/ctxmenu.js';
 
@@ -82,6 +83,14 @@ function onContext(ev) {
   // 卡片自己会在 contextmenu 里重新打开菜单（那一次走冒泡），这里只管「别处」
   if (!el.value?.contains(ev.target)) closeCtxMenu();
 }
+
+/* 没被任何组件接管的右键（页面空白、纸面、表缝）：换成我们自己的菜单，别弹系统那个。
+   放在冒泡阶段——卡片/组头/列表行会先 preventDefault + stopPropagation，轮不到这里 */
+function onAnyContext(ev) {
+  if (ev.defaultPrevented) return;      // 已经有人接管
+  if (keepNativeMenu(ev)) return;       // 输入框 / 选中了字：留给系统（要复制粘贴）
+  openPageMenu(ev);
+}
 const onAway = () => closeCtxMenu();
 
 watch(
@@ -96,6 +105,7 @@ onMounted(() => {
   document.addEventListener('pointerdown', onPointerDown, true);
   document.addEventListener('keydown', onKey);
   document.addEventListener('contextmenu', onContext, true);
+  document.addEventListener('contextmenu', onAnyContext);
   window.addEventListener('scroll', onAway, true);
   window.addEventListener('resize', onAway);
   window.addEventListener('blur', onAway);
@@ -104,6 +114,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onPointerDown, true);
   document.removeEventListener('keydown', onKey);
   document.removeEventListener('contextmenu', onContext, true);
+  document.removeEventListener('contextmenu', onAnyContext);
   window.removeEventListener('scroll', onAway, true);
   window.removeEventListener('resize', onAway);
   window.removeEventListener('blur', onAway);
