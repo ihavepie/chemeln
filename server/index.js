@@ -2704,6 +2704,29 @@ function ensurePrintRenderer() {
   return printRendererPromise;
 }
 
+let shotRendererPromise = null;
+function ensureShotRenderer() {
+  if (shotRendererPromise) return shotRendererPromise;
+  shotRendererPromise = (async () => {
+    const bin = path.join(CACHE_DIR, 'shot-render');
+    if (fs.existsSync(bin)) return bin;
+    await fsp.mkdir(CACHE_DIR, { recursive: true });
+    await new Promise((resolve, reject) => {
+      const p = spawn('swiftc', ['-O', '-module-cache-path', path.join(CACHE_DIR, 'clang'),
+        path.join(__dirname, 'shot.swift'), '-o', bin], { stdio: ['ignore', 'ignore', 'pipe'] });
+      let err = '';
+      p.stderr.on('data', (d) => (err += String(d)));
+      p.on('error', () => reject(new Error('这台机器没有 swiftc，导不了长图')));
+      p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`长图渲染器编译失败：${err.trim().slice(0, 300)}`))));
+    });
+    return bin;
+  })().catch((e) => {
+    shotRendererPromise = null;
+    throw e;
+  });
+  return shotRendererPromise;
+}
+
 /* ---------------------------------------------------------------- 本地 OCR */
 
 let ocrRendererPromise = null;
@@ -2859,6 +2882,39 @@ route('POST', '/api/print/pdf', async (req, res) => {
     res.end(data);
   } catch (e) {
     fail(res, 500, e.message || 'PDF 生成失败');
+  } finally {
+    PRINT_TOKENS.delete(token);
+    fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+/** 整页长图：把记录页（不分页、不裁切）整张截下来，像截屏但保留原始清晰度 */
+route('POST', '/api/snapshot/png', async (req, res) => {
+  const body = await readJson(req);
+  const html = str(body.html);
+  if (!html || html.length > 8_000_000) return fail(res, 400, '没有可导出的内容');
+  const width = Math.min(2000, Math.max(480, Number(body.width) || 794));
+
+  const token = crypto.randomUUID();
+  const dir = path.join(os.tmpdir(), `eln-shot-${token}`);
+  PRINT_TOKENS.set(token, dir);
+  try {
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(path.join(dir, 'page1.html'), pageDoc(html, str(body.css)), 'utf8');
+    const url = `http://127.0.0.1:${PORT}/api/print/page/${token}/1`;
+    const bin = await ensureShotRenderer();
+    const out = path.join(dir, 'out.png');
+    await runPrint(bin, [out, String(width), url]);
+    const data = await fsp.readFile(out);
+    res.writeHead(200, {
+      'content-type': 'image/png',
+      'content-length': data.length,
+      'cache-control': 'no-store',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(str(body.filename) || '记录.png')}`,
+    });
+    res.end(data);
+  } catch (e) {
+    fail(res, 500, e.message || '长图生成失败');
   } finally {
     PRINT_TOKENS.delete(token);
     fsp.rm(dir, { recursive: true, force: true }).catch(() => {});

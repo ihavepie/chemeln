@@ -26,6 +26,7 @@ import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
 import { flattenTextareas } from '../lib/autogrow.js';
+import { exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
 import { canonicalSmiles } from '../lib/chem.js';
 import { composeSchemeSvg } from '../lib/scheme.js';
@@ -934,6 +935,25 @@ const exportAll = () => {
   const p = store.project ? `?project=${encodeURIComponent(store.project)}` : '';
   window.open(`/api/export/notebook.md${p}`, '_blank');
 };
+/** 「像截屏一样」的两种导出：整页长图 / 自包含网页（都不按 A4 分页，不会被裁） */
+async function snapshotPng() {
+  if (dirty.value) await flush();
+  try {
+    await exportSnapshotPng(exp.value.code || '记录');
+  } catch (e) {
+    toast(e.message || '长图导出失败', 'err');
+  }
+}
+
+async function snapshotHtml() {
+  if (dirty.value) await flush();
+  try {
+    await exportSnapshotHtml(exp.value.code || '记录');
+  } catch (e) {
+    toast(e.message || '导出失败', 'err');
+  }
+}
+
 /** 点 TLC 图 / 反应式看大图：走弹窗预览（要下载再在弹窗里下） */
 const preview = ref(null);
 const openAttachment = (id) => {
@@ -1006,6 +1026,8 @@ const openAttachment = (id) => {
             <button @click="qrModal = true; moreMenu = false"><Icon name="qr" :size="13" /> 二维码（手机端查看）</button>
             <button @click="exportOne(); moreMenu = false"><Icon name="download" :size="13" /> 导出本条实验</button>
             <button @click="exportAll(); moreMenu = false"><Icon name="download" :size="13" /> 导出整本记录</button>
+            <button @click="snapshotPng(); moreMenu = false"><Icon name="image" :size="13" /> 导出长图（PNG，不分页）</button>
+            <button @click="snapshotHtml(); moreMenu = false"><Icon name="file" :size="13" /> 导出单文件网页（.html）</button>
             <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制这条实验</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验（重复 / 改一个变量）</button>
             <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存入化合物库</button>
