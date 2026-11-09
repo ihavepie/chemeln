@@ -2445,7 +2445,49 @@ route('GET', '/api/groups', async (req, res, params, url) => {
     const meta = eg.get(h.id) || {};
     return { id: h.id, kind: meta.kind || '', title: meta.title || '', count: members.length, members };
   });
-  ok(res, { items, total: items.length });
+
+  /* 自动匹配：没进过平行组（group_id 为空）的记录，如果底物完全一样，就按「同一底物」归一堆。
+     没有这一步的话，只有手动点过「＋」的才会出现在对照表里，而多数人其实是各记各的。 */
+  // 「散着的」= 不在任何 ≥2 条的平行组里（含 group_id 空、以及只剩一条的孤儿组）
+  const grouped = new Set(heads.map((h) => h.id));
+  const loose = db
+    .prepare(
+      `SELECT id, group_id, code, date, status, yield_pct, dr_ee, ee_pct, no_yield, solvent, temperature,
+              duration, atmosphere, addition, product_name, project
+         FROM experiments e
+        WHERE 1 = 1 ${where}
+        ORDER BY id`
+    )
+    .all(...args)
+    .filter((m) => !grouped.has(m.group_id));
+  const sigOf = (id) => {
+    const rows = db
+      .prepare("SELECT name FROM reagents WHERE exp_id = ? AND role = '底物' AND trim(name) <> '' ORDER BY name")
+      .all(id)
+      .map((r) => r.name.trim().toLowerCase());
+    return rows.length ? rows.join(' + ') : '';
+  };
+  const looseFull = loose.map((m) => ({ ...m, reagents: db.prepare(reagentSql).all(m.id) }));
+  const buckets = new Map();
+  for (const m of looseFull) {
+    const sig = sigOf(m.id);
+    if (!sig) continue;                     // 底物都没填，自动匹配不了
+    if (!buckets.has(sig)) buckets.set(sig, []);
+    buckets.get(sig).push(m);
+  }
+  const auto = [...buckets.entries()]
+    .filter(([, ms]) => ms.length > 1)
+    .map(([sig, ms]) => ({
+      id: `auto:${sig}`,
+      kind: 'auto',
+      title: '',
+      subject: ms[0].reagents.find((r) => r.role === '底物')?.name || sig,
+      count: ms.length,
+      members: ms,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  ok(res, { items, auto, total: items.length });
 });
 
 /* --- screenings --- */

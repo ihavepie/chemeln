@@ -5,7 +5,6 @@ import EmptyEditor from './views/EmptyEditor.vue';
 import CompoundsView from './views/CompoundsView.vue';
 import CompoundDetail from './views/CompoundDetail.vue';
 import ScreeningsView from './views/ScreeningsView.vue';
-import ScreeningView from './views/ScreeningView.vue';
 import SettingsView from './views/SettingsView.vue';
 import TrashView from './views/TrashView.vue';
 import MobileHome from './components/MobileHome.vue';
@@ -28,12 +27,6 @@ export const router = createRouter({
       props: (route) => ({ compoundId: route.params.id }),
     },
     { path: '/screenings', name: 'screenings', component: ScreeningsView },
-    {
-      path: '/s/:id',
-      name: 'screening',
-      component: ScreeningView,
-      props: (route) => ({ screeningId: route.params.id }),
-    },
     { path: '/trash', name: 'trash', component: TrashView },
     { path: '/settings', name: 'settings', component: SettingsView },
     { path: '/:pathMatch(.*)*', redirect: '/' },

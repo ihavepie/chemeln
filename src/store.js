@@ -180,10 +180,6 @@ export async function loadCompounds() {
   return store.compounds;
 }
 
-export async function loadScreenings() {
-  store.screenings = await api.screenings();
-  return store.screenings;
-}
 
 /**
  * 新建一个分类（scope: 'experiment' | 'compound'）。

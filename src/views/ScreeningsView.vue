@@ -16,16 +16,20 @@ import { compareMembers, memberDiffs } from '../lib/matrix.js';
 const router = useRouter();
 
 const groups = ref([]);
+const autos = ref([]);
 const loading = ref(true);
+
+const prep = (g) => {
+  const rows = compareMembers(g.members);
+  return { ...g, rows, diffs: memberDiffs(g.members, rows) };
+};
 
 async function load() {
   loading.value = true;
   try {
     const d = await api.groups(store.project);
-    groups.value = (d.items || []).map((g) => {
-      const rows = compareMembers(g.members);
-      return { ...g, rows, diffs: memberDiffs(g.members, rows) };
-    });
+    groups.value = (d.items || []).map(prep);
+    autos.value = (d.auto || []).map(prep);
   } finally {
     loading.value = false;
   }
@@ -54,7 +58,7 @@ const SECTION = { cond: '条件', reagent: '投料', result: '结果' };
       </header>
 
       <div v-if="loading" class="empty-note">正在整理…</div>
-      <div v-else-if="!groups.length" class="empty-note">
+      <div v-else-if="!groups.length && !autos.length" class="empty-note">
         还没有平行实验。到某条记录里点左侧「＋」，从它再建一条（改温度 / 换溶剂 / 重复一次都算），这里就会出现一张对照表。
       </div>
 
@@ -108,6 +112,64 @@ const SECTION = { cond: '条件', reagent: '投料', result: '结果' };
               </template>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section v-if="autos.length" class="mx-auto">
+        <h2 class="mx-auto-head">自动匹配 · 同一底物</h2>
+        <p class="mx-blank">
+          这几摞没点过「＋」成组，但底物完全一样，就当一摞给你摊开了。想把它们收成正式的一摞，在记录页点左侧「＋」再建一条就行。
+        </p>
+        <div v-for="g in autos" :key="g.id" class="mx-group">
+          <div class="mx-head">
+            <b>{{ g.subject }}</b>
+            <span class="mx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>
+            <span class="spacer" />
+            <button class="btn btn-sm btn-ghost" @click="open(g.members[0])">
+              <Icon name="file" :size="12" /> 打开基准
+            </button>
+          </div>
+          <p v-if="!g.rows.some((r) => r.section !== 'result')" class="mx-blank">
+            这几条的条件和投料都还没填，先在记录页补上，这里就有得比了。
+          </p>
+          <div v-else class="scope-wrap">
+            <table class="mx-table">
+              <thead>
+                <tr>
+                  <th class="mx-rowhead">条件项</th>
+                  <th v-for="(m, i) in g.members" :key="m.id" class="mx-col" :class="{ 'is-base': i === 0 }">
+                    <button type="button" class="linklike mono" @click="open(m)">{{ m.code }}</button>
+                    <span
+                      class="mx-tag"
+                      :class="g.diffs[i].base ? 'is-base' : g.diffs[i].labels.length ? 'is-diff' : ''"
+                    >
+                      {{ diffText(g.diffs[i]) }}
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <template v-for="(row, ri) in g.rows" :key="row.key">
+                  <tr v-if="!ri || g.rows[ri - 1].section !== row.section" class="mx-sep">
+                    <td :colspan="g.members.length + 1">{{ SECTION[row.section] }}</td>
+                  </tr>
+                  <tr>
+                    <th class="mx-rowhead" :class="{ 'is-role': row.section === 'reagent' }">
+                      <span v-if="row.role" class="mx-role">{{ row.role }}</span>{{ row.label }}
+                    </th>
+                    <td
+                      v-for="(c, i) in row.cells"
+                      :key="i"
+                      class="mono"
+                      :class="{ 'is-diff': row.diff && i > 0 && c !== row.cells[0], 'is-empty': !c }"
+                    >
+                      {{ c || '—' }}
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </div>
