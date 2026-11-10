@@ -91,7 +91,7 @@
 - `src/lib/sheetprefs.js` — 「记录页显示哪几块」的前端偏好（`sheetPrefs` / `setSheetPref` / `showAllSheetBlocks` / `SHEET_BLOCKS`，存 localStorage `eln:sheet`，默认全开）；`EditorView` 用 `v-if` 挂着，关掉的块页面和打印都没有。
 - `src/lib/peek.js` — 「书签悬停预览显示哪些块」的前端偏好（`peekPrefs` / `setPeekPref` / `PEEK_LABELS`，存 localStorage `eln:peek`；默认条件 / 底物 / 结果 / 结论开，备注关）。
 - `src/lib/expScheme.js` — **一条记录的「标准条件」**：`schemeParts(model, compounds)` 把投料表 + 结果块拆成反应式要的几条（反应物 / 产物 SMILES、箭头上下的字，规则跟记录页原来那段一样），`standardLine(exp)` 写成一行字（`环丁酮甲酯，LDA (2 eq)，THF，-78 °C，8 h → 苯基化产物`）。记录页「按投料表生成」和筛选表共用这一份，两个页面的箭头文字才不会各写一套。找化合物**先按 `compound_id`、再按名字**（抹掉空格括号后比对，重名不认）。
-- `src/lib/sctfields.js` — 筛选表的字段来源：`SOURCES`（自动列的选项，第一个是 `variation`「相对标准条件改了什么」）、`DEFAULT_FIELDS`（新建表默认 相对标准条件 / 产率 / 选择性，照文献优化表）、`variations(base, cur)`（按「A 代替 B / 加 / 去掉」算相对基准的改动，基准 = 第一行）、`autoValue(source, exp)`（按 source 取记录里的值，投料那格拼「名 + eq」）。**`tlc_rf` 不在 experiments 表里**（只有 `tlc_note`），写 SQL 取它必 500，踩过。
+- `src/lib/sctfields.js` — 筛选表的字段来源：`SOURCES`（自动列的选项，第一个是 `variation`「相对标准条件改了什么」）、`DEFAULT_FIELDS`（新建表默认 相对标准条件 / 产率 / 选择性，照文献优化表）、`variations(base, cur)`（**只写「变成什么」**：`-40 °C` / `底物 X` / `DCM` / `+ HFIP 2 eq` / `− PPh3` / `LDA 1.2 eq`；溶剂以投料行为准，基准 = 第一行）、`autoValue(source, exp)`（按 source 取记录里的值，投料那格拼「名 + eq」）。**`tlc_rf` 不在 experiments 表里**（只有 `tlc_note`），写 SQL 取它必 500，踩过。
 - `src/lib/colresize.js` — `useColResize(name, defaults)`：表格视图表头拖拽改列宽。**拖出来的增量在「这一列」和「它旁边那列」之间搬**（最后一列吃左边那列），所以所有列宽度和不变、整张表不跳；内部按 px 记、`colStyle()` 渲染成百分比（px 会顶出横向滚动条）。宽度存 `eln:colw:<表名>`；只吃 mouse 事件（WebKit 里表格上的 pointer 事件常被拖选文字吞掉）。拖动中 `body` 挂 `is-col-resizing`（整页 col-resize 光标）。
 - `src/lib/pagemenu.js` — **空白处右键的页面菜单**：`openPageMenu()` 的第一项是**刷新当前列表**，然后四个导航页，**「新建…」收进子菜单放最底下**（右键十次有九次是想刷新，新建顶着最上面太容易点错——用户报过）；`keepNativeMenu()` 判断这一下要不要让给系统（输入框、文本域、`contenteditable`、**选中了文字** → 让给系统，否则「复制粘贴」就没了）。挂在 `ContextMenu.vue` 的**冒泡**阶段 `document` contextmenu 上——卡片 / 组头 / 列表行自己会 `preventDefault + stopPropagation`，轮不到它，所以两者的菜单不会打架。
 - `src/lib/feedback.js` — `toast` / `confirm` / `prompt`（Element Plus 封装）。
@@ -121,7 +121,7 @@
 ## 6. 当前进度
 
 > 更早的轮次记录（同一套写法，逐字搬走、没删内容）在 **`HISTORY.md`**；这个文件有 **64 KB 注入上限**，所以最近几轮留在下面，再早的按顺序往下搬。加新内容前先看看体积。
-- **本轮（筛选表照文献重排 + 书签预览卡，`try/record-kind` 上）**：三线表照用户贴的 `Table 1` 改成 Times 衬线、细顶线 + 粗中线/底线、数字右对齐、去掉基准行底色、标题粗斜体 + 上标 `[a]/[b]` 脚注；**宽度默认按内容宽**、右边一道竖线可拖宽（双击自适应，存 `eln:sct:w`）；反应式居中到表格宽度里。**平行书签的悬停预览卡**改成 DSH 那个 turn 预览的样子：无边框、圆角 10、柔和投影，**一行粗体提要 + 最多三行灰字摘要**。细节见 `HISTORY.md` 的「2026-11 · 筛选表照文献重排」。**别改回无衬线 / 等宽 / 满页宽、也别把预览卡拆回带标签的小行**。
+- **本轮（筛选表照文献重排 + 书签预览卡 + 条件列化简，`try/record-kind` 上）**：三线表照用户贴的 `Table 1`（Times 衬线、细顶线 + 粗中线/底线、标题粗斜体）；**宽度按内容宽**、右边竖线可拖（双击自适应，存 `eln:sct:w`）；反应式居中到表格宽度里；书签悬停预览卡照 DSH 的 turn 预览（无边框、圆角 10、一行粗体提要 + 三行灰字）；「相对标准条件」格**只写变成什么**（`-40 °C` / `底物 X` / `+ 试剂` / `− 试剂`），不再写「A 代替 B」，服务端 `diffItems` 同修「溶剂 空」假差异。细节见 HISTORY 同名节。**别改回无衬线 / 等宽 / 满页宽、别把预览卡拆回带标签的小行、别写回「A 代替 B」。**
 - **上一轮（试验分支 `try/record-kind`，`main` 停在 6e229d3，回退 = `git checkout main`）**：记录「类型」+ `exp_groups` 分组 + 分类管理挂卡片组头右键 + 条件筛选页读记录清单 + 筛选表上方的标准条件反应式；明细见 `HISTORY.md` 的「2026-11 · 记录类型与分组」。
 - **已完成**：v2 全功能已构建进 `public/`（4780 跑的就是 v2）；逐项清单在 `HISTORY.md`。
 - **半成品 / 待确认**：「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。

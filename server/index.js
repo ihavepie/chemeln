@@ -1940,13 +1940,21 @@ function reagentMap(expId) {
   return out;
 }
 
+/** 溶剂现在就是投料表里 role=溶剂 的一行，`experiments.solvent` 是老字段：
+ *  有投料行时一律以投料行为准——不然老字段和投料行各说一遍，
+ *  会冒出「溶剂 空」这种假差异（记录里 THF 一直没动也会被标成改了溶剂）。 */
+const mapHasSolventRow = (m) => [...m.keys()].some((k) => k.startsWith('溶剂:'));
+
 /** 一条记录相对基准改了什么：条件字段 + 投料表（加减试剂 / 改当量）。返回 ['温度 -40 °C', 'LDA 1.2 eq'] */
 function diffItems(baseRow, baseMap, row, map) {
   const out = [];
+  const solventInTable = mapHasSolventRow(baseMap) || mapHasSolventRow(map);
   for (const [key, label] of DIFF_FIELDS) {
+    if (key === 'solvent' && solventInTable) continue;
     const a = str(baseRow[key]).trim();
     const b = str(row[key]).trim();
-    if (a !== b) out.push(`${label} ${b || '空'}`);
+    if (a === b) continue;
+    out.push(key === 'solvent' && !b ? '无溶剂' : `${label} ${b || '空'}`);
   }
   for (const [key, eq] of map) {
     const [role, name] = key.split(':');

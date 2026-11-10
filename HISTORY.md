@@ -128,3 +128,9 @@
   `-webkit-line-clamp: 3`）= 状态 · 条件 · 底物→产物 · 结果 · 结论 · 备注（按设置页 05 的开关拼，`·` 分隔）。
   箭头 `::after` 去掉了描边（卡片没有边框了），只剩一块同色小方块。旧的 `.peek-head/.peek-flag/.peek-metrics/
   .peek-row/.peek-note/.peek-foot` 全删了，`.pgroup-peek-title` / `.pgroup-peek-line` 两段 v1 残留也删了。
+
+  **「相对标准条件」列化简**（同轮）：`variations()` 只写「变成什么」，基准值不再逐条重复——
+  条件改值 `-40 °C`；换底物 `底物 环戊酮乙酯`（换试剂 / 换溶剂就写新名字）；加试剂 `+ HFIP 2 eq`；
+  去试剂 `− PPh3`；只改当量 `LDA 1.2 eq`。**溶剂以投料表 role=溶剂 那一行为准**（`solvent` 字段只是老壳），
+  不然「溶剂 空」和投料行的溶剂变化会各说一遍（用户截图里 TT-2 被标了「去掉溶剂（原 THF）」其实没动）。
+  服务端 `diffItems` 同样跳过投料行已经覆盖的 `solvent` 字段。

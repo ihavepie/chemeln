@@ -70,12 +70,15 @@ export function autoValue(source, exp, base) {
 }
 
 /* ---- 相对标准条件改了什么 ----
-   文献里的优化表都有一列「Variations from the standard conditions」，
-   写成 `105 °C instead of 110 °C` / `without HFIP` / `P(Cy)3 instead of DTMBPP`。
-   这里按同样口径从记录里算出来（基准 = 第一行）：改值写「A 代替 B」，加减试剂写「加 / 去掉」。 */
+   文献里的优化表都有一列「Variations from the standard conditions」，只写**变成了什么**
+   （`at 115 °C` / `in THF` / `without HFIP`）——基准值已经写在表格上方的「标准条件」里，
+   每条再重复一遍「A 代替 B」会把格子撑成两行（用户嫌长）。所以：
+     条件改值 → 新值（`-40 °C`）；去掉 → `无溶剂`
+     换试剂 / 换溶剂 / 换底物 → 只写新名字（底物加个「底物」前缀，免得看着像试剂）
+     加试剂 → `+ HFIP 2 eq`；去试剂 → `− PPh3`；只改当量 → `LDA 1.2 eq`
+   别再回到 `A 代替 B` / `去掉溶剂（原 THF）` 那种写法。 */
 const COND_LABEL = {
   temperature: '温度',
-  solvent: '溶剂',
   duration: '时间',
   atmosphere: '气氛',
   addition: '加料',
@@ -86,54 +89,64 @@ const reagentMapOf = (exp) =>
 
 const eqText = (v) => (v === null || v === undefined || v === '' ? '' : `${v} eq`);
 
+/** 溶剂现在就是投料表里 role=溶剂 的一行，`solvent` 字段只是老记录留下的壳。
+ *  有投料行时一律以投料行为准，否则同一件事会在格子里写两遍（踩过）。 */
+const hasSolventRow = (e) => (e?.reagents || []).some((r) => r.role === '溶剂' && String(r.name || '').trim());
+
 export function variations(base, cur) {
   if (!base || !cur) return [];
   const out = [];
+  const push = (v) => {
+    const t = String(v ?? '').trim();
+    if (t && !out.includes(t)) out.push(t);
+  };
+
   for (const [key, label] of Object.entries(COND_LABEL)) {
     const a = String(base[key] ?? '').trim();
     const b = String(cur[key] ?? '').trim();
     if (a === b) continue;
-    if (!a) out.push(`加${label} ${b}`);
-    else if (!b) out.push(`去掉${label}（原 ${a}）`);
-    else out.push(`${b} 代替 ${a}`);
+    push(b || `无${label}`);
   }
+  // 老记录（溶剂还不是投料行的时候）才看字段
+  if (!hasSolventRow(base) && !hasSolventRow(cur)) {
+    const a = String(base.solvent ?? '').trim();
+    const b = String(cur.solvent ?? '').trim();
+    if (a !== b) push(b || '无溶剂');
+  }
+
   const bm = reagentMapOf(base);
   const cm = reagentMapOf(cur);
   const nameOf = (k) => k.split(':')[1];
+  const roleOf = (k) => k.split(':')[0];
   const added = [...cm.keys()].filter((k) => !bm.has(k));
   const removed = [...bm.keys()].filter((k) => !cm.has(k));
+  const usedAdd = new Set();
+  const usedDel = new Set();
 
-  // 一进一出、而且**角色相同**（配体换配体、催化剂换催化剂）就写成「B 代替 A」，
-  // 跟文献里的 `P(Cy)3 instead of DTMBPP` 一个意思；对不上才写「加 / 去掉」。
-  const takenDel = new Set();
+  // 一进一出、角色相同（配体换配体、底物换底物）→ 只写换成什么；当量也变了才带 eq
   for (const a of added) {
-    const role = a.split(':')[0];
-    const d = removed.find((k) => !takenDel.has(k) && k.split(':')[0] === role);
+    const d = removed.find((k) => !usedDel.has(k) && roleOf(k) === roleOf(a));
     if (!d) continue;
-    takenDel.add(d);
-    const eqA = cm.get(a);
-    const eqD = bm.get(d);
-    // 当量一样就只写名字（文献里 `P(Cy)3 instead of DTMBPP` 那样），不一样才把 eq 带上
-    const sameEq = String(eqText(eqA)) === String(eqText(eqD));
-    const left = sameEq ? nameOf(a) : [nameOf(a), eqText(eqA)].filter(Boolean).join(' ');
-    const right = sameEq ? nameOf(d) : [nameOf(d), eqText(eqD)].filter(Boolean).join(' ');
-    out.push(`${left} 代替 ${right}`);
+    usedAdd.add(a);
+    usedDel.add(d);
+    const eqA = eqText(cm.get(a));
+    const same = eqA === eqText(bm.get(d));
+    const name = same ? nameOf(a) : [nameOf(a), eqA].filter(Boolean).join(' ');
+    push(roleOf(a) === '底物' ? `底物 ${name}` : name);
   }
   for (const a of added) {
-    if (out.some((x) => x.includes(`代替`) && x.startsWith(nameOf(a)))) continue;
-    out.push(`加 ${nameOf(a)}${eqText(cm.get(a)) ? ` ${eqText(cm.get(a))}` : ''}`);
+    if (usedAdd.has(a)) continue;
+    const eq = eqText(cm.get(a));
+    push(`+ ${nameOf(a)}${eq ? ` ${eq}` : ''}`);
   }
   for (const d of removed) {
-    if (takenDel.has(d)) continue;
-    if (out.some((x) => x.includes(`代替 ${nameOf(d)}`))) continue;
-    out.push(`去掉 ${nameOf(d)}`);
+    if (usedDel.has(d)) continue;
+    push(`− ${nameOf(d)}`);
   }
-  // 同一个试剂只改了当量
+  // 同一个试剂只改了当量：只写新当量
   for (const [k, eq] of cm) {
     if (!bm.has(k)) continue;
-    if (String(bm.get(k) ?? '') !== String(eq ?? '')) {
-      out.push(`${nameOf(k)} ${eqText(eq) || '—'} 代替 ${eqText(bm.get(k)) || '—'}`);
-    }
+    if (String(bm.get(k) ?? '') !== String(eq ?? '')) push(`${nameOf(k)} ${eqText(eq) || '—'}`);
   }
   return out;
 }
