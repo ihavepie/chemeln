@@ -224,12 +224,20 @@ const sum = computed(() => totals(rows.value));
 /** 体系总体积 → 建议的瓶 / 磁子 / 转速（只是提示） */
 const vessel = computed(() => vesselHint({ liquidUl: sum.value.liquidUl, solventUl: sum.value.solventUl }));
 
-// 每一组里「溶剂」永远排在最后一行（表里 Sub / Cat / … / Sol 这样读着顺）。
+// 每一组里按「相态」排：固体 → 液体 → 溶剂（称量时先称固体、最后量溶剂，跟实验台上的顺序一致）。
+// 相态按行的数据判：有浓度 / 体积的是液体，只有质量的是固体。
 // filter 出来的是新数组，排序不动 model.rows 本身（存盘顺序不变）。
+const phaseRank = (r) => {
+  if (isSolvent(r)) return 3;
+  const kind = rowKind(r);
+  if (kind === 'liquid') return 2;
+  if (kind === 'solid') return 1;
+  return 1; // 还没填的按固体排（一般是要称的）
+};
 const rowsOf = (i) =>
   rows.value
     .filter((r) => r.step === i + 1)
-    .sort((a, b) => Number(isSolvent(a)) - Number(isSolvent(b)));
+    .sort((a, b) => phaseRank(a) - phaseRank(b));
 
 /** 组分这一列直接显示英文缩写（数据里存的仍是中文，颜色/统计都按中文走） */
 const roleLabel = (r) => ROLE_EN[r.role] || r.role || '';
