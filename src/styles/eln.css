@@ -5765,7 +5765,7 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   z-index: 45;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   align-items: flex-end;
   transform: translateX(-100%);
 }
@@ -5779,63 +5779,35 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   user-select: none;
 }
 
-/* 一枚书签：右边贴着纸（无边框、直角），左边露在外面（圆角 + 一点投影）。
-   以前左边缘还有一道 2px 的「折边」，当前这条是强调色的红条——用户说不要红色条，
-   整道折边都去掉了，只靠底色 / 宽度 / 投影 / 编号颜色区分「抽出来的这条」。 */
+/* 一枚书签 = 一根**小短杠**（照 DSH 的 turn 导航那排 mark）：
+   12~22px 宽、2px 高、圆角，右侧贴着纸面对齐；不用卡片、不写字。
+   当前这条最宽最黑，悬停放大一档；编号什么的挪进原生 title / 悬停预览卡里。 */
 .pgroup-tab,
 .pgroup-add {
   position: relative;
-  display: block;
-  width: 84px;
-  padding: 6px 9px;
-  text-align: left;
-  background: #f9f7f0;
-  border: 1px solid #e9e4d7;
-  border-right: none;
-  border-radius: 8px 0 0 8px;
-  overflow: hidden;
-  /* 右边缘一道很淡的内阴影：书签像被「塞进」纸里，而不是浮在旁边 */
-  box-shadow: inset -8px 0 10px -10px rgba(20, 18, 14, 0.16);
-  color: var(--ink-3);
-  cursor: pointer;
-  font-family: var(--mono);
-  transition: background 0.12s, color 0.12s, width 0.12s, box-shadow 0.12s, border-color 0.12s;
-}
-
-.pgroup-tab:hover {
-  background: #fffef9;
-  border-color: #ded7c6;
-  color: var(--ink-2);
-}
-
-/* 编号、产率一行两端对齐，换行也不会错位 */
-/* 一行放编号，产率 / 状态另起一行贴左（书签就窄了，不再是一条长横杠） */
-.pgroup-row {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 10px;
-  line-height: 1.4;
-  letter-spacing: 0.02em;
+  align-items: center;
+  justify-content: flex-end;
+  width: 22px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
 }
-
-.pgroup-code { color: inherit; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.pgroup-meta {
-  display: block; margin: 2px 0 0 11px; font-size: 9px; line-height: 1.3; color: var(--ink-4);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.pgroup-tab::before {
+  content: '';
+  display: block;
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: #ddd7c6;
+  transition: width 0.14s, background 0.14s;
 }
-
-/* 当前这条：像被抽出来的一枚——纸白、宽一点、投影深一档、编号和右侧数值都用强调色 */
-.pgroup-tab.is-on {
-  width: 92px;
-  background: var(--paper);
-  border-color: var(--line-2);
-  color: var(--accent-ink);
-  box-shadow:
-    inset -8px 0 10px -10px rgba(20, 18, 14, 0.14),
-    -3px 2px 8px rgba(20, 18, 14, 0.09);
-}
-.pgroup-tab.is-on .pgroup-meta { color: var(--accent-ink); opacity: 0.8; }
+.pgroup-tab:hover::before { width: 20px; background: var(--ink-4); }
+/* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数） */
+.pgroup-tab.is-on::before { width: 22px; background: var(--ink); }
 
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
 /* 书签悬停预览卡：照 DSH 那个 turn 预览的样子——无边框、圆角 10、只有一层柔和投影，
@@ -5866,21 +5838,15 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 
 .pgroup-add {
-  width: 30px;
-  padding: 4px 0;
-  text-align: center;
+  justify-content: flex-end;
   font-size: 11px;
+  line-height: 1;
   color: var(--ink-4);
-  border-radius: 7px 0 0 7px;
+  padding-right: 3px;
 }
-.pgroup-add:hover { background: #fffdf6; color: var(--accent-ink); }
+.pgroup-add:hover { color: var(--accent-ink); }
 
-/* 窄一点的窗口：纸面两侧没地方，收窄一档；再窄就整排收起（入口在 ⋯ 菜单） */
-@media (max-width: 1280px) {
-  .pgroup-tab { width: 78px; }
-  .pgroup-tab.is-on { width: 86px; }
-}
-
+/* 窄一点的窗口：整排收起（入口在 ⋯ 菜单） */
 @media (max-width: 1100px) {
   .pgroup { display: none; }
 }
@@ -6046,10 +6012,6 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .stack-dot.tone-info, .pgroup-dot.tone-info { background: var(--info); }
 .stack-dot.tone-bad, .pgroup-dot.tone-bad { background: var(--bad); }
 .stack-dot.tone-accent, .pgroup-dot.tone-accent { background: var(--accent); }
-
-/* 书签那一行：号码 + 状态点 + 产率，三点对齐 */
-.pgroup-row { align-items: center; }
-.pgroup-dot { flex: 0 0 auto; margin-right: 0; }
 
 /* 小签里的三段（编号 / 状态 / 产率）用间距隔开，不靠空格，免得被模板吃掉 */
 .stack-chip .chip-code { margin-left: 2px; }

@@ -1187,17 +1187,11 @@ const openAttachment = (id) => {
               type="button"
               class="pgroup-tab"
               :class="{ 'is-on': String(s.id) === String(exp.id) }"
-              :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
+              :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}${sibLine(s) ? ` · ${sibLine(s)}` : ''}`"
               @mouseenter="showPeek(s, $event)"
               @mouseleave="hidePeek()"
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
-            >
-              <span class="pgroup-row">
-                <i class="pgroup-dot" :class="`tone-${STATUS_TONE[s.status] || 'plain'}`" />
-                <span class="pgroup-code">{{ s.code }}</span>
-              </span>
-              <span class="pgroup-meta">{{ sibLine(s) }}</span>
-            </button>
+            />
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
           </nav>
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
