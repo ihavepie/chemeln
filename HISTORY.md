@@ -139,3 +139,8 @@
   `.panes { grid-template-columns: var(--listw, var(--panes-w)) 1fr }`；命中区 14px 骑在边线上（`left: var(--listw)`、`margin-left: -7px`），
   平时透明、hover / 拖动才有 2px 强调色线；`min 236` / `max = min(620, 窗口宽 × 0.42)`；双击清 localStorage 回默认。
   跟 `lib/colresize.js` 一样只吃 mouse 事件，拖动时 body 挂 `is-pane-resizing`。
+
+  **表头改英文（同轮）**：筛选表是照论文里的优化表做的，所以标题 `Table N.`、表头 `Entry / Code / Variations from the
+  standard conditions / Yield [%] / Selectivity [%]`、基准行 `none`（没改动记 `same`）、脚注 `[a]`/`[b]` 全走英文口径
+  （`ScreeningTable` 里 `EN_LABEL` 映射 `source → 英文名`；用户自己命名的「手动」列保留原名，徽标写 `manual`）。
+  列表页块头也跟着写 `Table N`。

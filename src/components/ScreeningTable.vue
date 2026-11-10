@@ -24,6 +24,26 @@ const props = defineProps({
 const emit = defineEmits(['open', 'change', 'rename-field', 'remove-field', 'remove-row']);
 
 const fields = computed(() => (Array.isArray(props.screening?.vars) ? props.screening.vars : []));
+// 表头照文献用英文（这张表本来就照论文里的优化表做）；用户自己命名的「手动」列才保留原名
+const EN_LABEL = {
+  variation: 'Variations from the standard conditions',
+  temperature: 'Temperature',
+  solvent: 'Solvent',
+  duration: 'Time',
+  atmosphere: 'Atmosphere',
+  addition: 'Additive',
+  reagent: 'Reagents',
+  yield: 'Yield',
+  sel: 'Selectivity',
+  product: 'Product',
+  substrates: 'Substrate',
+  appearance: 'Appearance',
+  tlc_note: 'TLC',
+  conclusion: 'Conclusion',
+  notes: 'Notes',
+  date: 'Date',
+};
+const labelOf = (f) => EN_LABEL[f.source] || f.label;
 const isManual = (f) => !f.source || f.source === 'manual';
 // 文献表的表头带单位（`Yield (%)`）；只有明确是百分比的来源才标，别的列不猜
 const unitOf = (f) => (f.source === 'yield' || f.source === 'sel' ? '%' : '');
@@ -103,7 +123,7 @@ const cell = (f, r) => {
 <template>
   <div class="scope-wrap sct-plain">
     <p v-if="index || caption" class="sct-cap">
-      <span v-if="index" class="sct-cap-no">表 {{ index }}：</span><span v-if="caption" class="sct-cap-ti">{{ caption }}</span><sup
+      <span v-if="index" class="sct-cap-no">Table {{ index }}.</span><span v-if="caption" class="sct-cap-ti">{{ caption }}</span><sup
         v-if="hasStd"
         class="sct-cap-fn"
       >[a]</sup>
@@ -118,18 +138,18 @@ const cell = (f, r) => {
       <!-- 反应式居中压在表格上方，条件那行字居中跟在它下面（文献里压在箭头下面的那行） -->
       <div v-if="scheme" class="sct-std">
         <div class="sct-std-scheme" v-html="scheme" />
-        <p v-if="standard" class="sct-std-line"><span class="sct-std-lbl">标准条件：</span>{{ standard }}</p>
+        <p v-if="standard" class="sct-std-line"><span class="sct-std-lbl">Standard conditions:</span>{{ standard }}</p>
       </div>
       <!-- 画不出结构时只有一行字：不套卡片（一行字的白盒子看着像半个按钮），就压在表顶上 -->
       <p v-else-if="standard" class="sct-std-line sct-std-line--bare">
-        <span class="sct-std-lbl">标准条件：</span>{{ standard }}
+        <span class="sct-std-lbl">Standard conditions:</span>{{ standard }}
       </p>
       <div class="sct-tbwrap">
         <table class="sct-table">
           <thead>
             <tr>
               <th class="sct-c-entry">Entry</th>
-              <th class="sct-c-fix">实验编号</th>
+              <th class="sct-c-fix">Code</th>
               <th
                 v-for="f in fields"
                 :key="f.key"
@@ -138,12 +158,12 @@ const cell = (f, r) => {
               >
                 <div class="sct-th">
                   <span class="sct-th-label">
-                    {{ f.label }}<template v-if="unitOf(f)"> [{{ unitOf(f) }}]</template><sup
+                    {{ labelOf(f) }}<template v-if="unitOf(f)"> [{{ unitOf(f) }}]</template><sup
                       v-if="unitOf(f)"
                       class="sct-th-fn"
                     >[b]</sup>
                   </span>
-                  <span v-if="isManual(f)" class="sct-th-src">手动</span>
+                  <span v-if="isManual(f)" class="sct-th-src">manual</span>
                   <span v-if="editable" class="sct-th-acts">
                     <button class="sct-var-x" title="改名" @click="emit('rename-field', f)">改</button>
                     <button class="sct-var-x is-del" title="删这一列" @click="emit('remove-field', f)">×</button>
@@ -199,8 +219,8 @@ const cell = (f, r) => {
     </div>
     <!-- 文献表下面那行小字脚注：上标字母 + 小字，锚点跟标题的 [a]、表头的 [b] 对上 -->
     <p class="sct-note">
-      <span v-if="hasStd" class="sct-note-item"><sup>[a]</sup>标准条件见上方反应式；「相对标准条件」列只写相对基准改动的部分。</span>
-      <span v-if="hasUnit" class="sct-note-item"><sup>[b]</sup>产率 / 选择性取自记录里填的值，未填记作「—」。</span>
+      <span v-if="hasStd" class="sct-note-item"><sup>[a]</sup>Standard conditions are shown above; the variations column lists only what differs from them.</span>
+      <span v-if="hasUnit" class="sct-note-item"><sup>[b]</sup>Yields and selectivities are taken from the record entries.</span>
     </p>
   </div>
 </template>

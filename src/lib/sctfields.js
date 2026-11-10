@@ -48,10 +48,11 @@ export const reagentText = (exp) =>
 /** 自动列在某一行的值 */
 export function autoValue(source, exp, base) {
   if (!exp) return '';
+  // 这一格是照文献表写的（`none` = 基准那条，`same` = 条件没动），表里全是英文口径
   if (source === 'variation') {
-    if (!base || base.id === exp.id) return '标准条件';
+    if (!base || base.id === exp.id) return 'none';
     const v = variations(base, exp);
-    return v.length ? v.join(' · ') : '重复';
+    return v.length ? v.join(' · ') : 'same';
   }
   switch (source) {
     case 'reagent':

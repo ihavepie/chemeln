@@ -156,7 +156,7 @@ async function adopt(g) {
       <template v-if="tables.length">
         <section v-for="(t, i) in tables" :key="t.id" class="sct-block">
           <div class="sct-block-head">
-            <b><span class="sct-cap-no">表 {{ i + 1 }}</span>{{ t.title }}</b>
+            <b><span class="sct-cap-no">Table {{ i + 1 }}</span>{{ t.title }}</b>
             <span class="cx-meta">{{ t.rows.length }} 条 · {{ (t.vars || []).length }} 列</span>
             <span class="spacer" />
             <button class="btn btn-sm btn-ghost" @click="router.push(`/s/${t.id}`)">
