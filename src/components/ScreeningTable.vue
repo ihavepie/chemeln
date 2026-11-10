@@ -38,7 +38,7 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
 <template>
   <div class="scope-wrap sct-plain">
     <p v-if="index || caption" class="sct-cap">
-      <span v-if="index" class="sct-cap-no">表 {{ index }}</span><span v-if="caption" class="sct-cap-ti">{{ caption }}</span>
+      <span v-if="index" class="sct-cap-no">表 {{ index }}：</span><span v-if="caption" class="sct-cap-ti">{{ caption }}</span>
     </p>
     <!-- 反应式 + 条件文字并排一行（像论文里表格上方那张示意图 + 条件说明） -->
     <div v-if="scheme" class="sct-std">
@@ -61,7 +61,12 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
             :class="{ 'sct-num': f.num, 'sct-wide': isWide(f) }"
           >
             <div class="sct-th">
-              <span class="sct-th-label">{{ f.label }}<template v-if="unitOf(f)"> ({{ unitOf(f) }})</template></span>
+              <span class="sct-th-label">
+                {{ f.label }}<template v-if="unitOf(f)"> [{{ unitOf(f) }}]</template><sup
+                  v-if="unitOf(f)"
+                  class="sct-th-fn"
+                >[b]</sup>
+              </span>
               <span v-if="isManual(f)" class="sct-th-src">手动</span>
               <span v-if="editable" class="sct-th-acts">
                 <button class="sct-var-x" title="改名" @click="emit('rename-field', f)">改</button>
@@ -108,8 +113,11 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
       </tbody>
     </table>
     <!-- 文献表下面那行小字脚注 -->
-    <p v-if="rows.length > 1" class="sct-note">
-      <sup>a</sup> 标「标准条件」的一行为基准，其余为相对基准的单变量改动；产率 / 选择性取记录里填的值。
+    <p class="sct-note">
+      <b>[a]</b> 标准条件见上方反应式；「相对标准条件」列只写相对基准改动的部分。
+      <template v-if="rows.length > 1">
+        <b>[b]</b> 产率 / 选择性取自记录里填的值，未填记作「—」。
+      </template>
     </p>
   </div>
 </template>
