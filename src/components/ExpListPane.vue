@@ -268,8 +268,9 @@ function listDiff(base, m) {
         .split('|')
         .filter(Boolean)
         .map((one) => {
-          const [role, name, eq] = one.split(':');
-          return [`${role}:${name}`, { role, name, eq }];
+          // 角色:名字:当量:浓度:用量（后两段是后加的，老签名没有就是空）
+          const [role, name, eq, conc, ul] = one.split(':');
+          return [`${role}:${name}`, { role, name, eq, conc, ul }];
         })
     );
   const a = parse(base.reagent_sig);
@@ -304,9 +305,25 @@ function listDiff(base, m) {
     // 一条一条列，不要再折成「投料（加 X，去 Y 等）」——这里最想看的就是试剂到底动没动
     for (const [k, r] of Object.entries(b)) if (!a[k]) diffs.push(`加 ${nm(r)}${r.eq ? ` ${eqTxt(r.eq)}` : ''}`);
     for (const [k, r] of Object.entries(a)) if (!b[k]) diffs.push(`去 ${nm(r)}`);
+    const volTxt = (v) => {
+      const n = Number(String(v ?? '').trim());
+      if (!Number.isFinite(n) || n <= 0) return '—';
+      return n >= 1000 ? `${Math.round((n / 1000) * 100) / 100} mL` : `${Math.round(n * 10) / 10} µL`;
+    };
     for (const [k, rb] of Object.entries(b)) {
       const ra = a[k];
-      if (ra && !eqSame(ra.eq, rb.eq)) diffs.push(`${nm(rb)} ${eqTxt(ra.eq)} → ${eqTxt(rb.eq)}`);
+      if (!ra) continue;
+      // 溶剂只认用量（体积），别的行只认当量和浓度
+      if (rb.role === '溶剂') {
+        if (String(ra.ul ?? '') !== String(rb.ul ?? '')) diffs.push(`${nm(rb)} ${volTxt(ra.ul)} → ${volTxt(rb.ul)}`);
+        continue;
+      }
+      if (!eqSame(ra.eq, rb.eq)) diffs.push(`${nm(rb)} ${eqTxt(ra.eq)} → ${eqTxt(rb.eq)}`);
+      const ca = Number(String(ra.conc ?? '').trim());
+      const cb = Number(String(rb.conc ?? '').trim());
+      if (Number.isFinite(ca) && Number.isFinite(cb) && ca !== cb) {
+        diffs.push(`${nm(rb)} ${ca} M → ${cb} M`);
+      }
     }
   }
   return diffs;

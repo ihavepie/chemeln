@@ -547,13 +547,15 @@ function listExperiments(query) {
              WHERE f.compound_id = e.product_compound_id AND f.category = 'structure'
              ORDER BY f.id LIMIT 1) AS product_structure_id,
            -- 平行组：中栏列表要把同组的几条叠成一张卡片；
-           -- reagent_sig 是「角色:名字:当量」串起来的签名，列表靠它判断这条是不是真重复
+           -- reagent_sig 是「角色:名字:当量:浓度:用量」串起来的签名，列表靠它判断这条是不是真重复。
+           -- 浓度 / 用量也要进签名：溶剂只差体积（2 mL → 3 mL）、或者浓溶液改了 M 数，
+           -- 光比当量是看不出来的（踩过：两条记录差在 dioxane 的量，列表却写「重复」）
            e.group_id, e.kind,
            (SELECT kind FROM exp_groups eg WHERE eg.id = e.group_id) AS group_kind,
            (SELECT title FROM exp_groups eg WHERE eg.id = e.group_id) AS group_title,
            (SELECT COUNT(*) FROM experiments g WHERE g.group_id = e.group_id AND e.group_id <> '') AS group_size,
            (SELECT group_concat(x.sig, '|') FROM (
-              SELECT r.role || ':' || r.name || ':' || IFNULL(r.eq, '') AS sig
+              SELECT r.role || ':' || r.name || ':' || IFNULL(r.eq, '') || ':' || IFNULL(r.conc, '') || ':' || IFNULL(r.volume_ul, '') AS sig
                 FROM reagents r WHERE r.exp_id = e.id ORDER BY r.position, r.id) x) AS reagent_sig,
            -- 卡片墙上的缩略图：优先反应式，其次顺手挑一张图片附件
            (SELECT a.id FROM attachments a
