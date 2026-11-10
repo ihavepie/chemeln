@@ -2349,6 +2349,8 @@ route('POST', '/api/experiments/:id/parallel', async (req, res, params) => {
       );
     id = Number(row.lastInsertRowid);
     insertReagents(id, src.reagents);
+    // 排序位置跟着源记录走：不然新建的平行会掉进 sort_index 的 0 号桶，跑到列表另一头去
+    db.prepare('UPDATE experiments SET sort_index = ? WHERE id = ?').run(src.sort_index ?? null, id);
     if (!src.group_id) db.prepare('UPDATE experiments SET group_id = ? WHERE id = ?').run(groupId, src.id);
     db.exec('COMMIT');
   } catch (err) {

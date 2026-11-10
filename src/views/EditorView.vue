@@ -847,10 +847,22 @@ async function newParallel() {
   moreMenu.value = false;
   try {
     if (dirty.value) await flush();
+    // 带过去什么，先说清楚（服务端是「整份条件 + 投料表 + 反应式」照搬，只清结果）
+    const carried = [];
+    if (String(fields.title || '').trim()) carried.push(`名称「${String(fields.title).trim()}」`);
+    const nRows = reagent.rows.filter((r) => String(r.name || '').trim()).length;
+    if (nRows) carried.push(`${nRows} 行投料`);
+    const cond = [fields.temperature, fields.duration, fields.atmosphere].filter(Boolean);
+    if (cond.length) carried.push('条件');
+    if ((exp.value.attachments || []).some((a) => a.category === 'scheme')) carried.push('反应式');
     const e = await api.parallel(exp.value.id);
     await loadList();
     router.push(`/e/${e.id}`);
-    toast('已按这条实验新建一条平行实验；结果留空，改掉要变的那个变量就行');
+    toast(
+      `已新建平行实验${carried.length ? `：带过来 ${carried.join(' · ')}` : ''}；产率 / 表征 / TLC 留空，改掉要变的那个变量就行`,
+      'ok',
+      3600
+    );
   } catch (err) {
     toast(err.message || '建不了平行实验', 'err');
   }
