@@ -50,6 +50,12 @@ const historyOpen = ref(false);
 const schemeSketcherOpen = ref(false);   // 画反应式（Ketcher 画板，反应物 → 产物）
 const schemePadSeed = ref('');           // 打开画板时先塞进去的东西（按投料表拼出来的反应式）
 const recipeModal = ref(false);
+/** ⋯ 菜单里「导出」那个二级菜单展不展开；关菜单要一起收 */
+const exportSub = ref(false);
+function closeMore() {
+  moreMenu.value = false;
+  exportSub.value = false;
+}
 const qrModal = ref(false);
 const recipeList = ref([]);
 const recipePick = ref(null);
@@ -1188,22 +1194,30 @@ const openAttachment = (id) => {
             <Icon name="dots" :size="15" />
           </button>
           <div v-if="moreMenu" class="menu">
-            <button @click="doPrint(); moreMenu = false"><Icon name="print" :size="13" /> 打印这条记录</button>
+            <button @click="doPrint(); moreMenu = false"><Icon name="print" :size="13" /> 打印</button>
             <button @click="toggleLock(); moreMenu = false">
-              <Icon :name="exp.locked ? 'unlock' : 'lock'" :size="13" /> {{ exp.locked ? '解锁（恢复可编辑）' : '锁定（此后只读）' }}
+              <Icon :name="exp.locked ? 'unlock' : 'lock'" :size="13" /> {{ exp.locked ? '解锁' : '锁定' }}
             </button>
-            <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 修改历史</button>
+            <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 历史</button>
             <div class="menu-sep" />
-            <button @click="qrModal = true; moreMenu = false"><Icon name="qr" :size="13" /> 二维码（手机端查看）</button>
-            <button @click="exportOne(); moreMenu = false"><Icon name="download" :size="13" /> 导出本条实验</button>
-            <button @click="exportAll(); moreMenu = false"><Icon name="download" :size="13" /> 导出整本记录</button>
-            <button @click="snapshotPng(); moreMenu = false"><Icon name="image" :size="13" /> 导出长图（PNG，不分页）</button>
-            <button @click="snapshotHtml(); moreMenu = false"><Icon name="file" :size="13" /> 导出单文件网页（.html）</button>
-            <button @click="snapshotBundle(); moreMenu = false"><Icon name="folder" :size="13" /> 导出打包（.zip：网页 + 原图）</button>
-            <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制这条实验</button>
-            <button @click="undoSave()"><Icon name="undo" :size="13" /> 撤销上一次保存（⌘Z）</button>
-            <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验（重复 / 改一个变量）</button>
-            <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存入化合物库</button>
+            <button @click="qrModal = true; moreMenu = false"><Icon name="qr" :size="13" /> 二维码</button>
+            <!-- 导出类收进二级菜单（点一下展开，比一排「导出…（…）」干净） -->
+            <div class="menu-group">
+              <button :class="{ 'is-open': exportSub }" @click.stop="exportSub = !exportSub">
+                <Icon name="download" :size="13" /> 导出 <span class="menu-caret">›</span>
+              </button>
+              <div v-if="exportSub" class="menu menu-sub">
+                <button @click="exportOne(); closeMore()"><Icon name="file" :size="13" /> 本条记录</button>
+                <button @click="exportAll(); closeMore()"><Icon name="book" :size="13" /> 整本记录</button>
+                <button @click="snapshotPng(); closeMore()"><Icon name="image" :size="13" /> 长图 PNG</button>
+                <button @click="snapshotHtml(); closeMore()"><Icon name="file" :size="13" /> 单文件网页</button>
+                <button @click="snapshotBundle(); closeMore()"><Icon name="folder" :size="13" /> 打包 ZIP</button>
+              </div>
+            </div>
+            <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制</button>
+            <button @click="undoSave()"><Icon name="undo" :size="13" /> 撤销上次保存</button>
+            <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验</button>
+            <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存库</button>
             <div class="menu-sep" />
             <button class="menu-danger" @click="removeExperiment(); moreMenu = false">
               <Icon name="trash" :size="13" /> 移入回收站

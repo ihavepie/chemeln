@@ -4770,6 +4770,17 @@ kbd {
 
 /* ⋯ 菜单里的分组细线，和红色的破坏性项（删除实验 / 删除化合物） */
 .menu-sep { height: 1px; margin: 4px 2px; background: var(--line); }
+/* ⋯ 菜单里的二级菜单（现在只有「导出」）：点父项展开，往左弹（菜单本身钉在右上角，往右会出屏） */
+.menu-group { position: relative; }
+.menu button.is-open { background: #f4f2ee; color: var(--ink); }
+.menu-caret { margin-left: auto; font-size: 11px; color: var(--ink-4); line-height: 1; }
+.menu .menu-sub {
+  position: absolute;
+  top: -5px;
+  right: calc(100% + 2px);
+  min-width: 132px;
+  z-index: 3;
+}
 .menu button.menu-danger { color: var(--accent); }
 .menu button.menu-danger:hover { background: #fbf1ec; color: var(--accent); }
 

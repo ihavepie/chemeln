@@ -796,9 +796,9 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
           <Icon name="dots" :size="15" />
         </button>
         <div v-if="moreMenu" class="menu">
-          <button @click="label(); moreMenu = false"><Icon name="qr" :size="13" /> 打印瓶子标签</button>
-          <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 修改历史</button>
-          <button @click="lookupNow(); moreMenu = false"><Icon name="molecule" :size="13" /> 查这个结构（PubChem）</button>
+          <button @click="label(); moreMenu = false"><Icon name="qr" :size="13" /> 打印标签</button>
+          <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 历史</button>
+          <button @click="lookupNow(); moreMenu = false"><Icon name="molecule" :size="13" /> 查结构（PubChem）</button>
           <div class="menu-sep" />
           <button class="menu-danger" @click="removeCompound(); moreMenu = false">
             <Icon name="trash" :size="13" /> 移入回收站
