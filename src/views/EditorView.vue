@@ -1180,13 +1180,14 @@ const openAttachment = (id) => {
           <!-- 平行组书签：从纸面左边凸出去的一排纸签（重复实验 / 控制变量实验）。
                悬停先看一眼，点下去才切记录。 -->
           <nav v-if="siblings.length > 1 && page === 1" class="pgroup pgroup--float noprint" :style="railStyle" aria-label="平行实验">
-            <span class="pgroup-cap">平行</span>
+            <span class="pgroup-cap">平行 ×{{ siblings.length }}</span>
             <button
               v-for="s in siblings"
               :key="s.id"
               type="button"
               class="pgroup-tab"
               :class="{ 'is-on': String(s.id) === String(exp.id) }"
+              :data-code="s.code"
               :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}${sibLine(s) ? ` · ${sibLine(s)}` : ''}`"
               @mouseenter="showPeek(s, $event)"
               @mouseleave="hidePeek()"

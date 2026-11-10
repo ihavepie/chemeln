@@ -5806,8 +5806,22 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   transition: width 0.14s, background 0.14s;
 }
 .pgroup-tab:hover::before { width: 20px; background: var(--ink-4); }
-/* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数） */
+/* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数），
+   左边再跟一个很小的编号——一排短杠本身不带字，光看形状不知道这是哪条。 */
 .pgroup-tab.is-on::before { width: 22px; background: var(--ink); }
+.pgroup-tab.is-on::after {
+  content: attr(data-code);
+  position: absolute;
+  right: calc(100% + 7px);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  color: var(--ink-4);
+  white-space: nowrap;
+  pointer-events: none;
+}
 
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
 /* 书签悬停预览卡：照 DSH 那个 turn 预览的样子——无边框、圆角 10、只有一层柔和投影，
