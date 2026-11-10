@@ -745,7 +745,8 @@ function updateRail() {
   const el = sheetEl.value;
   if (!el || page.value !== 1) return;
   const r = el.getBoundingClientRect();
-  railStyle.value = { left: `${Math.round(r.left)}px`, top: `${Math.round(r.top + 42)}px` };
+  // 别贴着纸：整排在纸面左侧留出 18px 空隙，漂在内容区旁边的白底上
+  railStyle.value = { left: `${Math.round(r.left - 18)}px`, top: `${Math.round(r.top + 42)}px` };
 }
 watch([() => exp.value?.id, () => page.value, () => siblings.value.length], () => {
   nextTick(updateRail);
