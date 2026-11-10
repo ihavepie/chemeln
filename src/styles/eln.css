@@ -7104,10 +7104,10 @@ body.is-pane-resizing * { cursor: col-resize !important; user-select: none !impo
 
 /* ================================================================
    内容区左右两条抓手指，照 DSH 的 ConversationRoot 那套做的：
-   · 判定区是**整列高、40px 宽**的透明条，内边离内容区 8px，往外铺满 40px
-     （留白只有 48px，所以正好不出界）；
+   · 判定区是**整列高、34px 宽**的透明条，内边离内容区 14px，往外铺 34px
+     （留白 48px，正好不出界）；
    · 看得见的东西是条 **3px 宽、圆角**的小竖条，藏在判定区内侧 16px 处
-     （≈ 离内容区 24px），**纵向跟着鼠标走**，不是拉满整列；
+     （≈ 离内容区 31px），**纵向跟着鼠标走**，不是拉满整列；
    · 纵向是一段渐变发光：中间 24px 实心、上下各 40px 淡出（共约 104px），
      位置由 DocGrip 里 mousemove 写进 `--doc-grip-y`。
    平时整条隐形（opacity 0），hover / 拖动时才浮出来。
@@ -7118,14 +7118,14 @@ body.is-pane-resizing * { cursor: col-resize !important; user-select: none !impo
   top: 0;
   bottom: 0;
   z-index: 6;
-  width: 40px;
+  width: 34px;
   cursor: col-resize;
   touch-action: none;
   opacity: 0;
   transition: opacity 0.12s;
 }
-.doc-grip.is-left { right: calc(100% + 8px); }
-.doc-grip.is-right { left: calc(100% + 8px); }
+.doc-grip.is-left { right: calc(100% + 14px); }
+.doc-grip.is-right { left: calc(100% + 14px); }
 .doc-grip:hover,
 .doc-grip.is-on { opacity: 1; }
 .doc-grip::after {
