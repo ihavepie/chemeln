@@ -248,8 +248,9 @@ const LIST_VARS = [
   ['duration', '时长'],
   ['atmosphere', '气氛'],
 ];
-/** 卡片 / 组员行上跟着状态后面那截「反应描述」：记录类型（试反应 / 条件筛选…）+ 反应类型（改当量…） */
-const rxnDesc = (m) => [String(m.kind || '').trim(), String(m.rxn_type || '').trim()].filter(Boolean).join(' · ');
+/** 记录类型（试反应 / 条件筛选…）。反应类型单独做成一颗胶囊（`.tag.is-rxn`），不再挤在这段文字里 */
+const rxnDesc = (m) => String(m.kind || '').trim();
+const rxnType = (m) => String(m.rxn_type || '').trim();
 
 /** 当量差在 2%（且 ≤0.005）以内算同一个条件——放大/取整常让当量差一点点 */
 function eqSame(a, b) {
@@ -281,7 +282,11 @@ function listDiff(base, m) {
   for (const [k, label] of LIST_VARS) {
     if (k === 'concentration' && scaleChanged) continue;
     if (k === 'solvent' && solInTable) continue;
-    if (String(base[k] ?? '') !== String(m[k] ?? '')) diffs.push(label);
+    const a = String(base[k] ?? '').trim();
+    const b = String(m[k] ?? '').trim();
+    if (a === b) continue;
+    // 写「旧 → 新」，别只丢一个字段名——光看「温度」不知道改成了多少
+    diffs.push(`${label} ${a || '—'} → ${b || '—'}`);
   }
   // 基准那条的投料表要是压根没填（老记录只剩空行 / 只有溶剂），拿它比会把整张表都标成「加」——
   // 那不是改动，跳过；用户要的只是「改动部分」。
@@ -418,6 +423,7 @@ function onStackFace(row) {
             <span class="exp-code">{{ row.one.code }}</span>
             <span v-if="row.one.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
             <span class="tag" :class="STATUS_TONE[row.one.status]" style="font-size: 9px; padding: 1px 6px">{{ row.one.status }}</span>
+            <span v-if="rxnType(row.one)" class="tag is-rxn">{{ rxnType(row.one) }}</span>
             <span class="exp-date">{{ row.one.date }}</span>
           </div>
           <div class="exp-title">
@@ -462,6 +468,7 @@ function onStackFace(row) {
                 <span v-if="row.face.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                 <span class="stack-badge">平行 ×{{ row.members.length }}</span>
                 <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
+                <span v-if="rxnType(row.face)" class="tag is-rxn">{{ rxnType(row.face) }}</span>
                 <span class="exp-date">{{ row.face.date }}</span>
                 <button
                   type="button"
@@ -514,6 +521,7 @@ function onStackFace(row) {
                   <span class="exp-code">{{ m.code }}</span>
                   <span v-if="m.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                   <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
+                  <span v-if="rxnType(m)" class="tag is-rxn">{{ rxnType(m) }}</span>
                   <span v-if="rxnDesc(m)" class="stack-rxn">{{ rxnDesc(m) }}</span>
                   <span v-if="(!m.diffs || !m.diffs.length) && m.variant !== '改：规模'" class="stack-variant">{{ m.variant }}</span>
                   <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>

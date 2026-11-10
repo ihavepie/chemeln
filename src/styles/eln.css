@@ -6208,6 +6208,15 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   padding: 0 6px;
   white-space: nowrap;
 }
+/* 反应类型做成跟状态一样的胶囊，紧挨在状态后面（中性暖灰，不抢状态的颜色） */
+.tag.is-rxn {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 1px 6px;
+  background: #f4f1ec;
+  color: var(--ink-3);
+}
 /* 组员行顶栏那几颗小东西都不许被挤扁（「改当量」曾经被压成竖排） */
 .exp-card.is-member .top > * { flex: 0 0 auto; }
 .exp-card.is-member .exp-date { margin-left: auto; }
