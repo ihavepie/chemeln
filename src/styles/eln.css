@@ -5840,15 +5840,21 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
 /* 书签悬停预览卡：照 DSH 那个 turn 预览的样子——无边框、圆角 10、只有一层柔和投影，
    一行粗体提要 + 最多三行灰字摘要，出现时淡入并往右推 4px。 */
+/* 照 DSH 的 turn 预览卡（TurnNavigator 的 .preview）：宽 min(300)、
+   **最高 100px 就截断**、padding 10/12、圆角 10、不描边、只有一层柔投影，
+   卡片自己不带小箭头（DSH 也没有）。 */
 .pgroup-peek-float {
   position: fixed;
   z-index: 60;
   pointer-events: none;
+  box-sizing: border-box;
   padding: 10px 12px;
+  max-height: 100px;
+  overflow: hidden;
   background: var(--paper);
   border: 0;
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(20, 18, 14, 0.13), 0 2px 6px rgba(20, 18, 14, 0.05);
+  box-shadow: 0 10px 26px rgba(20, 18, 14, 0.1), 0 1px 3px rgba(20, 18, 14, 0.06);
   color: var(--ink-3);
   font-family: var(--sans, system-ui, sans-serif);
   text-align: left;
@@ -5857,20 +5863,6 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 @keyframes peek-in {
   from { opacity: 0; transform: translateX(4px); }
   to { opacity: 1; transform: none; }
-}
-
-/* 卡片右边缘的小箭头：指向正在悬停的那枚书签（--arrow-y 由 JS 按书签中线写）。
-   卡片没有边框了，箭头也只是同色的一小块，别再描那道线。 */
-.pgroup-peek-float::after {
-  content: '';
-  position: absolute;
-  right: -4.5px;
-  top: var(--arrow-y, 22px);
-  width: 9px;
-  height: 9px;
-  background: var(--paper);
-  border-radius: 1px;
-  transform: translateY(-50%) rotate(45deg);
 }
 
 .pgroup-add {

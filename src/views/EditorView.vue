@@ -768,30 +768,29 @@ async function newParallel() {
   }
 }
 
-/** 悬停预览卡：跟着鼠标所在的那枚书签定位，永远放在书签**左边**（不压纸张），
- *  卡上带一个小箭头指回正在悬停的那枚书签。 */
+/** 悬停预览卡：跟着鼠标所在的那枚书签定位，永远放在书签**左边**（不压纸张）。
+ *  形态照 DSH 的 turn 预览卡——不带箭头，跟书签留 12px。 */
 const peek = ref(null);
 const peekPos = ref({});
 const peekEl = ref(null);
 function showPeek(s, ev) {
   const r = ev.currentTarget.getBoundingClientRect();
   const width = 300;
-  // 卡片右边贴在书签左边（留 9px 给箭头尖）；左边不够就尽量靠左，别出屏幕
-  const left = Math.max(8, r.left - width - 9);
-  const top = Math.max(8, Math.min(window.innerHeight - 152, r.top - 6));
-  peekPos.value = { left: `${left}px`, top: `${top}px`, width: `${width}px` };
+  const left = Math.max(8, r.left - width - 12);
+  peekPos.value = {
+    left: `${left}px`,
+    top: `${Math.max(8, r.top - 6)}px`,
+    width: `${width}px`,
+  };
   peek.value = s;
-  // 卡片高度要等渲染出来才知道：把卡片竖直居中在书签上，箭头对准书签中线
+  // 卡片高度要等渲染出来才知道：竖直居中在书签上
   nextTick(() => {
-    const h = peekEl.value ? peekEl.value.offsetHeight : 160;
+    const h = peekEl.value ? peekEl.value.offsetHeight : 100;
     const cy = r.top + r.height / 2;
-    const t = Math.max(10, Math.min(window.innerHeight - h - 10, cy - h / 2));
-    const arrow = Math.max(14, Math.min(h - 14, cy - t));
     peekPos.value = {
       left: `${left}px`,
-      top: `${Math.round(t)}px`,
+      top: `${Math.round(Math.max(10, Math.min(window.innerHeight - h - 10, cy - h / 2)))}px`,
       width: `${width}px`,
-      '--arrow-y': `${Math.round(arrow)}px`,
     };
   });
 }
