@@ -750,19 +750,40 @@ function toggleRailSide() {
   nextTick(updateRail);
 }
 const railStyle = ref({});
-const railPlace = ref(railSide.value);   // 实际生效的那一侧（右侧留白不够时会退回 left）
+const railPlace = ref(railSide.value);   // 实际生效的那一侧（留白不够时会换边）
+const railCompact = ref(false);          // 挤的时候只留短杠、不显示编号
 function updateRail() {
   const el = sheetEl.value;
   if (!el || page.value !== 1) return;
   const r = el.getBoundingClientRect();
   // 别贴着纸：整排在纸面旁边留出 18px 空隙，漂在内容区旁边的白底上。
-  // 放右边得先看留白够不够（短杠 + 编号那行要 110px 才不挤，否则老实待在左边）
-  const rightGap = window.innerWidth - r.right;
-  const side = railSide.value === 'right' && rightGap >= 110 ? 'right' : 'left';
+  // 但不能越出「编辑区」那条边界——越过去就压在中栏列表的卡片上了（窄窗口就是这样）。
+  const ed = editorEl.value ? editorEl.value.getBoundingClientRect() : { left: 0, right: window.innerWidth };
+  const gapL = r.left - ed.left;
+  const gapR = window.innerWidth - r.right;
+  // 先按偏好选边；那一侧连 12px 都挤不出来才换另一侧（换边比贴着列表好，但别乱换）
+  const roomOf = (side) => (side === 'right' ? gapR : gapL);
+  let side = railSide.value;
+  if (roomOf(side) < 12) {
+    const other = side === 'right' ? 'left' : 'right';
+    if (roomOf(other) >= 12) side = other;
+  }
+  const room = roomOf(side);
+  const compact = room < 110;          // 放不下「编号」那一行时只留短杠
+  const railW = compact ? 22 : 42;
+  let left = side === 'right' ? r.right + 18 : r.left - 18 - railW;
+  if (side === 'left') {
+    left = Math.max(left, ed.left + 4);            // 不许压到中栏列表
+    if (left + railW > r.left - 4) left = r.left - railW - 4;  // 实在挤，就只留 4px 缝
+  } else {
+    left = Math.min(left, window.innerWidth - railW - 4);
+  }
   railPlace.value = side;
+  railCompact.value = compact;
   railStyle.value = {
-    left: `${Math.round(side === 'right' ? r.right + 18 : r.left - 18)}px`,
+    left: `${Math.round(left)}px`,
     top: `${Math.round(r.top + 42)}px`,
+    width: `${railW}px`,
   };
 }
 watch([() => exp.value?.id, () => page.value, () => siblings.value.length], () => {
@@ -1211,7 +1232,7 @@ const openAttachment = (id) => {
           <nav
             v-if="siblings.length > 1 && page === 1"
             class="pgroup pgroup--float noprint"
-            :class="{ 'is-right': railPlace === 'right' }"
+            :class="{ 'is-right': railPlace === 'right', 'is-compact': railCompact }"
             :style="railStyle"
             aria-label="平行实验"
           >

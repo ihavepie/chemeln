@@ -5761,6 +5761,8 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 
 /* 浮层版：定位由 JS 按纸面左上角写进来（left/top），整体再往左平移自身宽度。
    放纸面右边时（.is-right）整排改成左对齐、不再平移。 */
+/* 位置全部由 JS 算好写进 left/top/width（导航排不能越过编辑区边界，
+   否则窄窗口会压在中栏列表的卡片上），所以这里不再自己平移。 */
 .pgroup--float {
   position: fixed;
   z-index: 45;
@@ -5768,12 +5770,10 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   flex-direction: column;
   gap: 2px;
   align-items: flex-end;
-  transform: translateX(-100%);
 }
-.pgroup--float.is-right {
-  align-items: flex-start;
-  transform: none;
-}
+.pgroup--float.is-right { align-items: flex-start; }
+/* 挤的时候：只留短杠、不写编号（编号在悬停预览卡里，纸面右上也有） */
+.pgroup--float.is-compact .pgroup-lbl { display: none; }
 /* 靠右时短杠左端贴齐、编号挪到短杠**右边**，方向全部镜像过来 */
 .pgroup--float.is-right .pgroup-tab,
 .pgroup--float.is-right .pgroup-add { justify-content: flex-start; }
