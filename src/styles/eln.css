@@ -5784,14 +5784,20 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup--float.is-inline .pgroup-var { display: none; }
 
 
+/* 「平行 ×N」现在是个按钮：点一下把这一排收起 / 展开（收起时不占地方） */
 .pgroup-cap {
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 0.16em;
   color: var(--ink-4);
-  padding-right: 5px;
+  padding: 2px 5px 2px 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
   user-select: none;
+  transition: color 0.12s;
 }
+.pgroup-cap:hover { color: var(--ink-2); }
 
 /* 一枚书签 = 一根**小短杠**（照 DSH 的 turn 导航那排 mark）：
    12~22px 宽、2px 高、圆角，右侧贴着纸面对齐；不用卡片、不写字。
@@ -5813,12 +5819,29 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup-tab::before {
   content: '';
   display: block;
-  width: 14px;
+  /* 长度按产率（JS 写 --tick-w，14–22px）：完成的那条越长越好 */
+  width: var(--tick-w, 14px);
   height: 2px;
   border-radius: 2px;
   background: #ddd7c6;
   transition: width 0.14s, background 0.14s;
 }
+/* 悬停时从短杠往纸边拉一条 6px 的发丝线：明确「这排指的是这张纸」 */
+.pgroup-tab::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -6px;
+  width: 6px;
+  height: 1px;
+  background: var(--line-2);
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+.pgroup-tab:hover::after { opacity: 1; }
+/* 组员多于 6 条：行距压到 12px，别让这排长到屏幕外 */
+.pgroup--float.is-dense .pgroup-tab,
+.pgroup--float.is-dense .pgroup-add { height: 10px; }
 /* 状态用短杠的底色说：进行中偏暖、已完成偏绿、失败偏红……当前那条仍然是墨色最重。
    颜色由全局 tone 色（跟状态小圆点同一套）混进纸色，淡而不脏；不支持 color-mix 的老
    Safari 直接退回上面的灰色，依然是能用的。 */
@@ -5829,7 +5852,7 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup-tab[data-tone='accent']::before { background: color-mix(in oklab, var(--accent) 48%, #e8e3d6); }
 .pgroup-tab:hover::before { width: 20px; background: var(--ink-4); }
 /* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数） */
-.pgroup-tab.is-on::before { width: 22px; background: var(--ink); }
+.pgroup-tab.is-on::before { width: 22px; height: 2.5px; background: var(--ink); }
 
 /* 短杠旁边那一行小字 = 记录编号，写在**纸面自己的左边距**里（短杠右侧 7px）。
    为什么写在纸内而不是外侧那条缝里：悬停预览卡是在缝里往左弹的，写缝里会被盖住。

@@ -757,6 +757,13 @@ const siblings = computed(() => exp.value?.siblings || []);
  */
 const sheetEl = ref(null);
 const editorEl = ref(null);
+/** 这排书签收起来没有（点「平行 ×N」那行切换，只在这次会话里记） */
+const railOpen = ref(true);
+/** 短杠长度按产率来：14–22px（没填产率就是 14） */
+function tickW(s) {
+  const y = Number(s.yield_pct);
+  return Number.isFinite(y) ? Math.round(14 + Math.min(Math.max(y, 0), 100) / 100 * 8) : 14;
+}
 const railStyle = ref({});
 function updateRail() {
   const el = sheetEl.value;
@@ -1216,10 +1223,14 @@ const openAttachment = (id) => {
           <nav
             v-if="siblings.length > 1 && page === 1"
             class="pgroup pgroup--float noprint"
+            :class="{ 'is-dense': siblings.length > 6 }"
             :style="railStyle"
             aria-label="平行实验"
           >
-            <span class="pgroup-cap">平行 ×{{ siblings.length }}</span>
+            <button type="button" class="pgroup-cap" @click="railOpen = !railOpen">
+              {{ railOpen ? `平行 ×${siblings.length}` : '平行 ▸' }}
+            </button>
+            <template v-if="railOpen">
             <button
               v-for="s in siblings"
               :key="s.id"
@@ -1227,6 +1238,7 @@ const openAttachment = (id) => {
               class="pgroup-tab"
               :class="{ 'is-on': String(s.id) === String(exp.id) }"
               :data-tone="STATUS_TONE[s.status] || 'plain'"
+              :style="{ '--tick-w': `${tickW(s)}px` }"
               :data-code="s.code"
               :aria-label="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
               :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}${sibLine(s) ? ` · ${sibLine(s)}` : ''}`"
@@ -1239,6 +1251,7 @@ const openAttachment = (id) => {
               <span class="pgroup-lbl" aria-hidden="true">{{ s.code }}</span>
             </button>
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
+            </template>
           </nav>
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
           <Teleport to="body">
