@@ -565,18 +565,27 @@ async function runFillTableFromScheme() {
   }
   const hitOf = async (s) => index.get((await canonicalSmiles(s)) || s) || null;
 
-  const ok = await confirm({
-    title: '按反应式填投料表？',
-    body: `会用画板里这条反应式的 ${reactants.length} 个反应物重建投料表（现在表里的行会被覆盖），产物那一格也一起填。`,
-  });
-  if (!ok) return;
-
-  const rows = [];
+  // **合并，不覆盖**：已经在表里的行（按 compound_id / 名字对得上）原样留着，
+  // 只把「反应式里有、表里没有」的反应物补到后面——以前是整表重建，
+  // 用户不小心点一下就把手填的试剂全冲掉了（2026-11 踩过）。
+  const norm = (v) => String(v || '').toLowerCase().replace(/[\s（）()·\-_,，]/g, '');
+  const rows = reagent.rows;
+  const hitRow = (c) => rows.find((r) => (r.compound_id && Number(r.compound_id) === Number(c.id)) || (norm(r.name) && norm(r.name) === norm(c.name || c.code)));
+  let added = 0;
+  let kept = 0;
   let miss = 0;
-  for (const s of reactants) {
-    const c = await hitOf(s);
+  for (const smiOne of reactants) {
+    const c = await hitOf(smiOne);
     if (!c) {
       miss += 1;
+      continue;
+    }
+    const row = hitRow(c);
+    if (row) {
+      // 对上了就不动用户填的数字，只把缺的 MW / 关联补上
+      if (!num(row.mw) && c.mw != null) row.mw = c.mw;
+      if (!row.compound_id) row.compound_id = c.id;
+      kept += 1;
       continue;
     }
     const role = c.kind === '底物' ? '底物' : '试剂';
@@ -591,17 +600,25 @@ async function runFillTableFromScheme() {
         note: '',
       })
     );
+    added += 1;
   }
-  if (!rows.length) return toast('反应物一个都没在化合物库里找到——先把它们存进库，或者手工填', 'warn');
-  reagent.rows.splice(0, reagent.rows.length, ...rows);
+  if (!added && !kept) return toast('反应物一个都没在化合物库里找到——先把它们存进库，或者手工填', 'warn');
 
   const prod = products.length ? await hitOf(products[0]) : null;
   if (prod) {
-    fields.product_name = prod.name || fields.product_name;
-    if (prod.mw != null) fields.product_mw = String(prod.mw);
+    // 产物名空着才填，已有内容也不覆盖
+    if (!String(fields.product_name || '').trim()) fields.product_name = prod.name || '';
+    if (!num(fields.product_mw) && prod.mw != null) fields.product_mw = String(prod.mw);
     fields.product_compound_id = prod.id;
   }
-  toast(`填了 ${rows.length} 行${miss ? `，${miss} 个反应物库里没有` : ''}${prod ? '；产物也填上了' : ''}`);
+  notify();
+  toast(
+    [`补了 ${added} 行`, kept ? `沿用 ${kept} 行（没动数字）` : '', miss ? `${miss} 个反应物库里没有` : '', prod ? '产物也挂上了' : '']
+      .filter(Boolean)
+      .join(' · '),
+    'ok',
+    3200
+  );
 }
 
 /**
