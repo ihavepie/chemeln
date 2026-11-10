@@ -740,13 +740,30 @@ const siblings = computed(() => exp.value?.siblings || []);
  */
 const sheetEl = ref(null);
 const editorEl = ref(null);
+/** 平行书签靠哪边：默认左边；存在 localStorage，纸面右侧留白不够时自动退回左边 */
+const RAIL_SIDE_KEY = 'eln:railside';
+const railSide = ref(localStorage.getItem(RAIL_SIDE_KEY) === 'right' ? 'right' : 'left');
+function toggleRailSide() {
+  railSide.value = railSide.value === 'right' ? 'left' : 'right';
+  try { localStorage.setItem(RAIL_SIDE_KEY, railSide.value); } catch { /* 隐私模式无所谓 */ }
+  moreMenu.value = false;
+  nextTick(updateRail);
+}
 const railStyle = ref({});
+const railPlace = ref(railSide.value);   // 实际生效的那一侧（右侧留白不够时会退回 left）
 function updateRail() {
   const el = sheetEl.value;
   if (!el || page.value !== 1) return;
   const r = el.getBoundingClientRect();
-  // 别贴着纸：整排在纸面左侧留出 18px 空隙，漂在内容区旁边的白底上
-  railStyle.value = { left: `${Math.round(r.left - 18)}px`, top: `${Math.round(r.top + 42)}px` };
+  // 别贴着纸：整排在纸面旁边留出 18px 空隙，漂在内容区旁边的白底上。
+  // 放右边得先看留白够不够（短杠 + 编号那行要 110px 才不挤，否则老实待在左边）
+  const rightGap = window.innerWidth - r.right;
+  const side = railSide.value === 'right' && rightGap >= 110 ? 'right' : 'left';
+  railPlace.value = side;
+  railStyle.value = {
+    left: `${Math.round(side === 'right' ? r.right + 18 : r.left - 18)}px`,
+    top: `${Math.round(r.top + 42)}px`,
+  };
 }
 watch([() => exp.value?.id, () => page.value, () => siblings.value.length], () => {
   nextTick(updateRail);
@@ -1057,6 +1074,9 @@ const openAttachment = (id) => {
             <button @click="snapshotBundle(); moreMenu = false"><Icon name="folder" :size="13" /> 导出打包（.zip：网页 + 原图）</button>
             <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制这条实验</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验（重复 / 改一个变量）</button>
+            <button @click="toggleRailSide()">
+              <Icon name="table" :size="13" /> 平行书签放在{{ railSide === 'right' ? '左边' : '右边' }}
+            </button>
             <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存入化合物库</button>
             <div class="menu-sep" />
             <button class="menu-danger" @click="removeExperiment(); moreMenu = false">
@@ -1188,7 +1208,13 @@ const openAttachment = (id) => {
         <Teleport to="body">
           <!-- 平行组书签：从纸面左边凸出去的一排纸签（重复实验 / 控制变量实验）。
                悬停先看一眼，点下去才切记录。 -->
-          <nav v-if="siblings.length > 1 && page === 1" class="pgroup pgroup--float noprint" :style="railStyle" aria-label="平行实验">
+          <nav
+            v-if="siblings.length > 1 && page === 1"
+            class="pgroup pgroup--float noprint"
+            :class="{ 'is-right': railPlace === 'right' }"
+            :style="railStyle"
+            aria-label="平行实验"
+          >
             <span class="pgroup-cap">平行 ×{{ siblings.length }}</span>
             <button
               v-for="s in siblings"
