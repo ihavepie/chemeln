@@ -5,7 +5,7 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, vesselHint } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, variantText, vesselHint, volText } from '../lib/reagent.js';
 import { compoundDict, reagentDict, store } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
@@ -260,7 +260,17 @@ const stepHasExtras = (s) =>
   );
 const showStepHead = (s) => !singleStep.value || stepHasExtras(s);
 
+/** 溶剂行：只有「量」有意义，分子量 / 当量 / mmol 都不算，也不许按当量自动折体积 */
+const isSolvent = (r) => r && r.role === '溶剂';
+
 function syncAmount(r) {
+  if (isSolvent(r)) {
+    r.mass_mg = null;
+    r.mmol = null;
+    r.eq = '';
+    r.amountText = amountText(r);
+    return;
+  }
   const next = derive(r);
   r.mass_mg = next.mass_mg ?? null;
   r.volume_ul = next.volume_ul ?? null;
@@ -270,6 +280,7 @@ function syncAmount(r) {
 function recomputeAll() {
   const b = num(props.model.base) || 0;
   rows.value.forEach((r, i) => {
+    if (isSolvent(r)) return;
     if (i === 0) {
       if (!b || num(r.mmol) === b) return;
       r.mmol = b;
@@ -317,6 +328,7 @@ function eqDisplay(r) {
 }
 
 function onEq(r) {
+  if (isSolvent(r)) return props.notify();
   const eq = eqNum(r.eq);
   const b = num(props.model.base) || 0;
   if (eq !== null && b) {
@@ -631,6 +643,14 @@ const libShown = computed(() => {
  */
 function pickFromLib(it, v) {
   const role = (v && v.role) || it.role || '试剂';
+  if (role === '溶剂') {
+    const ul = (v && v.ul != null ? v.ul : it.defaultUl) ?? null;
+    const row = toRow({ step: steps.value.length, role, name: it.name, mw: null, eq: '', mmol: null, volume_ul: ul, amountText: ul ? volText(ul) : '', note: '' });
+    props.model.rows.push(row);
+    libOpen.value = false;
+    props.notify();
+    return;
+  }
   const eqRaw = v && v.eq !== '' && v.eq != null ? v.eq : it.defaultEq;
   const eq = eqRaw === '' || eqRaw == null ? 1 : (/^[\d.]+$/.test(String(eqRaw)) ? Number(eqRaw) : String(eqRaw));
   const row = toRow({
@@ -656,7 +676,8 @@ function addRow(step) {
 
 /** 溶剂也是投料表的一行（以前单独摆在「条件」里，用户想直接在这里加） */
 function addSolvent() {
-  props.model.rows.push({ step: steps.value.length, role: '溶剂', eq: '', mwText: '', amountText: '', name: '', note: '' });
+  // 溶剂行不填分子量 / 当量，只填量（mL / µL）
+  props.model.rows.push({ step: steps.value.length, role: '溶剂', eq: '', mmol: null, mw: null, mwText: '', amountText: '', name: '', note: '' });
   props.notify();
 }
 
@@ -1099,13 +1120,17 @@ function onDrop(ev) {
                 </div>
               </td>
               <td>
-                <input class="n mw-cell" data-f="mwcell" :value="mwDisplay(r)" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="r._mwEditing = true; focusHint(r, 'mwcell')" @blur="r._mwEditing = false; onMw(r); blurHint()" @keydown="onKeydown($event, r, 'mwcell')" />
+                <!-- 溶剂只记「用了多少量」：分子量 / 当量 / mmol 三格都不填，也就不会算出 17 µL 那种数 -->
+                <span v-if="isSolvent(r)" class="sol-blank">—</span>
+                <input v-else class="n mw-cell" data-f="mwcell" :value="mwDisplay(r)" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="r._mwEditing = true; focusHint(r, 'mwcell')" @blur="r._mwEditing = false; onMw(r); blurHint()" @keydown="onKeydown($event, r, 'mwcell')" />
               </td>
               <td>
-                <input class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq')" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
+                <span v-if="isSolvent(r)" class="sol-blank">—</span>
+                <input v-else class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq')" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
               </td>
               <td>
-                <input class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol')" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
+                <span v-if="isSolvent(r)" class="sol-blank">—</span>
+                <input v-else class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol')" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
               </td>
               <td class="amount-td" :data-kind="rowKind(r)">
                 <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount')" @blur="blurHint" @keydown="onKeydown($event, r, 'amount')" />
@@ -1176,7 +1201,7 @@ function onDrop(ev) {
                 @click.stop="pickFromLib(it, v)"
                 @keydown.enter.stop="pickFromLib(it, v)"
               >
-                {{ v.eq || '不带当量' }}<em v-if="v.n > 1">×{{ v.n }}</em>
+                {{ variantText(v) }}<em v-if="v.n > 1">×{{ v.n }}</em>
               </span>
             </span>
           </span>

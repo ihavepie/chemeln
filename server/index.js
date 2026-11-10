@@ -3978,8 +3978,8 @@ function reagentLibRows(project, kw) {
   // 从投料行直接汇总，不另建表：改一条记录的当量，这里跟着变。
   const useRows = db
     .prepare(
-      `SELECT lower(trim(r.name)) AS key, r.eq AS eq, r.role AS role, r.exp_id AS exp_id,
-              e.date AS last_at, e.code AS code
+      `SELECT lower(trim(r.name)) AS key, r.eq AS eq, r.role AS role, r.volume_ul AS ul,
+              r.exp_id AS exp_id, e.date AS last_at, e.code AS code
          FROM reagents r JOIN experiments e ON e.id = r.exp_id
         WHERE trim(r.name) <> '' ${project ? 'AND e.project = ?' : ''}
         ORDER BY r.id`
@@ -3994,13 +3994,16 @@ function reagentLibRows(project, kw) {
   };
   const variantsByKey = new Map();
   for (const u of useRows) {
-    const eq = normEq(u.eq);
     const role = str(u.role).trim();
-    const vk = `${eq}|${role}`;
+    // 溶剂只记「用了多少量」（mL / µL），别的都不算用法
+    const isSol = role === '溶剂';
+    const ul = isSol ? numOrNull(u.ul) : null;
+    const eq = isSol ? '' : normEq(u.eq);
+    const vk = isSol ? `vol:${ul ?? ''}` : `${eq}|${role}`;
     let m = variantsByKey.get(u.key);
     if (!m) variantsByKey.set(u.key, (m = new Map()));
     let v = m.get(vk);
-    if (!v) m.set(vk, (v = { eq, role, exps: new Set(), lastAt: '', lastCode: '' }));
+    if (!v) m.set(vk, (v = { eq, role, ul, exps: new Set(), lastAt: '', lastCode: '' }));
     v.exps.add(u.exp_id);
     if (str(u.last_at) >= v.lastAt) {
       v.lastAt = str(u.last_at);
@@ -4009,7 +4012,7 @@ function reagentLibRows(project, kw) {
   }
   const variantsOf = (key) =>
     [...(variantsByKey.get(key) || new Map()).values()]
-      .map((v) => ({ eq: v.eq, role: v.role, n: v.exps.size, lastAt: v.lastAt, lastCode: v.lastCode }))
+      .map((v) => ({ eq: v.eq, role: v.role, ul: v.ul, n: v.exps.size, lastAt: v.lastAt, lastCode: v.lastCode }))
       .sort((x, y) => y.n - x.n || String(y.lastAt).localeCompare(String(x.lastAt)))
       .slice(0, 8);
 
@@ -4033,6 +4036,7 @@ function reagentLibRows(project, kw) {
         // 这个试剂用过的所有「当量 / 组分」组合，用得最多的排前面；defaultEq 给「从试剂库选」用
         variants: variantsOf(it.key),
         defaultEq: (variantsOf(it.key)[0] || {}).eq ?? null,
+        defaultUl: (variantsOf(it.key)[0] || {}).ul ?? null,
         // checkedAt 空 = 还没联网核过；miss = 核了，三个库都没有（下次别再自动去敲）
         checkedAt: it.checked_at || '',
         checkState: it.check_state || '',

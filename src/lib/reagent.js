@@ -122,6 +122,20 @@ export function amountText(r) {
   return '';
 }
 
+/** 体积的说话方式：够 1 mL 写 mL，不够写 µL（溶剂那行就靠它） */
+export const volText = (ul) => {
+  const v = num(ul);
+  if (v === null || v <= 0) return '';
+  return v >= 1000 ? `${round(v / 1000, 2)} mL` : `${round(v, v >= 20 ? 0 : 1)} µL`;
+};
+
+/** 试剂库里「用法」小签上的字：溶剂写用量，其余写当量 */
+export const variantText = (v) => {
+  if (!v) return '';
+  if (v.role === '溶剂') return volText(v.ul) || '未记量';
+  return String(v.eq || '').trim() || '不带当量';
+};
+
 /** 固体（按 g 称）/ 液体（按 mL 量） */
 export function rowKind(r) {
   const mmol = num(r.mmol);

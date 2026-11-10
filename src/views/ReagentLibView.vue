@@ -4,6 +4,7 @@ import Icon from '../components/Icon.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { toast } from '../lib/feedback.js';
+import { variantText } from '../lib/reagent.js';
 import DocGrip from '../components/DocGrip.vue';
 
 /**
@@ -188,7 +189,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                     class="rl-var"
                     :class="{ 'is-on': it.defaultEq === v.eq }"
                   >
-                    {{ v.eq || '不带当量' }}<em v-if="v.n > 1">×{{ v.n }}</em>
+                    {{ variantText(v) }}<em v-if="v.n > 1">×{{ v.n }}</em>
                   </span>
                 </span>
               </td>
