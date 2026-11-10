@@ -4,25 +4,29 @@
 #   ./scripts/sync-server.sh            # 真同步
 #   ./scripts/sync-server.sh --dry-run  # 只看会做什么
 #
-# 连接信息可用环境变量覆盖（默认就是下面这台）：
-#   ELN_SYNC_HOST=root@123.56.150.128
-#   ELN_SYNC_KEY=<本机路径>/<私钥>.pem
-#   ELN_SYNC_KNOWN=<本机路径>/.ssh_known_hosts
-#   ELN_SYNC_AUTH=<用户>:<密码>        # 同步完用它核对条数
+# 连接信息**全部走环境变量**（仓库是公开的，别把主机 / 密钥路径 / 密码写进来）：
+#   ELN_SYNC_HOST=root@<服务器>            # 必填
+#   ELN_SYNC_KEY=~/.ssh/<私钥>             # 可选，不填就用 ssh 默认
+#   ELN_SYNC_KNOWN=<known_hosts 文件>       # 可选
+#   ELN_SYNC_AUTH=<用户>:<密码>             # 可选，同步完用它核对条数（开了 Basic Auth 才需要）
+# 本机的真实值写在 CLOUD-DEPLOY.local.md（已 gitignore），从这里 export 即可。
 set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-HOST=${ELN_SYNC_HOST:-root@123.56.150.128}
-KEY=${ELN_SYNC_KEY:-<本机路径>/<私钥>.pem}
-KNOWN=${ELN_SYNC_KNOWN:-<本机路径>/.ssh_known_hosts}
-AUTH=${ELN_SYNC_AUTH:-<用户>:<密码>}
+HOST=${ELN_SYNC_HOST:?请先 export ELN_SYNC_HOST=root@<服务器>}
+KEY=${ELN_SYNC_KEY:-}
+KNOWN=${ELN_SYNC_KNOWN:-}
+AUTH=${ELN_SYNC_AUTH:-}
 REMOTE_DATA=${ELN_SYNC_DATA:-/var/lib/eln}
 SITE=${ELN_SYNC_SITE:-http://${HOST#*@}}   # 默认就用同步的那台机器，别指到本机
 DRY=0
 [ "${1:-}" = "--dry-run" ] && DRY=1
 
-SSHOPTS=(-i "$KEY" -o BatchMode=yes -o ConnectTimeout=10)
-[ -f "$KNOWN" ] && SSHOPTS+=(-o "UserKnownHostsFile=$KNOWN")
+AUTHOPT=()
+[ -n "$AUTH" ] && AUTHOPT=(-u "$AUTH")
+SSHOPTS=(-o BatchMode=yes -o ConnectTimeout=10)
+[ -n "$KEY" ] && SSHOPTS+=(-i "$KEY")
+[ -n "$KNOWN" ] && [ -f "$KNOWN" ] && SSHOPTS+=(-o "UserKnownHostsFile=$KNOWN")
 SSH=(ssh "${SSHOPTS[@]}" "$HOST")
 SCP=(scp -q "${SSHOPTS[@]}")
 
@@ -63,7 +67,7 @@ say "启动服务器后端…"
 "${SSH[@]}" "chown -R eln:eln $REMOTE_DATA; rm -f $REMOTE_DATA/eln.db-wal $REMOTE_DATA/eln.db-shm; systemctl start eln; sleep 1; systemctl is-active eln" >/dev/null
 
 # 5) 核对（顺带确认认证还在）
-REMOTE_STAT=$(curl -s -m 15 -u "${AUTH}" "${SITE}/api/experiments" | python3 -c "
+REMOTE_STAT=$(curl -s -m 15 "${AUTHOPT[@]}" "${SITE}/api/experiments" | python3 -c "
 import json,sys
 try:
     d=json.load(sys.stdin); items=d.get('experiments') or d.get('items') or []
@@ -71,14 +75,14 @@ try:
 except Exception:
     print('?')
 " 2>/dev/null || echo '?')
-REMOTE_CMP=$(curl -s -m 15 -u "${AUTH}" "${SITE}/api/compounds" | python3 -c "
+REMOTE_CMP=$(curl -s -m 15 "${AUTHOPT[@]}" "${SITE}/api/compounds" | python3 -c "
 import json,sys
 d=json.load(sys.stdin); print(len(d.get('compounds') or d.get('items') or []))
 " 2>/dev/null || echo '?')
 
 echo
 if [ "${REMOTE_STAT}" = "$(echo "${LOCAL_STAT}" | cut -d/ -f1)" ]; then
-  echo "✓ 同步完成：服务器 $(curl -s -o /dev/null -w '%{http_code}' -u "${AUTH}" "${SITE}/") 在线，实验 ${REMOTE_STAT} 条 / 化合物 ${REMOTE_CMP} 个（本机 ${LOCAL_STAT}）"
+  echo "✓ 同步完成：服务器 $(curl -s -o /dev/null -w '%{http_code}' "${AUTHOPT[@]}" "${SITE}/") 在线，实验 ${REMOTE_STAT} 条 / 化合物 ${REMOTE_CMP} 个（本机 ${LOCAL_STAT}）"
 else
   echo "⚠ 传完了但对不上：服务器实验 ${REMOTE_STAT} 条、化合物 ${REMOTE_CMP} 个；本机 ${LOCAL_STAT}"
   exit 1

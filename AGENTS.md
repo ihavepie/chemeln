@@ -5,7 +5,7 @@
 ## 1. 这是什么
 - 个人电子实验记录本（ELN），给一位有机化学研究生单人使用，全本机运行，无后端服务、无账号、无联网需求。
 - 记录对象：方法学实验记录（反应式、投料表、条件、结果、TLC、谱图）+ 化合物档案（结构式、核磁图、TLC、二维码瓶签）。
-- 位置：`<本机路径>/Software/ELN`（外置盘，别假设它在系统盘）。
+- 位置：项目目录（本机在外置盘上的 `Software/ELN`，别假设它在系统盘）。
 
 ## 2. 现在只有一套前端（v2），v1 已退役
 - **4780 = 正式运行的那套**：`public/` 里是 `vite build` 产物（`index.html` + `assets/`），由 `start.command` 起的服务直接发出去。
@@ -23,8 +23,8 @@
 - **绝对不能删**：`data/`（用户全部实验记录）、`server/package.json`（内容是 `{"type":"commonjs"}`，删了服务端起不来）、`src/styles/eln.css` 里从 v1 原样搬来的大段规则、`public/`（**现在就是 v2 构建产物，删了 4780 打不开**；旧 v1 在 `.backup/public-v1-*/`）。
 - **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。常用：`git diff` 看改了啥、`git checkout -- <文件>` 撤销未提交改动、`git log --oneline` 看历史。**git 只保代码，不保数据**：`data/` 得自己拷走。
   **两个远程**：`backup` = 本机裸仓库 `<项目目录>-backup.git`（`git push backup main` 推一份）；`origin` = `git@github.com:ihavepie/chemeln.git`（公开仓库，HTTPS 地址 https://github.com/ihavepie/chemeln）。
-  **这台机器连 github.com 的 HTTPS 会超时**（`curl https://github.com/` 000，但 `api.github.com` 通），所以走 SSH：私钥在 `<本机路径>/.ssh/<私钥>`（不进门目录，沙箱写不了 `~/.ssh`），仓库里已配好 `core.sshCommand` 指到它，公钥要在 GitHub 账号里登记过才能推。
-  **脱敏**：`CLOUD-DEPLOY.md` 是模板（占位地址），真实 IP / 私钥 / 密码只在本机 `CLOUD-DEPLOY.local.md`（已 gitignore）。**历史已用 `git filter-branch` 重写过一遍**（IP / 密码 / `<用户目录>` 全抹，hash 全变，旧对象已 gc），**别再把这些写进仓库**；细节在 `HISTORY.md`。
+  **这台机器连 github.com 的 HTTPS 会超时**（`curl https://github.com/` 000，但 `api.github.com` 通），所以走 SSH：用本机生成的专用私钥（路径只写在本地的 `CLOUD-DEPLOY.local.md`，公开仓库里不留），仓库 `core.sshCommand` 指到它，公钥在 GitHub 账号里登记过才能推。
+  **脱敏**：`CLOUD-DEPLOY.md` 是模板（占位地址），真实 IP / 私钥 / 密码只在本机 `CLOUD-DEPLOY.local.md`（已 gitignore）；脚本里的连接信息一律走环境变量。**历史已用 `git filter-branch` 重写过**（IP / 密码 / 用户名全抹），**别再把这些写进仓库**；细节见 `HISTORY.md`。
 
 ## 4. 目录结构（一句话一个）
 - `src/main.js` — 入口：挂 router / Element Plus / 全局指令。
@@ -73,7 +73,7 @@
 - `src/lib/indigo.js` — **只给「带缩写」的结构用的渲染器**：`indigoSvg(molfile)` 动态 `import('indigo-ketcher/binaryWasm')`，`locateFile` 指 `/vendor/indigo/`，`M.render(mol, {render-output-format:'svg', render-coloring:'true'})`；**返回的是 base64**，要 `atob` + `TextDecoder` 解。拿不到 wasm 就抛错、调用方退回 openchemlib。`indigoSvgSized(molfile, bondPx, padPx)` 另给 `scheme.js` 用：拆出 `{svg, body, vb, w, h}`，尺寸按 **`INDIGO_BOND_UNITS = 100`**（一根键 = 100 个 viewBox 单位，实测）换算，好跟 openchemlib 画的结构键长一致；**Indigo 基本照抄 molfile 里给的坐标**（坐标改了形状就跟着变），所以喂进去前要先 `relayoutMolecule()` 规整坐标，再按常数反算缩放。body 里的 `id` / `href` / `url(#…)` 会统一加前缀——Indigo 每条图的 `glyph-*` id 是固定的，一张图里塞好几个 Indigo 结构时标签会串成乱码（踩过）。molfile 只去尾部空白（首行是标题，trim 掉会整段错位）。
   **线宽 / 尺度**：`INDIGO_LINE_WIDTH = '1.8'`（Indigo 的「一根键的线宽」= 这个数/30，1.8 对应 0.06，跟 openchemlib 的 stroke 1.44px / 键长 24px 一样粗；2.3 太粗，用户否过）；字号：**必须连单位一起设** `render-font-size-unit='px'` + `render-font-size='56'`（同一坐标系里一根键 100 单位，56 ≈ 0.56；openchemlib 是 14/24≈0.58）——只给 `render-font-size` 会被当成 0、标签整个消失（踩过）；`samePxScale()` 把整张图缩到 **`BOND_PX = 34`** 像素一根键（openchemlib 出图固定 24 px/键，`chem.js` 里也按同一比例放大），两边出图的像素尺度就一致了——不然 Indigo 的图（一根键 100 单位）动辄 500–900 px 宽，塞进 148 px 的格子里被缩一圈、线看着比 openchemlib 细。
   还有 `indigoLayout(molfile)`：**Indigo 的 layout（= Ketcher 里那个「layout」/ clean2d）**，把结构重排成规整坐标返回 molfile。**第二个参数是输出格式**——写成 `layout(mf)` / `layout(mf, opts)` 都会报 `Cannot pass non-string to std::string`，必须 `layout(mf, 'molfile', new MapStringString())`（踩了半天）。
-- `src/lib/relayout.js` — 三件套：`relayoutMolecule(lib, mol)`（重排坐标）、`canonicalOrientation(lib, mol)`（**摆正**：候选角度 = 每根键转到 24 个 **15°** 整角度，按分数挑最好的——**羰基 C=O 朝上最好**、环上的键落在 15° 网格、整张图横着比竖着好）。**两个坑**：①羰基方向要从 **C 指向 O** 算，直接用键向量会因为原子顺序反过来；②**openchemlib 的 y 轴朝上、SVG 的 y 轴朝下**，分子坐标里 **270°** 的 C=O 在图上才是「朝上」——按 90° 给分的话全画成朝下（踩过）。15° 这个档位是照用户自己的 ChemDraw 稿子定的（`合底物.cdxml`：715 根键里 99.4% 落在 15° 网格上，羰基在分子坐标里基本都是 270°=图上朝上）；另外还有 `orientLandscape(mol)`（比宽还高就转 90° 摆平）。**顺序是 relayout → orientLandscape → canonicalOrientation**——反过来的话「摆平」那一步会把刚竖好的羰基又转成横的（踩过）。以下是 `relayoutMolecule` 的说明：用 Indigo 的 layout 算一份规整坐标，**只把坐标写回 openchemlib 的分子**（化学信息仍用 openchemlib 自己解析的那份），**搬之前核对原子数和每个位置的元素标签**，对不上就不搬。**为什么非要这一步**：①openchemlib 排的键角在螺环 / 并环 / 多取代环上经常歪；②它自己的 layout **带随机性**——同一个 SMILES 连排两次坐标就可能不一样（同一化合物每次画出来不一样）。**别直接拿 Indigo 的 molfile 去画**（会冒出紫色键之类）。缩写那条路（`abbrev.js`）在写 molfile 之前也要先调它一次，因为 Indigo 渲染会照抄 molfile 里给的坐标。
+- `src/lib/relayout.js` — 三件套：`relayoutMolecule(lib, mol)`（重排坐标）、`canonicalOrientation(lib, mol)`（**摆正**：候选角度 = 每根键转到 24 个 **15°** 整角度，按分数挑最好的——**羰基 C=O 朝上最好**、环上的键落在 15° 网格、整张图横着比竖着好）。**两个坑**：①羰基方向要从 **C 指向 O** 算，直接用键向量会因为原子顺序反过来；②**openchemlib 的 y 轴朝上、SVG 的 y 轴朝下**，分子坐标里 **270°** 的 C=O 在图上才是「朝上」——按 90° 给分的话全画成朝下（踩过）。15° 这个档位是照用户自己的 ChemDraw 稿子定的（照一份 ChemDraw 稿定的：715 根键里 99.4% 落在 15° 网格上，羰基在分子坐标里基本都是 270°=图上朝上）；另外还有 `orientLandscape(mol)`（比宽还高就转 90° 摆平）。**顺序是 relayout → orientLandscape → canonicalOrientation**——反过来的话「摆平」那一步会把刚竖好的羰基又转成横的（踩过）。以下是 `relayoutMolecule` 的说明：用 Indigo 的 layout 算一份规整坐标，**只把坐标写回 openchemlib 的分子**（化学信息仍用 openchemlib 自己解析的那份），**搬之前核对原子数和每个位置的元素标签**，对不上就不搬。**为什么非要这一步**：①openchemlib 排的键角在螺环 / 并环 / 多取代环上经常歪；②它自己的 layout **带随机性**——同一个 SMILES 连排两次坐标就可能不一样（同一化合物每次画出来不一样）。**别直接拿 Indigo 的 molfile 去画**（会冒出紫色键之类）。缩写那条路（`abbrev.js`）在写 molfile 之前也要先调它一次，因为 Indigo 渲染会照抄 molfile 里给的坐标。
 - `src/lib/abbrev.js` — **自动认基团缩写**（Ts / Boc / CO2Et…，**没接进出图链路**）：`ABBREV_GROUPS` 是「标签 + `*` 封口片段 SMILES」的表（顺序即优先级，大基团在前），`abbreviateSmiles(smiles)` 用 openchemlib 的 `SSSearcher` 匹配、把命中的原子写进 SUP S-group（`M  STY / SAL / SMT`，**编号占 4 格**），`abbreviatedParts(smiles, bondPx)` 再交给 Indigo 出图。**四条坑**（氢数、表序、主体基团不缩写、同种基团要么全缩要么全画）的细节在 `HISTORY.md` 的「基团缩写」一节，改之前先看。
 - `src/lib/abbrevspread.js` — **缩写基团的键「短一截」的补法**：`spreadAbbrevBonds(mol, k=0.3)` 把缩写基团的附着原子在 2D 坐标里沿键方向往外挪 0.3 个键长，补回 Indigo 出图时给标签文字留位截掉的那一截（实测 0.72 → 0.99）。解析 `M  SAL` / `M  SAP`，**SAP 缺了就按「组内原子连到组外的那根键」倒推**（Ketcher 只给部分组写 SAP）；键长 ≥1.15 的跳过（幂等）；只动坐标，化学和 SMILES 都不碰。`SketcherModal.pick()` 里出图 / 存底稿都用挪过的那份。
 - `src/lib/chemdraw.js` — **让结构图像 ChemDraw**：Indigo 出图把标签渲成自带衬线矢量字形（`<use href="#glyph…">`）+ 偏小，Indigo 又没有换字体选项（`render-font-name` 报 not defined），所以出图后把标签换成真正的 `<text>`（Helvetica/Arial、字高 0.32 键长、下标用 tspan、按内容重算 `viewBox`）。标签归属靠「字符数唯一匹配 `M  SMT`」+ 最近键端点定左右（Indigo 会平移 + 翻 y，molfile 坐标不能直接用）；认不准原样返回。
@@ -146,7 +146,7 @@
 - **「课题」和「分类」不是一回事**：课题是 `experiments.project` 文本字段，决定了**全站空间**（侧栏切换，统计/列表/导出跟着走），课题表本身不存在——清单来自 `GROUP BY project` 加 settings 里的 `projects_json`（用来记还没写记录的课题），每个课题的编号前缀存 `prefix:<课题>`（没设就按课题名自动生成，见 `derivedPrefix()`；实验编号按课题分开数）。分类是卡片墙里的分组，仍按分类走，两者叠加。
 - **课题级设置覆盖**：01 记录本信息里，**课题名就是「标题」**——在课题里改标题等于改名（会走 `renameProject` 把记录一起搬），标题不再单独存覆盖值；编号前缀/记录人/课题组/二维码地址可以每个课题覆盖。存法：`prefix:<课题>`（编号前缀）+ `proj:<课题>:<字段>`（其余三项），空值就不落盘（= 跟着全局）。服务端 `settingsFor(project)` 做合并，bootstrap 同时返回 `settings`（已合并）、`settingsGlobal`（占位符用）、`projectOverrides`（表单编辑用）；`PUT /api/settings` 带 `project` 才写课题级（共用开关已经不存在了）。删课题时会把这两个前缀的键一起清掉。
 - **Node 自己不认系统代理**：本机开着 Clash（`scutil --proxy` 里 HTTP/HTTPS 都是 127.0.0.1:7892），`curl` 走代理一秒就回来，Node 的 `https.get` 直连 wikidata.org 却一路超时（connect 事件都不出现）。`fetchJson` 现在自己读 `HTTPS_PROXY` 或 `scutil --proxy`，手搭 CONNECT 隧道，并按主机记「直连 / 代理」；启动日志里有一行 `联网查询 → 系统代理 …`。查不到东西先看这行。
-- **投料表被「没加载完的页面」清空过**（SJ-2-2 真丢过）：`PUT /api/experiments/:id` 现在防呆，整表突然 0 行带名字的就 409 拦下。明细见 HISTORY。
+- **投料表被「没加载完的页面」清空过**（真丢过一条记录的投料表）：`PUT /api/experiments/:id` 现在防呆，整表突然 0 行带名字的就 409 拦下。明细见 HISTORY。
 - **不要在用户正编辑时用 API 改他的记录**（他页面里的自动保存会把改动覆盖回去）；验证只用临时记录，验完删掉。
 - 打开实验页本身会触发保存（`fill()` 会补算 mmol、补起始行）→ 「只看不动」的验证要用临时记录，或在该页拦掉非 GET 请求。
 - SQLite 子查询的 `ORDER BY` 里引用不到外层表的列 → 拆成「主查询 + 一条补数据查询」。

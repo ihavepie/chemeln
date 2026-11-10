@@ -669,7 +669,7 @@ function listProjects() {
 
 /**
  * 课题名 → 自动前缀：ASCII 取字母数字（最多 3 位、大写），
- * 中文名取前两个字（「氨基环丁酮类」→「氨基」）。撞了后面加 2、3…
+ * 中文名取前两个字（「某课题」→「氨基」）。撞了后面加 2、3…
  */
 function derivedPrefix(name) {
   const s = str(name).trim();

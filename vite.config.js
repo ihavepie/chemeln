@@ -40,8 +40,17 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
-    // 走 Tailscale/反代时 Host 不是 localhost，Vite 默认会 403；这几个域名放行
-    allowedHosts: ['.<tailnet>.ts.net', 'localhost', '127.0.0.1'],
+    // 走 Tailscale / 反代时 Host 不是 localhost，Vite 默认会 403。
+    // 具体域名不写进仓库（公开仓库，别把自己的 tailnet 名字晒出去）：
+    //   ELN_DEV_HOSTS=".xxx.ts.net,localhost" npm run dev
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      ...String(process.env.ELN_DEV_HOSTS || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ],
     proxy: {
       '/api': { target: 'http://127.0.0.1:4780', changeOrigin: false },
     },

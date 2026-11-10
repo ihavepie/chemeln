@@ -243,6 +243,10 @@ ensureColumn('experiments', 'product_mass', 'product_mass REAL');
 ensureColumn('experiments', 'product_mw', 'product_mw REAL');
 ensureColumn('experiments', 'tlc_note', "tlc_note TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'steps_json', "steps_json TEXT NOT NULL DEFAULT '[]'");
+// 加料（补加试剂的时间点）和搅拌转速：以前是在库里手改的，没写迁移 →
+// 新装一份数据库会因为「no such column: addition」直接起不来（造演示数据时踩到）
+ensureColumn('experiments', 'addition', "addition TEXT NOT NULL DEFAULT ''");
+ensureColumn('experiments', 'stir_rate', "stir_rate TEXT NOT NULL DEFAULT ''");
 // 粗产物 / 中间体这类「不计产率」：只记质量，不显示也不统计产率
 ensureColumn('experiments', 'no_yield', 'no_yield INTEGER NOT NULL DEFAULT 0');
 // 记录类型：原料 / 试反应 / 条件筛选 / 底物扩展（并行，不是阶段）；空 = 通用版式
