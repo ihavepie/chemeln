@@ -126,14 +126,7 @@ const rows = computed(() => {
       // 只差规模也算「另一种条件」（不然整摞会被读成「重复 ×2」），但卡片上不再重复写一遍——
       // 规模本来就有自己那行小注
       const variant = m.id === base.id ? '基准' : diffs.length ? `改：${diffs.join('、')}` : scaleNote ? '改：规模' : '重复';
-      // 组员行跟面子同名同描述就不再重复一遍（一排里两条一样的标题最显挤）
-      const faceTitle = String(base.title || '').trim();
-      const faceDesc = String(base.objective || '').trim();
-      const myTitle = String(m.title || '').trim();
-      const myDesc = String(m.objective || '').trim();
-      const headTitle = myTitle !== faceTitle ? m.title || m.objective || '（未命名实验）' : '';
-      const headDesc = myDesc && myDesc !== myTitle && myDesc !== faceDesc ? m.objective : '';
-      return { ...m, diffs, variant, scaleNote, headTitle, headDesc };
+      return { ...m, diffs, variant, scaleNote };
     });
     const allRepeat = withVariant.every((m) => m.variant === '基准' || m.variant === '重复');
     // 「重复」跟基准是同一套条件，不算多出来的一种；只有真改了变量的才算
@@ -535,9 +528,9 @@ function onStackFace(row) {
                   <span class="exp-date">{{ m.date }}</span>
                   <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
                 </div>
-                <div v-if="m.headTitle || m.headDesc" class="exp-title">
-                  <span v-if="m.headTitle" class="exp-name">{{ m.headTitle }}</span>
-                  <span v-if="m.headDesc" class="exp-desc-inline">{{ m.headDesc }}</span>
+                <div class="exp-title">
+                  <span class="exp-name">{{ m.title || m.objective || '（未命名实验）' }}</span>
+                  <span v-if="m.objective && m.objective !== m.title" class="exp-desc-inline">{{ m.objective }}</span>
                 </div>
                 <!-- 改了什么：一条一项，各自一颗小标签，不折成「投料（… 等）」也不让它断行 -->
                 <div v-if="m.diffs && m.diffs.length" class="member-diff">
