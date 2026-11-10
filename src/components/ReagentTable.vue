@@ -8,6 +8,7 @@ import { applyNumeric } from '../lib/numinput.js';
 import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, num, parseMwCell, roleTone, round, rowKind, totals, vesselHint } from '../lib/reagent.js';
 import { compoundDict, reagentDict } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
+import { analyzeSmiles } from '../lib/chem.js';
 
 const props = defineProps({
   model: { type: Object, required: true },
@@ -453,8 +454,18 @@ async function lookupName(r, key0) {
     return;
   }
   r._miss = false;
-  if (num(info.mw) !== null) {
-    r.mwText = round(Number(info.mw), 2);
+  let mw = num(info.mw);
+  // OPSIN 只回 SMILES：拿它在本地算分子式 / MW（openchemlib，不用联网）
+  if (mw === null && info.smiles) {
+    try {
+      const a = await analyzeSmiles(info.smiles);
+      if (num(a && a.mw) !== null) mw = a.mw;
+    } catch {
+      /* 算不出来就算了，手填就行 */
+    }
+  }
+  if (mw !== null) {
+    r.mwText = round(Number(mw), 2);
     onMw(r);
   }
   if (num(r.density) === null && info.props && info.props.density) {

@@ -3633,6 +3633,114 @@ function lookupCachePath(kind, value) {
   return path.join(LOOKUP_DIR, `${h}.json`);
 }
 
+/* --- 名字查不到时的第二、第三个来源（都是免费公开接口，不需要 key） ---------------
+   OPSIN：系统命名 / IUPAC 名 → SMILES。拿到 SMILES 就能在**本地**算出分子式和 MW
+          （前端 lib/chem.js，openchemlib），所以这里只回 SMILES 不算重量。
+   Wikidata：中文名也能搜（PubChem 只认英文 / CAS），P274 分子式、P2067 分子量。 */
+const OPSIN = 'https://www.ebi.ac.uk/opsin/ws';
+
+async function opsinLookup(name) {
+  const r = await fetchJson(`${OPSIN}/${encodeURIComponent(name)}.json`, 6000);
+  if (!r || str(r.status) !== 'SUCCESS' || !str(r.smiles)) return null;
+  return {
+    found: true,
+    source: 'opsin',
+    query: name,
+    name,
+    smiles: str(r.smiles),
+    inchikey: str(r.stdinchikey),
+    formula: '',
+    mw: '',
+    cas: [],
+    props: {},
+    url: `${OPSIN}/${encodeURIComponent(name)}.json`,
+  };
+}
+
+/** 给「可能很慢的备用源」套一个总超时：宁可查不到，也别让录数据等十几秒 */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+async function wikidataLookup(name) {
+  // 用 CirrusSearch 的 `haswbstatement:P274` 直接把「有分子式属性」的条目筛出来，
+  // 这样中文名也能命中，而且不会像 wbsearchentities 那样返回一堆同名的非化学条目。
+  const hit = await fetchJson(
+    'https://www.wikidata.org/w/api.php?action=query&list=search&srnamespace=0&srlimit=3&format=json' +
+      `&srsearch=${encodeURIComponent(`${name} haswbstatement:P274`)}`,
+    6000
+  ).catch(() => null);
+  for (const item of (hit && hit.query && hit.query.search) || []) {
+    const entity = await fetchJson(`https://www.wikidata.org/wiki/Special:EntityData/${item.title}.json`, 8000).catch(() => null);
+    const claims = entity && entity.entities && entity.entities[item.title] && entity.entities[item.title].claims;
+    if (!claims) continue;
+    // Wikidata 的分子式常带下标字符（C₇H₆O），统一成普通数字再给前端
+    const formula = str((claims.P274 || [])[0]?.mainsnak?.datavalue?.value)
+      .replace(/[₀-₉]/g, (c) => String('₀₁₂₃₄₅₆₇₈₉'.indexOf(c)));
+    const amount = (claims.P2067 || [])[0]?.mainsnak?.datavalue?.value?.amount;
+    const mw = amount == null ? '' : String(Math.round(Number(amount) * 1000) / 1000);
+    if (!formula && !mw) continue;
+    const label = entity.entities[item.title]?.labels?.zh?.value || entity.entities[item.title]?.labels?.en?.value || name;
+    return {
+      found: true,
+      source: 'wikidata',
+      query: name,
+      name: str(label),
+      formula,
+      mw,
+      cas: [],
+      props: {},
+      url: `https://www.wikidata.org/wiki/${item.title}`,
+    };
+  }
+  return null;
+}
+
+/** 给「可能很慢的备用源」套一个总超时：宁可查不到，也别让录数据等十几秒 */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
+async function wikidataLookup(name) {
+  for (const lang of ['zh', 'en']) {
+    const hit = await fetchJson(
+      `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(name)}` +
+        `&language=${lang}&uselang=${lang}&format=json&type=item&limit=5`,
+      6000
+    ).catch(() => null);
+    // 只核对前两条命中：Wikidata 搜同名会返回一堆非化学条目，挨个取实体太慢（实测能拖到 20s+）
+    for (const item of ((hit && hit.search) || []).slice(0, 2)) {
+      const entity = await fetchJson(`https://www.wikidata.org/wiki/Special:EntityData/${item.id}.json`, 8000).catch(() => null);
+      const claims = entity && entity.entities && entity.entities[item.id] && entity.entities[item.id].claims;
+      if (!claims) continue;
+      // Wikidata 的分子式常带下标字符（C₇H₆O），统一成普通数字再给前端
+      const formula = str((claims.P274 || [])[0]?.mainsnak?.datavalue?.value)
+        .replace(/[₀-₉]/g, (c) => String('₀₁₂₃₄₅₆₇₈₉'.indexOf(c)));
+      const amount = (claims.P2067 || [])[0]?.mainsnak?.datavalue?.value?.amount;
+      const mw = amount == null ? '' : String(Math.round(Number(amount) * 1000) / 1000);
+      if (!formula && !mw) continue;
+      return {
+        found: true,
+        source: 'wikidata',
+        query: name,
+        name: str(item.label) || name,
+        formula,
+        mw,
+        cas: [],
+        props: {},
+        url: `https://www.wikidata.org/wiki/${item.id}`,
+      };
+    }
+  }
+  return null;
+}
+
 route('GET', '/api/lookup', async (req, res, params, url) => {
   const smiles = str(url.searchParams.get('smiles')).trim();
   const inchikey = str(url.searchParams.get('inchikey')).trim();
@@ -3654,13 +3762,27 @@ route('GET', '/api/lookup', async (req, res, params, url) => {
     /* 没缓存 */
   }
 
-  let info;
+  let info = null;
+  let netErr = null;
   try {
     info = await pubchemLookup(kind, value);
   } catch (e) {
-    // 断网 / 超时：有旧结果就给旧的，没有就明说
+    netErr = e;   // PubChem 不通就先记下，后面还有别的源可以试
+  }
+  // PubChem 没有 → 再问 OPSIN（系统命名）和 Wikidata（中文名）；都是按名字查才有意义
+  if ((!info || !info.found) && kind === 'name') {
+    for (const [source, budget] of [[opsinLookup, 7000], [wikidataLookup, 6000]]) {
+      try {
+        const alt = await withTimeout(source(value), budget);
+        if (alt) { info = alt; break; }
+      } catch {
+        /* 这个源不通就跳过，不影响别的源 */
+      }
+    }
+  }
+  if (!info) {
     if (stale) return ok(res, { ...stale, cached: true, stale: true });
-    throw new HttpError(502, `查不到（${e.message || '网络不通'}）`);
+    throw new HttpError(502, `查不到（${(netErr && netErr.message) || '网络不通'}）`);
   }
   if (!info.found && stale) return ok(res, { ...stale, cached: true, stale: true });
   try {
