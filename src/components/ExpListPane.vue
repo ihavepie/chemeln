@@ -302,9 +302,26 @@ function listDiff(base, m) {
       if (!t) return '—';
       return /%$/.test(t) ? t : `${t} eq`;
     };
-    // 一条一条列，不要再折成「投料（加 X，去 Y 等）」——这里最想看的就是试剂到底动没动
-    for (const [k, r] of Object.entries(b)) if (!a[k]) diffs.push(`加 ${nm(r)}${r.eq ? ` ${eqTxt(r.eq)}` : ''}`);
-    for (const [k, r] of Object.entries(a)) if (!b[k]) diffs.push(`去 ${nm(r)}`);
+    // 一条一条列，不要再折成「投料（加 X，去 Y 等）」——这里最想看的就是试剂到底动没动。
+    // 但「一进一出、角色相同」（配体换配体、碱换碱、溶剂换溶剂）要合成一条
+    // 「旧 → 新」，否则两颗粒子（加 RuPhos / 去 P(Cy)3）说的是同一件事。
+    const added = Object.entries(b).filter(([k]) => !a[k]);
+    const removed = Object.entries(a).filter(([k]) => !b[k]);
+    const usedAdd = new Set();
+    const usedDel = new Set();
+    for (const [kb, rb] of added) {
+      const hit = removed.find(([ka, ra]) => !usedDel.has(ka) && String(ra.role || '') === String(rb.role || ''));
+      if (!hit) continue;
+      const [ka, ra] = hit;
+      usedAdd.add(kb);
+      usedDel.add(ka);
+      const eqA = String(ra.eq ?? '').trim();
+      const eqB = String(rb.eq ?? '').trim();
+      const sameEq = eqSame(eqA, eqB) || (!eqA && !eqB);
+      diffs.push(sameEq ? `${nm(ra)} → ${nm(rb)}` : `${nm(ra)} ${eqTxt(eqA)} → ${nm(rb)} ${eqTxt(eqB)}`);
+    }
+    for (const [k, r] of added) if (!usedAdd.has(k)) diffs.push(`加 ${nm(r)}${r.eq ? ` ${eqTxt(r.eq)}` : ''}`);
+    for (const [k, r] of removed) if (!usedDel.has(k)) diffs.push(`去 ${nm(r)}`);
     const volTxt = (v) => {
       const n = Number(String(v ?? '').trim());
       if (!Number.isFinite(n) || n <= 0) return '—';
