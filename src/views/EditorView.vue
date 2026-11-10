@@ -1422,22 +1422,7 @@ const openAttachment = (id) => {
             :model="fields"
             :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)" />
 
-          <section v-if="sheetPrefs.tlc" class="sec sec-tight sec-tlc">
-            <div class="block-head">
-              <span class="lbl">TLC</span>
-              <input class="tlc-note" v-model="fields.tlc_note" placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸" :disabled="exp.locked" />
-              <TlcOcr :shots="tlcShots" scope="attachment" @pick="applyTlcOcr" />
-            </div>
-            <TlcStrip
-              :attachments="exp.attachments || []"
-              :locked="exp.locked"
-              :hovered="hovered"
-              :on-hover="onHover"
-              :on-pick="pickFile"
-              :on-open="openAttachment"
-              :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
-            />
-          </section>
+
         </article>
 
         <!-- 平行书签是浮层：挂在 body 上、按纸面位置钉住，滚动容器裁不到它 -->
@@ -1526,6 +1511,22 @@ const openAttachment = (id) => {
           <section v-if="sheetPrefs.workup" class="sec">
             <h2 class="sec-title"><span class="num">二</span>后处理</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.workup" :disabled="exp.locked" placeholder="淬灭、萃取、干燥、柱层析（洗脱剂配比、Rf）" />
+          </section>
+          <section v-if="sheetPrefs.tlc" class="sec sec-tight sec-tlc">
+            <div class="block-head">
+              <span class="lbl">TLC</span>
+              <input class="tlc-note" v-model="fields.tlc_note" placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸" :disabled="exp.locked" />
+              <TlcOcr :shots="tlcShots" scope="attachment" @pick="applyTlcOcr" />
+            </div>
+            <TlcStrip
+              :attachments="exp.attachments || []"
+              :locked="exp.locked"
+              :hovered="hovered"
+              :on-hover="onHover"
+              :on-pick="pickFile"
+              :on-open="openAttachment"
+              :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
+            />
           </section>
           <section v-if="sheetPrefs.characterization" class="sec">
             <h2 class="sec-title"><span class="num">三</span>表征数据</h2>
