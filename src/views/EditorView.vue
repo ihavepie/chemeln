@@ -773,8 +773,15 @@ async function newParallel() {
 const peek = ref(null);
 const peekPos = ref({});
 const peekEl = ref(null);
+/** 悬停 220ms 才弹卡片：先让书签上的编号逐字浮出来（那一瞬间就够认了），
+ *  卡片再出来；不然卡片一出现就把编号盖住，等于白做。 */
+let peekTimer = 0;
 function showPeek(s, ev) {
   const r = ev.currentTarget.getBoundingClientRect();
+  clearTimeout(peekTimer);
+  peekTimer = window.setTimeout(() => revealPeek(s, r), 220);
+}
+function revealPeek(s, r) {
   const width = 300;
   const left = Math.max(8, r.left - width - 12);
   peekPos.value = {
@@ -795,6 +802,7 @@ function showPeek(s, ev) {
   });
 }
 function hidePeek() {
+  clearTimeout(peekTimer);
   peek.value = null;
 }
 
@@ -1188,11 +1196,23 @@ const openAttachment = (id) => {
               class="pgroup-tab"
               :class="{ 'is-on': String(s.id) === String(exp.id) }"
               :data-code="s.code"
+              :aria-label="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
               :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}${sibLine(s) ? ` · ${sibLine(s)}` : ''}`"
               @mouseenter="showPeek(s, $event)"
               @mouseleave="hidePeek()"
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
-            />
+            >
+              <!-- 编号逐字浮出：悬停 / 当前那条才显示，字距收紧一档（信息量还是靠预览卡） -->
+              <span class="pgroup-lbl" aria-hidden="true">
+                <span
+                  v-for="(ch, i) in [...s.code]"
+                  :key="i"
+                  class="pgroup-ch"
+                  :style="{ transitionDelay: `${Math.min(i, 10) * 12}ms` }"
+                  >{{ ch }}</span
+                >
+              </span>
+            </button>
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
           </nav>
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
