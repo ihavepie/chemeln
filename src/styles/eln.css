@@ -6093,6 +6093,28 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 
 /* 平行组：只差规模的组员，标一句「1 → 5 mmol」（不算改条件） */
 .stack-scale { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
+/* 组员行上的「化学类型」（记录表头那格手填的标签，比如「改当量」）：只做标记，不参与差异 */
+.stack-rxn { font-size: 9px; color: var(--ink-4); letter-spacing: 0.02em; }
+/* 变体标签不再折成「改 N 项」：改了什么单独占一行，一条一项、各自一颗小标签 */
+.member-diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 4px;
+  margin-top: 4px;
+}
+.member-diff-item {
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 14px;
+  color: var(--accent-ink);
+  background: #f8f0e9;
+  border-radius: 999px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+/* 组员行顶栏那几颗小东西都不许被挤扁（「改当量」曾经被压成竖排） */
+.exp-card.is-member .top > * { flex: 0 0 auto; }
+.exp-card.is-member .exp-date { margin-left: auto; }
 
 /* 平行组：小签 / 书签上的状态点（颜色跟状态标签同一套 tone） */
 .stack-dot,

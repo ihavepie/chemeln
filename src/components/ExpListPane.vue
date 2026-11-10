@@ -116,7 +116,7 @@ const rows = computed(() => {
     // 列表接口没带 variant（那是编辑页用完整投料表算的），这里用列表里有的条件字段自己比
     const withVariant = ordered.map((m) => {
       const diffs = m.id === base.id ? [] : listDiff(base, m);
-      const variant = m.id === base.id ? '基准' : diffs.length === 0 ? '重复' : diffs.length === 1 ? `改：${diffs[0]}` : `改 ${diffs.length} 项`;
+      const variant = m.id === base.id ? '基准' : diffs.length === 0 ? '重复' : `改：${diffs.join('、')}`;
       // 规模不同不算改条件（重复实验放大 / 缩小很正常），单独提示
       const scaleNote =
         String(base.base_mmol ?? '') !== String(m.base_mmol ?? '') && m.base_mmol != null
@@ -234,14 +234,15 @@ async function dropRow(anchor, at) {
   }
 }
 
-/** 列表里能拿到的条件字段：跟基准比一下，看这条是重复还是改了变量 */
+/** 列表里能拿到的条件字段：跟基准比一下，看这条是重复还是改了变量。
+ *  `rxn_type`（表头那格的化学类型）不算——它是给这条记录贴的标签，不是变量，
+ *  改它不该让整摞看起来「改了条件」；卡片上另外把标签显示出来。 */
 const LIST_VARS = [
   ['solvent', '溶剂'],
   ['concentration', '浓度'],
   ['temperature', '温度'],
   ['duration', '时长'],
   ['atmosphere', '气氛'],
-  ['rxn_type', '类型'],
 ];
 /** 当量差在 2%（且 ≤0.005）以内算同一个条件——放大/取整常让当量差一点点 */
 function eqSame(a, b) {
@@ -274,14 +275,19 @@ function listDiff(base, m) {
       );
     const a = parse(base.reagent_sig);
     const b = parse(m.reagent_sig);
-    const notes = [];
-    for (const [k, r] of Object.entries(b)) if (!a[k]) notes.push(`加 ${r.name || '（未命名）'}`);
-    for (const [k, r] of Object.entries(a)) if (!b[k]) notes.push(`去 ${r.name || '（未命名）'}`);
+    const nm = (r) => r.name || '（未命名）';
+    const eqTxt = (v) => {
+      const t = String(v ?? '').trim();
+      if (!t) return '—';
+      return /%$/.test(t) ? t : `${t} eq`;
+    };
+    // 一条一条列，不要再折成「投料（加 X，去 Y 等）」——这里最想看的就是试剂到底动没动
+    for (const [k, r] of Object.entries(b)) if (!a[k]) diffs.push(`加 ${nm(r)}${r.eq ? ` ${eqTxt(r.eq)}` : ''}`);
+    for (const [k, r] of Object.entries(a)) if (!b[k]) diffs.push(`去 ${nm(r)}`);
     for (const [k, rb] of Object.entries(b)) {
       const ra = a[k];
-      if (ra && !eqSame(ra.eq, rb.eq)) notes.push(`${rb.name || '（未命名）'} 当量`);
+      if (ra && !eqSame(ra.eq, rb.eq)) diffs.push(`${nm(rb)} ${eqTxt(ra.eq)} → ${eqTxt(rb.eq)}`);
     }
-    if (notes.length) diffs.push(`投料（${notes.slice(0, 3).join('，')}${notes.length > 3 ? ' 等' : ''}）`);
   }
   return diffs;
 }
@@ -454,6 +460,7 @@ function onStackFace(row) {
                 <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
                 <span v-if="row.face.project">{{ row.face.project }}</span>
                 <span class="sep">·</span><span class="stack-kind">{{ row.kindLabel }}</span>
+                <template v-if="row.face.rxn_type"><span class="sep">·</span><span class="stack-kind">{{ row.face.rxn_type }}</span></template>
                 <template v-if="row.mean != null"><span class="sep">·</span><span style="color: var(--ok)">均值 {{ row.mean }}%</span></template>
               </div>
               <div class="stack-codes">
@@ -486,12 +493,17 @@ function onStackFace(row) {
                   <span class="exp-code">{{ m.code }}</span>
                   <span v-if="m.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                   <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
-                  <span class="stack-variant" :title="m.diffs && m.diffs.length ? m.diffs.join('、') : '与基准条件相同'">{{ m.variant }}</span>
+                  <span v-if="m.rxn_type" class="stack-rxn">{{ m.rxn_type }}</span>
+                  <span v-if="!m.diffs || !m.diffs.length" class="stack-variant">{{ m.variant }}</span>
                   <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
                   <span class="exp-date">{{ m.date }}</span>
                   <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
                 </div>
                 <div class="exp-title">{{ m.title || '（未命名实验）' }}</div>
+                <!-- 改了什么：一条一项，各自一颗小标签，不折成「投料（… 等）」也不让它断行 -->
+                <div v-if="m.diffs && m.diffs.length" class="member-diff">
+                  <span v-for="d in m.diffs" :key="d" class="member-diff-item">{{ d }}</span>
+                </div>
               </button>
             </div>
           </Transition>
