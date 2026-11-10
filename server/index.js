@@ -739,7 +739,7 @@ function bootstrap(query = {}) {
   const seen = new Map();
   // 带上「组分」角色：下次打这个名字，除了 MW / 浓度，连它该当底物还是催化剂一起带出来
   for (const r of db
-    .prepare("SELECT name, role, mw, conc, density FROM reagents WHERE name <> '' ORDER BY id DESC")
+    .prepare("SELECT name, role, mw, conc, density FROM reagents WHERE name <> '' AND trim(role) <> '底物' ORDER BY id DESC")
     .all()) {
     const k = r.name.trim().toLowerCase();
     if (!k) continue;
@@ -3815,7 +3815,9 @@ route('GET', '/api/reagents', async (req, res, params, url) => {
     .prepare(
       `SELECT r.name, r.role, r.mw, r.conc, r.density, r.exp_id, e.date, e.code
          FROM reagents r LEFT JOIN experiments e ON e.id = r.exp_id
-        WHERE trim(r.name) <> '' ${project ? 'AND e.project = ?' : ''}
+        WHERE trim(r.name) <> ''
+          AND trim(r.role) <> '底物'          -- 底物走化合物库，不在试剂库里重复一遍
+          ${project ? 'AND e.project = ?' : ''}
         ORDER BY r.id DESC`
     )
     .all(...(project ? [project] : []));

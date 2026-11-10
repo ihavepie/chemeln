@@ -6,7 +6,7 @@ import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, vesselHint } from '../lib/reagent.js';
-import { compoundDict, reagentDict } from '../store.js';
+import { compoundDict, reagentDict, store } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
 
@@ -569,6 +569,69 @@ function setRole(r, role) {
   props.notify();
 }
 
+/** 投料行：把库里的值摊成一行（跟 EditorView 里那份 toRow 同构，字段少一点） */
+function toRow(r) {
+  const row = {
+    step: Math.max(1, Number(r.step) || 1),
+    role: r.role || '',
+    name: r.name || '',
+    mw: r.mw ?? null,
+    conc: r.conc ?? null,
+    density: r.density ?? null,
+    eq: r.eq ?? null,
+    mmol: null,
+    mass_mg: null,
+    volume_ul: null,
+    note: r.note || '',
+    compound_id: null,
+  };
+  row.mwText = mwFmt(row) || '';
+  row.amountText = '';
+  return row;
+}
+
+/** 从「试剂库」挑一个：一次把名字 / 组分 / 分子量 / 浓度·密度 填好，再按当前规模算用量 */
+const libOpen = ref(false);
+const libItems = ref([]);
+const libQ = ref('');
+const libLoading = ref(false);
+
+async function openLib() {
+  libOpen.value = true;
+  libQ.value = '';
+  libLoading.value = true;
+  try {
+    libItems.value = await api.reagents(store.project);
+  } catch {
+    libItems.value = [];
+  } finally {
+    libLoading.value = false;
+  }
+}
+
+const libShown = computed(() => {
+  const k = libQ.value.trim().toLowerCase();
+  return libItems.value.filter((it) => !k || String(it.name || '').toLowerCase().includes(k) || String(it.role || '').includes(k));
+});
+
+function pickFromLib(it) {
+  const role = it.role || '试剂';
+  const row = toRow({
+    step: steps.value.length,
+    role,
+    name: it.name,
+    mw: num(it.mw),
+    conc: num(it.conc),
+    density: role === '溶剂' ? saneDensity(it.density) : null,
+    eq: 1,
+    note: '',
+  });
+  props.model.rows.push(row);
+  onEq(row);              // 按当前反应规模算 mmol / 用量
+  libOpen.value = false;
+  props.notify();
+}
+
 function addRow(step) {
   props.model.rows.push({ step: step || steps.value.length, role: '试剂', eq: 1, mwText: '', amountText: '', name: '', note: '' });
   props.notify();
@@ -1064,6 +1127,7 @@ function onDrop(ev) {
             <div class="add-cell">
               <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
               <button class="add-row" @click="addSolvent"><Icon name="plus" :size="12" /> 加溶剂</button>
+              <button class="add-row" @click="openLib"><Icon name="flask" :size="12" /> 从试剂库选</button>
               <button class="add-row" @click="addStep"><Icon name="plus" :size="12" /> 加一步</button>
               <span class="spacer" />
               <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>
@@ -1072,6 +1136,19 @@ function onDrop(ev) {
         </tr>
       </tfoot>
     </table>
+
+    <AppModal v-if="libOpen" :model-value="libOpen" title="从试剂库选一个" :show-footer="false" width="520px" @close="libOpen = false">
+      <input v-model="libQ" class="lib-search" placeholder="搜试剂名 / 组分…" spellcheck="false" />
+      <div v-if="libLoading" class="lib-empty">读取中…</div>
+      <div v-else-if="!libShown.length" class="lib-empty">试剂库里没有匹配的条目。</div>
+      <div v-else class="lib-list">
+        <button v-for="it in libShown" :key="it.name" type="button" class="lib-row" @click="pickFromLib(it)">
+          <span class="lib-name">{{ it.name }}</span>
+          <span class="lib-role">{{ it.role || '试剂' }}</span>
+          <span class="lib-meta mono"><template v-if="it.conc">= {{ Number(it.conc).toFixed(2) }} M</template><template v-else-if="it.mw != null">{{ Number(it.mw).toFixed(2) }}<template v-if="it.per_mmol_g"> · 1 mmol {{ it.per_mmol_g }} g</template><template v-if="it.per_mmol_ul"> / {{ it.per_mmol_ul }} µL</template></template></span>
+        </button>
+      </div>
+    </AppModal>
 
     <AppModal
       v-if="browse.open"
