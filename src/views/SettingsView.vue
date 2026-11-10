@@ -7,6 +7,7 @@ import { peekPrefs, setPeekPref, PEEK_LABELS } from '../lib/peek.js';
 import { sheetPrefs, setSheetPref, showAllSheetBlocks, SHEET_BLOCKS } from '../lib/sheetprefs.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
+import DocGrip from '../components/DocGrip.vue';
 
 const saving = ref(false);
 
@@ -621,6 +622,7 @@ async function removeProject(p) {  const ok = await confirm({
       </section>
 
       <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上</p>
+      <DocGrip />
     </div>
   </div>
 </template>

@@ -4,6 +4,7 @@ import Icon from '../components/Icon.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList } from '../store.js';
 import { confirm, toast } from '../lib/feedback.js';
+import DocGrip from '../components/DocGrip.vue';
 
 /**
  * 回收站：删掉的实验 / 化合物暂存在这里。
@@ -122,6 +123,7 @@ async function clearAll() {
           </div>
         </div>
       </template>
+      <DocGrip />
     </div>
   </div>
 </template>

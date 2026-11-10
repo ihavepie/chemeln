@@ -6,6 +6,7 @@ import { api } from '../api.js';
 import { loadBoot, loadList, setProject, store } from '../store.js';
 import { STATUS_TONE } from '../lib/ui.js';
 import { round } from '../lib/reagent.js';
+import DocGrip from '../components/DocGrip.vue';
 
 const router = useRouter();
 onMounted(() => {
@@ -189,6 +190,7 @@ async function byProject(name) {
           {{ s.status }} {{ s.n }}
         </span>
       </div>
+      <DocGrip />
     </div>
   </div>
 </template>

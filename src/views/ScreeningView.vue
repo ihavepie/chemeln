@@ -9,6 +9,7 @@ import { api } from '../api.js';
 import { prompt, toast, confirm } from '../lib/feedback.js';
 import { SOURCES } from '../lib/sctfields.js';
 import { schemeParts } from '../lib/expScheme.js';
+import DocGrip from '../components/DocGrip.vue';
 
 /**
  * 一张条件筛选表：行 = 自己挑的实验，列 = 一串「字段」。
@@ -205,6 +206,7 @@ async function removeScreen() {
         </template>
       </template>
       <div v-else class="empty-note">这张筛选表不存在。</div>
+      <DocGrip />
     </div>
 
     <ExpPick :model-value="pickOpen" :exclude="ids" title="挑几条实验加进这张表" @close="pickOpen = false" @confirm="addRows" />

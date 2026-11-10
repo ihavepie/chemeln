@@ -66,57 +66,66 @@ export function usePaneSize() {
   return { width, resizing, startDrag, resetWidth };
 }
 
-/* ---- 左侧导轨（导航条）的宽度也能拖：DSH 那种「侧栏 / 内容」分隔条 ----
-   只在 ≥821px 时出现（手机上导轨本来就不渲染）。宽度同样存在 localStorage。 */
-const RAIL_KEY = 'eln:railw';
-const RAIL_MIN = 168;
-const RAIL_MAX = 320;
+/* ---- 内容区的宽度也能拖（DSH 那种分隔条）----
+   线在**内容区自己**的右边（`--docw`），拖它只改内容区宽度：左边导航条不动，
+   多出来的空白吃到右边去。工作台 / 条件筛选 / 一张筛选表 / 回收站 / 设置
+   这几页都是 `.single > .inner`，宽度读这个变量，存 localStorage。
+   为什么不做成「导轨↔内容」那条：导轨宽度是固定的，拖那条等于改导航条宽度，
+   用户明确说过不要（2026-11 那轮）。 */
+const DOC_KEY = 'eln:docw';
+const DOC_MIN = 560;
+const DOC_MAX = 1560;
 
-const applyRail = (w) => {
+/** 上限跟着窗口走，别让内容比窗口还宽 */
+const maxDoc = () => Math.max(DOC_MIN, Math.min(DOC_MAX, Math.round(window.innerWidth - 300)));
+
+const applyDoc = (w) => {
   const root = document.documentElement;
-  if (w > 0) root.style.setProperty('--railw', `${w}px`);
-  else root.style.removeProperty('--railw');
+  if (w > 0) root.style.setProperty('--docw', `${w}px`);
+  else root.style.removeProperty('--docw');
 };
 
-const storedRail = (() => {
-  const n = Number(localStorage.getItem(RAIL_KEY));
-  return Number.isFinite(n) && n >= RAIL_MIN ? Math.round(n) : 0;
+const storedDoc = (() => {
+  const n = Number(localStorage.getItem(DOC_KEY));
+  return Number.isFinite(n) && n >= DOC_MIN ? Math.round(n) : 0;
 })();
-if (storedRail) applyRail(storedRail);
+if (storedDoc) applyDoc(storedDoc);
 
-const railW = ref(storedRail);
-const railResizing = ref(false);
+const docW = ref(storedDoc);
+const docResizing = ref(false);
 
-function startRailDrag(e) {
+function startDocDrag(e) {
   e.preventDefault();
   const startX = e.clientX;
-  const startW = railW.value || Math.round(document.querySelector('.rail')?.getBoundingClientRect().width || 212);
-  railResizing.value = true;
-  document.body.classList.add('is-rail-resizing');
+  const inner = document.querySelector('.single > .inner');
+  const startW = docW.value || Math.round(inner?.getBoundingClientRect().width || 980);
+  const max = maxDoc();
+  docResizing.value = true;
+  document.body.classList.add('is-doc-resizing');
   const move = (ev) => {
-    const w = Math.min(Math.max(Math.round(startW + ev.clientX - startX), RAIL_MIN), RAIL_MAX);
-    railW.value = w;
-    applyRail(w);
+    const w = Math.min(Math.max(Math.round(startW + ev.clientX - startX), DOC_MIN), max);
+    docW.value = w;
+    applyDoc(w);
   };
   const up = () => {
-    railResizing.value = false;
-    document.body.classList.remove('is-rail-resizing');
+    docResizing.value = false;
+    document.body.classList.remove('is-doc-resizing');
     window.removeEventListener('mousemove', move);
     window.removeEventListener('mouseup', up);
-    if (railW.value) {
-      try { localStorage.setItem(RAIL_KEY, String(railW.value)); } catch { /* 同上 */ }
+    if (docW.value) {
+      try { localStorage.setItem(DOC_KEY, String(docW.value)); } catch { /* 隐私模式写不进去就算了 */ }
     }
   };
   window.addEventListener('mousemove', move);
   window.addEventListener('mouseup', up);
 }
 
-function resetRailWidth() {
-  railW.value = 0;
-  applyRail(0);
-  try { localStorage.removeItem(RAIL_KEY); } catch { /* 同上 */ }
+function resetDocWidth() {
+  docW.value = 0;
+  applyDoc(0);
+  try { localStorage.removeItem(DOC_KEY); } catch { /* 同上 */ }
 }
 
-export function useRailSize() {
-  return { railW, railResizing, startRailDrag, resetRailWidth };
+export function useDocSize() {
+  return { docW, docResizing, startDocDrag, resetDocWidth };
 }
