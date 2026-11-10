@@ -7065,10 +7065,25 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   left: 50%;
   width: 1px;
   margin-left: -0.5px;
-  /* 平时就是一道淡线（用户说「没看到线」），hover / 拖动才变强调色 */
-  background: #dcd8cf;
+  /* 平时就有一道**看得见**的线（用户说「没看到线」），hover / 拖动才变强调色 */
+  background: #beb9ab;
   transition: background 0.12s, width 0.12s;
 }
+/* 中线上一小段「抓手」，跟导轨那条一致 */
+.pane-grip::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 44px;
+  margin: -22px 0 0 -2px;
+  border-radius: 99px;
+  background: #a8a396;
+  transition: background 0.12s, height 0.12s;
+}
+.pane-grip:hover::before,
+.pane-grip.is-on::before { background: var(--accent); height: 56px; margin-top: -28px; }
 .pane-grip:hover::after,
 .pane-grip.is-on::after { background: var(--accent); width: 2px; margin-left: -1px; }
 body.is-pane-resizing,
@@ -7101,6 +7116,7 @@ body.is-pane-resizing * { cursor: col-resize !important; user-select: none !impo
   cursor: col-resize;
   touch-action: none;
 }
+/* 整条竖线：比导轨自己的边框深一档，不然在 #fbfbfa 底子上根本看不出来 */
 .rail-grip::after {
   content: '';
   position: absolute;
@@ -7109,10 +7125,25 @@ body.is-pane-resizing * { cursor: col-resize !important; user-select: none !impo
   left: 50%;
   width: 1px;
   margin-left: -0.5px;
-  background: #dcd8cf;
+  background: #beb9ab;
   transition: background 0.12s, width 0.12s;
+}
+/* 中线上一小段「抓手」：明显是能拖的地方（用户说光有线看不出来） */
+.rail-grip::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 44px;
+  margin: -22px 0 0 -2px;
+  border-radius: 99px;
+  background: #a8a396;
+  transition: background 0.12s, height 0.12s;
 }
 .rail-grip:hover::after,
 .rail-grip.is-on::after { background: var(--accent); width: 2px; margin-left: -1px; }
+.rail-grip:hover::before,
+.rail-grip.is-on::before { background: var(--accent); height: 56px; margin-top: -28px; }
 body.is-rail-resizing,
 body.is-rail-resizing * { cursor: col-resize !important; user-select: none !important; }
