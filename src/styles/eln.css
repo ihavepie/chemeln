@@ -7118,20 +7118,21 @@ body.is-pane-resizing * { cursor: col-resize !important; user-select: none !impo
 }
 .doc-grip {
   position: absolute;
-  top: 0;
-  width: 20px;
-  height: 160px;          /* 只负责好点中，本身透明 */
+  top: -180px;
+  width: 34px;
+  height: 360px;          /* 判定区：只负责好点中，本身透明 */
   cursor: col-resize;
   touch-action: none;
   pointer-events: auto;
   opacity: 0;
   transition: opacity 0.12s;
 }
-.doc-grip.is-right { right: -10px; }
-.doc-grip.is-left { left: -10px; }
+/* 离内容区远一点（参考 DSH 那条：线在留白里，不贴着内容边缘） */
+.doc-grip.is-right { right: -36px; }
+.doc-grip.is-left { left: -36px; }
 .doc-grip:hover,
 .doc-grip.is-on { opacity: 1; }
-/* 小把手：3px 宽、40px 高的一小段，hover 变强调色 */
+/* 小把手：3px 宽、一小段高，hover 变强调色；判定区比它大得多 */
 .doc-grip::before {
   content: '';
   position: absolute;
