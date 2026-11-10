@@ -5,7 +5,7 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, vesselHint } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, vesselHint } from '../lib/reagent.js';
 import { compoundDict, reagentDict } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
@@ -165,7 +165,7 @@ function applyCompound(r, c) {
   const role = KIND_TO_ROLE[c.kind];
   if (role && !isBaseRow(r)) r.role = role;
   if (!String(r.mwText || '').trim() && c.mw) {
-    r.mwText = round(c.mw, 2);
+    r.mwText = Number(c.mw).toFixed(2);
     onMw(r);
   }
   mergeCompounds([c]);
@@ -288,6 +288,12 @@ function onMw(r) {
   if (v.conc) r.mwText = `${round(v.conc, 3)}M`;
   syncAmount(r);
   props.notify();
+}
+
+/** MW 那一格：没在编辑时一律「两位小数」（280.4 → 280.40、168 → 168.00） */
+function mwDisplay(r) {
+  if (r._mwEditing) return r.mwText;
+  return mwFmt(r) || r.mwText || '';
 }
 
 /** 当量的写法：**小于 1 的用百分数**（0.1 → 10%），1 以上写数字；正在编辑的那格保留原文 */
@@ -479,7 +485,7 @@ async function lookupName(r, key0) {
     }
   }
   if (mw !== null) {
-    r.mwText = round(Number(mw), 2);
+    r.mwText = Number(mw).toFixed(2);
     onMw(r);
   }
   // 只有「溶剂」这一行才自动带密度（固体试剂带密度会算出 µL 这种没意义的用量），
@@ -508,7 +514,7 @@ async function recheck(r) {
   }
   const changed = [];
   if (num(info.mw) !== null) {
-    r.mwText = round(Number(info.mw), 2);
+    r.mwText = Number(info.mw).toFixed(2);
     r._mwManual = false;
     onMw(r);
     changed.push(`MW ${round(Number(info.mw), 2)}`);
@@ -536,7 +542,7 @@ function onName(r) {
   if (hit) {
     r.compound_id = hit.id;
     if (!r._mwManual && hit.mw) {
-      r.mwText = round(hit.mw, 2);
+      r.mwText = Number(hit.mw).toFixed(2);
       onMw(r);
       return;
     }
@@ -1009,7 +1015,7 @@ function onDrop(ev) {
                 </div>
               </td>
               <td>
-                <input class="n mw-cell" data-f="mwcell" :value="r.mwText" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="focusHint(r, 'mwcell')" @blur="blurHint" @keydown="onKeydown($event, r, 'mwcell')" />
+                <input class="n mw-cell" data-f="mwcell" :value="mwDisplay(r)" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="r._mwEditing = true; focusHint(r, 'mwcell')" @blur="r._mwEditing = false; onMw(r); blurHint()" @keydown="onKeydown($event, r, 'mwcell')" />
               </td>
               <td>
                 <input class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq')" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
