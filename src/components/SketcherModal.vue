@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../lib/lookup.js';
-import { spreadAbbrevBonds } from '../lib/abbrevspread.js';
+import { spreadAbbrevBonds, spreadRxnAbbrevBonds } from '../lib/abbrevspread.js';
 import { chemdrawLabels, scaleGlyphLabels } from '../lib/chemdraw.js';
 
 /**
@@ -87,10 +87,14 @@ async function pick() {
   // 反应式：不自动排版（箭头和 + 的位置是人手摆的，排一遍反而会挪走），
   // 直接拿 RXN 让 Ketcher 自己的 Indigo 画成图，连同 RXN 一起交回去存着，下次能接着改
   if (props.mode === 'reaction') {
-    const rxn = String((await a.getRxn()) || '').trim();
+    let rxn = String((await a.getRxn()) || '').trim();
     if (!rxn) return toast('画板上还是空的', 'warn');
-    const svg = await a.image(rxn);
+    // 跟化合物库里的结构走同一套后处理（画什么出什么，不做 layout）：
+    // ①缩写基团（Ph / OMe…）的键补长——RXN 里每个 $MOL 块各补一遍；②标签放大到同一尺度。
+    rxn = spreadRxnAbbrevBonds(rxn);
+    let svg = await a.image(rxn);
     if (!svg || !svg.includes('<svg')) return toast('反应式导不出来，再试一次', 'err');
+    if (svg.includes('xlink:href="#glyph')) svg = scaleGlyphLabels(svg);
     // 顺手把反应式文本也带回去：RXN 保留版式（重新打开用），SMILES 用来认反应物 / 产物
     const smiles = String((await a.getSmiles()) || '').trim();
     emit('pick', { rxn, smiles, svg });

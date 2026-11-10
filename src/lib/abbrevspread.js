@@ -15,6 +15,29 @@
 /** 往外挪多少（单位是「键长」）。0.3 正好把 Indigo 截掉的那一截补平。 */
 export const ABBREV_SPREAD = 0.3;
 
+/** 整条反应式（RXN）也照同一个规矩补：把里面每个 `$MOL` 块各自补一遍，再拼回去。
+ *  画板「画反应式」走的是这条路，不补的话同一批化合物在反应式里键会显短。 */
+export function spreadRxnAbbrevBonds(rxn, k = ABBREV_SPREAD) {
+  const src = String(rxn || '');
+  if (!src || !/^\$MOL\s*$/m.test(src)) return spreadAbbrevBonds(src, k);
+  const head = [];
+  const blocks = [];
+  let cur = null;
+  for (const line of src.split(/\r?\n/)) {
+    if (/^\$MOL\s*$/.test(line)) {
+      if (cur) blocks.push(cur);
+      cur = [];
+      continue;
+    }
+    if (cur) cur.push(line);
+    else head.push(line);
+  }
+  if (cur) blocks.push(cur);
+  const out = [head.join('\n')];
+  for (const b of blocks) out.push('$MOL', spreadAbbrevBonds(b.join('\n'), k));
+  return out.join('\n');
+}
+
 /** 已经挪过的就不要再挪（挪两遍会变成 1.6 倍键长，越存越长） */
 const ALREADY_SPREAD = 1.15;
 
