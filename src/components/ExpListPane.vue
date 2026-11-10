@@ -544,8 +544,8 @@ function onStackFace(row) {
                   <span class="exp-code">{{ m.code }}</span>
                   <span v-if="m.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                   <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
-                  <span v-if="rxnType(m)" class="tag is-rxn">{{ rxnType(m) }}</span>
                   <span v-if="rxnDesc(m)" class="stack-rxn">{{ rxnDesc(m) }}</span>
+                  <span v-if="rxnType(m)" class="tag is-rxn">{{ rxnType(m) }}</span>
                   <span v-if="(!m.diffs || !m.diffs.length) && m.variant !== '改：规模'" class="stack-variant">{{ m.variant }}</span>
                   <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
                   <span class="exp-date">{{ m.date }}</span>
