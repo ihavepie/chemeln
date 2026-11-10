@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed } from 'vue';
 import { autoValue } from '../lib/sctfields.js';
 
 /**
@@ -53,64 +53,6 @@ const base = computed(() => props.rows[0]?.exp || null);
 const hasUnit = computed(() => fields.value.some((f) => unitOf(f)));
 const hasStd = computed(() => !!props.scheme);
 
-// 表格宽度：默认「按内容宽」（比满页窄，文献里那种），右侧竖线可以拖宽 / 拖窄，
-// 双击回到自适应。宽度存 localStorage，是这台显示器上的偏好、不进库。
-const WIDTH_KEY = 'eln:sct:w';
-const storedW = Number(localStorage.getItem(WIDTH_KEY));
-const fitW = ref(Number.isFinite(storedW) && storedW >= 360 ? Math.round(storedW) : 0);
-const fitEl = ref(null);
-const resizing = ref(false);
-
-// 量一下表格「最窄能多窄」：临时按 min-content 排，量完还原（再窄就溢出去了）
-function measureMin() {
-  const tb = fitEl.value?.querySelector('table');
-  if (!tb) return 320;
-  const keep = tb.style.width;
-  tb.style.width = 'min-content';
-  const min = Math.ceil(tb.getBoundingClientRect().width);
-  tb.style.width = keep;
-  return Math.max(320, min);
-}
-
-// 只吃 mouse 事件：Safari 里表格上的 pointer 事件常被拖选吞掉（跟 lib/colresize.js 一个理由）
-function startResize(e) {
-  e.preventDefault();
-  const startX = e.clientX;
-  const startW = fitW.value || fitEl.value?.getBoundingClientRect().width || 0;
-  const minW = measureMin();
-  // 上限 = 外层容器（.sct-plain）的宽度，别把页面拱出横向滚动条
-  const maxW = Math.max(minW, Math.round(fitEl.value?.parentElement?.clientWidth || startW));
-  resizing.value = true;
-  document.body.classList.add('is-sct-resizing');
-  const move = (ev) => {
-    fitW.value = Math.min(Math.max(Math.round(startW + ev.clientX - startX), minW), maxW);
-  };
-  const up = () => {
-    resizing.value = false;
-    document.body.classList.remove('is-sct-resizing');
-    window.removeEventListener('mousemove', move);
-    window.removeEventListener('mouseup', up);
-    try { localStorage.setItem(WIDTH_KEY, String(fitW.value)); } catch { /* 隐私模式写不进去就算了 */ }
-  };
-  window.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', up);
-}
-function resetWidth() {
-  fitW.value = 0;
-  try { localStorage.removeItem(WIDTH_KEY); } catch { /* 同上 */ }
-}
-onMounted(() => {
-  if (!fitW.value) return;
-  const minW = measureMin();
-  if (fitW.value < minW) {
-    fitW.value = minW;
-    try { localStorage.setItem(WIDTH_KEY, String(minW)); } catch { /* 同上 */ }
-  }
-});
-onBeforeUnmount(() => {
-  document.body.classList.remove('is-sct-resizing');
-});
-
 // 表头已经写了单位（产率 [%]），格子里就不再重复一个 %——文献里的数字是裸的
 const cell = (f, r) => {
   const v = isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value);
@@ -126,90 +68,74 @@ const cell = (f, r) => {
         class="sct-cap-fn"
       >[a]</sup>
     </p>
-    <!-- 表格宽度由右边那条竖线拖（双击回自适应）；反应式跟表格放在同一个宽度里居中 -->
-    <div
-      ref="fitEl"
-      class="sct-fit"
-      :class="{ 'is-fixed': fitW > 0, 'is-resizing': resizing }"
-      :style="fitW ? { width: fitW + 'px' } : null"
-    >
-      <!-- 反应式居中压在表格上方（条件就画在箭头上下，不再另起一行字） -->
-      <div v-if="scheme" class="sct-std">
-        <div class="sct-std-scheme" v-html="scheme" />
-      </div>
-      <div class="sct-tbwrap">
-        <table class="sct-table">
-          <thead>
-            <tr>
-              <th class="sct-c-entry">Entry</th>
-              <th class="sct-c-fix">Code</th>
-              <th
-                v-for="f in fields"
-                :key="f.key"
-                class="sct-field"
-                :class="{ 'sct-num': f.num, 'sct-wide': isWide(f) }"
-              >
-                <div class="sct-th">
-                  <span class="sct-th-label">
-                    {{ labelOf(f) }}<template v-if="unitOf(f)"> [{{ unitOf(f) }}]</template><sup
-                      v-if="unitOf(f)"
-                      class="sct-th-fn"
-                    >[b]</sup>
-                  </span>
-                  <span v-if="isManual(f)" class="sct-th-src">manual</span>
-                  <span v-if="editable" class="sct-th-acts">
-                    <button class="sct-var-x" title="改名" @click="emit('rename-field', f)">改</button>
-                    <button class="sct-var-x is-del" title="删这一列" @click="emit('remove-field', f)">×</button>
-                  </span>
-                </div>
-              </th>
-              <th v-if="editable" class="sct-c-x"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(r, i) in rows" :key="r.exp_id" :class="{ 'is-base': i === 0 }">
-              <td class="sct-c-entry">{{ i + 1 }}</td>
-              <td class="sct-c-fix sct-sub">
-                <button v-if="r.exp" class="linklike" @click="emit('open', r)">{{ r.exp.code }}</button>
-                <span v-else class="mono muted">#{{ r.exp_id }}</span>
-                <!-- 记录页那个「实验名」多半是空的（编号才是日常叫法），有才跟在编号后面 -->
-                <span v-if="r.exp && r.exp.title" class="sct-title">{{ r.exp.title }}</span>
-              </td>
-              <td
-                v-for="f in fields"
-                :key="f.key"
-                class="sct-field"
-                :class="{ 'sct-num': f.num, 'sct-wide': isWide(f), 'is-manual': isManual(f) }"
-              >
-                <input
-                  v-if="editable && isManual(f)"
-                  :value="r.cells[f.key]"
-                  class="sct-cell"
-                  @input="(e) => { r.cells[f.key] = e.target.value; emit('change'); }"
-                />
-                <span
-                  v-else
-                  class="sct-auto"
-                  :class="{ 'sct-wrap': f.source === 'reagent' || f.source === 'variation' }"
-                >
-                  {{ cell(f, r) || '—' }}
-                </span>
-              </td>
-              <td v-if="editable" class="sct-c-x">
-                <button class="sct-row-x" title="从表里去掉" @click="emit('remove-row', i)">×</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <span
-          class="sct-grip"
-          title="拖动改表格宽度，双击恢复按内容宽"
-          @mousedown="startResize"
-          @dblclick="resetWidth"
-          @dragstart.prevent
-        />
-      </div>
+    <!-- 反应式居中压在表格上方（条件就画在箭头上下，不再另起一行字） -->
+    <div v-if="scheme" class="sct-std">
+      <div class="sct-std-scheme" v-html="scheme" />
     </div>
+    <!-- 表格铺满内容宽度（以前那条「自己拖表格宽度」的竖线用户不要了：要调宽度拖列表↔纸面那条） -->
+    <table class="sct-table">
+      <thead>
+        <tr>
+          <th class="sct-c-entry">Entry</th>
+          <th class="sct-c-fix">Code</th>
+          <th
+            v-for="f in fields"
+            :key="f.key"
+            class="sct-field"
+            :class="{ 'sct-num': f.num, 'sct-wide': isWide(f) }"
+          >
+            <div class="sct-th">
+              <span class="sct-th-label">
+                {{ labelOf(f) }}<template v-if="unitOf(f)"> [{{ unitOf(f) }}]</template><sup
+                  v-if="unitOf(f)"
+                  class="sct-th-fn"
+                >[b]</sup>
+              </span>
+              <span v-if="isManual(f)" class="sct-th-src">manual</span>
+              <span v-if="editable" class="sct-th-acts">
+                <button class="sct-var-x" title="改名" @click="emit('rename-field', f)">改</button>
+                <button class="sct-var-x is-del" title="删这一列" @click="emit('remove-field', f)">×</button>
+              </span>
+            </div>
+          </th>
+          <th v-if="editable" class="sct-c-x"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(r, i) in rows" :key="r.exp_id" :class="{ 'is-base': i === 0 }">
+          <td class="sct-c-entry">{{ i + 1 }}</td>
+          <td class="sct-c-fix sct-sub">
+            <button v-if="r.exp" class="linklike" @click="emit('open', r)">{{ r.exp.code }}</button>
+            <span v-else class="mono muted">#{{ r.exp_id }}</span>
+            <!-- 记录页那个「实验名」多半是空的（编号才是日常叫法），有才跟在编号后面 -->
+            <span v-if="r.exp && r.exp.title" class="sct-title">{{ r.exp.title }}</span>
+          </td>
+          <td
+            v-for="f in fields"
+            :key="f.key"
+            class="sct-field"
+            :class="{ 'sct-num': f.num, 'sct-wide': isWide(f), 'is-manual': isManual(f) }"
+          >
+            <input
+              v-if="editable && isManual(f)"
+              :value="r.cells[f.key]"
+              class="sct-cell"
+              @input="(e) => { r.cells[f.key] = e.target.value; emit('change'); }"
+            />
+            <span
+              v-else
+              class="sct-auto"
+              :class="{ 'sct-wrap': f.source === 'reagent' || f.source === 'variation' }"
+            >
+              {{ cell(f, r) || '—' }}
+            </span>
+          </td>
+          <td v-if="editable" class="sct-c-x">
+            <button class="sct-row-x" title="从表里去掉" @click="emit('remove-row', i)">×</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
     <!-- 文献表下面那行小字脚注：上标字母 + 小字，锚点跟标题的 [a]、表头的 [b] 对上 -->
     <p class="sct-note">
       <span v-if="hasStd" class="sct-note-item"><sup>[a]</sup>Standard conditions are shown above; the variations column lists only what differs from them.</span>

@@ -6847,10 +6847,8 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
    基准那一行也不铺底色。正文是衬线（文献表都是 Times 那一路的数字与字母）。
    用户贴的就是这种表，别又加回网格线 / 表格外框 / 列底色。 */
 .sct-table {
-  /* 默认「按内容宽」——不再铺满整页（以前满页时空隙很大，看着被拉长了）；
-     要更宽就拖右边那道竖线，见下面的 .sct-grip */
-  width: auto;
-  max-width: 100%;
+  /* 铺满内容宽度（文献表就是占满整栏）；宽度要调就拖「列表 ↔ 纸面」那条分隔线 */
+  width: 100%;
   border-collapse: collapse;
   /* 照用户给的那张文献表：Times 衬线、14px、行距宽松；数字右对齐，
      用 tabular-nums 让位数对齐。中文落到宋体（Songti）才跟 Times 一排不打架。 */
@@ -6946,27 +6944,6 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   --sct-serif: 'Times New Roman', Times, 'Songti SC', 'STSong', serif;
   padding: 0; margin-bottom: 22px; background: transparent; box-shadow: none;
 }
-/* 表格外壳：默认宽度跟着内容走（inline-block），拖过之后按 px 定死、表格吃满这个宽 */
-.sct-fit { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
-.sct-fit.is-fixed { display: block; }
-/* 拖动条只贴着表格上下（反应式那段不挂竖线） */
-.sct-tbwrap { position: relative; }
-.sct-fit.is-fixed .sct-table { width: 100%; }
-/* 右边那道竖线就是拖动条（照 DSH 那个面板分隔条的路子：细线不吃眼、hover 才明显，
-   14px 的命中区、col-resize 光标；双击恢复按内容宽） */
-.sct-grip {
-  position: absolute; top: 0; bottom: 0; right: -9px; width: 14px;
-  cursor: col-resize; touch-action: none; z-index: 3;
-}
-.sct-grip::after {
-  content: ''; position: absolute; top: 3px; bottom: 3px; left: 50%;
-  width: 1px; background: #dcd8cf; transition: background 0.12s;
-}
-.sct-fit:hover .sct-grip::after { background: var(--line-2); }
-.sct-fit.is-resizing .sct-grip::after { background: var(--accent); width: 1.5px; }
-/* 拖宽度期间整页 col-resize 光标 + 禁选字（跟 lib/colresize.js 的 is-col-resizing 一个路子） */
-body.is-sct-resizing,
-body.is-sct-resizing * { cursor: col-resize !important; user-select: none !important; }
 /* 表标题：`表 1：条件优化`，跟文献的 `Table 1:` 一样——衬线、粗斜体编号 + 粗体标题，
    后面跟一个上标 [a]（指向表下的脚注），压在表格顶上 */
 .sct-cap {

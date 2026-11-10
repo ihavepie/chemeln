@@ -149,3 +149,7 @@
   两个都有值这一行就被顶高（用户报「这边有点高」）。现在套一层 `.kind-inline`（flex 行）并排：
   select `flex: 0 0 auto; max-width: 78px`、input `flex: 1 1 0`，两者 `width: auto`（继承的 `width:100%` 会撑爆）。
   **注意 `td` 不能直接写 `display: flex`**——table-cell 的盒子会塌、整张 `.sheet-meta` 错位，必须里面再套一层。
+
+  **表格改回满宽、去掉表格自己的拖拽线**（同轮）：用户要「整个宽度」——`.sct-table { width: 100% }`，
+  `ScreeningTable` 里 `.sct-fit` / `.sct-tbwrap` / `.sct-grip`、`fitW` / `measureMin()` / `is-sct-resizing`
+  和 localStorage `eln:sct:w` 全删了；宽度要调就拖「列表 ↔ 纸面」那条分隔线（`PaneGrip`）。
