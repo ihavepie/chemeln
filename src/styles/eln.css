@@ -107,15 +107,9 @@ body {
   padding: 40px 48px 100px;
 }
 
-/* 内容区宽度可拖（左右两条线，见 .doc-grip）：左对齐，空白全落到右边，
-   线的位置跟着鼠标 1:1 走；`--docw`（宽）/`--docx`（左边让出多少）由
-   lib/panesize.js 写进 :root，默认 980px / 0 */
-.single > .inner {
-  position: relative;
-  max-width: var(--docw, 980px);
-  /* 左边也让出一截（拖左边那条线时改它），右边留白全落在后面 */
-  margin: 0 0 0 var(--docx, 0px);
-}
+/* 内容区宽度可拖（左右两条线，见 .doc-grip）：**始终居中**，拖线只改宽度。
+   `--docw` 由 lib/panesize.js 写进 :root，默认 980px */
+.single > .inner { position: relative; max-width: var(--docw, 980px); margin: 0 auto; }
 
 /* -------------------------------------------------------------- rail */
 
@@ -7109,56 +7103,49 @@ body.is-pane-resizing * { cursor: col-resize !important; user-select: none !impo
 .sheet-meta .kind-inline input { flex: 1 1 0; }
 
 /* ================================================================
-   内容区**自己**左右两条竖线可以拖（DSH 那种分隔条）。
-   拖右边 = 右边缘跟手，拖左边 = 左边缘跟手，两边都只改内容区宽度，
-   左侧导航条宽度不动——用户明确否掉过拖导航条。
-   **平时完全透明**，鼠标靠近的那条才浮出来（用户说「悬浮过去才出现」），
-   拖动中保持可见；双击回默认宽。
+   内容区左右两条抓手指（DSH 那种分隔条）。
+   拖任一条都只改内容区宽度——内容**始终居中**，两边对称长缩，导航条宽度不动。
+   **平时完全透明**，鼠标靠近才浮出；只留一小段短把手（用户说整列拉满「太丑」）。
+   外面那层是 position: sticky：把手停在屏幕中间，内容多长都抓得到。
    ================================================================ */
+.doc-grip-wrap {
+  position: sticky;
+  top: calc(50vh - 80px);
+  z-index: 6;
+  display: block;
+  height: 0;
+  pointer-events: none;
+}
 .doc-grip {
   position: absolute;
   top: 0;
-  bottom: 0;
-  z-index: 6;
-  width: 16px;
+  width: 20px;
+  height: 160px;          /* 只负责好点中，本身透明 */
   cursor: col-resize;
   touch-action: none;
+  pointer-events: auto;
   opacity: 0;
   transition: opacity 0.12s;
 }
-.doc-grip.is-right { right: -8px; }
-.doc-grip.is-left { left: -8px; }
+.doc-grip.is-right { right: -10px; }
+.doc-grip.is-left { left: -10px; }
 .doc-grip:hover,
 .doc-grip.is-on { opacity: 1; }
-/* 竖线：比纸面深一档，压在内容边缘上 */
-.doc-grip::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  margin-left: -0.5px;
-  background: #c8c3b4;
-  transition: background 0.12s, width 0.12s;
-}
-/* 中线上一小段「抓手」，一眼看出是能拖的地方 */
+/* 小把手：3px 宽、40px 高的一小段，hover 变强调色 */
 .doc-grip::before {
   content: '';
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 4px;
-  height: 44px;
-  margin: -22px 0 0 -2px;
+  width: 3px;
+  height: 40px;
+  margin: -20px 0 0 -1.5px;
   border-radius: 99px;
-  background: #a8a396;
+  background: #c3bdad;
   transition: background 0.12s, height 0.12s;
 }
-.doc-grip:hover::after,
-.doc-grip.is-on::after { background: var(--accent); width: 2px; margin-left: -1px; }
 .doc-grip:hover::before,
-.doc-grip.is-on::before { background: var(--accent); height: 56px; margin-top: -28px; }
+.doc-grip.is-on::before { background: var(--accent); height: 52px; margin-top: -26px; }
 body.is-doc-resizing,
 body.is-doc-resizing * { cursor: col-resize !important; user-select: none !important; }
 /* 手机上内容本来就只有一屏宽，塞不下这两条线 */

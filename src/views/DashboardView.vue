@@ -83,6 +83,7 @@ async function byProject(name) {
 <template>
   <div class="single">
     <div class="inner">
+      <DocGrip />
       <header class="page-head" v-anim="0">
         <h1 class="page-title">{{ store.project || '实验记录本' }}</h1>
         <p class="page-desc">{{ b.totals?.experiments ?? 0 }} 条实验 · {{ b.totals?.attachments ?? 0 }} 个附件 · 数据存在本机</p>
@@ -190,7 +191,6 @@ async function byProject(name) {
           {{ s.status }} {{ s.n }}
         </span>
       </div>
-      <DocGrip />
     </div>
   </div>
 </template>

@@ -171,6 +171,7 @@ async function removeScreen() {
 <template>
   <div class="single">
     <div class="inner">
+      <DocGrip />
       <div v-if="loading" class="empty-note">正在打开…</div>
       <template v-else-if="s">
         <div class="scr-head">
@@ -206,7 +207,6 @@ async function removeScreen() {
         </template>
       </template>
       <div v-else class="empty-note">这张筛选表不存在。</div>
-      <DocGrip />
     </div>
 
     <ExpPick :model-value="pickOpen" :exclude="ids" title="挑几条实验加进这张表" @close="pickOpen = false" @confirm="addRows" />

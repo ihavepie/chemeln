@@ -141,6 +141,7 @@ async function adopt(g) {
 <template>
   <div class="single">
     <div class="inner">
+      <DocGrip />
       <header class="page-head">
         <h1 class="page-title">条件筛选</h1>
         <p class="page-desc">
@@ -221,7 +222,6 @@ async function adopt(g) {
           </li>
         </ul>
       </section>
-      <DocGrip />
     </div>
 
     <ExpPick

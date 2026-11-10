@@ -372,6 +372,7 @@ async function removeProject(p) {  const ok = await confirm({
 <template>
   <div class="single">
     <div class="inner">
+      <DocGrip />
       <header class="page-head">
         <h1 class="page-title">设置</h1>
         <p class="page-desc">记录本的所有数据都在本机一个目录里，随时可以整个拷走。</p>
@@ -622,7 +623,6 @@ async function removeProject(p) {  const ok = await confirm({
       </section>
 
       <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上</p>
-      <DocGrip />
     </div>
   </div>
 </template>

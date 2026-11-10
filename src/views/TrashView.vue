@@ -94,6 +94,7 @@ async function clearAll() {
 <template>
   <div class="single">
     <div class="inner">
+      <DocGrip />
       <header class="page-head trash-head">
         <div>
           <h1 class="page-title">回收站</h1>
@@ -123,7 +124,6 @@ async function clearAll() {
           </div>
         </div>
       </template>
-      <DocGrip />
     </div>
   </div>
 </template>
