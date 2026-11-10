@@ -180,6 +180,9 @@ export async function composeSchemeSvg({ reactants = [], product = '', productLa
   const arrowX2 = arrowX1 + arrowLen;
   x = arrowZone + arrowW + GAP * 2;
   const PROD_SIZE = 15;
+  // 产物名（没有产物结构时写在箭头右边）用衬线斜体，跟 ChemDraw 里手写字标的样式接近；
+  // 结构式里的原子标签本身也是衬线字体，普通 sans 站在旁边会显得「另一套字体」
+  const PROD_FONT = "'Times New Roman', Times, 'Songti SC', serif";
   const pLabelW = pLabel ? [...pLabel].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? PROD_SIZE : PROD_SIZE * 0.55), 0) : 0;
   const prodPos = prod ? { ...prod, x, y: cy - prod.h / 2 } : null;
   x += prod ? prod.w : pLabelW;
@@ -240,7 +243,7 @@ export async function composeSchemeSvg({ reactants = [], product = '', productLa
     arrow +
     (prodPos ? molTag(prodPos) : '') +
     (pLabel
-      ? `<text x="${Math.round(arrowZone + arrowW + GAP * 2)}" y="${Math.round(cy + PROD_SIZE * 0.35)}" font-size="${PROD_SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${esc(pLabel)}</text>`
+      ? `<text x="${Math.round(arrowZone + arrowW + GAP * 2)}" y="${Math.round(cy + PROD_SIZE * 0.35)}" font-size="${PROD_SIZE}" font-family="${PROD_FONT}" font-style="italic" fill="#1b1a17">${esc(pLabel)}</text>`
       : '') +
     cap +
     '</svg>'
