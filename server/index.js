@@ -2214,6 +2214,22 @@ route('PUT', '/api/experiments/:id', async (req, res, params) => {
     }
 
     if (Array.isArray(body.reagents)) {
+      // 防呆：本来有好几行带名字的投料，这次整张表突然一行名字都没有——多半是页面没加载完
+      // / 旧标签页的自动保存（踩过：一条记录被这样清成两行空行）。拦下来，别动数据。
+      const namedStored = db
+        .prepare("SELECT COUNT(*) AS c FROM reagents WHERE exp_id = ? AND trim(name) <> '' AND trim(role) <> '溶剂'")
+        .get(id).c;
+      const namedIn = normalizeReagents(body.reagents).filter(
+        (r) => str(r.name).trim() && str(r.role).trim() !== '溶剂'
+      ).length;
+      if (namedStored >= 2 && namedIn === 0) {
+        db.exec('ROLLBACK');
+        return fail(
+          res,
+          409,
+          `投料表这次一行带名字的都没有（原来有 ${namedStored} 行），像是页面没加载完——已拦下，记录没动。真要清空请一行一行删。`
+        );
+      }
       const before = JSON.stringify(
         db.prepare('SELECT role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, step FROM reagents WHERE exp_id = ? ORDER BY position').all(id)
       );

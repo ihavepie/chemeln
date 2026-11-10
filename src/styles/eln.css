@@ -519,7 +519,30 @@ body {
   -webkit-line-clamp: 2;
 }
 
-/* 卡片上的「描述」：一行灰字，放在名字下面（跟名字一样就省略不画） */
+/* 卡片上的「描述」：跟在题目后面同一行、更淡更小（跟题目一样就省略不画）。
+   题目和描述都各占一行内的省略号，长描述不会把卡片撑高。 */
+.exp-title { display: flex; align-items: baseline; gap: 7px; }
+.exp-title .exp-name {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.exp-desc-inline {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--ink-4);
+  letter-spacing: 0.01em;
+  min-width: 0;
+  /* 描述比题目「让得快」：挤的时候先缩描述，题目尽量留全 */
+  flex: 0 8 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.exp-card.is-member .exp-desc-inline { font-size: 10px; }
 .exp-desc {
   font-size: 11px;
   line-height: 1.35;
