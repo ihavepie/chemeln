@@ -22,7 +22,7 @@ import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
 import { sheetPrefs } from '../lib/sheetprefs.js';
-import { KINDS } from '../lib/kind.js';
+import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -42,6 +42,7 @@ const error = ref('');
 const page = ref(1);
 const hovered = ref('');
 const statusMenu = ref(false);
+const rxnMenu = ref(false);   // 抬头「反应类型」那格的候选菜单
 const moreMenu = ref(false);
 const resBlock = ref(null);   // 结果块（「按投料表生成」缺产物时直接调它的选择器）
 const gone = ref(false);   // 删掉了就不再自动保存
@@ -295,6 +296,7 @@ async function newCategory() {
 function closeMenus(e) {
   if (!e.target.closest?.('.menu-wrap')) moreMenu.value = false;
   if (!e.target.closest?.('.status-wrap')) statusMenu.value = false;
+  if (!e.target.closest?.('.rxn-wrap')) rxnMenu.value = false;
 }
 
 function payload() {
@@ -1185,7 +1187,38 @@ const openAttachment = (id) => {
               :placeholder="fields.title || '实验目的（这一步想解决什么）'"
               :disabled="exp.locked"
             />
-            <input class="sheet-rxn" v-model="fields.rxn_type" placeholder="反应类型" :disabled="exp.locked" title="反应类型，比如 C–H 活化 / 改当量" />
+            <div class="rxn-wrap">
+              <input
+                class="sheet-rxn"
+                v-model="fields.rxn_type"
+                placeholder="反应类型"
+                :disabled="exp.locked"
+                title="反应类型：改当量 / 放大实验 / 转化…（也可以自己写）"
+                @click.stop="rxnMenu = true"
+                @focus="rxnMenu = true"
+                @keydown.esc="rxnMenu = false"
+              />
+              <div v-if="rxnMenu && !exp.locked" class="rxn-menu">
+                <button
+                  v-for="t in RXN_TYPES"
+                  :key="t"
+                  type="button"
+                  class="rxn-opt"
+                  :class="{ 'is-on': fields.rxn_type === t }"
+                  @click="fields.rxn_type = t; rxnMenu = false; notify()"
+                >
+                  {{ t }}
+                </button>
+                <button
+                  v-if="fields.rxn_type"
+                  type="button"
+                  class="rxn-opt is-clear"
+                  @click="fields.rxn_type = ''; rxnMenu = false; notify()"
+                >
+                  清掉
+                </button>
+              </div>
+            </div>
           </div>
 
           <table class="sheet-meta">
