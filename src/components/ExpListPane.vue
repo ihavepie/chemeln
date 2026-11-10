@@ -244,6 +244,9 @@ const LIST_VARS = [
   ['duration', '时长'],
   ['atmosphere', '气氛'],
 ];
+/** 卡片 / 组员行上跟着状态后面那截「反应描述」：记录类型（试反应 / 条件筛选…）+ 反应类型（改当量…） */
+const rxnDesc = (m) => [String(m.kind || '').trim(), String(m.rxn_type || '').trim()].filter(Boolean).join(' · ');
+
 /** 当量差在 2%（且 ≤0.005）以内算同一个条件——放大/取整常让当量差一点点 */
 function eqSame(a, b) {
   const x = Number(a);
@@ -409,7 +412,7 @@ function onStackFace(row) {
           <div class="exp-meta">
             <span v-if="catName(row.one)" class="cat-tag">{{ catName(row.one) }}</span>
             <span v-if="row.one.project">{{ row.one.project }}</span>
-            <template v-if="row.one.rxn_type"><span class="sep">·</span><span>{{ row.one.rxn_type }}</span></template>
+            <template v-if="rxnDesc(row.one)"><span class="sep">·</span><span>{{ rxnDesc(row.one) }}</span></template>
             <template v-if="row.one.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ row.one.yield_pct }}%</span></template>
             <template v-if="row.one.attach_count"><span class="sep">·</span><span>{{ row.one.attach_count }} 附件</span></template>
           </div>
@@ -493,7 +496,7 @@ function onStackFace(row) {
                   <span class="exp-code">{{ m.code }}</span>
                   <span v-if="m.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                   <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
-                  <span v-if="m.rxn_type" class="stack-rxn">{{ m.rxn_type }}</span>
+                  <span v-if="rxnDesc(m)" class="stack-rxn">{{ rxnDesc(m) }}</span>
                   <span v-if="!m.diffs || !m.diffs.length" class="stack-variant">{{ m.variant }}</span>
                   <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
                   <span class="exp-date">{{ m.date }}</span>
