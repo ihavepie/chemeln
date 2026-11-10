@@ -153,3 +153,8 @@
   **表格改回满宽、去掉表格自己的拖拽线**（同轮）：用户要「整个宽度」——`.sct-table { width: 100% }`，
   `ScreeningTable` 里 `.sct-fit` / `.sct-tbwrap` / `.sct-grip`、`fitW` / `measureMin()` / `is-sct-resizing`
   和 localStorage `eln:sct:w` 全删了；宽度要调就拖「列表 ↔ 纸面」那条分隔线（`PaneGrip`）。
+
+  **左侧导轨也能拖、分隔线平时可见**（同轮）：用户说「我没看到线」——`.pane-grip::after` 原来是
+  `background: transparent`（只在 hover 时出现），现在默认就是 1px `#dcd8cf`，hover / 拖动变 2px 强调色；
+  另外把 DSH 那条「侧栏↔内容」分隔条也补上：`App.vue` 里挂 `.rail-grip`，宽度写 `:root --railw`
+  （`.app` 的列宽读 `var(--railw, var(--rail))`），存 `eln:railw`，`168–320px`，双击回默认，只在 ≥821px 出现。

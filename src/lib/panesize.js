@@ -65,3 +65,58 @@ function resetWidth() {
 export function usePaneSize() {
   return { width, resizing, startDrag, resetWidth };
 }
+
+/* ---- 左侧导轨（导航条）的宽度也能拖：DSH 那种「侧栏 / 内容」分隔条 ----
+   只在 ≥821px 时出现（手机上导轨本来就不渲染）。宽度同样存在 localStorage。 */
+const RAIL_KEY = 'eln:railw';
+const RAIL_MIN = 168;
+const RAIL_MAX = 320;
+
+const applyRail = (w) => {
+  const root = document.documentElement;
+  if (w > 0) root.style.setProperty('--railw', `${w}px`);
+  else root.style.removeProperty('--railw');
+};
+
+const storedRail = (() => {
+  const n = Number(localStorage.getItem(RAIL_KEY));
+  return Number.isFinite(n) && n >= RAIL_MIN ? Math.round(n) : 0;
+})();
+if (storedRail) applyRail(storedRail);
+
+const railW = ref(storedRail);
+const railResizing = ref(false);
+
+function startRailDrag(e) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startW = railW.value || Math.round(document.querySelector('.rail')?.getBoundingClientRect().width || 212);
+  railResizing.value = true;
+  document.body.classList.add('is-rail-resizing');
+  const move = (ev) => {
+    const w = Math.min(Math.max(Math.round(startW + ev.clientX - startX), RAIL_MIN), RAIL_MAX);
+    railW.value = w;
+    applyRail(w);
+  };
+  const up = () => {
+    railResizing.value = false;
+    document.body.classList.remove('is-rail-resizing');
+    window.removeEventListener('mousemove', move);
+    window.removeEventListener('mouseup', up);
+    if (railW.value) {
+      try { localStorage.setItem(RAIL_KEY, String(railW.value)); } catch { /* 同上 */ }
+    }
+  };
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+}
+
+function resetRailWidth() {
+  railW.value = 0;
+  applyRail(0);
+  try { localStorage.removeItem(RAIL_KEY); } catch { /* 同上 */ }
+}
+
+export function useRailSize() {
+  return { railW, railResizing, startRailDrag, resetRailWidth };
+}
