@@ -423,7 +423,7 @@ function printQr() {
     <img src="/api/experiments/${exp.value.id}/qr.svg?unit=6" alt="">
     <div class="exp-qr-text">
       <div class="exp-qr-code">${exp.value.code}</div>
-      <div class="exp-qr-name">${(exp.value.title || '').replace(/[<>&]/g, '')}</div>
+      <div class="exp-qr-name">${(exp.value.title || exp.value.objective || '').replace(/[<>&]/g, '')}</div>
     </div>`;
   document.body.appendChild(el);
   document.body.classList.add('printing-expqr');
@@ -849,7 +849,8 @@ async function newParallel() {
     if (dirty.value) await flush();
     // 带过去什么，先说清楚（服务端是「整份条件 + 投料表 + 反应式」照搬，只清结果）
     const carried = [];
-    if (String(fields.title || '').trim()) carried.push(`名称「${String(fields.title).trim()}」`);
+    const head = String(fields.objective || fields.title || '').trim();
+    if (head) carried.push(`题目「${head}」`);
     const nRows = reagent.rows.filter((r) => String(r.name || '').trim()).length;
     if (nRows) carried.push(`${nRows} 行投料`);
     const cond = [fields.temperature, fields.duration, fields.atmosphere].filter(Boolean);
@@ -1176,7 +1177,16 @@ const openAttachment = (id) => {
             <span>{{ exp.code }}</span>
           </div>
 
-          <input class="sheet-title" v-model="fields.title" placeholder="实验名称" :disabled="exp.locked" />
+          <!-- 大标题写「实验目的」（记录名挪到抬头表格里）；反应类型跟在它右边 -->
+          <div class="sheet-headline">
+            <input
+              class="sheet-title"
+              v-model="fields.objective"
+              :placeholder="fields.title || '实验目的（这一步想解决什么）'"
+              :disabled="exp.locked"
+            />
+            <input class="sheet-rxn" v-model="fields.rxn_type" placeholder="反应类型" :disabled="exp.locked" title="反应类型，比如 C–H 活化 / 改当量" />
+          </div>
 
           <table class="sheet-meta">
             <colgroup>
@@ -1212,7 +1222,6 @@ const openAttachment = (id) => {
                       <option value="">通用</option>
                       <option v-for="k in KINDS" :key="k.key" :value="k.key">{{ k.key }}</option>
                     </select>
-                    <input class="kind-rxn" v-model="fields.rxn_type" placeholder="C–H 活化" :disabled="exp.locked" title="化学类型" />
                   </div>
                 </td>
                 <th>状态</th>
@@ -1237,8 +1246,10 @@ const openAttachment = (id) => {
                 </td>
               </tr>
               <tr v-if="sheetPrefs.literature">
+                <th>题目</th>
+                <td colspan="3"><input v-model="fields.title" placeholder="记录名（列表里显示）" :disabled="exp.locked" /></td>
                 <th>文献</th>
-                <td colspan="7"><input v-model="fields.literature" placeholder="DOI / 参考文献" :disabled="exp.locked" /></td>
+                <td colspan="3"><input v-model="fields.literature" placeholder="DOI / 参考文献" :disabled="exp.locked" /></td>
               </tr>
             </tbody>
           </table>

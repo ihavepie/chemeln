@@ -405,7 +405,7 @@ function onStackFace(row) {
             <span class="tag" :class="STATUS_TONE[row.one.status]" style="font-size: 9px; padding: 1px 6px">{{ row.one.status }}</span>
             <span class="exp-date">{{ row.one.date }}</span>
           </div>
-          <div class="exp-title">{{ row.one.title || '（未命名实验）' }}</div>
+          <div class="exp-title">{{ row.one.title || row.one.objective || '（未命名实验）' }}</div>
           <div class="exp-meta">
             <span v-if="catName(row.one)" class="cat-tag">{{ catName(row.one) }}</span>
             <span v-if="row.one.project">{{ row.one.project }}</span>
@@ -455,7 +455,7 @@ function onStackFace(row) {
                   {{ isGroupOpen(row.gid) ? '收起 ▴' : '展开 ▾' }}
                 </button>
               </div>
-              <div class="exp-title">{{ row.face.title || '（未命名实验）' }}</div>
+              <div class="exp-title">{{ row.face.title || row.face.objective || '（未命名实验）' }}</div>
               <div class="exp-meta">
                 <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
                 <span v-if="row.face.project">{{ row.face.project }}</span>
@@ -499,7 +499,7 @@ function onStackFace(row) {
                   <span class="exp-date">{{ m.date }}</span>
                   <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
                 </div>
-                <div class="exp-title">{{ m.title || '（未命名实验）' }}</div>
+                <div class="exp-title">{{ m.title || m.objective || '（未命名实验）' }}</div>
                 <!-- 改了什么：一条一项，各自一颗小标签，不折成「投料（… 等）」也不让它断行 -->
                 <div v-if="m.diffs && m.diffs.length" class="member-diff">
                   <span v-for="d in m.diffs" :key="d" class="member-diff-item">{{ d }}</span>

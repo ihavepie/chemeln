@@ -214,8 +214,8 @@ function liveCompoundId(value) {
 
 /* 改动留痕：字段名 → 界面上的叫法（「改了 产率、表征数据」比「改了 yield_pct」好读） */
 const EXP_FIELD_LABELS = {
-  scheme_rxn: '反应式（画板）', scheme_smiles: '反应式（文本）', title: '标题', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
-  ambient_humid: '湿度', project: '课题', rxn_type: '类型', literature: '文献', objective: '实验目的',
+  scheme_rxn: '反应式（画板）', scheme_smiles: '反应式（文本）', title: '题目', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
+  ambient_humid: '湿度', project: '课题', rxn_type: '反应类型', literature: '文献', objective: '实验目的',
   solvent: '溶剂', concentration: '浓度', temperature: '温度', duration: '时间', atmosphere: '气氛',
   apparatus: '装置 / 器皿', light: '光照 / 波长', kind: '记录类型',
   workup: '后处理', procedure: '操作步骤', product_name: '产物', appearance: '性状', yield_pct: '产率',
@@ -526,7 +526,7 @@ function listExperiments(query) {
   const order = sortMap[query.sort] || sortMap.newest;
 
   const sql = `
-    SELECT e.id, e.code, e.title, e.date, e.status, e.project, e.rxn_type,
+    SELECT e.id, e.code, e.title, e.objective, e.date, e.status, e.project, e.rxn_type,
            e.yield_pct, e.dr_ee, e.ee_pct, e.updated_at, e.locked, e.category_id,
            e.product_name, e.product_mass, e.product_mw, e.base_mmol,
            e.solvent, e.concentration, e.temperature, e.duration, e.atmosphere,
