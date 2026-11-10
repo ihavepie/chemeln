@@ -152,7 +152,8 @@ export const api = {
     request('/api/groups/adopt', { method: 'POST', body: { ids, title } }),
   groups: (project = '') =>
     request(`/api/groups${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d),
-  screenings: () => request('/api/screenings').then((d) => d.items || []),
+  screenings: (project = '') =>
+    request(`/api/screenings${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d.items || []),
   // 注意返回的是整个响应：{ screening, rows }——rows 里已经把每条实验的内容解析好了
   screening: (id) => request(`/api/screenings/${id}`),
   createScreening: (body) => request('/api/screenings', { method: 'POST', body }).then((d) => d.screening),

@@ -2552,8 +2552,20 @@ route('POST', '/api/groups/adopt', async (req, res) => {
 });
 
 /* --- screenings --- */
-route('GET', '/api/screenings', async (req, res) => {
-  const rows = db.prepare('SELECT * FROM screenings ORDER BY id DESC').all().map(parseScreening);
+/** 一张筛选表该落在哪个课题：先看第一条实验属于谁（没有就落共用课题） */
+function projectOfEntry(ids) {
+  const first = (Array.isArray(ids) ? ids : []).map(Number).find((n) => Number.isFinite(n) && n > 0);
+  if (!first) return '';
+  return str(db.prepare('SELECT project FROM experiments WHERE id = ?').get(first)?.project);
+}
+
+route('GET', '/api/screenings', async (req, res, params, url) => {
+  // 条件筛选跟实验一样按课题分：传了 project 就只给这个课题的表
+  const project = str(Object.fromEntries(url.searchParams.entries()).project);
+  const rows = db
+    .prepare(`SELECT * FROM screenings ${project ? 'WHERE project = ?' : ''} ORDER BY id DESC`)
+    .all(...(project ? [project] : []))
+    .map(parseScreening);
   ok(res, {
     items: rows.map((s) => ({
       id: s.id,
@@ -2572,8 +2584,8 @@ route('POST', '/api/screenings', async (req, res) => {
   const ts = nowISO();
   const row = db
     .prepare(
-      `INSERT INTO screenings(exp_id, title, note, vars_json, entries_json, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?)`
+      `INSERT INTO screenings(exp_id, title, note, vars_json, entries_json, project, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?)`
     )
     .run(
       numOrNull(body.exp_id),
@@ -2586,6 +2598,8 @@ route('POST', '/api/screenings', async (req, res) => {
           .filter((n) => Number.isFinite(n))
           .map((id) => ({ exp_id: id, cells: {} }))
       ),
+      // 表归属哪个课题：优先用调用方给的当前课题，没给就按第一条实验的课题
+      str(body.project) || projectOfEntry(body.exp_ids),
       ts,
       ts
     );

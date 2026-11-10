@@ -29,7 +29,8 @@ const pickOpen = ref(false);
 async function load() {
   loading.value = true;
   try {
-    const [d, t] = await Promise.all([api.groups(store.project), api.screenings()]);
+    // 两样都只取当前课题的：条件筛选不跨课题
+    const [d, t] = await Promise.all([api.groups(store.project), api.screenings(store.project)]);
     const tag = (g, source) => ({ ...g, source });
     groups.value = [...(d.items || []).map((g) => tag(g, 'manual')), ...(d.auto || []).map((g) => tag(g, 'auto'))];
     // 首页就把每张表摊开：把它的行也一起拉回来（表不多，一次并起来）
@@ -79,7 +80,12 @@ async function buildSchemes() {
 async function createTable(picked) {
   pickOpen.value = false;
   try {
-    const sc = await api.createScreening({ title: '未命名条件筛选', exp_ids: picked, vars: DEFAULT_FIELDS });
+    const sc = await api.createScreening({
+      title: '未命名条件筛选',
+      exp_ids: picked,
+      vars: DEFAULT_FIELDS,
+      project: store.project,
+    });
     router.push(`/s/${sc.id}`);
   } catch (e) {
     toast(e.message || '建不了', 'err');
@@ -93,6 +99,7 @@ async function asTable(g) {
       title: headOf(g),
       exp_ids: g.members.map((m) => m.id),
       vars: DEFAULT_FIELDS,
+      project: store.project,
     });
     router.push(`/s/${sc.id}`);
   } catch (e) {

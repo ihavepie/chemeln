@@ -201,6 +201,22 @@ ensureColumn('experiments', 'kind', "kind TEXT NOT NULL DEFAULT ''");
 // 条件行补两栏：用什么装置、有没有光照（自由文本，导出/打印一起走）
 ensureColumn('experiments', 'apparatus', "apparatus TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'light', "light TEXT NOT NULL DEFAULT ''");
+// 筛选表也归属课题（跟实验同一套规矩）：空串 = 共用课题。
+// 老表没有这列，按表里第一条实验的课题补一次（幂等，每次启动扫一遍没有 project 的）
+ensureColumn('screenings', 'project', "project TEXT NOT NULL DEFAULT ''");
+{
+  const rows = db.prepare("SELECT id, entries_json FROM screenings WHERE project = ''").all();
+  const upd = db.prepare('UPDATE screenings SET project = ? WHERE id = ?');
+  const projOf = db.prepare('SELECT project FROM experiments WHERE id = ?');
+  for (const r of rows) {
+    let list = [];
+    try { list = JSON.parse(r.entries_json || '[]'); } catch { list = []; }
+    const first = Number((list[0] || {}).exp_id);
+    if (!Number.isFinite(first) || first <= 0) continue;
+    const e = projOf.get(first);
+    if (e && e.project) upd.run(e.project, r.id);
+  }
+}
 ensureColumn('reagents', 'conc', 'conc REAL');
 ensureColumn('reagents', 'step', 'step INTEGER NOT NULL DEFAULT 1');
 // 投料行可以指向化合物库里的化合物；实验产物也可以
