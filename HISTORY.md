@@ -144,3 +144,8 @@
   standard conditions / Yield [%] / Selectivity [%]`、基准行 `none`（没改动记 `same`）、脚注 `[a]`/`[b]` 全走英文口径
   （`ScreeningTable` 里 `EN_LABEL` 映射 `source → 英文名`；用户自己命名的「手动」列保留原名，徽标写 `manual`）。
   列表页块头也跟着写 `Table N`。
+
+  **记录页「类型」格并排**（同轮）：`类型` 那格原来是记录类型 `<select>` + 化学类型 `<input>` 上下堆着，
+  两个都有值这一行就被顶高（用户报「这边有点高」）。现在套一层 `.kind-inline`（flex 行）并排：
+  select `flex: 0 0 auto; max-width: 78px`、input `flex: 1 1 0`，两者 `width: auto`（继承的 `width:100%` 会撑爆）。
+  **注意 `td` 不能直接写 `display: flex`**——table-cell 的盒子会塌、整张 `.sheet-meta` 错位，必须里面再套一层。

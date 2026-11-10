@@ -1097,11 +1097,13 @@ const openAttachment = (id) => {
                 <td class="proj-cell"><ProjPick :model-value="fields.project" :projects="projectList" :disabled="exp.locked" @update:model-value="onProjectChange" /></td>
                 <th>类型</th>
                 <td class="kind-cell">
-                  <select class="kind-pick" v-model="fields.kind" :disabled="exp.locked" title="记录类型（原料/试反应/条件筛选/底物扩展，并行存在）">
-                    <option value="">通用</option>
-                    <option v-for="k in KINDS" :key="k.key" :value="k.key">{{ k.key }}</option>
-                  </select>
-                  <input class="kind-rxn" v-model="fields.rxn_type" placeholder="C–H 活化" :disabled="exp.locked" title="化学类型" />
+                  <div class="kind-inline">
+                    <select class="kind-pick" v-model="fields.kind" :disabled="exp.locked" title="记录类型（原料/试反应/条件筛选/底物扩展，并行存在）">
+                      <option value="">通用</option>
+                      <option v-for="k in KINDS" :key="k.key" :value="k.key">{{ k.key }}</option>
+                    </select>
+                    <input class="kind-rxn" v-model="fields.rxn_type" placeholder="C–H 活化" :disabled="exp.locked" title="化学类型" />
+                  </div>
                 </td>
                 <th>状态</th>
                 <td class="tight status-cell">

@@ -7093,3 +7093,14 @@ body.is-sct-resizing * { cursor: col-resize !important; user-select: none !impor
 .pane-grip.is-on::after { background: var(--accent); }
 body.is-pane-resizing,
 body.is-pane-resizing * { cursor: col-resize !important; user-select: none !important; }
+
+/* ================================================================
+   记录页「类型」那一格：记录类型 + 化学类型**并排**（以前上下堆着，
+   两个值一填这一行就被顶高，用户说「有点高」）。td 不能改成 flex
+   （table-cell 的盒子会塌），所以里面再套一层 .kind-inline。
+   ================================================================ */
+.sheet-meta .kind-inline { display: flex; align-items: center; gap: 6px; }
+.sheet-meta .kind-inline select,
+.sheet-meta .kind-inline input { width: auto; min-width: 0; }
+.sheet-meta .kind-inline select { flex: 0 0 auto; max-width: 78px; }
+.sheet-meta .kind-inline input { flex: 1 1 0; }
