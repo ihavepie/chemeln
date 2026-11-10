@@ -6,7 +6,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { Readable } = require('node:stream');
 const os = require('node:os');
-const { spawn } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const https = require('node:https');
 
@@ -298,13 +298,17 @@ function touchReagentLib(expId, reagents, ts = nowISO()) {
        updated_at = excluded.updated_at`
   );
   const upUse = db.prepare('INSERT OR IGNORE INTO reagent_uses(key, exp_id, at) VALUES (?,?,?)');
+  const unchecked = [];
   for (const r of reagents) {
     const name = str(r.name).trim();
     if (!name) continue;
     const key = name.toLowerCase();
     upLib.run(key, name, str(r.role), r.mw ?? null, r.conc ?? null, r.density ?? null, ts, ts);
     if (expId) upUse.run(key, expId, ts);
+    // 这一行自己带了 MW 就不用查；没带的新名字交给后台核一次（见 queueReagentVerify）
+    if (r.mw == null) unchecked.push(key);
   }
+  if (unchecked.length) queueReagentVerify(unchecked);
 }
 
 function insertReagents(expId, reagents) {
@@ -776,6 +780,22 @@ function bootstrap(query = {}) {
     }
     // 同名的老条目：只补它还空着的角色 / 数值，别把最新的这条盖掉
     if (!prev.role && str(r.role)) prev.role = str(r.role);
+  }
+  // 试剂库里核对过的 MW / 密度也带上：记录删了、或者那一行当时没填 MW，下次打这个名字也能自动带出来
+  for (const l of db
+    .prepare("SELECT key, name, role, mw, conc, density FROM reagent_lib WHERE trim(role) <> '底物'")
+    .all()) {
+    const prev = seen.get(l.key);
+    if (!prev) {
+      if (l.mw != null || l.density != null || l.conc != null) {
+        seen.set(l.key, { name: l.name, role: str(l.role), mw: l.mw, conc: l.conc, density: l.density });
+      }
+      continue;
+    }
+    if (prev.mw == null) prev.mw = l.mw;
+    if (prev.conc == null) prev.conc = l.conc;
+    if (prev.density == null) prev.density = l.density;
+    if (!prev.role) prev.role = str(l.role);
   }
   const reagentDict = [...seen.values()].slice(0, 600);
 
@@ -3532,34 +3552,156 @@ function casValid(cas) {
   return sum % 10 === Number(check);
 }
 
-/** 取 JSON（不引第三方库）：404 当「查不到」返回 null，其它非 200 抛错 */
-function fetchJson(target, ms = 12000) {
+const UA = 'ELN-local/1.0 (personal notebook)';
+
+/**
+ * 本机的系统代理（macOS「网络」里配的 HTTP/HTTPS 代理，Clash 之类）。
+ * **Node 自己不认系统代理**：wikidata.org 直连被挡时 curl 一秒就回来、程序却一路超时
+ * （实测踩过），所以这里自己把代理读出来手搭 CONNECT 隧道。
+ */
+let proxyCache;
+function systemProxy() {
+  if (proxyCache !== undefined) return proxyCache;
+  proxyCache = null;
+  const env = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.ALL_PROXY || process.env.all_proxy;
+  if (env) {
+    try {
+      const u = new URL(env);
+      if (u.hostname) {
+        proxyCache = {
+          host: u.hostname,
+          port: Number(u.port) || 8080,
+          auth: u.username ? `Basic ${Buffer.from(`${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}`).toString('base64')}` : '',
+        };
+        return proxyCache;
+      }
+    } catch {
+      /* 环境变量写坏了就当没有 */
+    }
+  }
+  try {
+    const out = execFileSync('scutil', ['--proxy'], { encoding: 'utf8', timeout: 1500 });
+    // scutil 的格式是一行一个「键 : 值」，用正则拼容易在模板字符串的转义上翻车，
+    // 直接按「冒号前那截等于键」找
+    const pick = (key) => {
+      for (const line of out.split('\n')) {
+        const k = line.indexOf(':');
+        if (k > 0 && line.slice(0, k).trim() === key) return line.slice(k + 1).trim();
+      }
+      return '';
+    };
+    if (pick('HTTPSEnable') === '1' && pick('HTTPSProxy')) {
+      proxyCache = { host: pick('HTTPSProxy'), port: Number(pick('HTTPSPort')) || 8080, auth: '' };
+    } else if (pick('HTTPEnable') === '1' && pick('HTTPProxy')) {
+      proxyCache = { host: pick('HTTPProxy'), port: Number(pick('HTTPPort')) || 8080, auth: '' };
+    }
+  } catch {
+    /* 没有 scutil（非 macOS）就直连 */
+  }
+  return proxyCache;
+}
+
+/** 哪些主机要走代理：跑过一遍就记住，省得每次先等直连超时 */
+const PROXY_HOSTS = new Map();
+
+function readJsonResponse(r, resolve, reject, kill) {
+  let buf = '';
+  r.setEncoding('utf8');
+  r.on('data', (c) => {
+    buf += c;
+    if (buf.length > 4e6) kill(new Error('上游响应太大'));
+  });
+  r.on('end', () => {
+    if (r.statusCode === 404) return resolve(null);
+    if (r.statusCode !== 200) return reject(new Error(`上游返回 ${r.statusCode}`));
+    try {
+      resolve(JSON.parse(buf));
+    } catch {
+      reject(new Error('上游返回的不是 JSON'));
+    }
+  });
+}
+
+/** 直连取 JSON：404 当「查不到」返回 null，其它非 200 抛错 */
+function getDirect(target, ms = 12000) {
   return new Promise((resolve, reject) => {
     const lib = target.startsWith('https:') ? https : http;
     const req = lib.get(
       target,
-      { headers: { 'user-agent': 'ELN-local/1.0 (personal notebook)', accept: 'application/json' }, timeout: ms },
-      (r) => {
-        let buf = '';
-        r.setEncoding('utf8');
-        r.on('data', (c) => {
-          buf += c;
-          if (buf.length > 4e6) req.destroy(new Error('上游响应太大'));
-        });
-        r.on('end', () => {
-          if (r.statusCode === 404) return resolve(null);
-          if (r.statusCode !== 200) return reject(new Error(`上游返回 ${r.statusCode}`));
-          try {
-            resolve(JSON.parse(buf));
-          } catch {
-            reject(new Error('上游返回的不是 JSON'));
-          }
-        });
-      }
+      { headers: { 'user-agent': UA, accept: 'application/json' }, timeout: ms },
+      (r) => readJsonResponse(r, resolve, reject, (e) => req.destroy(e))
     );
     req.on('timeout', () => req.destroy(new Error('查询超时')));
     req.on('error', reject);
   });
+}
+
+/** 走系统代理（https 用 CONNECT 隧道） */
+function getViaProxy(target, proxy, ms = 12000) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(target);
+    const port = Number(u.port) || (u.protocol === 'http:' ? 80 : 443);
+    const connectReq = http.request({
+      host: proxy.host,
+      port: proxy.port,
+      method: 'CONNECT',
+      path: `${u.hostname}:${port}`,
+      timeout: ms,
+      headers: { host: `${u.hostname}:${port}`, ...(proxy.auth ? { 'proxy-authorization': proxy.auth } : {}) },
+    });
+    connectReq.on('timeout', () => connectReq.destroy(new Error('代理连接超时')));
+    connectReq.on('error', reject);
+    connectReq.on('connect', (r, socket) => {
+      if (r.statusCode !== 200) {
+        socket.destroy();
+        return reject(new Error(`代理拒绝（${r.statusCode}）`));
+      }
+      const req = https.request(
+        {
+          socket,
+          agent: false,
+          servername: u.hostname,
+          path: `${u.pathname}${u.search}`,
+          method: 'GET',
+          timeout: ms,
+          headers: { host: u.host, 'user-agent': UA, accept: 'application/json' },
+        },
+        (res) => readJsonResponse(res, resolve, reject, (e) => req.destroy(e))
+      );
+      req.on('timeout', () => req.destroy(new Error('查询超时')));
+      req.on('error', reject);
+      req.end();
+    });
+    connectReq.end();
+  });
+}
+
+/** 取 JSON：有系统代理就先走代理（跟浏览器一致），不通再直连；这台主机怎么走记住 */
+async function fetchJson(target, ms = 12000) {
+  let host = '';
+  try {
+    host = new URL(target).hostname;
+  } catch {
+    throw new Error('地址不对');
+  }
+  const proxy = systemProxy();
+  const viaProxy = !!proxy && PROXY_HOSTS.get(host) !== 'direct';
+  let lastErr = null;
+  if (viaProxy) {
+    try {
+      const out = await getViaProxy(target, proxy, ms);
+      PROXY_HOSTS.set(host, 'proxy');
+      return out;
+    } catch (e) {
+      lastErr = e;
+      PROXY_HOSTS.set(host, 'direct');   // 代理不认这台主机，后面都直连
+    }
+  }
+  try {
+    return await getDirect(target, ms);
+  } catch (e) {
+    throw lastErr || e;
+  }
 }
 
 const pubchemCids = async (kind, value) => {
@@ -3707,11 +3849,18 @@ async function wikidataLookup(name) {
   const hit = await fetchJson(
     'https://www.wikidata.org/w/api.php?action=query&list=search&srnamespace=0&srlimit=3&format=json' +
       `&srsearch=${encodeURIComponent(`${name} haswbstatement:P274`)}`,
-    6000
+    8000
   ).catch(() => null);
-  for (const item of (hit && hit.query && hit.query.search) || []) {
-    const entity = await fetchJson(`https://www.wikidata.org/wiki/Special:EntityData/${item.title}.json`, 8000).catch(() => null);
-    const claims = entity && entity.entities && entity.entities[item.title] && entity.entities[item.title].claims;
+  const ids = ((hit && hit.query && hit.query.search) || []).map((x) => str(x.title)).filter((t) => /^Q\d+$/.test(t)).slice(0, 2);
+  if (!ids.length) return null;
+  // 候选条目**一起取**：串着取两个实体就要 5 秒，中文名一查用户就以为卡死了
+  const ents = await Promise.all(
+    ids.map((id) => fetchJson(`https://www.wikidata.org/wiki/Special:EntityData/${id}.json`, 10000).catch(() => null))
+  );
+  for (let i = 0; i < ids.length; i += 1) {
+    const id = ids[i];
+    const ent = ents[i] && ents[i].entities && ents[i].entities[id];
+    const claims = ent && ent.claims;
     if (!claims) continue;
     // Wikidata 的分子式常带下标字符（C₇H₆O），统一成普通数字再给前端
     const formula = str((claims.P274 || [])[0]?.mainsnak?.datavalue?.value)
@@ -3719,7 +3868,7 @@ async function wikidataLookup(name) {
     const amount = (claims.P2067 || [])[0]?.mainsnak?.datavalue?.value?.amount;
     const mw = amount == null ? '' : String(Math.round(Number(amount) * 1000) / 1000);
     if (!formula && !mw) continue;
-    const label = entity.entities[item.title]?.labels?.zh?.value || entity.entities[item.title]?.labels?.en?.value || name;
+    const label = (ent.labels && ((ent.labels.zh && ent.labels.zh.value) || (ent.labels.en && ent.labels.en.value))) || name;
     return {
       found: true,
       source: 'wikidata',
@@ -3729,52 +3878,57 @@ async function wikidataLookup(name) {
       mw,
       cas: [],
       props: {},
-      url: `https://www.wikidata.org/wiki/${item.title}`,
+      url: `https://www.wikidata.org/wiki/${id}`,
     };
   }
   return null;
 }
 
-/** 给「可能很慢的备用源」套一个总超时：宁可查不到，也别让录数据等十几秒 */
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
-  ]);
-}
-
-async function wikidataLookup(name) {
-  for (const lang of ['zh', 'en']) {
-    const hit = await fetchJson(
-      `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(name)}` +
-        `&language=${lang}&uselang=${lang}&format=json&type=item&limit=5`,
-      6000
-    ).catch(() => null);
-    // 只核对前两条命中：Wikidata 搜同名会返回一堆非化学条目，挨个取实体太慢（实测能拖到 20s+）
-    for (const item of ((hit && hit.search) || []).slice(0, 2)) {
-      const entity = await fetchJson(`https://www.wikidata.org/wiki/Special:EntityData/${item.id}.json`, 8000).catch(() => null);
-      const claims = entity && entity.entities && entity.entities[item.id] && entity.entities[item.id].claims;
-      if (!claims) continue;
-      // Wikidata 的分子式常带下标字符（C₇H₆O），统一成普通数字再给前端
-      const formula = str((claims.P274 || [])[0]?.mainsnak?.datavalue?.value)
-        .replace(/[₀-₉]/g, (c) => String('₀₁₂₃₄₅₆₇₈₉'.indexOf(c)));
-      const amount = (claims.P2067 || [])[0]?.mainsnak?.datavalue?.value?.amount;
-      const mw = amount == null ? '' : String(Math.round(Number(amount) * 1000) / 1000);
-      if (!formula && !mw) continue;
-      return {
-        found: true,
-        source: 'wikidata',
-        query: name,
-        name: str(item.label) || name,
-        formula,
-        mw,
-        cas: [],
-        props: {},
-        url: `https://www.wikidata.org/wiki/${item.id}`,
-      };
+/** 查一次名字 / 结构的主流程：PubChem →（按名字时）OPSIN → Wikidata，结果按查询键缓存 30 天。
+ *  `/api/lookup`、试剂库的「核对」、新试剂进库时的自动核对，共用这一份，别再各写一遍。
+ *  force = 不信缓存，重查一遍（手动「核对」用）。
+ *  返回 { info, cached, stale, netErr }：info 为 null = 一个源都没答上来（基本就是断网）。 */
+async function lookupInfo(kind, value, { force = false } = {}) {
+  const file = lookupCachePath(kind, value);
+  let stale = null;
+  if (!force) {
+    try {
+      const raw = JSON.parse(await fsp.readFile(file, 'utf8'));
+      if (raw && raw.info) {
+        if (Date.now() - (raw.at || 0) < LOOKUP_TTL) return { info: raw.info, cached: true };
+        stale = raw.info;
+      }
+    } catch {
+      /* 没缓存 */
     }
   }
-  return null;
+  let info = null;
+  let netErr = null;
+  try {
+    info = await pubchemLookup(kind, value);
+  } catch (e) {
+    netErr = e;   // PubChem 不通就先记下，后面还有别的源可以试
+  }
+  // PubChem 没有 → 再问 OPSIN（系统命名）和 Wikidata（中文名）；都是按名字查才有意义
+  if ((!info || !info.found) && kind === 'name') {
+    for (const [source, budget] of [[opsinLookup, 7000], [wikidataLookup, 10000]]) {
+      try {
+        const alt = await withTimeout(source(value), budget);
+        if (alt) { info = alt; break; }
+      } catch {
+        /* 这个源不通就跳过，不影响别的源 */
+      }
+    }
+  }
+  if (!info) return { info: null, stale, netErr };
+  if (!info.found && stale) return { info: stale, cached: true, stale: true };
+  try {
+    await fsp.mkdir(LOOKUP_DIR, { recursive: true });
+    await fsp.writeFile(file, JSON.stringify({ at: Date.now(), info }), 'utf8');
+  } catch {
+    /* 缓存写不进去也不要紧 */
+  }
+  return { info, cached: false };
 }
 
 route('GET', '/api/lookup', async (req, res, params, url) => {
@@ -3786,48 +3940,13 @@ route('GET', '/api/lookup', async (req, res, params, url) => {
   if (!kind) throw new HttpError(400, '要带 smiles / inchikey / q 其中一个');
   if (value.length > 800) throw new HttpError(400, '查询内容太长');
 
-  const file = lookupCachePath(kind, value);
-  let stale = null;
-  try {
-    const raw = JSON.parse(await fsp.readFile(file, 'utf8'));
-    if (raw && raw.info) {
-      if (Date.now() - (raw.at || 0) < LOOKUP_TTL) return ok(res, { ...raw.info, cached: true });
-      stale = raw.info;
-    }
-  } catch {
-    /* 没缓存 */
-  }
-
-  let info = null;
-  let netErr = null;
-  try {
-    info = await pubchemLookup(kind, value);
-  } catch (e) {
-    netErr = e;   // PubChem 不通就先记下，后面还有别的源可以试
-  }
-  // PubChem 没有 → 再问 OPSIN（系统命名）和 Wikidata（中文名）；都是按名字查才有意义
-  if ((!info || !info.found) && kind === 'name') {
-    for (const [source, budget] of [[opsinLookup, 7000], [wikidataLookup, 6000]]) {
-      try {
-        const alt = await withTimeout(source(value), budget);
-        if (alt) { info = alt; break; }
-      } catch {
-        /* 这个源不通就跳过，不影响别的源 */
-      }
-    }
-  }
-  if (!info) {
-    if (stale) return ok(res, { ...stale, cached: true, stale: true });
-    throw new HttpError(502, `查不到（${(netErr && netErr.message) || '网络不通'}）`);
-  }
-  if (!info.found && stale) return ok(res, { ...stale, cached: true, stale: true });
-  try {
-    await fsp.mkdir(LOOKUP_DIR, { recursive: true });
-    await fsp.writeFile(file, JSON.stringify({ at: Date.now(), info }), 'utf8');
-  } catch {
-    /* 缓存写不进去也不要紧 */
-  }
-  ok(res, info);
+  const got = await lookupInfo(kind, value);
+  if (!got.info) throw new HttpError(502, `查不到（${(got.netErr && got.netErr.message) || '网络不通'}）`);
+  ok(res, {
+    ...got.info,
+    ...(got.cached ? { cached: true } : {}),
+    ...(got.stale ? { stale: true } : {}),
+  });
 });
 
 /* --- 试剂库：**输入过的**试剂都登记在 reagent_lib 里（删了记录也留着） ----------
@@ -3839,7 +3958,7 @@ function reagentLibRows(project, kw) {
   const projectArgs = project ? [project] : [];
   const lib = db
     .prepare(
-      `SELECT l.key, l.name, l.role, l.mw, l.conc, l.density, l.updated_at,
+      `SELECT l.key, l.name, l.role, l.mw, l.conc, l.density, l.updated_at, l.checked_at, l.check_state,
               (SELECT COUNT(*) FROM reagent_uses u WHERE u.key = l.key) AS used,
               (SELECT COUNT(DISTINCT r.exp_id) FROM reagents r JOIN experiments e ON e.id = r.exp_id
                 WHERE lower(trim(r.name)) = l.key ${project ? 'AND e.project = ?' : ''}) AS live,
@@ -3870,6 +3989,9 @@ function reagentLibRows(project, kw) {
         live: it.live,
         lastAt: it.last_at || '',
         lastCode: it.last_code || '',
+        // checkedAt 空 = 还没联网核过；miss = 核了，三个库都没有（下次别再自动去敲）
+        checkedAt: it.checked_at || '',
+        checkState: it.check_state || '',
         per_mmol_g: mw ? Math.round((mw / 1000) * 10000) / 10000 : null,
         per_mmol_ul: mw && density ? Math.round((mw / density) * 10) / 10 : null,
       };
@@ -3882,42 +4004,205 @@ route('GET', '/api/reagents', async (req, res, params, url) => {
   ok(res, { items, total: items.length });
 });
 
-/* 核对一个试剂：拿名字重查 PubChem → OPSIN → Wikidata，查到的 MW / 密度写回试剂库 */
+/* --- 核对：拿名字重查 PubChem → OPSIN → Wikidata，查到的 MW / 密度写回试剂库 -------
+   三种触发：
+     ① 新名字进库（touchReagentLib）→ 后台自动核一次，不阻塞保存；
+     ② 试剂库行尾的「核对」→ 单条，force 重查（不信缓存）；
+     ③ 试剂库顶上的「全部核对」→ 一批一批地喂 verify-all，前端好显示进度。
+   查不到的也记 checked_at + 'miss'，不然每次保存都会再去敲一遍网。 */
+
+/** SMILES → 分子量。服务端本来零依赖，能借到 openchemlib 就算一下（OPSIN 只回 SMILES，
+ *  拿不到库就留空，绝不因为算重量把核对判失败）。 */
+let oclLib = null;
+let oclTried = false;
+function mwFromSmiles(smiles) {
+  try {
+    if (!oclTried) {
+      oclTried = true;
+      oclLib = require(path.join(__dirname, '..', 'node_modules', 'openchemlib', 'dist', 'openchemlib.debug.js'));
+    }
+    if (!oclLib) return null;
+    const f = oclLib.Molecule.fromSmiles(String(smiles)).getMolecularFormula();
+    const w = Number(f && f.relativeWeight);
+    return Number.isFinite(w) && w > 0 ? Math.round(w * 100) / 100 : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 常见元素的原子量（够覆盖有机实验室见到的；表里没有的元素就放弃，宁可空着也别算错） */
+const ATOMIC_WEIGHT = {
+  H: 1.008, B: 10.81, C: 12.011, N: 14.007, O: 15.999, F: 18.998, Na: 22.99, Mg: 24.305,
+  Al: 26.982, Si: 28.085, P: 30.974, S: 32.06, Cl: 35.45, K: 39.098, Ca: 40.078, Li: 6.94,
+  Be: 9.012, Ti: 47.867, Cr: 51.996, Mn: 54.938, Fe: 55.845, Co: 58.933, Ni: 58.693,
+  Cu: 63.546, Zn: 65.38, Ge: 72.63, As: 74.922, Se: 78.971, Br: 79.904, Rb: 85.468,
+  Sr: 87.62, Mo: 95.95, Ru: 101.07, Rh: 102.91, Pd: 106.42, Ag: 107.87, Cd: 112.41,
+  In: 114.82, Sn: 118.71, Sb: 121.76, Cs: 132.91, Ba: 137.33, Pt: 195.08, Au: 196.97,
+  Hg: 200.59, Tl: 204.38, Pb: 207.2, Bi: 208.98, I: 126.904,
+};
+
+/** 分子式 → 分子量。Wikidata 的 P2067 偶尔不准（实测 DCM 写成 83.95，其实是 84.93），
+ *  有分子式就自己按原子量算一遍更靠得住；带电荷 / 结晶水记号的解析不了就返回 null。 */
+function mwFromFormula(formula) {
+  const f = str(formula).replace(/\s+/g, '');
+  if (!f || /[^A-Za-z0-9]/.test(f)) return null;
+  const rx = /([A-Z][a-z]?)(\d*)/g;
+  let total = 0;
+  let used = 0;
+  let m;
+  while ((m = rx.exec(f))) {
+    const w = ATOMIC_WEIGHT[m[1]];
+    if (w == null) return null;
+    total += w * (m[2] ? Number(m[2]) : 1);
+    used += m[0].length;
+  }
+  if (!used || used !== f.length || !(total > 0)) return null;
+  return Math.round(total * 100) / 100;
+}
+
+/** 核对一个试剂（key 或名字都行）。返回 { ok, state: 'ok'|'miss'|'error', mw, density, … } */
+async function verifyReagent(name, opts = {}) {
+  const raw = str(name).trim();
+  const key = raw.toLowerCase();
+  if (!key) return { name: raw, ok: false, state: 'error', reason: '空名字' };
+  const row = db.prepare('SELECT name, mw, density FROM reagent_lib WHERE key = ?').get(key);
+  const label = (row && row.name) || raw;
+  let info = null;
+  let netErr = null;
+  try {
+    const got = await lookupInfo('name', label, opts);
+    info = got.info;
+    netErr = got.netErr;
+  } catch (e) {
+    netErr = e;
+  }
+  if (!info) {
+    // 一个源都没答上（多半是断网）：不算核过，留着下次再试
+    return { name: label, ok: false, state: 'error', reason: (netErr && netErr.message) || '网络不通' };
+  }
+  const found = !!info.found;
+  let mw = found ? numOrNull(info.mw) : null;
+  if (found && info.formula) {
+    const calc = mwFromFormula(info.formula);
+    if (calc != null) mw = calc;      // 分子式算出来的比某些源给的数字可信
+  }
+  if (mw == null && found && info.smiles) mw = mwFromSmiles(info.smiles);
+  let density = null;
+  if (found && info.props && info.props.density) {
+    const d = Number(String(info.props.density).replace(/[^\d.]/g, ''));
+    if (Number.isFinite(d) && d >= 0.3 && d <= 3.5) density = d;
+  }
+  const ts = nowISO();
+  db.prepare(
+    `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density),
+            checked_at = ?, check_state = ?, updated_at = ? WHERE key = ?`
+  ).run(mw, density, ts, found ? 'ok' : 'miss', ts, key);
+  return {
+    name: label,
+    key,
+    ok: found,
+    state: found ? 'ok' : 'miss',
+    source: info.source || 'pubchem',
+    mw,
+    formula: info.formula || '',
+    density,
+    smiles: info.smiles || '',
+  };
+}
+
+/* 新试剂进库时的后台核对：串行、一次一个、离线连败就停手（别在断网时反复等超时） */
+const autoVerifyQueue = [];
+const autoVerifySeen = new Set();
+let autoVerifyBusy = false;
+let autoVerifyFails = 0;
+
+function queueReagentVerify(keys) {
+  if (process.env.ELN_AUTO_VERIFY === '0') return;
+  const list = [...new Set((keys || []).map((k) => str(k).trim().toLowerCase()).filter(Boolean))]
+    .filter((k) => !autoVerifySeen.has(k) && !autoVerifyQueue.includes(k));
+  if (!list.length) return;
+  // 只核「MW 还空着、而且没核过」的；已经有人填过数字的不动
+  const rows = db
+    .prepare(
+      `SELECT key FROM reagent_lib
+        WHERE checked_at IS NULL AND mw IS NULL AND trim(role) <> '底物'
+          AND key IN (${list.map(() => '?').join(',')})`
+    )
+    .all(...list);
+  for (const r of rows) {
+    autoVerifySeen.add(r.key);
+    autoVerifyQueue.push(r.key);
+  }
+  if (autoVerifyQueue.length) setTimeout(drainReagentVerify, 400);
+}
+
+async function drainReagentVerify() {
+  if (autoVerifyBusy) return;
+  autoVerifyBusy = true;
+  try {
+    while (autoVerifyQueue.length && autoVerifyFails < 3) {
+      const key = autoVerifyQueue.shift();
+      try {
+        const r = await verifyReagent(key);
+        autoVerifyFails = r.state === 'error' ? autoVerifyFails + 1 : 0;
+        if (r.state !== 'error') console.log(`[eln] 自动核对 ${r.name} → ${r.state}${r.mw ? ' MW ' + r.mw : ''}`);
+      } catch {
+        autoVerifyFails += 1;
+      }
+    }
+  } finally {
+    autoVerifyBusy = false;
+  }
+}
+
 route('POST', '/api/reagents/verify', async (req, res) => {
   const body = await readJson(req);
   const name = str(body.name).trim();
   if (!name) throw new HttpError(400, '要带 name');
-  let info = null;
-  try {
-    info = await pubchemLookup('name', name);
-  } catch {
-    info = null;
+  ok(res, await verifyReagent(name, { force: !!body.force }));
+});
+
+/* 全部核对：一次最多 20 个（默认 8），前端一轮一轮地调，好显示「核对了几个 / 还剩几个」。
+   不传 names 就由服务端挑「还没核过、MW 空着」的条目，按用过的次数从多到少。 */
+route('POST', '/api/reagents/verify-all', async (req, res) => {
+  const body = await readJson(req);
+  const limit = Math.min(Math.max(Number(body.limit) || 8, 1), 20);
+  let names = Array.isArray(body.names) ? body.names.map((x) => str(x).trim()).filter(Boolean) : [];
+  let remaining = 0;
+  if (!names.length) {
+    names = db
+      .prepare(
+        `SELECT l.name FROM reagent_lib l
+          WHERE trim(l.role) <> '底物' AND l.mw IS NULL AND l.checked_at IS NULL
+          ORDER BY (SELECT COUNT(*) FROM reagent_uses u WHERE u.key = l.key) DESC, l.name COLLATE NOCASE
+          LIMIT ?`
+      )
+      .all(limit)
+      .map((r) => r.name);
+  } else {
+    names = names.slice(0, limit);
   }
-  if (!info || !info.found) {
-    for (const [source, budget] of [[opsinLookup, 7000], [wikidataLookup, 6000]]) {
+  const results = [];
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < names.length) {
+      const name = names[cursor++];
       try {
-        const alt = await withTimeout(source(name), budget);
-        if (alt) { info = alt; break; }
-      } catch { /* 这个源不通就跳过 */ }
+        results.push(await verifyReagent(name, { force: !!body.force }));
+      } catch (e) {
+        results.push({ name, ok: false, state: 'error', reason: e.message || '核对失败' });
+      }
     }
-  }
-  if (!info) return ok(res, { ok: false, name });
-  // OPSIN 只回 SMILES → 前端算 MW 太绕，这里就不写 MW，让用户手填
-  const mwNum = numOrNull(info.mw);
-  const dens = info.props && info.props.density ? Number(String(info.props.density).replace(/[^\d.]/g, '')) : NaN;
-  const density = Number.isFinite(dens) && dens >= 0.3 && dens <= 3.5 ? dens : null;
-  const key = name.toLowerCase();
-  db.prepare(
-    `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density), updated_at = ? WHERE key = ?`
-  ).run(mwNum, density, nowISO(), key);
+  };
+  // 同时打 3 个源已经是 PubChem 能容忍的上限，再多容易被限流
+  await Promise.all([worker(), worker(), worker()]);
+  const count = (where) => db.prepare(`SELECT COUNT(*) AS n FROM reagent_lib WHERE trim(role) <> '底物' AND ${where}`).get().n;
+  remaining = count('mw IS NULL AND checked_at IS NULL');
   ok(res, {
-    ok: true,
-    name,
-    source: info.source || 'pubchem',
-    mw: mwNum,
-    formula: info.formula || '',
-    density,
-    smiles: info.smiles || '',
+    results,
+    remaining,
+    checked: count("checked_at IS NOT NULL AND checked_at <> ''"),
+    total: count('1 = 1'),
   });
 });
 
@@ -4094,6 +4379,12 @@ function listen(port, attempt = 0) {
       exec(cmd, () => {});
     }
   });
+}
+
+// 联网查询走哪个口：没代理就是直连（这一行平时用不着关心，查不到东西时有用）
+{
+  const px = systemProxy();
+  console.log(`  联网查询        → ${px ? `系统代理 ${px.host}:${px.port}` : '直连'}`);
 }
 
 // 后台先把 PDF 渲染器编译好（第一次生成 PDF 就不用等编译）

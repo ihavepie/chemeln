@@ -158,3 +158,21 @@
   `background: transparent`（只在 hover 时出现），现在默认就是 1px `#dcd8cf`，hover / 拖动变 2px 强调色；
   另外把 DSH 那条「侧栏↔内容」分隔条也补上：`App.vue` 里挂 `.rail-grip`，宽度写 `:root --railw`
   （`.app` 的列宽读 `var(--railw, var(--rail))`），存 `eln:railw`，`168–320px`，双击回默认，只在 ≥821px 出现。
+
+## 2026-11 · 试剂库核对 + 卡片堆/缩写细节（从 AGENTS.md 搬来）
+
+### 试剂库核对（`全部核对` + 进库自动核一次）
+- 页头 `全部核对（N）`：一批 6 个、服务端一次最多 20；选「`checked_at IS NULL` 且 `mw IS NULL`」按 `reagent_uses` 次数降序；返回 `remaining` 让前端一轮轮喂，查完按钮变「都核对过了」，只剩 miss 时变「重查查不到的（N）」（`names` + `force`）。
+- 新名字进 `reagent_lib` 时（`touchReagentLib`）把没带 MW 的 key 丢进后台队列：串行、一次一个、`ELN_AUTO_VERIFY=0` 可关、离线连败 3 次停手；查到就写回 `mw/density` 并记 `checked_at/check_state`，**查不到也记 miss**，免得每次保存都敲网。
+- `verifyReagent()` 走 `lookupInfo()`（PubChem → OPSIN → Wikidata，30 天缓存，`force` 跳过缓存）；MW 优先 `mwFromFormula()` 按原子量现算（Wikidata 的 P2067 会把 DCM 写成 83.95，实际 84.93），其次 `mwFromSmiles()`（懒 require `openchemlib/dist/openchemlib.debug.js`，因为主构建把属性名压minify了）。
+- 顺手删掉了 `withTimeout` / `wikidataLookup` 的重复定义（后一份会盖掉前一份，把 CirrusSearch 那版换成老的 `wbsearchentities`，慢十几秒）。
+
+### 卡片堆：组员行与垫纸
+- **组员行只有文字、不加框线**：行与行之间只留 2px，靠行自己的 6px 内边距分开——**别把 gap 调回 9px 又把内边距留成 2px**，那样是「薄薄几行漂在大空隙里」。
+- 左侧一道淡竖线分组；日期用 `margin-left:auto` 顶到右边、产率接在日期后面，整行吃满卡片宽度。
+- **两张垫纸挂在 `.stack-top` 上（只包面子那张卡片），不能挂在 `.exp-stack` 上**——`.exp-stack` 展开后还包着组员行，`inset:0` 的纸片会露一整块白底在组员行下面（踩过）。
+- `stack-top::before/after` 是两张纸色（`#faf8f1` / `#fdfcf7`）的垫纸，**和卡片一样大小、往右上方错开** `translate(8px,-8px)` / `(4px,-4px)`，`inset: 0`——垫纸只有 `.stack-top` 这张卡片那么高，所以不会糊到展开的组员行上。
+- `.listpane-body` 内边距 `12px 14px 14px 12px`（左右基本对称，卡片宽度扣掉垫纸错出的 10px 也不拱横向滚动条）；点过的行要 `outline:none`，否则会留一圈浏览器默认焦点环；组员小签别放回上面那行，会把小签挤到换行。
+
+### 基团缩写（`lib/abbrev.js`）四条坑
+①`SSSearcher` 不认 `[CH3]` 的氢数（要按「重原子邻居数完全一致」再筛一遍）；②**Ph / Me / Et 放表末**（前面那些含甲基 / 苯环的基团要先匹配），**nBu 去掉了**（长链末端也会被它糊成 nBu，看着不对）；③**主体基团不缩写**：只有「缩掉的原子比剩下的少」才缩——苯甲醛、甲苯、联苯这种整条分子就是个苯环的，画出来而不是写 Ph（用户要求）；④**同一种基团要么全缩、要么全画**：3,3-二苯基环丁酮不会出现「一个环画、一个写成 Ph」。

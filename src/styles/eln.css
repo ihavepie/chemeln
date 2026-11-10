@@ -7261,6 +7261,22 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 }
 .rl-check:hover { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
 .rl-check:disabled { opacity: 0.5; cursor: default; }
+/* 试剂库页头那颗「全部核对」：跟行尾的「核对」同一路质感，只是稍宽一点、带条数 */
+.rl-allcheck {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.rl-allcheck:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
+.rl-allcheck:disabled { opacity: 0.45; cursor: default; }
+/* 核过了、三个库都没有：写「查无」并压淡，跟「还没查过」的一横区分开 */
+.rl-miss { color: var(--ink-4); opacity: 0.7; font-size: 11px; letter-spacing: 0.02em; }
 
 /* 「从试剂库选」弹窗：一列可点的行（名字 / 组分 / 1 mmol 折多少 g 或 µL） */
 .lib-search {

@@ -153,7 +153,9 @@ export const api = {
   groups: (project = '') =>
     request(`/api/groups${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d),
   /** 核对一个试剂：服务端拿名字重查 PubChem / OPSIN / Wikidata，把 MW / 密度写回试剂库 */
-  reagentsVerify: (name) => request('/api/reagents/verify', { method: 'POST', body: { name } }),
+  reagentsVerify: (name, force = false) => request('/api/reagents/verify', { method: 'POST', body: { name, force } }),
+  // 全部核对：一次喂一批（服务端挑「没核过、MW 空着」的，或者给 names），返回还剩几个没核
+  reagentsVerifyAll: (payload = {}) => request('/api/reagents/verify-all', { method: 'POST', body: payload }),
   /** 试剂库（用过的试剂汇总）：按名字聚合，带组分 / MW / 密度 / 1 mmol 折算量 */
   reagents: (project = '', q = '') => {
     const qs = new URLSearchParams();
