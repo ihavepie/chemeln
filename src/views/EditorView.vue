@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import AppModal from '../components/AppModal.vue';
 import ExperimentMobile from '../components/ExperimentMobile.vue';
 import ExpListPane from '../components/ExpListPane.vue';
+import PaneGrip from '../components/PaneGrip.vue';
 import AttachmentsBlock from '../components/AttachmentsBlock.vue';
 import FilePreview from '../components/FilePreview.vue';
 import CondRow from '../components/CondRow.vue';
@@ -988,6 +989,7 @@ const openAttachment = (id) => {
     <!-- 左：实验列表。读取中就一直挂着——从列表/卡片墙点进来时，这栏以前会跟着
          整棵 v-if 分支一起卸载重建，看着就是闪一下 -->
     <ExpListPane />
+    <PaneGrip />
     <div class="editor" ref="editorEl" @scroll="updateRail">
       <!-- 读取中：左边列表原地不动，只把右边这张纸换成空白骨架，
            不然点开记录是一整片白闪一下再长出内容 -->

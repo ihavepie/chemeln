@@ -90,8 +90,11 @@ body {
 
 /* three panes */
 .panes {
+  /* 列宽可以拖（见 .pane-grip）：拖过就按 :root 的 --listw 走，没拖过用 --panes-w 的默认值 */
+  --panes-w: 336px;
+  position: relative;
   display: grid;
-  grid-template-columns: 336px 1fr;
+  grid-template-columns: var(--listw, var(--panes-w)) 1fr;
   width: 100%;
   overflow: hidden;
 }
@@ -3183,7 +3186,7 @@ kbd {
 
 @media (max-width: 1180px) {
   :root { --rail: 176px; }
-  .panes { grid-template-columns: 292px 1fr; }
+  .panes { --panes-w: 292px; }
   .editor-inner { padding: 24px 26px 0; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -7076,3 +7079,35 @@ body.is-sct-resizing * { cursor: col-resize !important; user-select: none !impor
 .sct-block-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 2px; }
 .sct-block-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .sct-block-head .spacer { flex: 1 1 auto; }
+
+/* ================================================================
+   列表列和纸面之间的分隔线可以拖（跟 DSH 布局里那条面板分隔条一个路数）：
+   平时就是列表自己那道 1px 边线，鼠标靠近才浮出一条强调色细线；
+   拖动时整页 col-resize 光标 + 禁选字。宽度存 localStorage `eln:listw`。
+   ================================================================ */
+.pane-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 8;
+  left: var(--listw, var(--panes-w));
+  width: 14px;
+  margin-left: -7px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.pane-grip::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: transparent;
+  transition: background 0.12s;
+}
+.pane-grip:hover::after,
+.pane-grip.is-on::after { background: var(--accent); }
+body.is-pane-resizing,
+body.is-pane-resizing * { cursor: col-resize !important; user-select: none !important; }

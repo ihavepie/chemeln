@@ -134,3 +134,8 @@
   去试剂 `− PPh3`；只改当量 `LDA 1.2 eq`。**溶剂以投料表 role=溶剂 那一行为准**（`solvent` 字段只是老壳），
   不然「溶剂 空」和投料行的溶剂变化会各说一遍（用户截图里 TT-2 被标了「去掉溶剂（原 THF）」其实没动）。
   服务端 `diffItems` 同样跳过投料行已经覆盖的 `solvent` 字段。
+
+  **列表↔纸面的分隔线可拖**（同轮）：新增 `src/lib/panesize.js` + `src/components/PaneGrip.vue`。宽度写 `:root --listw`，
+  `.panes { grid-template-columns: var(--listw, var(--panes-w)) 1fr }`；命中区 14px 骑在边线上（`left: var(--listw)`、`margin-left: -7px`），
+  平时透明、hover / 拖动才有 2px 强调色线；`min 236` / `max = min(620, 窗口宽 × 0.42)`；双击清 localStorage 回默认。
+  跟 `lib/colresize.js` 一样只吃 mouse 事件，拖动时 body 挂 `is-pane-resizing`。

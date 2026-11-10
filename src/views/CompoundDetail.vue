@@ -5,6 +5,7 @@ import Icon from '../components/Icon.vue';
 import CatPick from '../components/CatPick.vue';
 import ProjPick from '../components/ProjPick.vue';
 import CmpListPane from '../components/CmpListPane.vue';
+import PaneGrip from '../components/PaneGrip.vue';
 import CompoundMobile from '../components/CompoundMobile.vue';
 import AppModal from '../components/AppModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
@@ -770,6 +771,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
 
   <div v-else class="panes">
     <CmpListPane />
+    <PaneGrip />
     <div v-if="error" class="editor"><div class="empty-note" style="padding: 80px">{{ error }}</div></div>
     <div v-else-if="!c" class="editor"><div class="empty-note" style="padding: 80px">读取中…</div></div>
 
