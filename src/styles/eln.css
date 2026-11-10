@@ -5819,12 +5819,14 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   background: #ddd7c6;
   transition: width 0.14s, background 0.14s;
 }
-/* 状态用短杠的底色说：进行中偏暖、已完成偏绿、失败偏红……当前那条仍然是墨色最重 */
-.pgroup-tab[data-tone='warn']::before { background: #d8c8a2; }
-.pgroup-tab[data-tone='ok']::before { background: #bfd0c0; }
-.pgroup-tab[data-tone='info']::before { background: #c2d4e0; }
-.pgroup-tab[data-tone='bad']::before { background: #dcbcbc; }
-.pgroup-tab[data-tone='accent']::before { background: #dcc4b6; }
+/* 状态用短杠的底色说：进行中偏暖、已完成偏绿、失败偏红……当前那条仍然是墨色最重。
+   颜色由全局 tone 色（跟状态小圆点同一套）混进纸色，淡而不脏；不支持 color-mix 的老
+   Safari 直接退回上面的灰色，依然是能用的。 */
+.pgroup-tab[data-tone='warn']::before { background: color-mix(in oklab, var(--warn) 52%, #e8e3d6); }
+.pgroup-tab[data-tone='ok']::before { background: color-mix(in oklab, var(--ok) 50%, #e8e3d6); }
+.pgroup-tab[data-tone='info']::before { background: color-mix(in oklab, var(--info) 50%, #e8e3d6); }
+.pgroup-tab[data-tone='bad']::before { background: color-mix(in oklab, var(--bad) 50%, #e8e3d6); }
+.pgroup-tab[data-tone='accent']::before { background: color-mix(in oklab, var(--accent) 48%, #e8e3d6); }
 .pgroup-tab:hover::before { width: 20px; background: var(--ink-4); }
 /* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数） */
 .pgroup-tab.is-on::before { width: 22px; background: var(--ink); }
