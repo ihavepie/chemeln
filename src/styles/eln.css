@@ -5831,46 +5831,39 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup-tab.is-on .pgroup-meta { color: var(--accent-ink); opacity: 0.8; }
 
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
+/* 书签悬停预览卡：照 DSH 那个 turn 预览的样子——无边框、圆角 10、只有一层柔和投影，
+   一行粗体提要 + 最多三行灰字摘要，出现时淡入并往右推 4px。 */
 .pgroup-peek-float {
   position: fixed;
   z-index: 60;
   pointer-events: none;
   padding: 10px 12px;
   background: var(--paper);
-  border: 1px solid var(--line-2);
-  border-radius: 5px;
-  box-shadow: 0 8px 22px rgba(20, 18, 14, 0.12);
-  color: var(--ink-2);
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(20, 18, 14, 0.13), 0 2px 6px rgba(20, 18, 14, 0.05);
+  color: var(--ink-3);
   font-family: var(--sans, system-ui, sans-serif);
   text-align: left;
+  animation: peek-in 0.12s ease-out;
+}
+@keyframes peek-in {
+  from { opacity: 0; transform: translateX(4px); }
+  to { opacity: 1; transform: none; }
 }
 
-/* 卡片右边缘的小箭头：指向正在悬停的那枚书签（--arrow-y 由 JS 按书签中线写） */
+/* 卡片右边缘的小箭头：指向正在悬停的那枚书签（--arrow-y 由 JS 按书签中线写）。
+   卡片没有边框了，箭头也只是同色的一小块，别再描那道线。 */
 .pgroup-peek-float::after {
   content: '';
   position: absolute;
-  right: -5.5px;
+  right: -4.5px;
   top: var(--arrow-y, 22px);
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   background: var(--paper);
-  border-top: 1px solid var(--line-2);
-  border-right: 1px solid var(--line-2);
   border-radius: 1px;
   transform: translateY(-50%) rotate(45deg);
-}
-
-.pgroup-peek-title {
-  font-size: 12px;
-  line-height: 1.3;
-  color: var(--ink);
-  margin-bottom: 4px;
-}
-
-.pgroup-peek-line {
-  font-size: 10px;
-  line-height: 1.55;
-  color: var(--ink-3);
 }
 
 .pgroup-add {
@@ -6149,123 +6142,29 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 
 /* ================================================================
-   平行书签的悬停预览卡（v2）：标题行 + 差异横幅 + 关键数字一排 + 条件/底物/结论/备注
-   —— 关键数字用等宽加粗，标签用小号灰字，正文最多两行，别把卡片拉太长。
+   平行书签的悬停预览卡：一行粗体提要 + 最多三行灰字摘要
+   （跟 DSH 的 turn 预览一个路数：不分区、不描边、不铺底色，超长就截断）
    ================================================================ */
-.pgroup-peek-float .peek-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.pgroup-peek-float .peek-title {
-  flex: 1 1 auto;
-  font-family: var(--serif);
-  font-size: 14.5px;
-  line-height: 1.3;
+.pgroup-peek-float .peek-line {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
   color: var(--ink);
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
-.pgroup-peek-float .peek-flag {
-  margin: 0 0 8px;
-  padding: 5px 9px;
-  border-radius: 3px;
-  font-size: 11.5px;
-  line-height: 1.5;
-}
-/* 差异 / 条件相同：只靠淡底 + 字色区分（左边那道 2px 色条也去掉了，用户不喜欢红条） */
-.pgroup-peek-float .peek-flag.is-diff {
-  background: #fbf1e9;
-  color: var(--accent-ink);
-}
-.pgroup-peek-float .peek-flag.is-same {
-  background: #f2f5f0;
-  color: #40573c;
-}
-/* 「基准」只有一个词，做成小胶囊，不要整条横幅占一行 */
-.pgroup-peek-float .peek-flag.is-base {
-  display: inline-block;
-  margin-bottom: 8px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: #f5f4f1;
-  border-left: none;
-  color: var(--ink-3);
-}
-
-/* 关键数字：一排，数字大一点、等宽，单位小字跟在后面 */
-.pgroup-peek-float .peek-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 6px 0 7px;
-  border-top: 1px dotted var(--line-2);
-  border-bottom: 1px dotted var(--line-2);
-  margin-bottom: 6px;
-}
-.pgroup-peek-float .peek-k {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink-1, var(--ink));
-  white-space: nowrap;
-}
-.pgroup-peek-float .peek-k em {
-  font-style: normal;
-  font-size: 10.5px;
-  color: var(--ink-3);
-  margin-right: 4px;
-}
-.pgroup-peek-float .peek-k b {
-  font-weight: 600;
-  font-size: 13.5px;
-  color: var(--ink);
-}
-.pgroup-peek-float .peek-k.is-ok b { color: var(--ok); }
-
-/* 条件 / 底物：标签固定宽度，值自然折行 */
-.pgroup-peek-float .peek-row {
-  display: flex;
-  gap: 8px;
+.pgroup-peek-float .peek-body {
+  margin: 4px 0 0;
   font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink);
-}
-.pgroup-peek-float .peek-label {
-  flex: none;
-  width: 30px;
+  line-height: 1.55;
   color: var(--ink-3);
-  font-size: 11px;
-  padding-top: 1px;
-}
-.pgroup-peek-float .peek-val { flex: 1 1 auto; }
-.pgroup-peek-float .peek-note {
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
-  padding: 6px 8px;
-  background: #f8f7f3;
-  border-radius: 3px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink-2);
-}
-.pgroup-peek-float .peek-note .peek-val {
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-}
-.pgroup-peek-float .peek-foot {
-  margin-top: 8px;
-  padding-top: 7px;
-  border-top: 1px dotted var(--line-2);
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--ink-3);
-  letter-spacing: 0.02em;
 }
 
 /* ================================================================

@@ -808,16 +808,39 @@ const peekConds = computed(() => {
 });
 
 /** 关键数字那一排：规模 / 溶剂用量 / 产率 / ee（没有 ee 就显示 dr） */
-const peekMetrics = computed(() => {
+/** 预览卡第一行（粗体一行，照 DSH 那个 turn 预览的样子）：编号 + 相对基准改了什么 */
+const peekLine = computed(() => {
   const p = peek.value;
-  if (!p) return [];
-  const out = [];
-  if (p.base_mmol) out.push({ k: '规模', v: `${p.base_mmol} mmol` });
-  if (p.solvent_ml) out.push({ k: '溶剂', v: `${p.solvent_ml} mL` });
-  if (peekPrefs.result && p.yield_pct != null) out.push({ k: '产率', v: `${p.yield_pct}%`, ok: true });
-  if (peekPrefs.result && p.ee_pct != null) out.push({ k: 'ee', v: `${p.ee_pct}%` });
-  else if (peekPrefs.result && p.dr_ee) out.push({ k: 'dr/ee', v: String(p.dr_ee) });
-  return out;
+  if (!p) return '';
+  let diff = '';
+  if (p.variant === '基准') diff = '基准';
+  else if (p.variant === '重复') diff = p.scaleNote ? `重复 · 规模 ${p.scaleNote}` : '重复';
+  else if (Array.isArray(p.diffs) && p.diffs.length) diff = `改 ${p.diffs.join('、')}`;
+  return [p.code, p.title, diff].filter(Boolean).join(' · ');
+});
+
+/** 预览卡下面那几行灰字：状态 · 条件 · 底物→产物 · 结果 · 结论 · 备注（按 05 的开关），
+ *  拼成一句话、最多三行，超出截断——别再回到一格格带标签的小行。 */
+const peekBody = computed(() => {
+  const p = peek.value;
+  if (!p) return '';
+  const seg = [];
+  if (p.status) seg.push(p.status);
+  if (peekPrefs.conditions && peekConds.value) seg.push(peekConds.value);
+  if (peekPrefs.substrates && (p.substrates || p.product_name)) {
+    seg.push(`${p.substrates || '—'}${p.product_name ? ` → ${p.product_name}` : ''}`);
+  }
+  if (peekPrefs.result) {
+    const r = [];
+    if (p.yield_pct != null) r.push(`产率 ${p.yield_pct}%`);
+    if (p.ee_pct != null) r.push(`ee ${p.ee_pct}%`);
+    else if (p.dr_ee) r.push(`dr/ee ${p.dr_ee}`);
+    if (p.base_mmol) r.push(`${p.base_mmol} mmol`);
+    if (r.length) seg.push(r.join(' · '));
+  }
+  if (peekPrefs.conclusion && p.conclusion) seg.push(p.conclusion);
+  if (peekPrefs.notes && p.notes) seg.push(p.notes);
+  return seg.join(' · ');
 });
 
 /** 书签上那一行小字：产率有就写产率，没有就写状态 */
@@ -1177,38 +1200,8 @@ const openAttachment = (id) => {
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
           <Teleport to="body">
             <div v-if="peek" ref="peekEl" class="pgroup-peek-float" :style="peekPos">
-              <div class="peek-head">
-                <span class="peek-title">{{ peek.title || '（未命名实验）' }}</span>
-                <span class="tag" :class="STATUS_TONE[peek.status]" style="font-size: 10px; padding: 1px 7px">{{ peek.status }}</span>
-              </div>
-
-              <div v-if="peek.variant === '基准'" class="peek-flag is-base">基准</div>
-              <div v-else-if="peek.variant === '重复'" class="peek-flag is-same">
-                条件相同<template v-if="peek.scaleNote"> · 规模 {{ peek.scaleNote }}</template>
-              </div>
-              <div v-else-if="peek.diffs && peek.diffs.length" class="peek-flag is-diff">差异：{{ peek.diffs.join('、') }}</div>
-
-              <div v-if="peekMetrics.length" class="peek-metrics">
-                <span v-for="m in peekMetrics" :key="m.k" class="peek-k" :class="{ 'is-ok': m.ok }">
-                  <em>{{ m.k }}</em><b>{{ m.v }}</b>
-                </span>
-              </div>
-
-              <div v-if="peekPrefs.conditions && peekConds" class="peek-row">
-                <span class="peek-label">条件</span><span class="peek-val">{{ peekConds }}</span>
-              </div>
-              <div v-if="peekPrefs.substrates && (peek.substrates || peek.product_name)" class="peek-row">
-                <span class="peek-label">底物</span>
-                <span class="peek-val">{{ peek.substrates || '—' }}<template v-if="peek.product_name"> → {{ peek.product_name }}</template></span>
-              </div>
-              <div v-if="peekPrefs.conclusion && peek.conclusion" class="peek-note">
-                <span class="peek-label">结论</span><span class="peek-val">{{ peek.conclusion }}</span>
-              </div>
-              <div v-if="peekPrefs.notes && peek.notes" class="peek-note">
-                <span class="peek-label">备注</span><span class="peek-val">{{ peek.notes }}</span>
-              </div>
-
-              <div class="peek-foot">{{ peek.code }} · {{ peek.date }}</div>
+              <p class="peek-line">{{ peekLine }}</p>
+              <p v-if="peekBody" class="peek-body">{{ peekBody }}</p>
             </div>
           </Teleport>
         </Teleport>

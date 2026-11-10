@@ -17,12 +17,12 @@
 - 前端：Vue 3.5 `<script setup>`、vue-router 4（hash 模式）、Element Plus 2.8（zh-CN）、Vite 6，无 TypeScript、无状态管理库（一个 reactive store）。
 - 化学计算：`openchemlib` 9.25.1，**动态 import**（约 1.1 MB chunk），负责 SMILES/MOL → 分子式、MW、结构 SVG。**只给「带基团缩写」的结构另加一份 `indigo-ketcher` 1.46 的 WASM**（`src/lib/indigo.js`，11.8 MB，放 `vendor/indigo/`，按需加载）。
 - 服务端：零依赖 Node CommonJS（`server/index.js` 单文件，约 35+ 条 REST 路由），数据库用内置 `node:sqlite`，端口 4780。
-- 启动：`preview.command`（4780 已在跑就复用 + `npx vite --port 5173`）、`npm run dev`、`npm run serve`。
+- 启动：`preview.command`（4780 已在跑就复用，再起 5173）、`npm run dev` / `npm run serve`。
 - 数据：全部在 `data/` —— `data/eln.db`（SQLite）+ `data/attachments/`（谱图等原始文件）+ `data/compounds/`（化合物文件）。备份 = 整个 `data/` 拷走。
 - **数据备份用 `node scripts/backup.js`**：`VACUUM INTO` 把（含 WAL 的）真数据写成一个自包含单文件，再连 `attachments/`、`compounds/` 一起拷到 `.backups/<日期>/`，默认留 7 份（`--list` 看已有、`--keep N` 改份数）。**别用 `cp data/eln.db` 当备份**——真数据在 `-wal` 里，拷出来是空壳。目前**没有排定时任务**，要手动跑；`.backups/` 不进 git。
 - **绝对不能删**：`data/`（用户全部实验记录）、`server/package.json`（内容是 `{"type":"commonjs"}`，删了服务端起不来）、`src/styles/eln.css` 里从 v1 原样搬来的大段规则、`public/`（**现在就是 v2 构建产物，删了 4780 打不开**；旧 v1 在 `.backup/public-v1-*/`）。
 - **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。常用：`git diff` 看改了啥、`git checkout -- <文件>` 撤销未提交改动、`git log --oneline` 看历史。**git 只保代码，不保数据**：`data/` 得自己拷走。
-  **两个远程**：`backup` = 本机裸仓库 `<项目目录>-backup.git`（`git push backup main` 推一份）；`origin` = `git@github.com:hvaepe/chemlen.git`（公开仓库）。
+  **两个远程**：`backup` = 本机裸仓库 `<项目目录>-backup.git`（`git push backup main` 推一份）；`origin` = `git@github.com:ihavepie/chemeln.git`（公开仓库，HTTPS 地址 https://github.com/ihavepie/chemeln）。
   **这台机器连 github.com 的 HTTPS 会超时**（`curl https://github.com/` 000，但 `api.github.com` 通），所以走 SSH：私钥在 `<本机路径>/.ssh/<私钥>`（不进门目录，沙箱写不了 `~/.ssh`），仓库里已配好 `core.sshCommand` 指到它，公钥要在 GitHub 账号里登记过才能推。
   **脱敏**：`CLOUD-DEPLOY.md` 是模板（占位地址），真实 IP / 私钥 / 密码只在本机 `CLOUD-DEPLOY.local.md`（已 gitignore）。**历史已用 `git filter-branch` 重写过一遍**（IP / 密码 / `<用户目录>` 全抹，hash 全变，旧对象已 gc），**别再把这些写进仓库**；细节在 `HISTORY.md`。
 
@@ -121,7 +121,7 @@
 ## 6. 当前进度
 
 > 更早的轮次记录（同一套写法，逐字搬走、没删内容）在 **`HISTORY.md`**；这个文件有 **64 KB 注入上限**，所以最近几轮留在下面，再早的按顺序往下搬。加新内容前先看看体积。
-- **本轮（筛选表照文献重排，`try/record-kind` 上）**：三线表照用户贴的 `Table 1`——**Times 衬线**（中文落宋体，`--sct-serif` 定义在 `.sct-plain`）、14px；**细顶线 1px + 表头下 / 表尾各 2.5px 粗线**；表头加粗、数字右对齐、第一列和标题顶着最左那条线、基准行不铺底；标题「表 N：」粗斜体 + 上标 `[a]`、表下上标 `[a]/[b]` 脚注；带单位的列格子里不重复 %。**宽度默认按内容宽**（不再铺满整页）；表格右边那道竖线**可以拖着改宽 / 改窄**（双击回自适应；宽度存 localStorage `eln:sct:w`；min 按表格 `min-content` 量）；**反应式居中对齐到表格宽度里**（`.sct-std` 放在 `.sct-fit` 里面），条件那行字居中跟在下面。**别再改回无衬线 / 等宽 / 满页宽**。
+- **本轮（筛选表照文献重排 + 书签预览卡，`try/record-kind` 上）**：三线表照用户贴的 `Table 1` 改成 Times 衬线、细顶线 + 粗中线/底线、数字右对齐、去掉基准行底色、标题粗斜体 + 上标 `[a]/[b]` 脚注；**宽度默认按内容宽**、右边一道竖线可拖宽（双击自适应，存 `eln:sct:w`）；反应式居中到表格宽度里。**平行书签的悬停预览卡**改成 DSH 那个 turn 预览的样子：无边框、圆角 10、柔和投影，**一行粗体提要 + 最多三行灰字摘要**。细节见 `HISTORY.md` 的「2026-11 · 筛选表照文献重排」。**别改回无衬线 / 等宽 / 满页宽、也别把预览卡拆回带标签的小行**。
 - **上一轮（试验分支 `try/record-kind`，`main` 停在 6e229d3，回退 = `git checkout main`）**：记录「类型」+ `exp_groups` 分组 + 分类管理挂卡片组头右键 + 条件筛选页读记录清单 + 筛选表上方的标准条件反应式；明细见 `HISTORY.md` 的「2026-11 · 记录类型与分组」。
 - **已完成**：v2 全功能已构建进 `public/`（4780 跑的就是 v2）；逐项清单在 `HISTORY.md`。
 - **半成品 / 待确认**：「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
