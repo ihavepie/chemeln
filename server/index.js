@@ -792,7 +792,9 @@ function bootstrap(query = {}) {
       }
       continue;
     }
-    if (prev.mw == null) prev.mw = l.mw;
+    // 记录里存的是「一位小数」那种粗值（比如 P(Cy)3 的 280.4）时，用库里更细的换掉
+    const coarseMw = (v) => v != null && Math.round(Number(v) * 100) % 10 === 0;
+    if (prev.mw == null || (l.mw != null && coarseMw(prev.mw))) prev.mw = l.mw;
     if (prev.conc == null) prev.conc = l.conc;
     if (prev.density == null) prev.density = l.density;
     if (!prev.role) prev.role = str(l.role);
@@ -4079,14 +4081,16 @@ function mwFromSmiles(smiles) {
 }
 
 /** 常见元素的原子量（够覆盖有机实验室见到的；表里没有的元素就放弃，宁可空着也别算错） */
+// 标准原子量（IUPAC，多留几位再四舍五入）——少留一位会把 P(Cy)3 算成 280.44 这种
 const ATOMIC_WEIGHT = {
-  H: 1.008, B: 10.81, C: 12.011, N: 14.007, O: 15.999, F: 18.998, Na: 22.99, Mg: 24.305,
-  Al: 26.982, Si: 28.085, P: 30.974, S: 32.06, Cl: 35.45, K: 39.098, Ca: 40.078, Li: 6.94,
-  Be: 9.012, Ti: 47.867, Cr: 51.996, Mn: 54.938, Fe: 55.845, Co: 58.933, Ni: 58.693,
-  Cu: 63.546, Zn: 65.38, Ge: 72.63, As: 74.922, Se: 78.971, Br: 79.904, Rb: 85.468,
-  Sr: 87.62, Mo: 95.95, Ru: 101.07, Rh: 102.91, Pd: 106.42, Ag: 107.87, Cd: 112.41,
-  In: 114.82, Sn: 118.71, Sb: 121.76, Cs: 132.91, Ba: 137.33, Pt: 195.08, Au: 196.97,
-  Hg: 200.59, Tl: 204.38, Pb: 207.2, Bi: 208.98, I: 126.904,
+  H: 1.00794, B: 10.811, C: 12.0107, N: 14.0067, O: 15.9994, F: 18.9984032, Na: 22.98977,
+  Mg: 24.305, Al: 26.981538, Si: 28.0855, P: 30.973762, S: 32.065, Cl: 35.453, K: 39.0983,
+  Li: 6.941, Be: 9.012182, Ti: 47.867, Cr: 51.9961, Mn: 54.938045, Fe: 55.845, Co: 58.933195,
+  Ni: 58.6934, Cu: 63.546, Zn: 65.38, Ge: 72.64, As: 74.9216, Se: 78.96, Br: 79.904,
+  Rb: 85.4678, Sr: 87.62, Mo: 95.94, Ru: 101.07, Rh: 102.9055, Pd: 106.42, Ag: 107.8682,
+  Cd: 112.411, In: 114.818, Sn: 118.71, Sb: 121.76, Cs: 132.9054519, Ba: 137.327,
+  Pt: 195.084, Au: 196.966569, Hg: 200.59, Tl: 204.3833, Pb: 207.2, Bi: 208.9804,
+  I: 126.90447,
 };
 
 /** 分子式 → 分子量。Wikidata 的 P2067 偶尔不准（实测 DCM 写成 83.95，其实是 84.93），
@@ -4130,6 +4134,7 @@ async function verifyReagent(name, opts = {}) {
   }
   const found = !!info.found;
   let mw = found ? numOrNull(info.mw) : null;
+  const prevMw = numOrNull(row && row.mw);
   if (found && info.formula) {
     const calc = mwFromFormula(info.formula);
     if (calc != null) mw = calc;      // 分子式算出来的比某些源给的数字可信
@@ -4141,10 +4146,13 @@ async function verifyReagent(name, opts = {}) {
     if (Number.isFinite(d) && d >= 0.3 && d <= 3.5) density = d;
   }
   const ts = nowISO();
+  // 旧值只有「一位小数」的精度（280.4 → 界面显示成 280.40）时，用算出来更细的替换；
+  // 手填的两位小数（280.43）不动，空值就补上
+  const coarse = prevMw === null || Math.round(prevMw * 100) % 10 === 0;
   db.prepare(
     `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density),
             checked_at = ?, check_state = ?, updated_at = ? WHERE key = ?`
-  ).run(mw, density, ts, found ? 'ok' : 'miss', ts, key);
+  ).run(mw != null && coarse ? mw : null, density, ts, found ? 'ok' : 'miss', ts, key);
   return {
     name: label,
     key,

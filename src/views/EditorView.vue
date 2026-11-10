@@ -19,7 +19,7 @@ import HistoryModal from '../components/HistoryModal.vue';
 import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
-import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
+import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
 import { sheetPrefs } from '../lib/sheetprefs.js';
 import { KINDS, RXN_TYPES } from '../lib/kind.js';
@@ -147,6 +147,30 @@ function fill(e) {
   reagent.rows = rows;
   ensureSolventRow();     // 老记录：溶剂还在字段里 → 补成投料表的一行
   markLoaded();
+  if (fixCoarseMw(rows)) notify();   // 分子量被修细了，顺手存一次（导出 / 列表才跟页面对得上）
+}
+
+/** 老数据里的分子量可能只有一位小数（P(Cy)3 = 280.4），词库里有更细的（280.43）就换掉；
+ *  手填过两位小数的不动。换完把用量按新分子量重算，跟「1 mmol ≈ x g」对得上。 */
+function fixCoarseMw(rows) {
+  const coarse = (v) => v != null && Math.round(Number(v) * 100) % 10 === 0;
+  let changed = false;
+  for (const r of rows) {
+    if (!r.name || r.compound_id || r._mwManual) continue;
+    const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === String(r.name).toLowerCase());
+    if (!d || d.mw == null || !coarse(r.mw)) continue;
+    if (Number(d.mw).toFixed(2) === Number(r.mw).toFixed(2)) continue;
+    r.mw = Number(d.mw);
+    r.mwText = Number(d.mw).toFixed(2);
+    changed = true;
+    if (r.role !== '溶剂' && num(r.mmol) !== null) {
+      const next = derive({ ...r });
+      r.mass_mg = next.mass_mg ?? null;
+      r.volume_ul = next.volume_ul ?? null;
+      r.amountText = amountText(next);
+    }
+  }
+  return changed;
 }
 
 /** 打开这条记录时的内容快照，用来「重置」 */
