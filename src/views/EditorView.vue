@@ -1203,15 +1203,19 @@ const openAttachment = (id) => {
               @mouseleave="hidePeek()"
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
             >
-              <!-- 编号逐字浮出：悬停 / 当前那条才显示，字距收紧一档（信息量还是靠预览卡） -->
+              <!-- 短杠旁边那一行小字：平时只淡淡地写编号（一眼知道这一组有哪几条），
+                   悬停 / 当前那条再多浮出「基准 / 改 X / 产率」——信息量还是靠预览卡 -->
               <span class="pgroup-lbl" aria-hidden="true">
-                <span
-                  v-for="(ch, i) in [...s.code]"
-                  :key="i"
-                  class="pgroup-ch"
-                  :style="{ transitionDelay: `${Math.min(i, 10) * 12}ms` }"
-                  >{{ ch }}</span
-                >
+                <span class="pgroup-code">{{ s.code }}</span>
+                <span class="pgroup-var">
+                  <span
+                    v-for="(ch, i) in [...sibLine(s)]"
+                    :key="i"
+                    class="pgroup-ch"
+                    :style="{ transitionDelay: `${Math.min(i, 12) * 14}ms` }"
+                    >{{ ch }}</span
+                  >
+                </span>
               </span>
             </button>
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>

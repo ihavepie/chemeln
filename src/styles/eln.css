@@ -5809,14 +5809,16 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 /* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数） */
 .pgroup-tab.is-on::before { width: 22px; background: var(--ink); }
 
-/* 编号：一排短杠不带字，光看形状不知道是哪条，所以悬停 / 当前那条会浮出编号。
-   做法是**逐字**上浮 + 淡入（每个字自己延后 12ms），比整段文字一起淡入更有「浮起来」的感觉。 */
+/* 短杠左边那一行小字：**编号一直在**（淡一点，整排看过去就知道这组有哪几条），
+   悬停 / 当前那条再加一段「基准 / 改 X / 产率」——那一段是**逐字**浮出来的
+   （每个字延后 14ms 上浮 + 淡入），比整段一起淡入更有「浮起来」的感觉。 */
 .pgroup-lbl {
   position: absolute;
   right: calc(100% + 8px);
   top: 50%;
   transform: translateY(-50%);
   display: flex;
+  align-items: baseline;
   font-family: var(--mono);
   font-size: 9.5px;
   line-height: 1;
@@ -5824,7 +5826,24 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   color: var(--ink-4);
   white-space: nowrap;
   pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 0.14s, color 0.14s;
 }
+.pgroup-tab:hover .pgroup-lbl,
+.pgroup-tab.is-on .pgroup-lbl { opacity: 1; color: var(--ink-3); }
+.pgroup-tab:hover .pgroup-lbl { color: var(--ink-2); }
+
+/* 变化那一段：宽度 0 → 展开（不然一悬停整排字突然变长、短杠被推走），字再逐字浮出 */
+.pgroup-var {
+  display: inline-flex;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s, margin-left 0.24s;
+}
+.pgroup-tab:hover .pgroup-var,
+.pgroup-tab.is-on .pgroup-var { max-width: 130px; opacity: 1; margin-left: 6px; }
+.pgroup-var::before { content: '·'; margin-right: 5px; color: var(--ink-4); }
 .pgroup-ch {
   display: inline-block;
   opacity: 0;
@@ -5833,7 +5852,6 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .pgroup-tab:hover .pgroup-ch,
 .pgroup-tab.is-on .pgroup-ch { opacity: 1; transform: none; }
-.pgroup-tab:hover .pgroup-lbl { color: var(--ink-2); }
 
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
 /* 书签悬停预览卡：照 DSH 那个 turn 预览的样子——无边框、圆角 10、只有一层柔和投影，
