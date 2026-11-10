@@ -28,6 +28,7 @@ import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, eqNum, mwText, num, round, saneDensity, volText } from '../lib/reagent.js';
 import { schemeParts } from '../lib/expScheme.js';
+import { preloadSchemeLib } from '../lib/scheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
@@ -158,7 +159,9 @@ function fill(e) {
   // 免得一换数据就把人家的 ChemDraw 图顶掉
   const sc = (e.attachments || []).find((a) => a.category === 'scheme');
   schemeLive.value = !sc || /^反应式\.svg$/i.test(String(sc.original_name || sc.filename || ''));
-  scheduleLive(0);
+  const cached = readSchemeCache(e.id);
+  liveScheme.value = cached?.svg || liveCache.get(e.id) || '';   // 有缓存就先顶上，别白一下
+  if (!(cached && cached.sig === liveSig.value)) scheduleLive(cached ? 200 : 0);
 }
 
 /** 打开记录时顺手修两样老数据的毛病（改了就存一次）：
@@ -242,6 +245,7 @@ function onResize() {
 }
 
 onMounted(async () => {
+  void preloadSchemeLib();      // 顺手把 openchemlib 拉下来，别等第一次画反应式才等
   window.addEventListener('resize', onResize);
   window.addEventListener('resize', updateRail);
   page.value = String(route.query.p) === '2' ? 2 : 1;
@@ -699,9 +703,37 @@ async function runFillTableFromScheme() {
  * 底物（可以两个）画成反应物，试剂 / 催化剂 / 碱……和溶剂、温度、时间写在箭头上方一格，
  * 产物取结果块里挂库的那个。尺度和字号在 lib/scheme.js 里统一控制。
  */
-/** 反应式「跟随投料表」：只画在页面上（不写文件），投料表 / 条件 / 产物一变就重画 */
+/** 反应式「跟随投料表」：只画在页面上（不写文件），投料表 / 条件 / 产物一变就重画。
+ *  每条记录留一张上次画好的图（内存缓存）：切回来 / 刷新时先显示它，再悄悄重画，
+ *  这样不会出现「先白一下再出来」。 */
 const schemeLive = ref(true);
 const liveScheme = ref('');
+const liveCache = new Map();   // exp.id → svg
+/* 刷新页面时内存缓存就没了，会白一下（用户报过）。所以再往 sessionStorage 里放一份：
+   同一个标签页内刷新，先用上次那张顶上去，再按当前数据悄悄重画。
+   存 { sig, svg }，sig 一样就连重画都省了。最多留 4 条，别把 sessionStorage 撑爆。 */
+const SCHEME_CACHE_KEY = (id) => `eln:scheme:${id}`;
+function readSchemeCache(id) {
+  try {
+    const raw = sessionStorage.getItem(SCHEME_CACHE_KEY(id));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+function writeSchemeCache(id, sig, svg) {
+  try {
+    sessionStorage.setItem(SCHEME_CACHE_KEY(id), JSON.stringify({ sig, svg }));
+    const keys = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith('eln:scheme:')) keys.push(k);
+    }
+    for (const k of keys.slice(0, Math.max(0, keys.length - 4))) sessionStorage.removeItem(k);
+  } catch {
+    /* 存不下就算了，不影响显示 */
+  }
+}
 let liveTimer = null;
 const liveSig = computed(() =>
   JSON.stringify({
@@ -731,7 +763,7 @@ async function renderLive() {
       liveScheme.value = '';
       return;
     }
-    liveScheme.value = await composeSchemeSvg({
+    const svg = await composeSchemeSvg({
       reactants: parts.reactants,
       product: parts.product,
       productLabel: parts.product ? '' : parts.prodName,
@@ -739,6 +771,11 @@ async function renderLive() {
       below: parts.below,
       background: false,     // 直接贴在纸面上，别垫一块白方块
     });
+    liveScheme.value = svg;
+    if (exp.value) {
+      liveCache.set(exp.value.id, svg);
+      writeSchemeCache(exp.value.id, liveSig.value, svg);
+    }
   } catch {
     liveScheme.value = '';
   }

@@ -24,6 +24,12 @@ async function moduleIndigo() {
   return loading;
 }
 
+/** 提前把 11 MB 的 WASM 拉起来（记录页一打开就调）：第一次画反应式要排坐标，
+ *  等它加载完才开始画会白一下（用户报过）。失败就当没有，反正有 openchemlib 兜底。 */
+export function preloadIndigo() {
+  return moduleIndigo().catch(() => null);
+}
+
 function utf8FromBase64(b64) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);

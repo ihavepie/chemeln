@@ -40,6 +40,13 @@ async function chem() {
   return cached;
 }
 
+/** 提前把 openchemlib（1 MB）+ Indigo（11 MB WASM）拉下来：记录页一打开就调，
+ *  省得第一次画反应式时干等（会白一下） */
+export async function preloadSchemeLib() {
+  const { preloadIndigo } = await import('./indigo.js');
+  await Promise.all([chem().catch(() => null), preloadIndigo()]);
+}
+
 /**
  * 一行字拆成「正常 / 下标 / 上标」几段：
  *  - 字母或右括号后面的数字当下标（Pd(PPh3)4 → Pd(PPh₃)₄，H2O → H₂O），
