@@ -102,6 +102,15 @@ CREATE TABLE IF NOT EXISTS attachments (
 );
 CREATE INDEX IF NOT EXISTS idx_attach_exp ON attachments(exp_id);
 
+-- 记录页那张「按投料表生成的」内联 SVG 缓存：画过一次就存这里，下次打开直接拿，
+-- 省掉等 openchemlib / Indigo 起来的那一下空白（用户报过「还会闪」）
+CREATE TABLE IF NOT EXISTS scheme_cache (
+  exp_id INTEGER PRIMARY KEY,
+  sig    TEXT NOT NULL DEFAULT '',
+  svg    TEXT NOT NULL DEFAULT '',
+  at     TEXT
+);
+
 CREATE TABLE IF NOT EXISTS screenings (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   exp_id     INTEGER REFERENCES experiments(id) ON DELETE SET NULL,

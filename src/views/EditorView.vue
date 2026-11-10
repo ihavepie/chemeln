@@ -32,7 +32,6 @@ import { preloadSchemeLib } from '../lib/scheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
-import { canonicalSmiles } from '../lib/chem.js';
 import { composeSchemeSvg } from '../lib/scheme.js';
 
 const route = useRoute();
@@ -155,13 +154,16 @@ function fill(e) {
   ensureSolventRow();     // 老记录：溶剂还在字段里 → 补成投料表的一行
   markLoaded();
   if (fixReagentRows(rows)) notify();   // 分子量 / 密度被补上，顺手存一次（导出 / 列表才跟页面对得上）
-  // 「反应式跟随投料表」：自己生成的那种（附件名 反应式.svg）默认开；手动画 / 上传的图默认关，
-  // 免得一换数据就把人家的 ChemDraw 图顶掉
-  const sc = (e.attachments || []).find((a) => a.category === 'scheme');
-  schemeLive.value = !sc || /^反应式\.svg$/i.test(String(sc.original_name || sc.filename || ''));
-  const cached = readSchemeCache(e.id);
-  liveScheme.value = cached?.svg || liveCache.get(e.id) || '';   // 有缓存就先顶上，别白一下
-  if (!(cached && cached.sig === liveSig.value)) scheduleLive(cached ? 200 : 0);
+  // 服务端存着上次画好的那张：数据没变（sig 一样）就直接贴上去，连重画都省了
+  const cache = e.scheme_cache;
+  if (cache && cache.sig === liveSig.value) {
+    liveScheme.value = cache.svg;
+    liveSigShown.value = cache.sig;
+  } else {
+    liveScheme.value = '';
+    liveSigShown.value = '';
+    scheduleLive(0);
+  }
 }
 
 /** 打开记录时顺手修两样老数据的毛病（改了就存一次）：
@@ -615,152 +617,53 @@ async function applySketchScheme({ rxn, smiles, svg }) {
  * 对上就按库里的名字 / 分子量 / 类型填行（类型是底物的当底物，其余当试剂）；
  * 产物那一侧对上的话，结果块的产物名 / MW / 挂库也一起填。
  */
-async function fillTableFromScheme() {
-  if (!exp.value || exp.value.locked) return;
-  try {
-    await runFillTableFromScheme();
-  } catch (e) {
-    toast(e.message || '按反应式填表失败', 'err');
-  }
-}
-
-async function runFillTableFromScheme() {
-  const smi = String(fields.scheme_smiles || '').trim();
-  if (!smi) return toast('这条反应式还没有文本形态，重新画一次就行', 'warn');
-  const [left, right] = smi.split('>>');
-  const reactants = String(left || '').split('.').map((x) => x.trim()).filter(Boolean);
-  const products = String(right || '').split('.').map((x) => x.trim()).filter(Boolean);
-  if (!reactants.length) return toast('反应式里没读出反应物', 'warn');
-
-  await loadCompounds();
-  const lib = store.compounds || [];
-  const index = new Map();
-  for (const c of lib) {
-    if (!c.smiles) continue;
-    const key = (await canonicalSmiles(c.smiles)) || c.smiles;
-    if (key && !index.has(key)) index.set(key, c);
-  }
-  const hitOf = async (s) => index.get((await canonicalSmiles(s)) || s) || null;
-
-  // **合并，不覆盖**：已经在表里的行（按 compound_id / 名字对得上）原样留着，
-  // 只把「反应式里有、表里没有」的反应物补到后面——以前是整表重建，
-  // 用户不小心点一下就把手填的试剂全冲掉了（2026-11 踩过）。
-  const norm = (v) => String(v || '').toLowerCase().replace(/[\s（）()·\-_,，]/g, '');
-  const rows = reagent.rows;
-  const hitRow = (c) => rows.find((r) => (r.compound_id && Number(r.compound_id) === Number(c.id)) || (norm(r.name) && norm(r.name) === norm(c.name || c.code)));
-  let added = 0;
-  let kept = 0;
-  let miss = 0;
-  for (const smiOne of reactants) {
-    const c = await hitOf(smiOne);
-    if (!c) {
-      miss += 1;
-      continue;
-    }
-    const row = hitRow(c);
-    if (row) {
-      // 对上了就不动用户填的数字，只把缺的 MW / 关联补上
-      if (!num(row.mw) && c.mw != null) row.mw = c.mw;
-      if (!row.compound_id) row.compound_id = c.id;
-      kept += 1;
-      continue;
-    }
-    const role = c.kind === '底物' ? '底物' : '试剂';
-    rows.push(
-      toRow({
-        step: 1,
-        role,
-        name: c.name || c.code || '',
-        mw: c.mw ?? null,
-        eq: role === '底物' ? 1 : null,
-        compound_id: c.id,
-        note: '',
-      })
-    );
-    added += 1;
-  }
-  if (!added && !kept) return toast('反应物一个都没在化合物库里找到——先把它们存进库，或者手工填', 'warn');
-
-  const prod = products.length ? await hitOf(products[0]) : null;
-  if (prod) {
-    // 产物名空着才填，已有内容也不覆盖
-    if (!String(fields.product_name || '').trim()) fields.product_name = prod.name || '';
-    if (!num(fields.product_mw) && prod.mw != null) fields.product_mw = String(prod.mw);
-    fields.product_compound_id = prod.id;
-  }
-  notify();
-  toast(
-    [`补了 ${added} 行`, kept ? `沿用 ${kept} 行（没动数字）` : '', miss ? `${miss} 个反应物库里没有` : '', prod ? '产物也挂上了' : '']
-      .filter(Boolean)
-      .join(' · '),
-    'ok',
-    3200
-  );
-}
-
 /**
  * 按投料表 + 条件拼一张反应式图（不经过画板）。
  * 底物（可以两个）画成反应物，试剂 / 催化剂 / 碱……和溶剂、温度、时间写在箭头上方一格，
  * 产物取结果块里挂库的那个。尺度和字号在 lib/scheme.js 里统一控制。
  */
-/** 反应式「跟随投料表」：只画在页面上（不写文件），投料表 / 条件 / 产物一变就重画。
- *  每条记录留一张上次画好的图（内存缓存）：切回来 / 刷新时先显示它，再悄悄重画，
- *  这样不会出现「先白一下再出来」。 */
-const schemeLive = ref(true);
+/** 反应式：一直跟着投料表画（没有开关了，用户说「都用这张」）。
+ *  画好的那张按记录存到服务端（`scheme_cache`），数据没变就直接贴出来，省掉重画那一下空白；
+ *  数据变了（sig 不同）才重画，画完再存回去。 */
 const liveScheme = ref('');
-const liveCache = new Map();   // exp.id → svg
-/* 刷新页面时内存缓存就没了，会白一下（用户报过）。所以再往 sessionStorage 里放一份：
-   同一个标签页内刷新，先用上次那张顶上去，再按当前数据悄悄重画。
-   存 { sig, svg }，sig 一样就连重画都省了。最多留 4 条，别把 sessionStorage 撑爆。 */
-const SCHEME_CACHE_KEY = (id) => `eln:scheme:${id}`;
-function readSchemeCache(id) {
-  try {
-    const raw = sessionStorage.getItem(SCHEME_CACHE_KEY(id));
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-function writeSchemeCache(id, sig, svg) {
-  try {
-    sessionStorage.setItem(SCHEME_CACHE_KEY(id), JSON.stringify({ sig, svg }));
-    const keys = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const k = sessionStorage.key(i);
-      if (k && k.startsWith('eln:scheme:')) keys.push(k);
-    }
-    for (const k of keys.slice(0, Math.max(0, keys.length - 4))) sessionStorage.removeItem(k);
-  } catch {
-    /* 存不下就算了，不影响显示 */
-  }
-}
-let liveTimer = null;
+/* 屏幕上这张图对应的是哪个 sig：一样就不用再画（缓存命中时首帧直接贴上，不再重画一次——
+   以前化合物库晚一步读进来会触发一次多余的重画，看着就是「闪一下」） */
+const liveSigShown = ref('');
+/* sig 只看「会进这张图的字段」，别把密度 / 用量那些也塞进来——它们一变就白重画一次，
+   页面一打开就能对得上缓存（化合物库还没读进来也不影响）。版本号用来让旧缓存失效。 */
+const SCHEME_SIG_VERSION = 'v2';
 const liveSig = computed(() =>
+  SCHEME_SIG_VERSION +
   JSON.stringify({
-    b: reagent.base,
-    r: (reagent.rows || []).map((r) => [r.role || '', r.name || '', r.eq ?? '', r.volume_ul ?? '', r.conc ?? '', r.density ?? '']),
-    s: fields.solvent,
-    t: fields.temperature,
-    d: fields.duration,
-    pn: fields.product_name,
-    pc: fields.product_compound_id,
+    r: (reagent.rows || []).map((r) => [r.role || '', r.name || '', String(r.eq ?? ''), r.compound_id ?? '']),
+    s: fields.solvent || '',
+    t: fields.temperature || '',
+    d: fields.duration || '',
+    pn: fields.product_name || '',
+    pc: fields.product_compound_id ?? '',
   })
 );
+let liveTimer = null;
 function scheduleLive(ms = 700) {
   clearTimeout(liveTimer);
   liveTimer = setTimeout(() => void renderLive(), ms);
 }
 async function renderLive() {
-  if (!schemeLive.value || !exp.value || exp.value.locked) {
+  const id = exp.value?.id;
+  if (!id || exp.value.locked) {
     liveScheme.value = '';
+    liveSigShown.value = '';
     return;
   }
+  const sig = liveSig.value;
+  if (liveScheme.value && liveSigShown.value === sig) return;   // 已经是这张了，别白画一遍
   try {
     // 化合物库还没读进来时（刚打开页面）先读一次，否则底物挂不上结构、反应式是空的
     if (!(store.compounds && store.compounds.length)) await loadCompounds();
     const parts = schemeParts({ ...fields, reagents: reagent.rows }, store.compounds || []);
     if (!parts.reactants.length) {
       liveScheme.value = '';
+      liveSigShown.value = '';
       return;
     }
     const svg = await composeSchemeSvg({
@@ -771,22 +674,19 @@ async function renderLive() {
       below: parts.below,
       background: false,     // 直接贴在纸面上，别垫一块白方块
     });
+    if (exp.value?.id !== id) return;   // 等的时候切到别的记录了：这份丢掉
     liveScheme.value = svg;
-    if (exp.value) {
-      liveCache.set(exp.value.id, svg);
-      writeSchemeCache(exp.value.id, liveSig.value, svg);
-    }
+    liveSigShown.value = sig;
+    api.saveSchemeCache(id, { sig, svg }).catch(() => {});   // 存不下也不影响显示
   } catch {
-    liveScheme.value = '';
+    if (exp.value?.id === id) {
+      liveScheme.value = '';
+      liveSigShown.value = '';
+    }
   }
 }
 watch(liveSig, () => scheduleLive());
-watch(schemeLive, () => scheduleLive(0));
 watch(() => (store.compounds || []).length, () => scheduleLive(50));
-function toggleSchemeLive() {
-  schemeLive.value = !schemeLive.value;
-  toast(schemeLive.value ? '反应式跟随投料表自动更新' : '反应式改为显示存下来的那张图', 'ok', 2000);
-}
 
 async function schemeFromTable() {
   if (!exp.value || exp.value.locked) return;
@@ -1439,12 +1339,8 @@ const openAttachment = (id) => {
             :on-pick="pickFile"
             :on-open="openAttachment"
             :on-sketch="openSchemePad"
-            :has-scheme="!!fields.scheme_smiles"
-            :on-fill="fillTableFromScheme"
             :on-from-table="schemeFromTable"
-            :live="schemeLive"
             :live-svg="liveScheme"
-            :on-toggle-live="toggleSchemeLive"
           />
 
           <ReagentTable v-if="sheetPrefs.reagents" :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">

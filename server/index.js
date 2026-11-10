@@ -2124,7 +2124,33 @@ route('POST', '/api/experiments', async (req, res) => {
 route('GET', '/api/experiments/:id', async (req, res, params) => {
   const exp = getExperiment(Number(params.id));
   if (!exp) return fail(res, 404, '实验不存在');
+  exp.scheme_cache = readSchemeCache(exp.id); // 有就带上，前端首帧直接把图贴出来
   ok(res, { experiment: exp });
+});
+
+/** 反应式缓存：`{ sig, svg }`，没有就 null */
+function readSchemeCache(id) {
+  const row = db.prepare('SELECT sig, svg FROM scheme_cache WHERE exp_id = ?').get(id);
+  return row ? { sig: row.sig, svg: row.svg } : null;
+}
+
+/**
+ * 记录页把按投料表画好的那张内联 SVG 存回来：数据没变（sig 一样）时下次打开直接显示，
+ * 省掉重画那一两秒的空白。只当缓存用，删掉也不影响记录本身。
+ */
+route('PUT', '/api/experiments/:id/scheme-cache', async (req, res, params) => {
+  const id = Number(params.id);
+  const row = db.prepare('SELECT id FROM experiments WHERE id = ?').get(id);
+  if (!row) return fail(res, 404, '实验不存在');
+  const body = await readJson(req);
+  const sig = String(body.sig || '').slice(0, 600);
+  const svg = String(body.svg || '').slice(0, 400000);
+  if (!sig || !svg) return fail(res, 400, '缺少 sig / svg');
+  db.prepare(
+    `INSERT INTO scheme_cache (exp_id, sig, svg, at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(exp_id) DO UPDATE SET sig = excluded.sig, svg = excluded.svg, at = excluded.at`
+  ).run(id, sig, svg, nowISO());
+  ok(res, { ok: true });
 });
 
 /**
@@ -2952,6 +2978,7 @@ async function purgeTrashRow(t) {
       await fsp.rm(attachmentPath(a), { recursive: true, force: true }).catch(() => {});
     }
     await fsp.rm(path.join(ATTACH_DIR, String(t.entity_id)), { recursive: true, force: true }).catch(() => {});
+    db.prepare('DELETE FROM scheme_cache WHERE exp_id = ?').run(Number(t.entity_id));
   } else {
     await fsp.rm(path.join(COMPOUND_DIR, String(t.entity_id)), { recursive: true, force: true }).catch(() => {});
   }

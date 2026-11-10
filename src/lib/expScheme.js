@@ -5,7 +5,7 @@
  * 在两个页面拼出来的箭头上文字会不一样。筛选表那边拿到的记录没有 `compound_id`，
  * 所以这里按名字去化合物库里找，**只在名字唯一时**才认，免得挂错结构。
  */
-import { num, round } from './reagent.js';
+import { eqNum, round } from './reagent.js';
 
 const MAX_ABOVE = 34; // 箭头上方一行大约放得下多少「字」（中文按 1、西文按 0.55 估）
 const str = (v) => (v == null ? '' : String(v).trim());
@@ -13,12 +13,23 @@ const str = (v) => (v == null ? '' : String(v).trim());
 const norm = (v) => str(v).replace(/[\s()（）\[\]【】·,，、\-—_]/g, '').toLowerCase();
 const widthOf = (t) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0);
 
-/** 试剂名 / 当量写成箭头上那种标签：`LDA (2 eq)`，1 eq 就只写名字 */
+/**
+ * 试剂名 / 当量写成箭头上那种标签：`LDA (2 eq)`、`RuPhos (20%)`。
+ * 写法跟投料表的当量格一致：不到 1 的用百分数（0.2 → 20%），其余写 `X eq`。
+ * 以前 `10%` 这种摩尔百分数用 num() 读出来是 null，箭头上干脆不写当量（用户报过）。
+ */
+function eqText(v) {
+  const x = eqNum(v);
+  if (x == null) return '';
+  if (x > 0 && x < 1) return `${round(x * 100, 2)}%`;
+  return `${round(x, 2)} eq`;
+}
+
 function label(r, c) {
   const name = str(r.name) || (c ? str(c.name || c.code) : '');
   if (!name) return '';
-  const eq = num(r.eq);
-  return eq != null && eq !== 1 ? `${name} (${round(eq, 2)} eq)` : name;
+  const t = eqText(r.eq);
+  return t ? `${name} (${t})` : name;
 }
 
 /**

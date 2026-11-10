@@ -104,6 +104,8 @@ export const api = {
   uploadPath: (id, body) => request(`/api/experiments/${id}/attachments/path`, { method: 'POST', body }),
   updateAttachment: (id, body) => request(`/api/attachments/${id}`, { method: 'PUT', body }),
   deleteAttachment: (id) => request(`/api/attachments/${id}`, { method: 'DELETE' }),
+  // 反应式那张内联 SVG 的缓存（服务端只存不画，删了也不影响记录）
+  saveSchemeCache: (id, body) => request(`/api/experiments/${id}/scheme-cache`, { method: 'PUT', body }),
 
   categories: (query = {}) => {
     const p = new URLSearchParams();
