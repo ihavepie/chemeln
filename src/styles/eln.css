@@ -7390,6 +7390,28 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .lib-var.is-on { background: #f8f0e9; color: var(--accent-ink); }
 .rl-var em,
 .lib-var em { font-style: normal; opacity: 0.65; margin-left: 1px; }
+/* 标签右边留一小格给 ×（平时不占眼睛、悬停才浮出来）：填错的那种可以就地摘掉 */
+.rl-var { position: relative; padding-right: 7px; }
+.rl-var-x {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 9px;
+  height: 11px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.rl-var:hover .rl-var-x { opacity: 0.55; }
+.rl-var-x:hover { opacity: 1 !important; color: var(--accent-ink); }
 .lib-vars { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 6px; vertical-align: middle; }
 .lib-var { cursor: pointer; }
 .lib-var:hover { background: #f8f0e9; color: var(--accent-ink); }

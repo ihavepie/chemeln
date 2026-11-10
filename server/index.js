@@ -14,7 +14,7 @@ const store = require('./db');
 const qr = require('./qr');
 const { experimentToMarkdown, screeningToMarkdown, screeningToCsv, CELL_CATEGORY } = require('./export');
 
-const { db, DATA_DIR, ATTACH_DIR, COMPOUND_DIR, allSettings, getSetting, setSetting, nextCode, logEvent, logEdit, historyFor } = store;
+const { db, DATA_DIR, ATTACH_DIR, COMPOUND_DIR, allSettings, getSetting, setSetting, nextCode, logEvent, logEdit, historyFor, variantKey } = store;
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 // 第三方静态资源（Ketcher 结构画板等）：不放进 public/，因为每次 build 都会清空它
@@ -298,6 +298,11 @@ function touchReagentLib(expId, reagents, ts = nowISO()) {
        updated_at = excluded.updated_at`
   );
   const upUse = db.prepare('INSERT OR IGNORE INTO reagent_uses(key, exp_id, at) VALUES (?,?,?)');
+  // 「用法」标签：这次填的当量 / 用量跟以前的都不一样就多一颗，**只加不删**
+  const upVar = db.prepare(
+    `INSERT OR IGNORE INTO reagent_variant_uses(key, vkey, exp_id, eq, role, volume_ul, at)
+     VALUES (?,?,?,?,?,?,?)`
+  );
   const unchecked = [];
   for (const r of reagents) {
     const name = str(r.name).trim();
@@ -305,6 +310,8 @@ function touchReagentLib(expId, reagents, ts = nowISO()) {
     const key = name.toLowerCase();
     upLib.run(key, name, str(r.role), r.mw ?? null, r.conc ?? null, r.density ?? null, ts, ts);
     if (expId) upUse.run(key, expId, ts);
+    const v = variantKey(r.role, r.eq, r.volume_ul);
+    upVar.run(key, v.vkey, Number(expId) || 0, v.eq, v.role, v.ul, ts);
     // 这一行自己带了 MW 就不用查；没带的新名字交给后台核一次（见 queueReagentVerify）
     if (r.mw == null) unchecked.push(key);
   }
@@ -3976,45 +3983,30 @@ function reagentLibRows(project, kw) {
     )
     .all(...(project ? [...projectArgs, ...projectArgs, ...projectArgs] : []));
 
-  // 同一个试剂在不同记录里的用法（当量 / 组分）→ 一个试剂一条，用法挂在它下面。
-  // 从投料行直接汇总，不另建表：改一条记录的当量，这里跟着变。
-  const useRows = db
-    .prepare(
-      `SELECT lower(trim(r.name)) AS key, r.eq AS eq, r.role AS role, r.volume_ul AS ul,
-              r.exp_id AS exp_id, e.date AS last_at, e.code AS code
-         FROM reagents r JOIN experiments e ON e.id = r.exp_id
-        WHERE trim(r.name) <> '' ${project ? 'AND e.project = ?' : ''}
-        ORDER BY r.id`
-    )
-    .all(...projectArgs);
-  const normEq = (v) => {
-    const t = str(v).trim();
-    if (!t) return '';
-    const x = Number(t);
-    // 「1」「1.0」算同一种用法；「10%」这种百分数原样留着
-    return Number.isFinite(x) ? String(x) : t;
-  };
+  // 同一个试剂用过的「用法」标签（当量 / 组分，溶剂是用量）→ 一个试剂一条，标签挂在它下面。
+  // 读 reagent_variant_uses：保存时**只加不删**，所以记录后来改了当量、甚至删了，旧的标签也还在。
+  const varRows = db
+    .prepare('SELECT key, vkey, eq, role, volume_ul AS ul, exp_id FROM reagent_variant_uses ORDER BY at')
+    .all();
+  const expMeta = new Map(
+    db.prepare('SELECT id, date, code FROM experiments').all().map((e) => [e.id, { date: str(e.date), code: str(e.code) }])
+  );
   const variantsByKey = new Map();
-  for (const u of useRows) {
-    const role = str(u.role).trim();
-    // 溶剂只记「用了多少量」（mL / µL），别的都不算用法
-    const isSol = role === '溶剂';
-    const ul = isSol ? numOrNull(u.ul) : null;
-    const eq = isSol ? '' : normEq(u.eq);
-    const vk = isSol ? `vol:${ul ?? ''}` : `${eq}|${role}`;
+  for (const u of varRows) {
     let m = variantsByKey.get(u.key);
     if (!m) variantsByKey.set(u.key, (m = new Map()));
-    let v = m.get(vk);
-    if (!v) m.set(vk, (v = { eq, role, ul, exps: new Set(), lastAt: '', lastCode: '' }));
-    v.exps.add(u.exp_id);
-    if (str(u.last_at) >= v.lastAt) {
-      v.lastAt = str(u.last_at);
-      v.lastCode = str(u.code);
+    let v = m.get(u.vkey);
+    if (!v) m.set(u.vkey, (v = { vkey: u.vkey, eq: str(u.eq), role: str(u.role), ul: numOrNull(u.ul), exps: new Set(), lastAt: '', lastCode: '' }));
+    if (u.exp_id) v.exps.add(u.exp_id);
+    const meta = expMeta.get(u.exp_id);
+    if (meta && meta.date >= v.lastAt) {
+      v.lastAt = meta.date;
+      v.lastCode = meta.code;
     }
   }
   const variantsOf = (key) =>
     [...(variantsByKey.get(key) || new Map()).values()]
-      .map((v) => ({ eq: v.eq, role: v.role, ul: v.ul, n: v.exps.size, lastAt: v.lastAt, lastCode: v.lastCode }))
+      .map((v) => ({ vkey: v.vkey, eq: v.eq, role: v.role, ul: v.ul, n: v.exps.size, lastAt: v.lastAt, lastCode: v.lastCode }))
       .sort((x, y) => y.n - x.n || String(y.lastAt).localeCompare(String(x.lastAt)))
       .slice(0, 8);
 
@@ -4216,6 +4208,17 @@ route('POST', '/api/reagents/verify', async (req, res) => {
   const name = str(body.name).trim();
   if (!name) throw new HttpError(400, '要带 name');
   ok(res, await verifyReagent(name, { force: !!body.force }));
+});
+
+/* 删掉一颗「用法」标签（填错过的那种）：只删标签，不动任何记录。
+   下次这条记录再保存时它会重新长回来——标签本来就是「填过就记一笔」。 */
+route('POST', '/api/reagents/variant-remove', async (req, res) => {
+  const body = await readJson(req);
+  const name = str(body.name || body.key).trim().toLowerCase();
+  const vkey = str(body.vkey);
+  if (!name || !vkey) throw new HttpError(400, '要带 name 和 vkey');
+  const info = db.prepare('DELETE FROM reagent_variant_uses WHERE key = ? AND vkey = ?').run(name, vkey);
+  ok(res, { removed: Number(info.changes) || 0 });
 });
 
 /* 全部核对：一次最多 20 个（默认 8），前端一轮一轮地调，好显示「核对了几个 / 还剩几个」。

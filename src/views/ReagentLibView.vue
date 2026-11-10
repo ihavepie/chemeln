@@ -114,6 +114,19 @@ async function load() {
 onMounted(load);
 watch(() => store.project, load);
 
+/** 摘掉一颗用法标签：只删这一颗（记录里的投料行不动），下次这条记录再存又会长回来 */
+async function dropVariant(it, v) {
+  if (!v || !v.vkey) return;
+  try {
+    await api.reagentVariantRemove(it.name, v.vkey);
+    it.variants = (it.variants || []).filter((x) => x.vkey !== v.vkey);
+    if (it.defaultEq === v.eq) it.defaultEq = (it.variants[0] || {}).eq ?? null;
+    toast(`去掉了「${it.name} ${variantText(v)}」`, 'ok', 1800);
+  } catch (e) {
+    toast(e.message || '没删成', 'err');
+  }
+}
+
 /** 点一行就把名字复制走——录记录时多半是要粘到试剂名那一格 */
 async function copyName(it) {
   try {
@@ -185,11 +198,13 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 <span v-if="it.variants && it.variants.length" class="rl-vars">
                   <span
                     v-for="v in it.variants"
-                    :key="v.eq + '|' + v.role"
+                    :key="v.vkey || v.eq + '|' + v.role"
                     class="rl-var"
-                    :class="{ 'is-on': it.defaultEq === v.eq }"
+                    :class="{ 'is-on': it.defaultEq === v.eq, 'is-none': !v.eq }"
                   >
                     {{ variantText(v) }}<em v-if="v.n > 1">×{{ v.n }}</em>
+                    <!-- 填错的那种标签可以就地摘掉（只删标签，记录里的投料行不动） -->
+                    <button type="button" class="rl-var-x" aria-label="去掉这颗用法标签" @click.stop="dropVariant(it, v)">×</button>
                   </span>
                 </span>
               </td>

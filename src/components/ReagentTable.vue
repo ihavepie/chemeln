@@ -1199,7 +1199,7 @@ function onDrop(ev) {
             <span v-if="it.variants && it.variants.length" class="lib-vars">
               <span
                 v-for="v in it.variants"
-                :key="v.eq + '|' + v.role"
+                :key="v.vkey || v.eq + '|' + v.role"
                 class="lib-var"
                 :class="{ 'is-on': it.defaultEq === v.eq, 'is-none': !v.eq }"
                 role="button"

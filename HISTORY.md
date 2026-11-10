@@ -176,3 +176,16 @@
 
 ### 基团缩写（`lib/abbrev.js`）四条坑
 ①`SSSearcher` 不认 `[CH3]` 的氢数（要按「重原子邻居数完全一致」再筛一遍）；②**Ph / Me / Et 放表末**（前面那些含甲基 / 苯环的基团要先匹配），**nBu 去掉了**（长链末端也会被它糊成 nBu，看着不对）；③**主体基团不缩写**：只有「缩掉的原子比剩下的少」才缩——苯甲醛、甲苯、联苯这种整条分子就是个苯环的，画出来而不是写 Ph（用户要求）；④**同一种基团要么全缩、要么全画**：3,3-二苯基环丁酮不会出现「一个环画、一个写成 Ph」。
+
+## 2026-11 · 试剂库「用法」标签改成只加不删
+
+**需求原话**：「就是如果每次试剂填写的不一样，就在原有的基础上加一个标签」——同一个试剂永远只有一条库记录，但每次填的当量 / 用量不一样就多一颗签，**旧的不能掉**。
+
+- 以前 `variants` 是从现存投料行现算的：记录改成别的当量、或者记录被删，旧标签就跟着消失。现在单建一张 `reagent_variant_uses(key, vkey, exp_id, eq, role, volume_ul, at)`，主键 `(key, vkey, exp_id)`：
+  - `vkey` 由 `server/db.js` 的 `variantKey(role, eq, volumeUl)` 统一给：溶剂 `vol:2000`（只认用量），其余 `1.2|试剂`（当量归一，「1」和「1.0」算一颗，「10%」原样留着）。**index.js 也从 db.js 引这一个函数**，别在两处各写一份。
+  - `touchReagentLib()` 保存时 `INSERT OR IGNORE`，所以同一条记录反复自动保存不会把 `n` 刷大（`n` = 用过的不同记录数）。
+  - 一次性种子写在 `db.js` 启动里，用 `settings` 的 `migr:variant_uses` 做标记——**没这个标记的话，用户删掉的标签下次启动会被重新灌回来**。`allSettings()` 也得跳过 `migr:` 前缀，否则它会出现在设置里。
+  - `reagentLibRows()` 改成读这张表（`variants` / `defaultEq` / `defaultUl` 形状不变），`lastAt/lastCode` 用 `experiments` 的 id→date/code 映射补。
+- 界面：`试剂库` 每颗签右侧留 7px 给一个 `×`（平时 `opacity:0`，悬停才浮出来），点了走 `POST /api/reagents/variant-remove {name, vkey}` —— **只删标签，不动任何记录**；下次那条记录再保存会重新长回来（本来语义就是「填过就记一笔」）。
+- 验证：临时记录里把 LDA 填 1.5 eq → 多出 `1.5|试剂`，把同一条改成 1.8 → 1.5 和 1.8 都在（旧的不掉）；删掉记录后标签仍在；`variant-remove` 删掉一颗后回到原样。清理：删临时记录 + 彻底删除 + `DELETE FROM reagent_uses/reagent_variant_uses WHERE exp_id = 198`，`lda` 回到 `2×6 / 1.2×4 / 3×1`、used 11、live 11。
+- 坑：`db.exec(\`…\`)` 里的 SQL 注释**不能写反引号**（`vol:2000`），模板字符串会被当场截断，报 `missing ) after argument list`。

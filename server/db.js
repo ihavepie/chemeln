@@ -202,7 +202,35 @@ CREATE TABLE IF NOT EXISTS reagent_uses (
   at     TEXT NOT NULL,
   PRIMARY KEY (key, exp_id)
 );
+/* 同一个试剂的「用法」标签：当量 / 组分（溶剂就是用量）。
+   跟 reagent_uses 一样**只增不减**——记录后来改成别的当量、甚至删了，
+   标签也留在库里，用户要的是「每次填得不一样就在原有的基础上加一个」。 */
+CREATE TABLE IF NOT EXISTS reagent_variant_uses (
+  key       TEXT NOT NULL,
+  vkey      TEXT NOT NULL,   -- 溶剂 vol:2000；其余 1.2|试剂
+  exp_id    INTEGER NOT NULL DEFAULT 0,
+  eq        TEXT NOT NULL DEFAULT '',
+  role      TEXT NOT NULL DEFAULT '',
+  volume_ul REAL,
+  at        TEXT NOT NULL,
+  PRIMARY KEY (key, vkey, exp_id)
+);
 `);
+
+/** 用法标签的唯一键：溶剂按用量（`vol:2000`），其余按「当量|组分」（`1.2|试剂`）。
+ *  「1」和「1.0」算同一种用法，「10%」这种百分数原样留着。 */
+function variantKey(role, eq, volumeUl) {
+  const rl = String(role == null ? '' : role).trim();
+  if (rl === '溶剂') {
+    const n = Number(volumeUl);
+    const ul = Number.isFinite(n) && n > 0 ? n : null;
+    return { vkey: `vol:${ul == null ? '' : ul}`, eq: '', role: rl, ul };
+  }
+  const t = String(eq == null ? '' : eq).trim();
+  const x = t ? Number(t) : NaN;
+  const e = t ? (Number.isFinite(x) ? String(x) : t) : '';
+  return { vkey: `${e}|${rl}`, eq: e, role: rl, ul: null };
+}
 
 function ensureColumn(table, name, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
@@ -264,6 +292,24 @@ ensureColumn('screenings', 'project', "project TEXT NOT NULL DEFAULT ''");
       if (r.exp_id) upUse.run(key, r.exp_id, ts);
     }
   }
+}
+// 一次性把现有投料行的「用法」灌进标签表；之后只靠保存时追加（有 `migr:` 标记，删掉的标签不会被重新灌回来）
+if (!getSetting('migr:variant_uses')) {
+  const rows = db
+    .prepare("SELECT exp_id, name, role, eq, volume_ul FROM reagents WHERE trim(name) <> '' ORDER BY id")
+    .all();
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO reagent_variant_uses(key, vkey, exp_id, eq, role, volume_ul, at)
+     VALUES (?,?,?,?,?,?,?)`
+  );
+  const ts = new Date().toISOString();
+  for (const r of rows) {
+    const name = String(r.name).trim();
+    if (!name) continue;
+    const v = variantKey(r.role, r.eq, r.volume_ul);
+    ins.run(name.toLowerCase(), v.vkey, Number(r.exp_id) || 0, v.eq, v.role, v.ul, ts);
+  }
+  setSetting('migr:variant_uses', '1');
 }
 ensureColumn('reagents', 'conc', 'conc REAL');
 ensureColumn('reagents', 'step', 'step INTEGER NOT NULL DEFAULT 1');
@@ -410,7 +456,7 @@ function allSettings() {
   const out = { ...DEFAULT_SETTINGS };
   for (const row of db.prepare('SELECT key, value FROM settings').all()) {
     // seq:/prefix:/proj: 是计数器与课题级覆盖，projects_json 是课题清单，都不算「设置」
-    if (row.key.startsWith('seq:') || row.key.startsWith('prefix:') || row.key.startsWith('proj:') || row.key === 'projects_json') continue;
+    if (row.key.startsWith('seq:') || row.key.startsWith('prefix:') || row.key.startsWith('proj:') || row.key.startsWith('migr:') || row.key === 'projects_json') continue;
     out[row.key] = row.value;
   }
   return out;
@@ -542,5 +588,6 @@ module.exports = {
   logEvent,
   logEdit,
   historyFor,
+  variantKey,
   DEFAULT_SETTINGS,
 };

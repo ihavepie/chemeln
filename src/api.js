@@ -156,6 +156,9 @@ export const api = {
   reagentsVerify: (name, force = false) => request('/api/reagents/verify', { method: 'POST', body: { name, force } }),
   // 全部核对：一次喂一批（服务端挑「没核过、MW 空着」的，或者给 names），返回还剩几个没核
   reagentsVerifyAll: (payload = {}) => request('/api/reagents/verify-all', { method: 'POST', body: payload }),
+  /** 删掉一个试剂的某颗「用法」标签（填错的那种）；记录本身的投料行不动 */
+  reagentVariantRemove: (name, vkey) =>
+    request('/api/reagents/variant-remove', { method: 'POST', body: { name, vkey } }),
   /** 试剂库（用过的试剂汇总）：按名字聚合，带组分 / MW / 密度 / 1 mmol 折算量 */
   reagents: (project = '', q = '') => {
     const qs = new URLSearchParams();
