@@ -66,7 +66,9 @@ export function schemeParts(model, compounds) {
     ? byId.get(Number(model.product_compound_id)) || null
     : byName.get(norm(model.product_name)) || null;
 
-  const cond = [model.solvent, model.concentration, model.temperature, model.duration]
+  // 箭头上下的条件不写「浓度」（那个数是按投料表折算出来的，常常是个没意义的 M 值，
+  // 化学式上写出来反而干扰）；溶剂 / 温度 / 时间照旧
+  const cond = [model.solvent, model.temperature, model.duration]
     .map(str)
     .filter(Boolean)
     .join('，');
