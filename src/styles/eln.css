@@ -5819,6 +5819,12 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   background: #ddd7c6;
   transition: width 0.14s, background 0.14s;
 }
+/* 状态用短杠的底色说：进行中偏暖、已完成偏绿、失败偏红……当前那条仍然是墨色最重 */
+.pgroup-tab[data-tone='warn']::before { background: #d8c8a2; }
+.pgroup-tab[data-tone='ok']::before { background: #bfd0c0; }
+.pgroup-tab[data-tone='info']::before { background: #c2d4e0; }
+.pgroup-tab[data-tone='bad']::before { background: #dcbcbc; }
+.pgroup-tab[data-tone='accent']::before { background: #dcc4b6; }
 .pgroup-tab:hover::before { width: 20px; background: var(--ink-4); }
 /* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数） */
 .pgroup-tab.is-on::before { width: 22px; background: var(--ink); }

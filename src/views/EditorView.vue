@@ -203,15 +203,32 @@ onMounted(async () => {
   document.addEventListener('paste', onPaste);
   document.addEventListener('click', closeMenus);
   document.addEventListener('keydown', onShortcut);
+  document.addEventListener('keydown', onParallelKey);
   // 等这一帧渲染完再量纸面位置
   requestAnimationFrame(updateRail);
 });
+/** 键盘 ↑/↓ 在这组平行实验里上下切（在输入框 / 文本域里打字时不接管） */
+function onParallelKey(ev) {
+  if (siblings.value.length < 2 || page.value !== 1) return;
+  if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+  const t = ev.target;
+  if (t && (t.closest?.('input, textarea, [contenteditable="true"]') || t.isContentEditable)) return;
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const i = siblings.value.findIndex((s) => String(s.id) === String(exp.value?.id));
+  if (i < 0) return;
+  const next = siblings.value[ev.key === 'ArrowUp' ? i - 1 : i + 1];
+  if (!next) return;
+  ev.preventDefault();
+  router.push(`/e/${next.id}`);
+}
+
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize);
   window.removeEventListener('resize', updateRail);
   document.removeEventListener('paste', onPaste);
   document.removeEventListener('click', closeMenus);
   document.removeEventListener('keydown', onShortcut);
+  document.removeEventListener('keydown', onParallelKey);
 });
 
 /** ⌘S / Ctrl+S 立即保存（浏览器默认的「保存网页」挡掉） */
@@ -1209,6 +1226,7 @@ const openAttachment = (id) => {
               type="button"
               class="pgroup-tab"
               :class="{ 'is-on': String(s.id) === String(exp.id) }"
+              :data-tone="STATUS_TONE[s.status] || 'plain'"
               :data-code="s.code"
               :aria-label="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
               :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}${sibLine(s) ? ` · ${sibLine(s)}` : ''}`"
