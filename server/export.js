@@ -17,10 +17,14 @@ const num = (v, d = 2) => {
   return Number(n.toFixed(d)).toString();
 };
 
+/* 导出跟页面一套规矩：一律按克写，只有不到 1 mg 才退回 mg */
 const mass = (mg) => {
   if (mg === null || mg === undefined) return '';
-  if (mg >= 1000) return `${num(mg / 1000, 3)} g`;
-  return `${num(mg, 1)} mg`;
+  const g = mg / 1000;
+  if (g >= 1) return `${num(g, 2)} g`;
+  if (g >= 0.1) return `${num(g, 3)} g`;
+  if (g >= 0.001) return `${num(g, 4)} g`;
+  return `${num(mg, 2)} mg`;
 };
 
 const vol = (ul) => {

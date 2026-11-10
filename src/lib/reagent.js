@@ -92,7 +92,12 @@ export function amountText(r) {
       const ml = mg / d / 1000;
       if (ml >= 0.1) return `${round(ml, 2)} mL`;
     }
-    return mg >= 1000 ? `${round(mg / 1000, 4)} g` : `${round(mg, 1)} mg`;
+    // 用量一律按**克**写（跟合计那行的 `固体 0.0977 g` 对得上）；只有不到 1 mg 才退回 mg
+    const g = mg / 1000;
+    if (g >= 1) return `${round(g, 2)} g`;
+    if (g >= 0.1) return `${round(g, 3)} g`;
+    if (g >= 0.001) return `${round(g, 4)} g`;
+    return `${round(mg, 2)} mg`;
   }
   const ul = num(r.volume_ul);
   if (ul !== null) return `${round(ul / 1000, 2)} mL`;
