@@ -8,7 +8,7 @@ import ScreeningTable from '../components/ScreeningTable.vue';
 import { api } from '../api.js';
 import { prompt, toast, confirm } from '../lib/feedback.js';
 import { SOURCES } from '../lib/sctfields.js';
-import { schemeParts, standardLine } from '../lib/expScheme.js';
+import { schemeParts } from '../lib/expScheme.js';
 
 /**
  * 一张条件筛选表：行 = 自己挑的实验，列 = 一串「字段」。
@@ -54,7 +54,6 @@ watch(id, load);
    有结构就照记录页那套拼一张反应式（箭头上写试剂、下面写溶剂温度时间），
    拼不出来（化合物库里没有底物 / 产物）就退回一行字。 */
 const stdSvg = ref('');
-const stdLine = computed(() => standardLine(rows.value[0]?.exp));
 
 let cmpsCache = null;
 async function buildStandard() {
@@ -196,7 +195,6 @@ async function removeScreen() {
             :index="1"
             :caption="'条件优化'"
             :scheme="stdSvg"
-            :standard="stdLine"
             editable
             @open="(r) => router.push(`/e/${r.exp_id}`)"
             @change="save()"

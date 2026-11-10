@@ -6986,34 +6986,16 @@ body.is-sct-resizing * { cursor: col-resize !important; user-select: none !impor
 }
 /* 卡里面的反应式不再单独套卡（卡片里套卡片），就一块普通内容，压在三线表顶线上面 */
 .sct-std {
-  /* 反应式居中摆在表格上方，条件那行字居中跟在它下面（文献里压在箭头下面的那行） */
+  /* 反应式居中摆在表格上方；条件就画在箭头上下，不再另起一行「Standard conditions: …」
+     （用户明确不要那行字，别加回来） */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
   margin: 0 0 10px;
   padding: 0;
 }
-.sct-std .sct-std-line { flex: 0 1 auto; min-width: 0; max-width: 100%; margin: 0; text-align: center; }
 .sct-std-scheme { display: block; }
 .sct-std > .sct-std-scheme { min-width: 0; }
-.sct-std-line {
-  margin: 7px 0 0;
-  text-align: center;
-  font-family: var(--sct-serif);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--ink-3);
-}
-.sct-std-scheme + .sct-std-line { margin-top: 6px; }
-/* 没有反应式时只有那行字，直接压在表顶上 */
-.sct-std-line--bare { padding: 0; margin: 0 0 10px; text-align: center; }
-.sct-std-lbl {
-  margin-right: 2px;
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  color: var(--ink-4);
-}
 /* 条件筛选首页一页可能摊好几张表，那里的图收小一点，别把清单顶下去 */
 .sct-block .sct-std { margin: 0 0 8px; }
 .sct-block .sct-std svg { max-height: 160px; }

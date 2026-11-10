@@ -13,8 +13,6 @@ const props = defineProps({
   screening: { type: Object, required: true },
   rows: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
-  // 「标准条件」一行字（基准那条记录的投料 + 溶剂 / 温度 / 时间），像文献表格的副标题
-  standard: { type: String, default: '' },
   // 能画出结构时给一段反应式 SVG（不带白底），画在表格上方
   scheme: { type: String, default: '' },
   // 文献表的表标题：`表 1　条件优化`（index 是这张表在本页的序号）
@@ -53,7 +51,7 @@ const isWide = (f) => WIDE.has(f.source);
 const base = computed(() => props.rows[0]?.exp || null);
 // 有带单位的列（产率 / 选择性）才在标题后挂 [a]、表下挂 [b]，跟文献的脚注锚点对上
 const hasUnit = computed(() => fields.value.some((f) => unitOf(f)));
-const hasStd = computed(() => !!(props.scheme || props.standard));
+const hasStd = computed(() => !!props.scheme);
 
 // 表格宽度：默认「按内容宽」（比满页窄，文献里那种），右侧竖线可以拖宽 / 拖窄，
 // 双击回到自适应。宽度存 localStorage，是这台显示器上的偏好、不进库。
@@ -135,15 +133,10 @@ const cell = (f, r) => {
       :class="{ 'is-fixed': fitW > 0, 'is-resizing': resizing }"
       :style="fitW ? { width: fitW + 'px' } : null"
     >
-      <!-- 反应式居中压在表格上方，条件那行字居中跟在它下面（文献里压在箭头下面的那行） -->
+      <!-- 反应式居中压在表格上方（条件就画在箭头上下，不再另起一行字） -->
       <div v-if="scheme" class="sct-std">
         <div class="sct-std-scheme" v-html="scheme" />
-        <p v-if="standard" class="sct-std-line"><span class="sct-std-lbl">Standard conditions:</span>{{ standard }}</p>
       </div>
-      <!-- 画不出结构时只有一行字：不套卡片（一行字的白盒子看着像半个按钮），就压在表顶上 -->
-      <p v-else-if="standard" class="sct-std-line sct-std-line--bare">
-        <span class="sct-std-lbl">Standard conditions:</span>{{ standard }}
-      </p>
       <div class="sct-tbwrap">
         <table class="sct-table">
           <thead>

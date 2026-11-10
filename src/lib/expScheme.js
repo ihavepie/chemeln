@@ -94,26 +94,3 @@ export function schemeParts(model, compounds) {
   };
 }
 
-/**
- * 「标准条件」写成一行字（筛选表的表头注释用，没有结构式也能读）：
- * `环丁酮甲酯 (1 eq)，LDA (2 eq)，BnBr (1.2 eq)，THF，-78 °C，8 h，N2 → 苯基化产物`
- */
-export function standardLine(exp) {
-  if (!exp) return '';
-  const rows = exp.reagents || [];
-  const sub = [];
-  const re = [];
-  rows.forEach((r) => {
-    if (r.role === '溶剂') return;
-    const text = label(r, null);
-    if (text) (r.role === '底物' ? sub : re).push(text);
-  });
-  const solvent = str((rows.find((r) => r.role === '溶剂') || {}).name) || str(exp.solvent);
-  const tail = [solvent, str(exp.temperature), str(exp.duration), str(exp.atmosphere)]
-    .filter(Boolean)
-    .join('，');
-  const prod = str(exp.product_name);
-  const line = [[...sub, ...re].join('，'), tail].filter(Boolean).join('，') + (prod ? ` → ${prod}` : '');
-  // 数值和单位之间用不断行空格：窄一点的时候不会把「-78 °C」「1.2 eq」从中间断开
-  return line.replace(/(\d)\s(°C|℃|h|eq|mL|mol)/g, '$1\u00A0$2');
-}
