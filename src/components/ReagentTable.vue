@@ -693,10 +693,21 @@ function onStepTime(ev, i, key) {
 const rowLabel = (r) => (r.name || '').trim() || (r.role || '这一行');
 
 /** 一行实际的换算：mmol + (MW 或 浓度) → 克 / 毫升 */
-function amountMath(mmol, mw, conc) {
-  if (conc && mmol !== null) return `${round(mmol, 3)} mmol ÷ ${round(conc, 3)} M = ${round(mmol / conc, 3)} mL`;
-  if (mw && mmol !== null) return `${round(mmol, 3)} mmol × ${round(mw, 2)} = ${round((mmol * mw) / 1000, 4)} g`;
-  return '';
+/**
+ * 底部那行算式：跟单元格里显示的用量**说同一件事**（走 lib/reagent 的 derive + amountText），
+ * 有密度就一路除到体积（HFIP 41 µL），没有密度才写克；末位跟单元格一样四舍五入。
+ */
+function amountMath(r, mmol) {
+  if (mmol === null) return '';
+  const conc = num(r.conc);
+  if (conc) return `${round(mmol, 3)} mmol ÷ ${round(conc, 3)} M = ${amountText({ conc, mmol })}`;
+  const mw = num(r.mw);
+  if (!mw) return '';
+  const shown = amountText(derive({ mmol, mw, density: r.density }));
+  const d = saneDensity(r.density);
+  return d
+    ? `${round(mmol, 3)} mmol × ${round(mw, 2)} ÷ ${round(d, 2)} = ${shown}`
+    : `${round(mmol, 3)} mmol × ${round(mw, 2)} = ${shown}`;
 }
 
 function toggleRoleMenu(r, ev) {
@@ -747,8 +758,8 @@ function hintFor(r, field) {
   const name = rowLabel(r);
 
   if (field === 'mwcell') {
-    if (conc && mmol !== null) return `${name}：${amountMath(mmol, null, conc)}`;
-    if (mw && mmol !== null) return `${name}：${amountMath(mmol, mw, null)}`;
+    const math = amountMath(r, mmol);
+    if (math) return `${name}：${math}`;
     return `${name}：填分子量（如 120.15）或浓度（如 2 M）`;
   }
 
@@ -756,21 +767,21 @@ function hintFor(r, field) {
     if (isBaseRow(r)) return `${name}：基准行，${round(mmol ?? base ?? 0, 3)} mmol 就是反应规模`;
     if (eq !== null && base) {
       const mmolOut = base * eq;
-      const extra = amountMath(mmolOut, mw, conc);
-      return `${name}：${round(base, 3)} mmol × ${round(eq, 3)} eq = ${round(mmolOut, 4)} mmol${extra ? ` → ${extra.split(' = ')[1]}` : ''}`;
+      const extra = amountMath({ ...r, mmol: mmolOut }, mmolOut);
+      return `${name}：${round(base, 3)} mmol × ${round(eq, 3)} eq = ${round(mmolOut, 4)} mmol${extra ? ` → ${extra.split(' = ').pop()}` : ''}`;
     }
     return `${name}：${eq === null ? '未填当量' : `${round(eq, 3)} eq`}，规模 ${base ? `${round(base, 3)} mmol` : '未填'}`;
   }
 
   if (field === 'mmol') {
-    const math = amountMath(mmol, mw, conc);
+    const math = amountMath(r, mmol);
     if (math) return `${name}：${math}`;
     return `${name}：${mmol === null ? '未填 mmol' : `${round(mmol, 3)} mmol`}${mw || conc ? '' : '（需填分子量或浓度方可计算用量）'}`;
   }
 
   if (field === 'amount') {
     if (mmol === null) return `${name}：先填当量或 mmol，用量将自动计算`;
-    const math = amountMath(mmol, mw, conc);
+    const math = amountMath(r, mmol);
     return math ? `${name}：${math}` : `${name}：${round(mmol, 3)} mmol`;
   }
 
@@ -783,9 +794,7 @@ const defaultHint = computed(() => {
   if (!b) return '';
   const name = rowLabel(b);
   const mmol = num(b.mmol) ?? num(props.model.base);
-  const mw = num(b.mw);
-  const conc = num(b.conc);
-  const math = amountMath(mmol, mw, conc);
+  const math = amountMath(b, mmol);
   if (math) return `${name}：${math}`;
   if (mmol !== null) return `${name}：规模 ${round(mmol, 3)} mmol（填写分子量后自动计算用量）`;
   return '';
