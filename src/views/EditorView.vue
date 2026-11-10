@@ -776,7 +776,7 @@ function updateRail() {
   const railW = 22;
   railStyle.value = {
     left: `${Math.round(Math.max(r.left - 6 - railW, ed.left + 4))}px`,
-    top: `${Math.round(r.top + 42)}px`,
+    top: `${Math.round(r.top + 72)}px`,   // 让开纸面顶栏那行小字（记录本名 / 课题名）
     width: `${railW}px`,
   };
 }
@@ -823,14 +823,16 @@ function revealPeek(s, r) {
     width: `${width}px`,
   };
   peek.value = s;
-  // 卡片高度要等渲染出来才知道：竖直居中在书签上
+  // 卡片高度要等渲染出来才知道：竖直居中在短杠上，箭头对准短杠中线
   nextTick(() => {
     const h = peekEl.value ? peekEl.value.offsetHeight : 100;
     const cy = r.top + r.height / 2;
+    const top = Math.max(10, Math.min(window.innerHeight - h - 10, cy - h / 2));
     peekPos.value = {
       left: `${left}px`,
-      top: `${Math.round(Math.max(10, Math.min(window.innerHeight - h - 10, cy - h / 2)))}px`,
+      top: `${Math.round(top)}px`,
       width: `${width}px`,
+      '--arrow-y': `${Math.round(Math.max(12, Math.min(h - 12, cy - top)))}px`,
     };
   });
 }
@@ -1241,7 +1243,6 @@ const openAttachment = (id) => {
               :style="{ '--tick-w': `${tickW(s)}px` }"
               :data-code="s.code"
               :aria-label="`${s.code}${s.variant ? ` · ${s.variant}` : ''}`"
-              :title="`${s.code}${s.variant ? ` · ${s.variant}` : ''}${sibLine(s) ? ` · ${sibLine(s)}` : ''}`"
               @mouseenter="showPeek(s, $event)"
               @mouseleave="hidePeek()"
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"

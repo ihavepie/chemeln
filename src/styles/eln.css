@@ -5789,7 +5789,7 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    不然「平行 ×5」会折成两行，看着很碎）。 */
 .pgroup-cap {
   position: absolute;
-  left: calc(100% + 7px);
+  left: calc(100% + 10px);
   top: -3px;
   font-family: var(--mono);
   font-size: 8.5px;
@@ -5866,11 +5866,11 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    详细条件 / 结果一律走预览卡，这里只留编号（淡淡的，当前那条深一档）。 */
 .pgroup-lbl {
   position: absolute;
-  left: calc(100% + 7px);
+  left: calc(100% + 10px);
   top: 50%;
   transform: translateY(-50%);
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 8.5px;
   line-height: 1;
   letter-spacing: 0.02em;
   color: var(--ink-4);
@@ -5881,6 +5881,19 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 }
 .pgroup-tab:hover .pgroup-lbl { opacity: 1; color: var(--ink-2); }
 .pgroup-tab.is-on .pgroup-lbl { opacity: 1; color: var(--ink-3); }
+
+/* 预览卡右侧的小箭头：指向正在悬停的那根短杠（--arrow-y 由 JS 按短杠中线写） */
+.pgroup-peek-float::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: var(--arrow-y, 24px);
+  width: 9px;
+  height: 9px;
+  background: var(--paper);
+  border-radius: 1.5px;
+  transform: translateY(-50%) rotate(45deg);
+}
 
 /* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
 /* 书签悬停预览卡：照 DSH 那个 turn 预览的样子——无边框、圆角 10、只有一层柔和投影，
