@@ -610,12 +610,14 @@ function toRow(r) {
     eq: r.eq ?? null,
     mmol: null,
     mass_mg: null,
-    volume_ul: null,
+    // 用量要接住：从试剂库挑「2 mL」那种用量小签、或者传进来的用量，不能一律清空
+    //（以前写死 null，选完溶剂量是空的）
+    volume_ul: r.volume_ul ?? null,
     note: r.note || '',
     compound_id: null,
   };
   row.mwText = mwFmt(row) || '';
-  row.amountText = '';
+  row.amountText = r.amountText || (row.volume_ul ? volText(row.volume_ul) : '');
   return row;
 }
 
