@@ -409,6 +409,7 @@ function onStackFace(row) {
             <span class="exp-date">{{ row.one.date }}</span>
           </div>
           <div class="exp-title">{{ row.one.title || row.one.objective || '（未命名实验）' }}</div>
+          <div v-if="row.one.objective && row.one.objective !== row.one.title" class="exp-desc">{{ row.one.objective }}</div>
           <div class="exp-meta">
             <span v-if="catName(row.one)" class="cat-tag">{{ catName(row.one) }}</span>
             <span v-if="row.one.project">{{ row.one.project }}</span>
@@ -459,6 +460,7 @@ function onStackFace(row) {
                 </button>
               </div>
               <div class="exp-title">{{ row.face.title || row.face.objective || '（未命名实验）' }}</div>
+              <div v-if="row.face.objective && row.face.objective !== row.face.title" class="exp-desc">{{ row.face.objective }}</div>
               <div class="exp-meta">
                 <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
                 <span v-if="row.face.project">{{ row.face.project }}</span>
@@ -503,6 +505,7 @@ function onStackFace(row) {
                   <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
                 </div>
                 <div class="exp-title">{{ m.title || m.objective || '（未命名实验）' }}</div>
+                <div v-if="m.objective && m.objective !== m.title" class="exp-desc">{{ m.objective }}</div>
                 <!-- 改了什么：一条一项，各自一颗小标签，不折成「投料（… 等）」也不让它断行 -->
                 <div v-if="m.diffs && m.diffs.length" class="member-diff">
                   <span v-for="d in m.diffs" :key="d" class="member-diff-item">{{ d }}</span>

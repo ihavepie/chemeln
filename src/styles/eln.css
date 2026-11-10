@@ -519,6 +519,18 @@ body {
   -webkit-line-clamp: 2;
 }
 
+/* 卡片上的「描述」：一行灰字，放在名字下面（跟名字一样就省略不画） */
+.exp-desc {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink-3);
+  margin: -2px 0 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grid-body .exp-desc { font-size: 10.5px; margin: -1px 0 3px; }
+
 .grid-body .exp-meta { font-size: 10px; gap: 5px; }
 
 /* 空位：不画框，就是一块很淡的「还能放东西的地方」；悬停才浮成一张纸 */
@@ -1790,8 +1802,11 @@ kbd {
 }
 /* 大标题右边那颗「描述 / 目的」：小一号、灰一点，跟实验名分开 */
 .sheet-desc {
+  /* 描述可以长（「基于 XX 的尝试」）：给它 34% 的宽度（最多 380px），标题让一点出来 */
   flex: 0 0 auto;
-  width: 240px;
+  width: 34%;
+  max-width: 380px;
+  min-width: 160px;
   border: none;
   background: transparent;
   font-family: var(--sans);

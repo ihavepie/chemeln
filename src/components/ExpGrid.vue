@@ -286,6 +286,7 @@ function groupMenu(ev, g) {
                     <span class="exp-date">{{ card.it.date }}</span>
                   </div>
                   <div class="exp-title">{{ card.it.title || card.it.objective || '（未命名实验）' }}</div>
+                  <div v-if="card.it.objective && card.it.objective !== card.it.title" class="exp-desc">{{ card.it.objective }}</div>
                   <div class="exp-meta">
                     <span v-if="card.it.category_name" class="cat-tag">{{ card.it.category_name }}</span>
                     <span v-if="card.it.project">{{ card.it.project }}</span>
@@ -324,6 +325,7 @@ function groupMenu(ev, g) {
                   <span class="exp-date">{{ card.it.date }}</span>
                 </div>
                 <div class="exp-title">{{ card.it.title || card.it.objective || '（未命名实验）' }}</div>
+                  <div v-if="card.it.objective && card.it.objective !== card.it.title" class="exp-desc">{{ card.it.objective }}</div>
                 <div class="exp-meta">
                   <span v-if="card.it.category_name" class="cat-tag">{{ card.it.category_name }}</span>
                   <span v-if="card.it.project">{{ card.it.project }}</span>
