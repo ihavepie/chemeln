@@ -87,8 +87,8 @@
 - `src/lib/autosave.js` — `useAutosave(payload, save, opts)`：JSON 快照监听 + 防抖；**卸载时会补一次 `flush()`**（最后不到 1 秒的输入不丢），`lastSaved` 记的是「请求发出那一刻」的快照。
 - `src/lib/autogrow.js` — 文本域跟着内容长（`v-autogrow` 用的 `growTextarea` / `growAll`）；`flattenTextareas(root)` 把文本域换成 div，**打印 / 存 PDF 前必须调**（textarea 只印得出自己那几行高，长表征会被截断，实测 12 行只出 5 行）。
 - `src/components/HistoryModal.vue` — 改动历史弹窗（`entity` = experiment / compound + `id`），读 `/api/history/...`；实验页和化合物页的 ⋯ 菜单里都有入口。
-- `src/lib/lookup.js` — **结构信息查询**（`structureInfo(smiles)` / `nameInfo(name)` / `describeInfo(info)`）+ **外部数据库站点表 `LOOKUP_SITES`**（PubChem / ChemicalBook / NIST / TCI / CAS Common Chemistry；每项一个 `url(ids)`，缺标识就返回空、前端不显示）+ 各自的 `pubchemUrl` / `chemicalBookUrl` / `nistUrl` / `tciUrl` / `casCommonUrl`：
-  走 `/api/lookup`（服务端问 PubChem、带缓存），拿 IUPAC 名 / CAS / 分子式 / MW；网络失败一律返回 null，不让主流程受影响。
+- `src/lib/lookup.js` — **结构信息查询**（`structureInfo(smiles)` / `nameInfo(name)` / `describeInfo(info)`）+ **外部数据库站点表 `LOOKUP_SITES`**（PubChem / ChemicalBook / NIST / TCI / CAS Common Chemistry；缺标识就返回空）+ 各自的 `pubchemUrl` / `chemicalBookUrl` / `nistUrl` / `tciUrl` / `casCommonUrl`：
+  走 `/api/lookup`（链式查 **PubChem → OPSIN → Wikidata**，带缓存）：OPSIN 回 SMILES（前端本地算 MW），Wikidata 认**中文名**（`haswbstatement:P274`）；失败一律 null。
 - `src/lib/sheetprefs.js` — 「记录页显示哪几块」的前端偏好（`sheetPrefs` / `setSheetPref` / `showAllSheetBlocks` / `SHEET_BLOCKS`，存 localStorage `eln:sheet`，默认全开）；`EditorView` 用 `v-if` 挂着，关掉的块页面和打印都没有。
 - `src/lib/peek.js` — 「书签悬停预览显示哪些块」的前端偏好（`peekPrefs` / `setPeekPref` / `PEEK_LABELS`，存 localStorage `eln:peek`；默认条件 / 底物 / 结果 / 结论开，备注关）。
 - `src/lib/expScheme.js` — **一条记录的「标准条件」**：`schemeParts(model, compounds)` 把投料表 + 结果块拆成反应式要的几条（反应物 / 产物 SMILES、箭头上下的字，规则跟记录页原来那段一样），箭头上的字跟记录页「按投料表生成」共用这一份。找化合物**先按 `compound_id`、再按名字**（抹掉空格括号后比对，重名不认）。
