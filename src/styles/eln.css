@@ -7484,6 +7484,17 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .lib-var:active { transform: translateY(0.5px); }
 .lib-var.is-none { opacity: 0.7; }
 
+/* 查不到时的外部检索入口（PubChem / ChemicalBook）：小小的链接，别做成按钮 */
+.rl-ext {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  margin-left: 6px;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--line-2);
+  white-space: nowrap;
+}
+.rl-ext:hover { color: var(--accent-ink); border-bottom-color: var(--accent); }
 /* 核过了、三个库都没有：写「查无」并压淡，跟「还没查过」的一横区分开 */
 .rl-miss { color: var(--ink-4); opacity: 0.7; font-size: 11px; letter-spacing: 0.02em; }
 

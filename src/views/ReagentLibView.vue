@@ -5,6 +5,11 @@ import { api } from '../api.js';
 import { store } from '../store.js';
 import { toast } from '../lib/feedback.js';
 import { variantText } from '../lib/reagent.js';
+import { LOOKUP_SITES } from '../lib/lookup.js';
+
+// 查不到时给的外部检索入口：只有「按名字 / CAS 能直接打开」的那几家（TCI 只认 CAS，没 CAS 就不显示）
+const extSites = (name) =>
+  LOOKUP_SITES.map((s) => ({ label: s.label, href: s.url({ name }) })).filter((s) => s.href);
 import DocGrip from '../components/DocGrip.vue';
 
 /**
@@ -238,6 +243,18 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 >
                   {{ checking === it.name ? '查询中…' : it.checkedAt ? '重核' : '核对' }}
                 </button>
+                <!-- 三个库都查不到时，给几个能直接跳到外部库检索的入口（自己看一眼再手填 MW） -->
+                <template v-if="it.checkState === 'miss'">
+                  <a
+                    v-for="s in extSites(it.name)"
+                    :key="s.label"
+                    class="rl-ext"
+                    :href="s.href"
+                    target="_blank"
+                    rel="noopener"
+                    @click.stop
+                  >{{ s.label }}↗</a>
+                </template>
               </td>
             </tr>
           </tbody>

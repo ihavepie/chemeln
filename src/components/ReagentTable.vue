@@ -310,8 +310,20 @@ function onMw(r) {
   r.mw = v.mw;
   r.conc = v.conc;
   if (v.conc) r.mwText = `${round(v.conc, 3)}M`;
+  // 名字一带出分子量，就把 mmol 折出来——不然「用量」那格永远空着，
+  // 得手动去碰一下当量才动（用户报过：填了名字、分子量有了，用量还是空）
+  healRow(r);
   syncAmount(r);
   props.notify();
+}
+
+/** 只补「空着」的行：当量有数、规模有数、mmol 还空 → 折出 mmol 和用量。已填好的行不动 */
+function healRow(r) {
+  if (isSolvent(r) || num(r.mmol) !== null) return;
+  const b = num(props.model.base) || 0;
+  const e = eqNum(r.eq);
+  if (!b || e === null) return;
+  r.mmol = round(b * e, 4);
 }
 
 /** MW 那一格：没在编辑时一律「两位小数」（280.4 → 280.40、168 → 168.00） */
@@ -679,7 +691,9 @@ function pickFromLib(it, v) {
 }
 
 function addRow(step) {
-  props.model.rows.push({ step: step || steps.value.length, role: '试剂', eq: 1, mwText: '', amountText: '', name: '', note: '' });
+  const row = { step: step || steps.value.length, role: '试剂', eq: 1, mwText: '', amountText: '', name: '', note: '' };
+  healRow(row);
+  props.model.rows.push(row);
   props.notify();
 }
 
@@ -780,6 +794,21 @@ function onDocKey(ev) {
 onMounted(() => {
   document.addEventListener('click', onDocClick);
   document.addEventListener('keydown', onDocKey);
+  // 打开记录时顺手把「有当量、有分子量、mmol 却空着」的行补算一次
+  // （老记录 / 手填名字的行常常卡在这个状态，用量那格一直空）
+  let healed = false;
+  const b = num(props.model.base) || 0;
+  if (b) {
+    for (const r of rows.value) {
+      if (isSolvent(r) || num(r.mmol) !== null) continue;
+      const e = eqNum(r.eq);
+      if (e === null) continue;
+      r.mmol = round(b * e, 4);
+      syncAmount(r);
+      healed = true;
+    }
+  }
+  if (healed) props.notify();
 });
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocClick);
