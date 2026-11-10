@@ -303,6 +303,8 @@ function eqDisplay(r) {
   if (raw.endsWith('%')) return raw;
   const x = num(raw);
   if (x !== null && x > 0 && x < 1) return `${round(x * 100, 2)}%`;
+  // 1 以上写一位小数（1 → 1.0、2 → 2.0），列表里对得齐
+  if (x !== null) return x.toFixed(1);
   return raw;
 }
 

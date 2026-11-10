@@ -273,7 +273,8 @@ function normalizeReagents(list) {
       mw: numOrNull(r.mw),
       conc: numOrNull(r.conc),
       density: numOrNull(r.density),
-      eq: numOrNull(r.eq),
+      // 当量允许写成 `10%`（摩尔百分数）：这种文本要原样留着，不能当 NaN 丢掉
+      eq: /%\s*$/.test(String(r.eq ?? '')) ? String(r.eq).trim() : numOrNull(r.eq),
       mmol: numOrNull(r.mmol),
       mass_mg: numOrNull(r.mass_mg),
       volume_ul: numOrNull(r.volume_ul),
