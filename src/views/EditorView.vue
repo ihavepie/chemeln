@@ -740,41 +740,21 @@ const siblings = computed(() => exp.value?.siblings || []);
  */
 const sheetEl = ref(null);
 const editorEl = ref(null);
-/** 平行书签靠哪边：默认左边；存在 localStorage，纸面右侧留白不够时自动退回左边 */
-const RAIL_SIDE_KEY = 'eln:railside';
-const railSide = ref(localStorage.getItem(RAIL_SIDE_KEY) === 'right' ? 'right' : 'left');
-function toggleRailSide() {
-  railSide.value = railSide.value === 'right' ? 'left' : 'right';
-  try { localStorage.setItem(RAIL_SIDE_KEY, railSide.value); } catch { /* 隐私模式无所谓 */ }
-  moreMenu.value = false;
-  nextTick(updateRail);
-}
 const railStyle = ref({});
-const railPlace = ref(railSide.value);   // 实际生效的那一侧（留白不够时会换边）
-const railInline = ref(false);           // 缝太窄：编号改画在纸面左边距里（只写编号）
+const railInline = ref(false);   // 缝太窄：编号改画在纸面左边距里（只写编号）
 function updateRail() {
   const el = sheetEl.value;
   if (!el || page.value !== 1) return;
   const r = el.getBoundingClientRect();
-  // 短杠贴着纸边（6px 缝）站在“缝”里；编号那行不占缝——它画在**纸面自己的左边距**里
-  // （A4 纸左边距 44px，够写一行 9.5px 小字），所以窗口窄也不会压到中栏列表。
+  // 固定站在纸面**左边**那条缝里，短杠离纸 6px。
+  // 缝里挤（窗口窄）时短杠会顶到编辑区左边界，但绝不越过它——不能压中栏列表；
+  // 编号那一行不占缝：够宽写在缝里，不够就画进纸面自己的左边距（A4 有 44px）。
   const ed = editorEl.value ? editorEl.value.getBoundingClientRect() : { left: 0, right: window.innerWidth };
   const railW = 22;
-  let side = railSide.value;
-  if (side === 'right' && window.innerWidth - r.right < 34) side = 'left';
-  if (side === 'left' && r.left - ed.left < 12) side = 'right';
-  // 那一侧的缝够宽（≥130px）就把编号写在缝里；不够就写进纸面自己的左边距（只写编号）
-  const gutter = side === 'right' ? window.innerWidth - r.right : r.left - ed.left;
+  const gutter = r.left - ed.left;
   railInline.value = gutter < 130;
-  let left = side === 'right' ? r.right + 6 : r.left - 6 - railW;
-  if (side === 'left') {
-    left = Math.max(left, ed.left + 4);                          // 不许压到中栏列表
-  } else {
-    left = Math.min(left, window.innerWidth - railW - 4);
-  }
-  railPlace.value = side;
   railStyle.value = {
-    left: `${Math.round(left)}px`,
+    left: `${Math.round(Math.max(r.left - 6 - railW, ed.left + 4))}px`,
     top: `${Math.round(r.top + 42)}px`,
     width: `${railW}px`,
   };
@@ -1088,9 +1068,6 @@ const openAttachment = (id) => {
             <button @click="snapshotBundle(); moreMenu = false"><Icon name="folder" :size="13" /> 导出打包（.zip：网页 + 原图）</button>
             <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制这条实验</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验（重复 / 改一个变量）</button>
-            <button @click="toggleRailSide()">
-              <Icon name="table" :size="13" /> 平行书签放在{{ railSide === 'right' ? '左边' : '右边' }}
-            </button>
             <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存入化合物库</button>
             <div class="menu-sep" />
             <button class="menu-danger" @click="removeExperiment(); moreMenu = false">
@@ -1225,7 +1202,7 @@ const openAttachment = (id) => {
           <nav
             v-if="siblings.length > 1 && page === 1"
             class="pgroup pgroup--float noprint"
-            :class="{ 'is-right': railPlace === 'right', 'is-inline': railInline }"
+            :class="{ 'is-inline': railInline }"
             :style="railStyle"
             aria-label="平行实验"
           >

@@ -5759,8 +5759,7 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
    ================================================================ */
 .sheet { position: relative; }
 
-/* 浮层版：定位由 JS 按纸面左上角写进来（left/top），整体再往左平移自身宽度。
-   放纸面右边时（.is-right）整排改成左对齐、不再平移。 */
+/* 浮层版：位置由 JS 算好写进 left/top/width（固定站在纸面左边的缝里）。 */
 /* 位置全部由 JS 算好写进 left/top/width（导航排不能越过编辑区边界，
    否则窄窗口会压在中栏列表的卡片上），所以这里不再自己平移。 */
 .pgroup--float {
@@ -5771,18 +5770,9 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   gap: 2px;
   align-items: flex-end;
 }
-.pgroup--float.is-right { align-items: flex-start; }
 /* 编号那行画在**纸面自己的左边距**里（`left: calc(100% + 6px)` 就是纸的起点），
    不占中栏列表那侧那 20 多 px 的缝，所以窗口窄也不会压到列表卡片。 */
 /* 靠右时短杠左端贴齐、编号挪到短杠**右边**，方向全部镜像过来 */
-.pgroup--float.is-right .pgroup-tab,
-.pgroup--float.is-right .pgroup-add { justify-content: flex-start; }
-.pgroup--float.is-right .pgroup-tab::before { order: -1; }
-.pgroup--float.is-right .pgroup-lbl {
-  left: calc(100% + 8px);
-  right: auto;
-  flex-direction: row-reverse;
-}
 /* 缝太窄（<130px）时把编号改画进**纸面自己的左边距**里（A4 有 44px），
    只写编号、不写变化——那一段留给悬停预览卡。 */
 .pgroup--float.is-inline .pgroup-lbl {
@@ -5791,13 +5781,8 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   flex-direction: row;
   opacity: 0.8;
 }
-.pgroup--float.is-right.is-inline .pgroup-lbl {
-  left: auto;
-  right: calc(100% + 7px);
-  flex-direction: row-reverse;
-}
 .pgroup--float.is-inline .pgroup-var { display: none; }
-.pgroup--float.is-right .pgroup-add { padding-right: 0; padding-left: 3px; }
+
 
 .pgroup-cap {
   font-family: var(--mono);
