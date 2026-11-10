@@ -24,6 +24,30 @@ const shown = computed(() => {
 });
 
 const solidCount = computed(() => items.value.filter((it) => it.mw && !it.per_mmol_ul).length);
+const liveCount = computed(() => items.value.filter((it) => it.live > 0).length);
+
+/** 核对一个试剂（PubChem → OPSIN → Wikidata），回来的 MW / 密度写回试剂库 */
+const checking = ref('');
+async function verify(it) {
+  checking.value = it.name;
+  try {
+    const r = await api.reagentsVerify(it.name);
+    if (!r || !r.ok) {
+      toast(`「${it.name}」三个库都没查到`, 'warn', 3200);
+    } else {
+      const bits = [];
+      if (r.mw) bits.push(`MW ${Number(r.mw).toFixed(2)}`);
+      if (r.formula) bits.push(r.formula);
+      if (r.density) bits.push(`密度 ${r.density}`);
+      toast(`已核对（${r.source}）：${bits.join(' · ') || '查到条目但没 MW'}`, 'ok', 3200);
+    }
+    await load();
+  } catch (e) {
+    toast(e.message || '核对失败（可能没联网）', 'err');
+  } finally {
+    checking.value = '';
+  }
+}
 
 async function load() {
   loading.value = true;
@@ -75,7 +99,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
 
       <template v-else>
         <div class="rl-sum">
-          {{ items.length }} 个试剂 · 固体 {{ solidCount }} 个 · 液体 {{ items.length - solidCount }} 个
+          {{ items.length }} 个试剂（输入过的都留着）· 当前在用 {{ liveCount }} 个 · 固体 {{ solidCount }} 个
           <span v-if="q.trim()">· 筛出 {{ shown.length }} 个</span>
         </div>
 
@@ -88,7 +112,9 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <th class="n">浓度 / 密度</th>
               <th class="n">1 mmol ≈</th>
               <th class="n">用过</th>
+              <th class="n">当前</th>
               <th class="n">最近</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -106,10 +132,16 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 <template v-if="it.per_mmol_ul"> · {{ ulPer(it) }}</template>
                 <template v-if="!it.per_mmol_g && !it.per_mmol_ul">—</template>
               </td>
-              <td class="n mono">{{ it.uses }}</td>
+              <td class="n mono">{{ it.used }}</td>
+              <td class="n mono" :class="{ 'rl-zero': !it.live }">{{ it.live }}</td>
               <td class="n mono rl-last">
                 {{ it.lastCode || '' }}
                 <span v-if="it.lastAt" class="rl-date">{{ it.lastAt }}</span>
+              </td>
+              <td class="n">
+                <button type="button" class="rl-check" :disabled="checking === it.name" @click.stop="verify(it)">
+                  {{ checking === it.name ? '查询中…' : '核对' }}
+                </button>
               </td>
             </tr>
           </tbody>

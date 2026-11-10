@@ -152,6 +152,8 @@ export const api = {
     request('/api/groups/adopt', { method: 'POST', body: { ids, title } }),
   groups: (project = '') =>
     request(`/api/groups${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d),
+  /** 核对一个试剂：服务端拿名字重查 PubChem / OPSIN / Wikidata，把 MW / 密度写回试剂库 */
+  reagentsVerify: (name) => request('/api/reagents/verify', { method: 'POST', body: { name } }),
   /** 试剂库（用过的试剂汇总）：按名字聚合，带组分 / MW / 密度 / 1 mmol 折算量 */
   reagents: (project = '', q = '') => {
     const qs = new URLSearchParams();

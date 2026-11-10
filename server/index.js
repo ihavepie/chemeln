@@ -283,7 +283,32 @@ function normalizeReagents(list) {
     .filter((r) => r.name || r.role || r.mw !== null || r.eq !== null);
 }
 
+/** 把这一版投料行登记到试剂库：名字进 reagent_lib（只补最新值），
+ *  再往 reagent_uses 记一条「这条记录用过它」——删记录也不会把库里的条目删掉。 */
+function touchReagentLib(expId, reagents, ts = nowISO()) {
+  const upLib = db.prepare(
+    `INSERT INTO reagent_lib(key, name, role, mw, conc, density, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?)
+     ON CONFLICT(key) DO UPDATE SET
+       name = COALESCE(NULLIF(excluded.name, ''), reagent_lib.name),
+       role = CASE WHEN reagent_lib.role = '' THEN excluded.role ELSE reagent_lib.role END,
+       mw = COALESCE(excluded.mw, reagent_lib.mw),
+       conc = COALESCE(excluded.conc, reagent_lib.conc),
+       density = COALESCE(excluded.density, reagent_lib.density),
+       updated_at = excluded.updated_at`
+  );
+  const upUse = db.prepare('INSERT OR IGNORE INTO reagent_uses(key, exp_id, at) VALUES (?,?,?)');
+  for (const r of reagents) {
+    const name = str(r.name).trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    upLib.run(key, name, str(r.role), r.mw ?? null, r.conc ?? null, r.density ?? null, ts, ts);
+    if (expId) upUse.run(key, expId, ts);
+  }
+}
+
 function insertReagents(expId, reagents) {
+  touchReagentLib(expId, reagents);
   const stmt = db.prepare(
     `INSERT INTO reagents(exp_id, position, step, compound_id, role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
@@ -800,7 +825,7 @@ function bootstrap(query = {}) {
     trashCount: db.prepare('SELECT COUNT(*) AS n FROM trash').get().n,
     reagentDict,
     reagentCount: (() => {
-      try { return db.prepare("SELECT COUNT(DISTINCT lower(trim(name))) AS n FROM reagents WHERE trim(name) <> ''").get().n || 0; } catch { return 0; }
+      try { return db.prepare("SELECT COUNT(*) AS n FROM reagent_lib WHERE trim(role) <> '底物'").get().n || 0; } catch { return 0; }
     })(),
     compoundDict,
     compoundCount,
@@ -3805,68 +3830,95 @@ route('GET', '/api/lookup', async (req, res, params, url) => {
   ok(res, info);
 });
 
-/* --- 试剂库（「用过的试剂」的完整版）：从所有投料行汇总 ----------------------
-   一行一个试剂名：最近一次用的组分 / 分子量 / 浓度 / 密度，用过几条记录，
-   再按 1 mmol 折一个「多少 g / 多少 µL」——称量时最常用的就是这两个数。 */
-route('GET', '/api/reagents', async (req, res, params, url) => {
-  const q = Object.fromEntries(url.searchParams.entries());
-  const project = str(q.project);
-  const kw = str(q.q).trim().toLowerCase();
-  const rows = db
+/* --- 试剂库：**输入过的**试剂都登记在 reagent_lib 里（删了记录也留着） ----------
+   两个计数：
+     used = 历史上引用过它的记录数（reagent_uses，只增不减）
+     live = 现在还有几条记录在用（reagents 里现存的，按课题筛）
+   底物不进试剂库（那是化合物库的事）。 */
+function reagentLibRows(project, kw) {
+  const projectArgs = project ? [project] : [];
+  const lib = db
     .prepare(
-      `SELECT r.name, r.role, r.mw, r.conc, r.density, r.exp_id, e.date, e.code
-         FROM reagents r LEFT JOIN experiments e ON e.id = r.exp_id
-        WHERE trim(r.name) <> ''
-          AND trim(r.role) <> '底物'          -- 底物走化合物库，不在试剂库里重复一遍
-          ${project ? 'AND e.project = ?' : ''}
-        ORDER BY r.id DESC`
+      `SELECT l.key, l.name, l.role, l.mw, l.conc, l.density, l.updated_at,
+              (SELECT COUNT(*) FROM reagent_uses u WHERE u.key = l.key) AS used,
+              (SELECT COUNT(DISTINCT r.exp_id) FROM reagents r JOIN experiments e ON e.id = r.exp_id
+                WHERE lower(trim(r.name)) = l.key ${project ? 'AND e.project = ?' : ''}) AS live,
+              (SELECT MAX(e.date) FROM reagents r JOIN experiments e ON e.id = r.exp_id
+                WHERE lower(trim(r.name)) = l.key ${project ? 'AND e.project = ?' : ''}) AS last_at,
+              (SELECT e.code FROM reagents r JOIN experiments e ON e.id = r.exp_id
+                WHERE lower(trim(r.name)) = l.key ${project ? 'AND e.project = ?' : ''} ORDER BY r.id DESC LIMIT 1) AS last_code
+         FROM reagent_lib l
+        WHERE trim(l.role) <> '底物'
+        ORDER BY live DESC, used DESC, l.name COLLATE NOCASE`
     )
-    .all(...(project ? [project] : []));
+    .all(...(project ? [...projectArgs, ...projectArgs, ...projectArgs] : []));
 
-  const map = new Map();
-  for (const r of rows) {
-    const key = r.name.trim().toLowerCase();
-    let it = map.get(key);
-    if (!it) {
-      it = {
-        name: r.name.trim(),
-        role: '',
-        mw: null,
-        conc: null,
-        density: null,
-        uses: 0,
-        seen: new Set(),
-        lastAt: r.date || '',
-        lastCode: r.code || '',
-      };
-      map.set(key, it);
-    }
-    // 最新那条优先：只补还空着的字段
-    if (!it.role && str(r.role)) it.role = str(r.role);
-    if (it.mw === null && r.mw !== null) it.mw = r.mw;
-    if (it.conc === null && r.conc !== null) it.conc = r.conc;
-    if (it.density === null && r.density !== null) it.density = r.density;
-    if (r.exp_id && !it.seen.has(r.exp_id)) {
-      it.seen.add(r.exp_id);
-      it.uses += 1;
-    }
-  }
-
-  const items = [...map.values()]
-    .map(({ seen, ...it }) => {
-      const mw = it.mw;
+  const k = str(kw).trim().toLowerCase();
+  return lib
+    .filter((it) => !k || it.name.toLowerCase().includes(k) || str(it.role).includes(k))
+    .map((it) => {
       const density = it.density != null && it.density >= 0.3 && it.density <= 3.5 ? it.density : null;
+      const mw = it.mw;
       return {
-        ...it,
-        // 1 mmol 折出来的量：称多少 g / 量多少 µL（没密度就是固体，只给 g）
+        key: it.key,
+        name: it.name,
+        role: it.role,
+        mw,
+        conc: it.conc,
+        density,
+        used: it.used,
+        live: it.live,
+        lastAt: it.last_at || '',
+        lastCode: it.last_code || '',
         per_mmol_g: mw ? Math.round((mw / 1000) * 10000) / 10000 : null,
         per_mmol_ul: mw && density ? Math.round((mw / density) * 10) / 10 : null,
       };
-    })
-    .filter((it) => !kw || it.name.toLowerCase().includes(kw) || str(it.role).includes(kw))
-    .sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name));
+    });
+}
 
+route('GET', '/api/reagents', async (req, res, params, url) => {
+  const q = Object.fromEntries(url.searchParams.entries());
+  const items = reagentLibRows(str(q.project), str(q.q));
   ok(res, { items, total: items.length });
+});
+
+/* 核对一个试剂：拿名字重查 PubChem → OPSIN → Wikidata，查到的 MW / 密度写回试剂库 */
+route('POST', '/api/reagents/verify', async (req, res) => {
+  const body = await readJson(req);
+  const name = str(body.name).trim();
+  if (!name) throw new HttpError(400, '要带 name');
+  let info = null;
+  try {
+    info = await pubchemLookup('name', name);
+  } catch {
+    info = null;
+  }
+  if (!info || !info.found) {
+    for (const [source, budget] of [[opsinLookup, 7000], [wikidataLookup, 6000]]) {
+      try {
+        const alt = await withTimeout(source(name), budget);
+        if (alt) { info = alt; break; }
+      } catch { /* 这个源不通就跳过 */ }
+    }
+  }
+  if (!info) return ok(res, { ok: false, name });
+  // OPSIN 只回 SMILES → 前端算 MW 太绕，这里就不写 MW，让用户手填
+  const mwNum = numOrNull(info.mw);
+  const dens = info.props && info.props.density ? Number(String(info.props.density).replace(/[^\d.]/g, '')) : NaN;
+  const density = Number.isFinite(dens) && dens >= 0.3 && dens <= 3.5 ? dens : null;
+  const key = name.toLowerCase();
+  db.prepare(
+    `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density), updated_at = ? WHERE key = ?`
+  ).run(mwNum, density, nowISO(), key);
+  ok(res, {
+    ok: true,
+    name,
+    source: info.source || 'pubchem',
+    mw: mwNum,
+    formula: info.formula || '',
+    density,
+    smiles: info.smiles || '',
+  });
 });
 
 /* --------------------------------------------------------------- server */

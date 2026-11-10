@@ -7247,6 +7247,20 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-role { color: var(--ink-3); white-space: nowrap; }
 .rl-last { color: var(--ink-4); white-space: nowrap; }
 .rl-date { margin-left: 6px; color: var(--ink-4); opacity: 0.8; }
+/* 试剂库里「当前引用为 0」的条目：数字淡一点，表示这个试剂现在没记录在用 */
+.rl-table .rl-zero { color: var(--ink-4); opacity: 0.55; }
+.rl-check {
+  padding: 2px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.rl-check:hover { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
+.rl-check:disabled { opacity: 0.5; cursor: default; }
 
 /* 「从试剂库选」弹窗：一列可点的行（名字 / 组分 / 1 mmol 折多少 g 或 µL） */
 .lib-search {

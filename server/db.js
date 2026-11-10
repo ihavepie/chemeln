@@ -183,6 +183,27 @@ CREATE TABLE IF NOT EXISTS categories (
 `);
 
 // 老库补列
+/* 试剂库（登记表）：**输入过的**试剂都留一条，哪怕现在没有记录在用（引用数 0）。
+   以前只是从投料行临时汇总，删掉记录就没了，用户要的是「输入过就一直留着」。 */
+db.exec(`
+CREATE TABLE IF NOT EXISTS reagent_lib (
+  key        TEXT PRIMARY KEY,          -- lower(trim(name))
+  name       TEXT NOT NULL,
+  role       TEXT NOT NULL DEFAULT '',
+  mw         REAL,
+  conc       REAL,
+  density    REAL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reagent_uses (
+  key    TEXT NOT NULL,
+  exp_id INTEGER NOT NULL,
+  at     TEXT NOT NULL,
+  PRIMARY KEY (key, exp_id)
+);
+`);
+
 function ensureColumn(table, name, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
   if (!cols.includes(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
@@ -215,6 +236,33 @@ ensureColumn('screenings', 'project', "project TEXT NOT NULL DEFAULT ''");
     if (!Number.isFinite(first) || first <= 0) continue;
     const e = projOf.get(first);
     if (e && e.project) upd.run(e.project, r.id);
+  }
+}
+// 第一次跑试剂库表时，把已有的投料行灌进去（老数据也要有底子）；之后由保存时增量登记
+{
+  const rows = db
+    .prepare("SELECT exp_id, name, role, mw, conc, density FROM reagents WHERE trim(name) <> '' ORDER BY id")
+    .all();
+  if (rows.length && !db.prepare('SELECT 1 AS x FROM reagent_lib LIMIT 1').get()) {
+    const ts = new Date().toISOString();
+    const upLib = db.prepare(
+      `INSERT INTO reagent_lib(key, name, role, mw, conc, density, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?)
+       ON CONFLICT(key) DO UPDATE SET
+         role = CASE WHEN reagent_lib.role = '' THEN excluded.role ELSE reagent_lib.role END,
+         mw = COALESCE(excluded.mw, reagent_lib.mw),
+         conc = COALESCE(excluded.conc, reagent_lib.conc),
+         density = COALESCE(excluded.density, reagent_lib.density),
+         updated_at = excluded.updated_at`
+    );
+    const upUse = db.prepare('INSERT OR IGNORE INTO reagent_uses(key, exp_id, at) VALUES (?,?,?)');
+    for (const r of rows) {
+      const name = String(r.name).trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      upLib.run(key, name, String(r.role || ''), r.mw ?? null, r.conc ?? null, r.density ?? null, ts, ts);
+      if (r.exp_id) upUse.run(key, r.exp_id, ts);
+    }
   }
 }
 ensureColumn('reagents', 'conc', 'conc REAL');
