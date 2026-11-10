@@ -167,14 +167,20 @@ export async function composeSchemeSvg({ reactants = [], product = '', productLa
   const GAP = 14;          // 结构之间的一般间距
   const PLUS = 18;         // 加号的宽度
   const ARROW_MIN = 110;   // 箭头最短多长；实际长度按上下最长那行字来（够写条件就行，别拉太长）
-  // 箭头那块地方要放得下最长的那行字（13px 字，中文按全角估），否则字会压到反应物上
-  const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 13 : 7.1), 0);
+  // 箭头上下的条件字号（跟结构式里的原子标签差不多大；以前 13px 偏小，用户说看不清）
+  const CAP_SIZE = 15;
+  // 箭头那块地方要放得下最长的那行字（按 CAP_SIZE 估宽：中文全角、西文约 0.53 倍），
+  // 否则字会压到反应物上
+  // 系数按实测校准过：15px 的 Helvetica 混排大约 0.47×字号 / 西文字符，中文按全角 1.0×
+  const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? CAP_SIZE : CAP_SIZE * 0.47), 0);
   const capAbove = above.filter((t) => lineText(t).trim());
   const capBelow = below.filter((t) => lineText(t).trim());
-  const capW = Math.max(0, ...[...capAbove, ...capBelow].map(textW));
-  const arrowLen = Math.max(ARROW_MIN, Math.round(capW) + 16); // 箭头比最长的条件行再宽一点就够
+  const capW = Math.max(0, ...[...capAbove, ...capBelow].map((t) => textW(lineText(t))));
+  // 画出来那根线比 arrowLen 短（两头留白 / 箭头尖用掉了约 37px），所以这里补回来：
+  // 目标 = 线比最长的条件行宽 16px 左右
+  const arrowLen = Math.max(ARROW_MIN, Math.round(capW) + 53);
   const arrowW = arrowLen + 26;                                // 这块区域两头各留 13px，字不会贴到结构上
-  const LINE_H = 18;
+  const LINE_H = 20;
   const CAP_GAP = 15;      // 最近那行字离箭头多远
   const capTopH = capAbove.length ? capAbove.length * LINE_H + CAP_GAP : 0;
   const capBotH = capBelow.length ? capBelow.length * LINE_H + CAP_GAP : 0;
@@ -224,7 +230,7 @@ export async function composeSchemeSvg({ reactants = [], product = '', productLa
 
   const capX = Math.round(arrowZone + arrowW / 2);
   // 下标 / 上标靠 tspan 的 dy 挪基线，字号小一号；挪完要挪回来，不然后面全跟着跑
-  const SIZE = 13;
+  const SIZE = CAP_SIZE;
   const textTag = (line, y) => {
     // 每段字自己带着「相对上一段的基线偏移」走：正常 0、下标 +3、上标 -4。
     // 以前是「先记 pending 再还回去」写反了——下标没往下挪，后面的字反而被抬起来，
