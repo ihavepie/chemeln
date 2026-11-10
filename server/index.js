@@ -4143,7 +4143,9 @@ async function verifyReagent(name, opts = {}) {
   const raw = str(name).trim();
   const key = raw.toLowerCase();
   if (!key) return { name: raw, ok: false, state: 'error', reason: '空名字' };
-  const row = db.prepare('SELECT name, mw, density FROM reagent_lib WHERE key = ?').get(key);
+  const row = db.prepare('SELECT name, mw, density, manual FROM reagent_lib WHERE key = ?').get(key);
+  // 用户手填过的字段（MW / 密度）不再被联网结果覆盖
+  const manual = new Set(String((row && row.manual) || '').split(',').map((x) => x.trim()).filter(Boolean));
   const label = (row && row.name) || raw;
   let info = null;
   let netErr = null;
@@ -4178,7 +4180,14 @@ async function verifyReagent(name, opts = {}) {
   db.prepare(
     `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density),
             checked_at = ?, check_state = ?, updated_at = ? WHERE key = ?`
-  ).run(mw != null && coarse ? mw : null, density, ts, found ? 'ok' : 'miss', ts, key);
+  ).run(
+    !manual.has('mw') && mw != null && coarse ? mw : null,
+    manual.has('density') ? null : density,
+    ts,
+    found ? 'ok' : 'miss',
+    ts,
+    key
+  );
   return {
     name: label,
     key,
@@ -4244,6 +4253,37 @@ route('POST', '/api/reagents/verify', async (req, res) => {
   ok(res, await verifyReagent(name, { force: !!body.force }));
 });
 
+/* 自定义「检索站点」：用户自己加的化学数据库，试剂库里「查无」时一起列出来。
+   url 模板里用 {name} / {cas} 占位（只做跳转，不替用户抓页面——各家页面结构不同，
+   硬解析迟早会坏；要抓特定字段得给解析规则，那是另一步）。 */
+const DEFAULT_LOOKUP_SITES = [];
+function lookupSites() {
+  try {
+    const raw = JSON.parse(getSetting('lookup_sites') || '[]');
+    return Array.isArray(raw) ? raw.filter((x) => x && x.label && x.url).slice(0, 20) : [];
+  } catch {
+    return DEFAULT_LOOKUP_SITES;
+  }
+}
+
+route('GET', '/api/lookup-sites', async (req, res) => ok(res, { items: lookupSites() }));
+
+route('PUT', '/api/lookup-sites', async (req, res) => {
+  const body = await readJson(req);
+  const list = Array.isArray(body.items) ? body.items : [];
+  const clean = [];
+  for (const it of list) {
+    const label = str(it && it.label).trim().slice(0, 24);
+    const url = str(it && it.url).trim().slice(0, 400);
+    if (!label || !url) continue;
+    if (!/^https?:\/\//i.test(url)) throw new HttpError(400, `「${label}」的网址要是 http(s) 开头`);
+    clean.push({ label, url });
+    if (clean.length >= 20) break;
+  }
+  setSetting('lookup_sites', JSON.stringify(clean));
+  ok(res, { items: clean });
+});
+
 /* 试剂库条目：改名 / 删除。
    库条目是从投料行汇总出来的，所以：
      · 改名 = 把所有记录里这个试剂名**一起改掉**（只改库不带记录的话，下次保存又长回旧名字）；
@@ -4252,11 +4292,39 @@ route('POST', '/api/reagents/verify', async (req, res) => {
 route('PATCH', '/api/reagents/:key', async (req, res, params) => {
   const key = decodeURIComponent(String(params.key || '')).trim().toLowerCase();
   const body = await readJson(req);
-  const name = str(body.name).trim();
   if (!key) throw new HttpError(400, '要带 key');
-  if (!name) throw new HttpError(400, '名字不能为空');
   const lib = db.prepare('SELECT * FROM reagent_lib WHERE key = ?').get(key);
   if (!lib) return fail(res, 404, '试剂库里没有这一条');
+
+  // 手填 MW / 密度（只改这几个字段，不动名字）：填过就标记成 manual，
+  // 以后「核对 / 自动核对」都不会再把它覆盖掉
+  const hasMarks = body.mw !== undefined || body.density !== undefined || body.conc !== undefined;
+  if (hasMarks) {
+    const marks = new Set(String(lib.manual || '').split(',').map((x) => x.trim()).filter(Boolean));
+    const mw = body.mw === undefined ? lib.mw : numOrNull(body.mw);
+    const density = body.density === undefined ? lib.density : numOrNull(body.density);
+    const conc = body.conc === undefined ? lib.conc : numOrNull(body.conc);
+    if (body.mw !== undefined) marks.add('mw');
+    if (body.density !== undefined) marks.add('density');
+    // 手改过的值顺手写回所有还在用这个名字的投料行（记录页那边也跟着变）
+    db.exec('BEGIN');
+    try {
+      db.prepare('UPDATE reagent_lib SET mw = ?, density = ?, conc = ?, manual = ?, updated_at = ? WHERE key = ?').run(
+        mw, density, conc, [...marks].join(','), nowISO(), key
+      );
+      db.prepare('UPDATE reagents SET mw = COALESCE(?, mw), density = COALESCE(?, density) WHERE lower(trim(name)) = ?').run(
+        mw, density, key
+      );
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    return ok(res, { key, mw, density, manual: [...marks].join(',') });
+  }
+
+  const name = str(body.name).trim();
+  if (!name) throw new HttpError(400, '名字不能为空');
   const nextKey = name.toLowerCase();
   const ts = nowISO();
   // 改记录里的名字（同一事务里做完，别出现「库改了记录没改」）

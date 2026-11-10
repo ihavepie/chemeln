@@ -7,10 +7,66 @@ import { confirm, prompt, toast } from '../lib/feedback.js';
 import { variantText } from '../lib/reagent.js';
 import { LOOKUP_SITES } from '../lib/lookup.js';
 
-// 查不到时给的外部检索入口：只有「按名字 / CAS 能直接打开」的那几家（TCI 只认 CAS，没 CAS 就不显示）
-const extSites = (name) =>
-  LOOKUP_SITES.map((s) => ({ label: s.label, href: s.url({ name }) })).filter((s) => s.href);
+// 自定义检索站点（设置里加的）：url 模板里 {name} 换成试剂名
+const customSites = ref([]);
+const sitesOpen = ref(false);
+const sitesDraft = ref([]);
+
+// 查不到时给的外部检索入口：内置那几家 + 自己加的
+const extSites = (name) => {
+  const builtin = LOOKUP_SITES.map((s) => ({ label: s.label, href: s.url({ name }) })).filter((s) => s.href);
+  const mine = customSites.value
+    .map((s) => ({ label: s.label, href: String(s.url || '').replace(/\{name\}/g, encodeURIComponent(name)) }))
+    .filter((s) => s.href);
+  return [...builtin, ...mine];
+};
+
+async function openSites() {
+  try {
+    customSites.value = await api.lookupSites();
+  } catch {
+    customSites.value = [];
+  }
+  sitesDraft.value = customSites.value.map((s) => ({ ...s }));
+  if (!sitesDraft.value.length) sitesDraft.value.push({ label: '', url: '' });
+  sitesOpen.value = true;
+}
+async function saveSites() {
+  try {
+    const r = await api.saveLookupSites(sitesDraft.value.filter((s) => String(s.label || '').trim() && String(s.url || '').trim()));
+    customSites.value = r.items || [];
+    sitesOpen.value = false;
+    toast(`检索站点已保存（${(r.items || []).length} 个）`, 'ok', 2000);
+  } catch (e) {
+    toast(e.message || '没存上', 'err');
+  }
+}
+
+/** 手填 MW / 密度：写回库条目，并标记成 manual（以后核对不再覆盖） */
+async function editNumber(it, field) {
+  const isDensity = field === 'density';
+  const cur = isDensity ? it.density : it.mw;
+  const v = await prompt({
+    title: isDensity ? `「${it.name}」的密度（g/mL）` : `「${it.name}」的分子量`,
+    placeholder: isDensity ? '例如 1.21；不确定就留空' : '例如 280.43',
+    value: cur == null ? '' : String(cur),
+    confirmText: '保存',
+    allowEmpty: true,
+  });
+  if (v === null) return;
+  const patch = field === 'density' ? { density: v.trim() === '' ? null : Number(v) } : { mw: v.trim() === '' ? null : Number(v) };
+  if (field !== 'density' && v.trim() !== '' && !Number.isFinite(patch.mw)) return toast('分子量要是个数字', 'warn', 2000);
+  if (field === 'density' && v.trim() !== '' && !Number.isFinite(patch.density)) return toast('密度要是个数字', 'warn', 2000);
+  try {
+    await api.reagentPatch(it.key || it.name.toLowerCase(), patch);
+    await load();
+    toast('已保存（以后核对不会再覆盖它）', 'ok', 2200);
+  } catch (e) {
+    toast(e.message || '没存上', 'err');
+  }
+}
 import DocGrip from '../components/DocGrip.vue';
+import AppModal from '../components/AppModal.vue';
 
 /**
  * 试剂库 = 「用过的试剂」的完整版。
@@ -115,8 +171,18 @@ async function load() {
     loading.value = false;
   }
 }
+async function loadSites() {
+  try {
+    customSites.value = await api.lookupSites();
+  } catch {
+    customSites.value = [];
+  }
+}
 
-onMounted(load);
+onMounted(() => {
+  void load();
+  void loadSites();
+});
 watch(() => store.project, load);
 
 /** 改试剂名：所有记录里的这个名字会一起改（不然下次保存又长回旧名字） */
@@ -205,8 +271,24 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
         >
           {{ allRun ? `核对中 ${allDone}${pendingCount ? ` / ${allDone + pendingCount}` : ''}` : pendingCount ? `全部核对（${pendingCount}）` : missCount ? `重查查不到的（${missCount}）` : '都核对过了' }}
         </button>
+        <button type="button" class="rl-allcheck rl-sites-btn" @click="openSites">检索站点</button>
         <input v-model="q" class="rl-search" placeholder="搜试剂名 / 组分…" spellcheck="false" />
       </header>
+
+      <!-- 自定义检索站点：自己的数据库 / 供应商页面，{name} 会换成试剂名 -->
+      <AppModal v-if="sitesOpen" :model-value="sitesOpen" title="检索站点" confirm-text="保存" width="560px" @close="sitesOpen = false" @confirm="saveSites">
+        <p class="hint" style="margin: 0 0 10px">「查不到」的试剂后面会列出这些链接。网址里用 <code>{name}</code> 占位，例如 <code>https://example.com/search?q={name}</code></p>
+        <div class="site-editor">
+          <div v-for="(s, i) in sitesDraft" :key="i" class="site-row">
+            <input v-model="s.label" class="site-label" placeholder="名称（PubChem）" spellcheck="false" />
+            <input v-model="s.url" class="site-url" placeholder="https://…/search?q={name}" spellcheck="false" />
+            <button type="button" class="rl-act is-danger" @click="sitesDraft.splice(i, 1)">删除</button>
+          </div>
+        </div>
+        <button type="button" class="add-row" style="margin-top: 8px" @click="sitesDraft.push({ label: '', url: '' })">
+          <Icon name="plus" :size="12" /> 加一个站点
+        </button>
+      </AppModal>
 
       <div v-if="loading" class="rl-empty">读取中…</div>
       <div v-else-if="!items.length" class="rl-empty">
@@ -253,13 +335,13 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 </span>
               </td>
               <td class="rl-role">{{ it.role || '—' }}</td>
-              <td class="n mono">
+              <td class="n mono rl-edit" title="点一下自己填（填过就不再被核对覆盖）" @click.stop="editNumber(it, 'mw')">
                 <span v-if="it.mw == null" :class="{ 'rl-miss': it.checkState === 'miss' }">{{ it.checkState === 'miss' ? '查无' : '—' }}</span>
                 <template v-else>{{Number(it.mw).toFixed(2) }}</template>
               </td>
-              <td class="n mono">
+              <td class="n mono rl-edit" title="点一下自己填密度（g/mL）" @click.stop="editNumber(it, 'density')">
                 <template v-if="it.conc">={{ Number(it.conc).toFixed(2) }} M</template>
-                <template v-else-if="it.per_mmol_ul">ρ {{ Number(it.density).toFixed(2) }}</template>
+                <template v-else-if="it.density">ρ {{ Number(it.density).toFixed(2) }}</template>
                 <template v-else>—</template>
               </td>
               <td class="n mono">

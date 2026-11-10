@@ -156,6 +156,11 @@ export const api = {
   reagentsVerify: (name, force = false) => request('/api/reagents/verify', { method: 'POST', body: { name, force } }),
   // 全部核对：一次喂一批（服务端挑「没核过、MW 空着」的，或者给 names），返回还剩几个没核
   reagentsVerifyAll: (payload = {}) => request('/api/reagents/verify-all', { method: 'POST', body: payload }),
+  /** 自定义检索站点（试剂库「查无」时列出来的外部库） */
+  lookupSites: () => request('/api/lookup-sites').then((d) => d.items || []),
+  saveLookupSites: (items) => request('/api/lookup-sites', { method: 'PUT', body: { items } }),
+  /** 手填试剂库的 MW / 密度（填过就标 manual，以后核对不再覆盖） */
+  reagentPatch: (key, patch) => request(`/api/reagents/${encodeURIComponent(key)}`, { method: 'PATCH', body: patch }),
   /** 改试剂库条目的名字：会把所有记录里这个名字一起改掉 */
   reagentRename: (key, name) => request(`/api/reagents/${encodeURIComponent(key)}`, { method: 'PATCH', body: { name } }),
   /** 删掉试剂库条目（连同用法标签 / 用过计数）；还有记录在用的会重新长回来 */

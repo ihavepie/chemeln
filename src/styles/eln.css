@@ -7484,6 +7484,14 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .lib-var:active { transform: translateY(0.5px); }
 .lib-var.is-none { opacity: 0.7; }
 
+/* MW / 密度 两格可以点着改（填过的值不再被核对覆盖） */
+.rl-edit { cursor: text; border-radius: 3px; }
+.rl-edit:hover { background: #f8f7f2; box-shadow: inset 0 0 0 1px var(--line-2); }
+/* 检索站点编辑：一行「名称 + 网址模板」 */
+.site-editor { display: flex; flex-direction: column; gap: 6px; }
+.site-row { display: flex; align-items: center; gap: 6px; }
+.site-label { width: 120px; }
+.site-url { flex: 1; }
 /* 试剂库每行右侧的「改名 / 删除」：平时不占眼睛，鼠标移到这一行才浮出来 */
 .rl-acts-h { width: 72px; }
 .rl-rowacts { white-space: nowrap; opacity: 0; transition: opacity 0.12s; }
