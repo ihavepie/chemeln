@@ -521,13 +521,22 @@ body {
 
 /* 卡片上的「描述」：跟在题目后面同一行、更淡更小（跟题目一样就省略不画）。
    题目和描述都各占一行内的省略号，长描述不会把卡片撑高。 */
-.exp-title { display: flex; align-items: baseline; gap: 7px; }
+.exp-title { display: flex; align-items: baseline; gap: 7px; min-width: 0; overflow: hidden; }
 .exp-title .exp-name {
   min-width: 0;
   flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 题目和描述之间拉一根极淡的横线，描述靠右（像稿纸上「题目 —— 副题」那种排法） */
+.exp-title .exp-rule {
+  flex: 1 1 auto;
+  min-width: 18px;
+  height: 1px;
+  align-self: center;
+  background: var(--line-2);
+  opacity: 0.85;
 }
 .exp-desc-inline {
   font-family: var(--sans);
@@ -538,6 +547,8 @@ body {
   min-width: 0;
   /* 描述比题目「让得快」：挤的时候先缩描述，题目尽量留全 */
   flex: 0 8 auto;
+  max-width: 52%;
+  text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

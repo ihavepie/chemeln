@@ -445,7 +445,10 @@ function onStackFace(row) {
           </div>
           <div class="exp-title">
             <span class="exp-name">{{ row.one.title || row.one.objective || '（未命名实验）' }}</span>
-            <span v-if="row.one.objective && row.one.objective !== row.one.title" class="exp-desc-inline">{{ row.one.objective }}</span>
+            <template v-if="row.one.objective && row.one.objective !== row.one.title">
+              <span class="exp-rule" aria-hidden="true" />
+              <span class="exp-desc-inline">{{ row.one.objective }}</span>
+            </template>
           </div>
           <div class="exp-meta">
             <span v-if="catName(row.one)" class="cat-tag">{{ catName(row.one) }}</span>
@@ -499,7 +502,10 @@ function onStackFace(row) {
               </div>
               <div class="exp-title">
                 <span class="exp-name">{{ row.face.title || row.face.objective || '（未命名实验）' }}</span>
-                <span v-if="row.face.objective && row.face.objective !== row.face.title" class="exp-desc-inline">{{ row.face.objective }}</span>
+                <template v-if="row.face.objective && row.face.objective !== row.face.title">
+                  <span class="exp-rule" aria-hidden="true" />
+                  <span class="exp-desc-inline">{{ row.face.objective }}</span>
+                </template>
               </div>
               <div class="exp-meta">
                 <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
@@ -547,7 +553,10 @@ function onStackFace(row) {
                 </div>
                 <div class="exp-title">
                   <span class="exp-name">{{ m.title || m.objective || '（未命名实验）' }}</span>
-                  <span v-if="m.objective && m.objective !== m.title" class="exp-desc-inline">{{ m.objective }}</span>
+                  <template v-if="m.objective && m.objective !== m.title">
+                    <span class="exp-rule" aria-hidden="true" />
+                    <span class="exp-desc-inline">{{ m.objective }}</span>
+                  </template>
                 </div>
                 <!-- 改了什么：一条一项，各自一颗小标签，不折成「投料（… 等）」也不让它断行 -->
                 <div v-if="m.diffs && m.diffs.length" class="member-diff">
