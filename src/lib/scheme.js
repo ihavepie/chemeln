@@ -12,6 +12,24 @@
  */
 
 import { relayoutMolecule, orientLandscape, canonicalOrientation } from './relayout.js';
+import { roleTone } from './reagent.js';
+
+/** 组分 → 文字颜色，跟投料表「组分」那一列的配色一致（Sub 棕、Cat 紫、Base 蓝、Lig 绿…） */
+const TONE_COLOR = {
+  sub: '#7c3315',
+  base: '#1f6c9f',
+  cat: '#6b4d8f',
+  lig: '#2f6b4f',
+  sol: '#8d8b84',
+  add: '#8a5f00',
+  ox: '#9f2f2d',
+  red: '#a8471f',
+  plain: '#1b1a17',
+};
+const roleColor = (role) => (role ? TONE_COLOR[roleTone(role)] || '#1b1a17' : '#1b1a17');
+/** 一行字可以是纯字符串，也可以是 [{ text, role }] 的分段（分段按组分上色） */
+const lineParts = (line) => (Array.isArray(line) ? line.filter((p) => p && String(p.text || '').trim()) : String(line || '').trim() ? [{ text: String(line) }] : []);
+const lineText = (line) => lineParts(line).map((p) => p.text).join('，');
 
 const BOND_PX = 26; // 一根键的像素长度，整张图的尺度基准
 const PAD = 16;
@@ -151,8 +169,8 @@ export async function composeSchemeSvg({ reactants = [], product = '', productLa
   const ARROW_MIN = 150;   // 箭头最短多长；实际长度会按上下最长那行字拉长（至少盖住所有条件再留点余量）
   // 箭头那块地方要放得下最长的那行字（13px 字，中文按全角估），否则字会压到反应物上
   const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 13 : 7.1), 0);
-  const capAbove = above.filter((t) => String(t || '').trim());
-  const capBelow = below.filter((t) => String(t || '').trim());
+  const capAbove = above.filter((t) => lineText(t).trim());
+  const capBelow = below.filter((t) => lineText(t).trim());
   const capW = Math.max(0, ...[...capAbove, ...capBelow].map(textW));
   const arrowLen = Math.max(ARROW_MIN, Math.round(capW) + 30); // 箭头要比最长的条件行再宽 30px
   const arrowW = arrowLen + 34;                                // 这块区域两头各留 17px，字不会贴到结构上
@@ -212,17 +230,22 @@ export async function composeSchemeSvg({ reactants = [], product = '', productLa
     // 以前是「先记 pending 再还回去」写反了——下标没往下挪，后面的字反而被抬起来，
     // 整行看着上上下下地飘（用户截过图）。现在按「目标偏移 - 当前偏移」算 dy，不会攒错。
     let cur = 0;
-    const spans = splitScript(line)
-      .map((r) => {
+    const spans = [];
+    const parts = lineParts(line);
+    parts.forEach((part, pi) => {
+      const fill = roleColor(part.role);
+      const text = pi ? `，${part.text}` : part.text;   // 段与段之间用顿号分开
+      for (const r of splitScript(text)) {
         const want = r.kind === 'sub' ? 3 : r.kind === 'sup' ? -4 : 0;
         const dy = want - cur;
         cur = want;
         const dyAttr = dy ? ` dy="${dy}"` : '';
         const size = r.kind === 'n' ? '' : ` font-size="${Math.round(SIZE * 0.72)}"`;
-        return `<tspan${dyAttr}${size}>${esc(r.t)}</tspan>`;
-      })
-      .join('');
-    return `<text x="${capX}" y="${Math.round(y)}" text-anchor="middle" font-size="${SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${spans}</text>`;
+        const colorAttr = fill === '#1b1a17' ? '' : ` fill="${fill}"`;
+        spans.push(`<tspan${dyAttr}${size}${colorAttr}>${esc(r.t)}</tspan>`);
+      }
+    });
+    return `<text x="${capX}" y="${Math.round(y)}" text-anchor="middle" font-size="${SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${spans.join('')}</text>`;
   };
   let cap = '';
   capAbove.forEach((line, i) => {

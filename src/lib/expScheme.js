@@ -55,10 +55,10 @@ export function schemeParts(model, compounds) {
       continue;
     }
     if (r.role === '底物') {
-      if (text) loose.push(text);
+      if (text) loose.push({ text, role: r.role });
       continue;
     }
-    if (text) others.push(text);
+    if (text) others.push({ text, role: r.role });
   }
   if (loose.length) others.unshift(...loose);
 
@@ -77,7 +77,7 @@ export function schemeParts(model, compounds) {
   const over = [];
   let used = 0;
   for (const t of others) {
-    const need = (fit.length ? 1 : 0) + widthOf(t);
+    const need = (fit.length ? 1 : 0) + widthOf(t.text);
     if (used + need <= MAX_ABOVE) {
       fit.push(t);
       used += need;
@@ -91,8 +91,9 @@ export function schemeParts(model, compounds) {
     product: prod && prod.smiles ? prod.smiles : '',
     prodName: prod ? str(prod.name || prod.code) : str(model.product_name),
     loose: loose.length, // 有名字但挂不上库的底物，记录页据此提示
-    above: fit.length ? [fit.join('，')] : [],
-    below: [over.join('，'), cond].filter(Boolean),
+    // 试剂名按组分上色（Sub 棕 / Cat 紫 / Base 蓝 / Lig 绿 / Add 金…），跟投料表一致
+    above: fit.length ? [fit] : [],
+    below: [over.length ? over : '', cond].filter(Boolean),
   };
 }
 
