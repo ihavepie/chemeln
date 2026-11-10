@@ -66,17 +66,17 @@ export function usePaneSize() {
   return { width, resizing, startDrag, resetWidth };
 }
 
-/* ---- 内容区的宽度也能拖（DSH 那种分隔条）----
-   线在**内容区自己**的右边（`--docw`），拖它只改内容区宽度：左边导航条不动，
-   多出来的空白吃到右边去。工作台 / 条件筛选 / 一张筛选表 / 回收站 / 设置
-   这几页都是 `.single > .inner`，宽度读这个变量，存 localStorage。
-   为什么不做成「导轨↔内容」那条：导轨宽度是固定的，拖那条等于改导航条宽度，
-   用户明确说过不要（2026-11 那轮）。 */
+/* ---- 内容区的宽度能拖（DSH 那种分隔条）----
+   左右**各一条**：右边拖 = 右边缘跟手、宽度变；左边拖 = 左边缘跟手、宽度变
+   （右边那条边不动）。导航条宽度完全不动——用户明确否掉过拖导轨。
+   两个值写进 `:root`：`--docw`（宽）/ `--docx`（左边让出多少），存 localStorage。
+   工作台 / 条件筛选 / 一张筛选表 / 回收站 / 设置 这几页都是 `.single > .inner`。 */
 const DOC_KEY = 'eln:docw';
+const DOCX_KEY = 'eln:docx';
 const DOC_MIN = 560;
 const DOC_MAX = 1560;
 
-/** 上限跟着窗口走，别让内容比窗口还宽 */
+/** 宽度上限跟着窗口走，别让内容比窗口还宽 */
 const maxDoc = () => Math.max(DOC_MIN, Math.min(DOC_MAX, Math.round(window.innerWidth - 300)));
 
 const applyDoc = (w) => {
@@ -84,48 +84,100 @@ const applyDoc = (w) => {
   if (w > 0) root.style.setProperty('--docw', `${w}px`);
   else root.style.removeProperty('--docw');
 };
+const applyDocX = (x) => {
+  const root = document.documentElement;
+  if (x > 0) root.style.setProperty('--docx', `${x}px`);
+  else root.style.removeProperty('--docx');
+};
 
-const storedDoc = (() => {
-  const n = Number(localStorage.getItem(DOC_KEY));
-  return Number.isFinite(n) && n >= DOC_MIN ? Math.round(n) : 0;
-})();
-if (storedDoc) applyDoc(storedDoc);
-
-const docW = ref(storedDoc);
+const num = (k) => {
+  const n = Number(localStorage.getItem(k));
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+};
+const storedDoc = num(DOC_KEY);
+const storedDocX = num(DOCX_KEY);
+// 小于下限的宽度当没设过（老版本写过更窄的值也不会把内容压扁）
+const docW = ref(storedDoc >= DOC_MIN ? storedDoc : 0);
+const docX = ref(storedDocX);
+if (docW.value) applyDoc(docW.value);
+if (storedDocX) applyDocX(storedDocX);
 const docResizing = ref(false);
 
-function startDocDrag(e) {
-  e.preventDefault();
-  const startX = e.clientX;
+/** 量一下内容区最多能有多宽（`.single` 的内容盒，扣掉左右内边距） */
+function box() {
+  const wrap = document.querySelector('.single');
   const inner = document.querySelector('.single > .inner');
-  const startW = docW.value || Math.round(inner?.getBoundingClientRect().width || 980);
-  const max = maxDoc();
+  const cs = getComputedStyle(wrap);
+  const padL = parseFloat(cs.paddingLeft) || 0;
+  const padR = parseFloat(cs.paddingRight) || 0;
+  const r = inner.getBoundingClientRect();
+  return {
+    left: r.left,
+    right: r.right,
+    width: r.width,
+    base: wrap.getBoundingClientRect().left + padL,   // 内容区能靠到的最左边
+    avail: wrap.clientWidth - padL - padR,            // 内容区最多能有多宽
+  };
+}
+
+function startDocDrag(e, side = 'right') {
+  e.preventDefault();
+  const b = box();
+  const startX = e.clientX;
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+  // 宽度上限：窗口上限 / 这一页能给的宽度，取小的
+  const capW = Math.max(DOC_MIN, Math.min(maxDoc(), b.avail));
   docResizing.value = true;
   document.body.classList.add('is-doc-resizing');
-  const move = (ev) => {
-    const w = Math.min(Math.max(Math.round(startW + ev.clientX - startX), DOC_MIN), max);
-    docW.value = w;
-    applyDoc(w);
-  };
+
+  let move;
+  if (side === 'left') {
+    // 左边缘跟手：右边那条边钉住，让出来的宽度 = 左边缩进去多少
+    const maxLeft = b.right - DOC_MIN;
+    move = (ev) => {
+      const left = clamp(b.left + ev.clientX - startX, b.base, maxLeft);
+      const x = Math.round(left - b.base);
+      const w = Math.round(Math.min(b.right - left, capW));
+      docX.value = x;
+      docW.value = w;
+      applyDocX(x);
+      applyDoc(w);
+    };
+  } else {
+    // 右边缘跟手：宽度直接跟着走，左边不动
+    const max = Math.max(DOC_MIN, capW - docX.value);
+    move = (ev) => {
+      const w = clamp(Math.round(b.width + ev.clientX - startX), DOC_MIN, max);
+      docW.value = w;
+      applyDoc(w);
+    };
+  }
+
   const up = () => {
     docResizing.value = false;
     document.body.classList.remove('is-doc-resizing');
     window.removeEventListener('mousemove', move);
     window.removeEventListener('mouseup', up);
-    if (docW.value) {
-      try { localStorage.setItem(DOC_KEY, String(docW.value)); } catch { /* 隐私模式写不进去就算了 */ }
-    }
+    try {
+      if (docW.value) localStorage.setItem(DOC_KEY, String(docW.value));
+      if (docX.value) localStorage.setItem(DOCX_KEY, String(docX.value));
+    } catch { /* 隐私模式写不进去就算了 */ }
   };
   window.addEventListener('mousemove', move);
   window.addEventListener('mouseup', up);
 }
 
-function resetDocWidth() {
+function resetDocSize() {
   docW.value = 0;
+  docX.value = 0;
   applyDoc(0);
-  try { localStorage.removeItem(DOC_KEY); } catch { /* 同上 */ }
+  applyDocX(0);
+  try {
+    localStorage.removeItem(DOC_KEY);
+    localStorage.removeItem(DOCX_KEY);
+  } catch { /* 同上 */ }
 }
 
 export function useDocSize() {
-  return { docW, docResizing, startDocDrag, resetDocWidth };
+  return { docW, docX, docResizing, startDocDrag, resetDocSize };
 }
