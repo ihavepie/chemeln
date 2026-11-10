@@ -6945,7 +6945,10 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
    基准那一行也不铺底色。正文是衬线（文献表都是 Times 那一路的数字与字母）。
    用户贴的就是这种表，别又加回网格线 / 表格外框 / 列底色。 */
 .sct-table {
-  width: 100%;
+  /* 默认「按内容宽」——不再铺满整页（以前满页时空隙很大，看着被拉长了）；
+     要更宽就拖右边那道竖线，见下面的 .sct-grip */
+  width: auto;
+  max-width: 100%;
   border-collapse: collapse;
   /* 照用户给的那张文献表：Times 衬线、14px、行距宽松；数字右对齐，
      用 tabular-nums 让位数对齐。中文落到宋体（Songti）才跟 Times 一排不打架。 */
@@ -6993,7 +6996,7 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 /* 编号也是正文的字（不要等宽 / 强调色那种 app 观感） */
 .sct-table .sct-c-fix .linklike { font: inherit; color: var(--ink); }
 .sct-table .sct-c-fix .linklike:hover { color: var(--accent-ink); }
-.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 140px; max-width: 240px; }
+.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 120px; max-width: 240px; }
 /* 编号后面跟的一句实验名（有才出现），别把它也做成等宽/强调色 */
 .sct-table .sct-title {
   display: inline-block;
@@ -7028,9 +7031,9 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 /* 数字列（产率 / 选择性…）右对齐：跟文献一样数字贴着列的右边；
    表头从列左边起头，所以表头比数字宽出一截是正常的（文献那张也一样）。 */
 .sct-table th.sct-num,
-.sct-table td.sct-num { text-align: right; width: 118px; }
+.sct-table td.sct-num { text-align: right; width: 96px; }
 /* 长文字的列保底宽度，句子尽量不折行 */
-.sct-table .sct-wide { min-width: 240px; }
+.sct-table .sct-wide { min-width: 200px; }
 /* 手动列（备注之类）别被数字列挤没 */
 .sct-table .sct-field.is-manual { min-width: 120px; }
 .sct-table th.sct-num .sct-th { justify-content: flex-start; }
@@ -7041,6 +7044,27 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   --sct-serif: 'Times New Roman', Times, 'Songti SC', 'STSong', serif;
   padding: 0; margin-bottom: 22px; background: transparent; box-shadow: none;
 }
+/* 表格外壳：默认宽度跟着内容走（inline-block），拖过之后按 px 定死、表格吃满这个宽 */
+.sct-fit { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.sct-fit.is-fixed { display: block; }
+/* 拖动条只贴着表格上下（反应式那段不挂竖线） */
+.sct-tbwrap { position: relative; }
+.sct-fit.is-fixed .sct-table { width: 100%; }
+/* 右边那道竖线就是拖动条（照 DSH 那个面板分隔条的路子：细线不吃眼、hover 才明显，
+   14px 的命中区、col-resize 光标；双击恢复按内容宽） */
+.sct-grip {
+  position: absolute; top: 0; bottom: 0; right: -9px; width: 14px;
+  cursor: col-resize; touch-action: none; z-index: 3;
+}
+.sct-grip::after {
+  content: ''; position: absolute; top: 3px; bottom: 3px; left: 50%;
+  width: 1px; background: #dcd8cf; transition: background 0.12s;
+}
+.sct-fit:hover .sct-grip::after { background: var(--line-2); }
+.sct-fit.is-resizing .sct-grip::after { background: var(--accent); width: 1.5px; }
+/* 拖宽度期间整页 col-resize 光标 + 禁选字（跟 lib/colresize.js 的 is-col-resizing 一个路子） */
+body.is-sct-resizing,
+body.is-sct-resizing * { cursor: col-resize !important; user-select: none !important; }
 /* 表标题：`表 1：条件优化`，跟文献的 `Table 1:` 一样——衬线、粗斜体编号 + 粗体标题，
    后面跟一个上标 [a]（指向表下的脚注），压在表格顶上 */
 .sct-cap {
@@ -7060,27 +7084,28 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 /* 卡里面的反应式不再单独套卡（卡片里套卡片），就一块普通内容，压在三线表顶线上面 */
 .sct-std {
+  /* 反应式居中摆在表格上方，条件那行字居中跟在它下面（文献里压在箭头下面的那行） */
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 26px;
-  margin: 0 0 4px;
-  padding: 0 2px;
+  gap: 3px;
+  margin: 0 0 10px;
+  padding: 0;
 }
-.sct-std:has(.sct-std-line) .sct-std-scheme { flex: 0 1 auto; }
-.sct-std .sct-std-line { flex: 1 1 260px; min-width: 220px; margin: 0; }
+.sct-std .sct-std-line { flex: 0 1 auto; min-width: 0; max-width: 100%; margin: 0; text-align: center; }
 .sct-std-scheme { display: block; }
 .sct-std > .sct-std-scheme { min-width: 0; }
 .sct-std-line {
   margin: 7px 0 0;
-  text-align: left;
+  text-align: center;
   font-family: var(--sct-serif);
   font-size: 12px;
   line-height: 1.6;
   color: var(--ink-3);
 }
-.sct-std-scheme + .sct-std-line { margin-top: 9px; }
+.sct-std-scheme + .sct-std-line { margin-top: 6px; }
 /* 没有反应式时只有那行字，直接压在表顶上 */
-.sct-std-line--bare { padding: 0; margin: 0 0 8px; }
+.sct-std-line--bare { padding: 0; margin: 0 0 10px; text-align: center; }
 .sct-std-lbl {
   margin-right: 2px;
   font-size: 10.5px;
@@ -7122,7 +7147,7 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-var-x.is-del:hover { color: var(--bad); }
 .sct-auto { display: inline-block; white-space: nowrap; }
 /* 「相对标准条件」那种长句：跟正文一样是 14px 衬线（小一号就比别的格子虚），只稍微压灰 */
-.sct-auto.sct-wrap { white-space: normal; max-width: 460px; color: var(--ink); }
+.sct-auto.sct-wrap { white-space: normal; max-width: 380px; color: var(--ink); }
 .sct-cell {
   width: 100%; box-sizing: border-box; padding: 3px 5px;
   border: 1px solid transparent; border-radius: 4px; background: transparent;
