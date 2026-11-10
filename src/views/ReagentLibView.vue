@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import Icon from '../components/Icon.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
-import { toast } from '../lib/feedback.js';
+import { confirm, prompt, toast } from '../lib/feedback.js';
 import { variantText } from '../lib/reagent.js';
 import { LOOKUP_SITES } from '../lib/lookup.js';
 
@@ -119,6 +119,45 @@ async function load() {
 onMounted(load);
 watch(() => store.project, load);
 
+/** 改试剂名：所有记录里的这个名字会一起改（不然下次保存又长回旧名字） */
+async function renameEntry(it) {
+  const name = await prompt({
+    title: '改试剂名',
+    placeholder: '新的名字',
+    value: it.name,
+    confirmText: '改名',
+  });
+  if (!name || name === it.name) return;
+  try {
+    const r = await api.reagentRename(it.key || it.name.toLowerCase(), name);
+    await load();
+    toast(`改名：${it.name} → ${r.name || name}`, 'ok', 2400);
+  } catch (e) {
+    toast(e.message || '没改成', 'err');
+  }
+}
+
+/** 删掉这一条库条目（记录里的投料行不动）；还有记录在用的，下次保存会重新长出来 */
+async function removeEntry(it) {
+  const live = Number(it.live) || 0;
+  const okd = await confirm({
+    title: `删除「${it.name}」这条试剂记录？`,
+    body: live
+      ? `还有 ${live} 条记录在用这个名字，删掉后它们再保存一次，这条会重新出现。`
+      : '它现在没有记录在用，删了就干净了。记录里的投料行不会被动。',
+    danger: true,
+    confirmText: '删除',
+  });
+  if (!okd) return;
+  try {
+    await api.reagentRemove(it.key || it.name.toLowerCase());
+    await load();
+    toast(`已删除「${it.name}」`, 'ok', 2000);
+  } catch (e) {
+    toast(e.message || '没删成', 'err');
+  }
+}
+
 /** 摘掉一颗用法标签：只删这一颗（记录里的投料行不动），下次这条记录再存又会长回来 */
 async function dropVariant(it, v) {
   if (!v || !v.vkey) return;
@@ -192,7 +231,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <th class="n">用过</th>
               <th class="n">当前</th>
               <th class="n">最近</th>
-              <th />
+              <th class="n rl-acts-h" />
             </tr>
           </thead>
           <tbody>
@@ -233,6 +272,10 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <td class="n mono rl-last">
                 {{ it.lastCode || '' }}
                 <span v-if="it.lastAt" class="rl-date">{{ it.lastAt }}</span>
+              </td>
+              <td class="n rl-rowacts">
+                <button type="button" class="rl-act" @click.stop="renameEntry(it)">改名</button>
+                <button type="button" class="rl-act is-danger" @click.stop="removeEntry(it)">删除</button>
               </td>
               <td class="n">
                 <button

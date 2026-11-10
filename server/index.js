@@ -3991,6 +3991,9 @@ route('GET', '/api/lookup', async (req, res, params, url) => {
      used = 历史上引用过它的记录数（reagent_uses，只增不减）
      live = 现在还有几条记录在用（reagents 里现存的，按课题筛）
    底物不进试剂库（那是化合物库的事）。 */
+// 密度只有对「按体积量」的组分有意义（跟 src/lib/reagent.js 的 VOLUME_ROLES 保持一致）
+const DENSITY_ROLES = new Set(['溶剂', '添加剂', '试剂']);
+
 function reagentLibRows(project, kw) {
   const projectArgs = project ? [project] : [];
   const lib = db
@@ -4061,7 +4064,12 @@ function reagentLibRows(project, kw) {
         checkedAt: it.checked_at || '',
         checkState: it.check_state || '',
         per_mmol_g: mw ? Math.round((mw / 1000) * 10000) / 10000 : null,
-        per_mmol_ul: mw && density ? Math.round((mw / density) * 10) / 10 : null,
+        // 「1 mmol ≈ 多少 µL」只对按体积量的组分有意义（溶剂 / 添加剂 / 普通试剂）；
+        // 配体 / 碱 / 催化剂多是固体，按 g 称，别给它折 µL（RuPhos 被折成 363 µL）
+        per_mmol_ul:
+          mw && density && DENSITY_ROLES.has(str(it.role).trim())
+            ? Math.round((mw / density) * 10) / 10
+            : null,
       };
     });
 }
@@ -4234,6 +4242,58 @@ route('POST', '/api/reagents/verify', async (req, res) => {
   const name = str(body.name).trim();
   if (!name) throw new HttpError(400, '要带 name');
   ok(res, await verifyReagent(name, { force: !!body.force }));
+});
+
+/* 试剂库条目：改名 / 删除。
+   库条目是从投料行汇总出来的，所以：
+     · 改名 = 把所有记录里这个试剂名**一起改掉**（只改库不带记录的话，下次保存又长回旧名字）；
+     · 删除 = 只删库条目（连同用法标签和「用过」计数）；还有记录在用的，下次保存会重新长出来，
+       所以把 live 一起返回，界面据此提示。 */
+route('PATCH', '/api/reagents/:key', async (req, res, params) => {
+  const key = decodeURIComponent(String(params.key || '')).trim().toLowerCase();
+  const body = await readJson(req);
+  const name = str(body.name).trim();
+  if (!key) throw new HttpError(400, '要带 key');
+  if (!name) throw new HttpError(400, '名字不能为空');
+  const lib = db.prepare('SELECT * FROM reagent_lib WHERE key = ?').get(key);
+  if (!lib) return fail(res, 404, '试剂库里没有这一条');
+  const nextKey = name.toLowerCase();
+  const ts = nowISO();
+  // 改记录里的名字（同一事务里做完，别出现「库改了记录没改」）
+  db.exec('BEGIN');
+  try {
+    db.prepare("UPDATE reagents SET name = ? WHERE lower(trim(name)) = ?").run(name, key);
+    db.prepare('DELETE FROM reagent_lib WHERE key = ?').run(nextKey);
+    db.prepare('UPDATE reagent_lib SET key = ?, name = ?, updated_at = ? WHERE key = ?').run(nextKey, name, ts, key);
+    db.prepare('UPDATE OR REPLACE reagent_uses SET key = ? WHERE key = ?').run(nextKey, key);
+    db.prepare('UPDATE OR REPLACE reagent_variant_uses SET key = ? WHERE key = ?').run(nextKey, key);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  ok(res, { key: nextKey, name });
+});
+
+route('DELETE', '/api/reagents/:key', async (req, res, params) => {
+  const key = decodeURIComponent(String(params.key || '')).trim().toLowerCase();
+  if (!key) throw new HttpError(400, '要带 key');
+  const live = db
+    .prepare(
+      `SELECT COUNT(DISTINCT r.exp_id) AS c FROM reagents r WHERE lower(trim(r.name)) = ?`
+    )
+    .get(key).c;
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM reagent_lib WHERE key = ?').run(key);
+    db.prepare('DELETE FROM reagent_uses WHERE key = ?').run(key);
+    db.prepare('DELETE FROM reagent_variant_uses WHERE key = ?').run(key);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  ok(res, { removed: true, live });
 });
 
 /* 删掉一颗「用法」标签（填错过的那种）：只删标签，不动任何记录。

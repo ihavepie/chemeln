@@ -426,7 +426,20 @@ function onAmount(r) {
 
 /* ---- 边打字边算（不用等失焦） ---- */
 
+/* 中文输入法组字过程中不要动数据：每个 composition 的中间态都会触发 input，
+   顺手去查词库 / 开候选，会把半成品拼进名字里（出现过「RuP ho sRuPhos」这种乱条目）。
+   组字结束后再按最终值走一次。 */
+let composing = false;
+function onComposeStart() {
+  composing = true;
+}
+function onComposeEnd(ev, r) {
+  composing = false;
+  onNameInput(ev, r);
+}
+
 function onNameInput(ev, r) {
+  if (composing || ev.isComposing) return;
   r.name = ev.target.value;
   onName(r);
 
@@ -880,6 +893,7 @@ const footInfo = computed(() => (focus.value ? hintFor(focus.value.r, focus.valu
 
 function onKeydown(ev, r, field) {
   if (props.locked) return;
+  if (ev.isComposing || composing) return;   // 输入法正在选字，按键归它
 
   // 化合物候选列表打开时，方向键 / 回车先给它
   if (field === 'name' && picker.open && picker.row === r && picker.items.length) {
@@ -1092,6 +1106,8 @@ function onDrop(ev) {
                   :placeholder="isBaseRow(r) ? '起始原料' : '试剂名称'"
                   :disabled="locked"
                   @input="onNameInput($event, r)"
+                  @compositionstart="onComposeStart"
+                  @compositionend="onComposeEnd($event, r)"
                   @change="onName(r)"
                   @keydown="onKeydown($event, r, 'name')"
                   @blur="verifyName(r)"

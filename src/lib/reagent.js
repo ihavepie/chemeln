@@ -90,6 +90,12 @@ export const saneDensity = (v) => {
   return x !== null && x >= 0.3 && x <= 3.5 ? x : null;
 };
 
+/** 密度只对「按体积量」的组分有意义：溶剂 / 添加剂 / 普通试剂（多半是液体）。
+ *  配体、碱、催化剂、底物基本都是固体，按 g 称——PubChem 给的密度常是预测值，
+ *  拿来折 µL 会得出「RuPhos 1 mmol = 363 µL」这种没意义的数（用户报过）。 */
+const VOLUME_ROLES = new Set(['溶剂', '添加剂', '试剂']);
+export const densityUsable = (r) => (VOLUME_ROLES.has(String((r && r.role) || '').trim()) ? saneDensity(r && r.density) : null);
+
 export function amountText(r) {
   const mmol = num(r.mmol);
   const conc = num(r.conc);
@@ -102,8 +108,9 @@ export function amountText(r) {
   }
   const mg = num(r.mass_mg);
   if (mg !== null) {
-    // 只有「密度可信」才折成体积；密度是垃圾值（0.069 / 给固体硬填的 1.74）就老老实实写 g
-    const d = saneDensity(r.density);
+    // 只有「密度可信 + 这个组分本来就按体积量」才折成体积；固体（配体 / 碱 / 催化剂）
+    // 和垃圾密度值（0.069 / 硬填的 1.74）都老老实实写 g
+    const d = densityUsable(r);
     if (d) {
       const ml = mg / d / 1000;
       if (ml >= 1) return `${round(ml, 2)} mL`;
@@ -151,7 +158,7 @@ export function derive(row) {
   if (mmol === null) return row;
   const conc = num(row.conc);
   const mw = num(row.mw);
-  const density = saneDensity(row.density);
+  const density = densityUsable(row);
   if (conc) return { ...row, volume_ul: Math.round((mmol / conc) * 1000 * 1000) / 1000, mass_mg: null };
   if (mw) {
     const mg = mmol * mw;

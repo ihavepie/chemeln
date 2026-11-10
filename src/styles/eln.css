@@ -7484,6 +7484,20 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .lib-var:active { transform: translateY(0.5px); }
 .lib-var.is-none { opacity: 0.7; }
 
+/* 试剂库每行右侧的「改名 / 删除」：平时不占眼睛，鼠标移到这一行才浮出来 */
+.rl-acts-h { width: 72px; }
+.rl-rowacts { white-space: nowrap; opacity: 0; transition: opacity 0.12s; }
+.rl-table tbody tr:hover .rl-rowacts { opacity: 1; }
+.rl-act {
+  border: 0;
+  background: none;
+  padding: 0 3px;
+  font-size: 10px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.rl-act:hover { color: var(--accent-ink); }
+.rl-act.is-danger:hover { color: var(--bad, #b4423a); }
 /* 查不到时的外部检索入口（PubChem / ChemicalBook）：小小的链接，别做成按钮 */
 .rl-ext {
   font-family: var(--mono);
