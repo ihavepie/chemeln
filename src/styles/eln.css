@@ -5784,20 +5784,27 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup--float.is-inline .pgroup-var { display: none; }
 
 
-/* 「平行 ×N」现在是个按钮：点一下把这一排收起 / 展开（收起时不占地方） */
+/* 「平行 ×5」：按钮，点一下收起 / 展开这一排。
+   它**画在纸面左边距里**、跟编号那列同一个起点（不塞进 22px 宽的短杠列里，
+   不然「平行 ×5」会折成两行，看着很碎）。 */
 .pgroup-cap {
+  position: absolute;
+  left: calc(100% + 7px);
+  top: -3px;
   font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 0.16em;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  white-space: nowrap;
   color: var(--ink-4);
-  padding: 2px 5px 2px 0;
   background: transparent;
   border: 0;
+  padding: 0;
   cursor: pointer;
   user-select: none;
   transition: color 0.12s;
 }
-.pgroup-cap:hover { color: var(--ink-2); }
+.pgroup-cap:hover { color: var(--accent-ink); }
 
 /* 一枚书签 = 一根**小短杠**（照 DSH 的 turn 导航那排 mark）：
    12~22px 宽、2px 高、圆角，右侧贴着纸面对齐；不用卡片、不写字。
@@ -7087,9 +7094,10 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   left: 50%;
   width: 1px;
   margin-left: -0.5px;
-  /* 平时就有一道**看得见**的线（用户说「没看到线」），hover / 拖动才变强调色 */
-  background: #beb9ab;
-  transition: background 0.12s, width 0.12s;
+  /* 平时**不画线**（用户嫌这条线一直在）：hover / 拖动才浮出来，跟 .doc-grip 一致 */
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s, width 0.12s;
 }
 /* 中线上一小段「抓手」，跟导轨那条一致 */
 .pane-grip::before {
@@ -7102,8 +7110,13 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   margin: -22px 0 0 -2px;
   border-radius: 99px;
   background: #a8a396;
-  transition: background 0.12s, height 0.12s;
+  opacity: 0;                       /* 抓手也只在 hover 时出现 */
+  transition: background 0.12s, height 0.12s, opacity 0.12s;
 }
+.pane-grip:hover::before,
+.pane-grip.is-on::before { opacity: 1; }
+.pane-grip:hover::after,
+.pane-grip.is-on::after { opacity: 1; }
 .pane-grip:hover::before,
 .pane-grip.is-on::before { background: var(--accent); height: 56px; margin-top: -28px; }
 .pane-grip:hover::after,
