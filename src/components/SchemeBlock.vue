@@ -13,6 +13,9 @@ const props = defineProps({
   onFill: Function,        // 反应式 → 投料表
   onFromTable: Function,   // 投料表 + 产物 → 反应式
   hasScheme: Boolean,
+  live: Boolean,           // 跟着投料表实时重画
+  liveSvg: String,         // 实时算出来的那张图（inline SVG，不落盘）
+  onToggleLive: Function,
 });
 
 const scheme = computed(() => props.attachments.find((a) => a.category === 'scheme'));
@@ -24,6 +27,16 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
       <span class="lbl">反应式</span>
       <span class="spacer" />
       <!-- 懒得起 ChemDraw 时，直接在画板里把反应物 → 产物连起来 -->
+      <button
+        v-if="!locked"
+        type="button"
+        class="btn btn-sm btn-ghost noprint"
+        :class="{ 'is-on': live }"
+        :title="live ? '反应式正在跟随投料表自动更新（点一下改成显示存下来的图）' : '点一下让反应式跟着投料表自动更新'"
+        @click.stop="onToggleLive && onToggleLive()"
+      >
+        <Icon name="wave" :size="13" /> 跟随投料表
+      </button>
       <button
         v-if="!locked"
         type="button"
@@ -54,13 +67,20 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
     </div>
     <div
       class="scheme-slot"
-      :class="{ 'is-hover': hovered === 'scheme', has: !!scheme }"
+      :class="{ 'is-hover': hovered === 'scheme', has: !!scheme || (live && !!liveSvg) }"
       @mouseenter="onHover('scheme')"
       @mouseleave="onHover('')"
       @click="onPick('scheme')"
     >
+      <!-- 跟随投料表时直接显示现画的（inline SVG，不进附件）；没有可画的就退回存下来的那张 -->
+      <div
+        v-if="live && liveSvg"
+        class="scheme-live"
+        @click.stop
+        v-html="liveSvg"
+      />
       <img
-        v-if="scheme && /\.(png|jpe?g|gif|webp|svg)$/i.test(scheme.original_name || scheme.filename)"
+        v-else-if="scheme && /\.(png|jpe?g|gif|webp|svg)$/i.test(scheme.original_name || scheme.filename)"
         :src="`/api/files/${scheme.id}`"
         alt=""
         title="点一下看大图"

@@ -6837,6 +6837,11 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .qmenu.cat-menu::-webkit-scrollbar,
 .kind-menu::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
+/* 反应式「跟随投料表」：inline SVG 铺满格子，跟图片一样的高度上限 */
+.scheme-live { width: 100%; display: flex; align-items: center; justify-content: center; }
+.scheme-live svg { width: 100%; height: auto; max-height: 240px; }
+@media print { .scheme-live svg { max-height: 210px; } }
+
 /* 反应式格子右上角的「画反应式」按钮：字号跟着这一带走，别把标签挤歪 */
 .scheme-head { align-items: center; }
 .scheme-head .spacer { flex: 1; }

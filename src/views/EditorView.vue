@@ -154,6 +154,11 @@ function fill(e) {
   ensureSolventRow();     // 老记录：溶剂还在字段里 → 补成投料表的一行
   markLoaded();
   if (fixReagentRows(rows)) notify();   // 分子量 / 密度被补上，顺手存一次（导出 / 列表才跟页面对得上）
+  // 「反应式跟随投料表」：自己生成的那种（附件名 反应式.svg）默认开；手动画 / 上传的图默认关，
+  // 免得一换数据就把人家的 ChemDraw 图顶掉
+  const sc = (e.attachments || []).find((a) => a.category === 'scheme');
+  schemeLive.value = !sc || /^反应式\.svg$/i.test(String(sc.original_name || sc.filename || ''));
+  scheduleLive(0);
 }
 
 /** 打开记录时顺手修两样老数据的毛病（改了就存一次）：
@@ -694,6 +699,58 @@ async function runFillTableFromScheme() {
  * 底物（可以两个）画成反应物，试剂 / 催化剂 / 碱……和溶剂、温度、时间写在箭头上方一格，
  * 产物取结果块里挂库的那个。尺度和字号在 lib/scheme.js 里统一控制。
  */
+/** 反应式「跟随投料表」：只画在页面上（不写文件），投料表 / 条件 / 产物一变就重画 */
+const schemeLive = ref(true);
+const liveScheme = ref('');
+let liveTimer = null;
+const liveSig = computed(() =>
+  JSON.stringify({
+    b: reagent.base,
+    r: (reagent.rows || []).map((r) => [r.role || '', r.name || '', r.eq ?? '', r.volume_ul ?? '', r.conc ?? '', r.density ?? '']),
+    s: fields.solvent,
+    t: fields.temperature,
+    d: fields.duration,
+    pn: fields.product_name,
+    pc: fields.product_compound_id,
+  })
+);
+function scheduleLive(ms = 700) {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => void renderLive(), ms);
+}
+async function renderLive() {
+  if (!schemeLive.value || !exp.value || exp.value.locked) {
+    liveScheme.value = '';
+    return;
+  }
+  try {
+    // 化合物库还没读进来时（刚打开页面）先读一次，否则底物挂不上结构、反应式是空的
+    if (!(store.compounds && store.compounds.length)) await loadCompounds();
+    const parts = schemeParts({ ...fields, reagents: reagent.rows }, store.compounds || []);
+    if (!parts.reactants.length) {
+      liveScheme.value = '';
+      return;
+    }
+    liveScheme.value = await composeSchemeSvg({
+      reactants: parts.reactants,
+      product: parts.product,
+      productLabel: parts.product ? '' : parts.prodName,
+      above: parts.above,
+      below: parts.below,
+      background: false,     // 直接贴在纸面上，别垫一块白方块
+    });
+  } catch {
+    liveScheme.value = '';
+  }
+}
+watch(liveSig, () => scheduleLive());
+watch(schemeLive, () => scheduleLive(0));
+watch(() => (store.compounds || []).length, () => scheduleLive(50));
+function toggleSchemeLive() {
+  schemeLive.value = !schemeLive.value;
+  toast(schemeLive.value ? '反应式跟随投料表自动更新' : '反应式改为显示存下来的那张图', 'ok', 2000);
+}
+
 async function schemeFromTable() {
   if (!exp.value || exp.value.locked) return;
   try {
@@ -1348,6 +1405,9 @@ const openAttachment = (id) => {
             :has-scheme="!!fields.scheme_smiles"
             :on-fill="fillTableFromScheme"
             :on-from-table="schemeFromTable"
+            :live="schemeLive"
+            :live-svg="liveScheme"
+            :on-toggle-live="toggleSchemeLive"
           />
 
           <ReagentTable v-if="sheetPrefs.reagents" :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
