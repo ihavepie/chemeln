@@ -237,6 +237,14 @@ function onShortcut(ev) {
   if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 's') {
     ev.preventDefault();
     void doSave();
+    return;
+  }
+  // ⌘Z：撤销上一次保存（只在没聚焦到输入框时接管，不然会把正在打的字撤掉）
+  if ((ev.metaKey || ev.ctrlKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z') {
+    const t = ev.target;
+    if (t && (t.closest?.('input, textarea, [contenteditable="true"]') || t.isContentEditable)) return;
+    ev.preventDefault();
+    void undoSave();
   }
 }
 
@@ -298,6 +306,25 @@ function payload() {
   return body;
 }
 
+/** 撤销上一次保存：把上一版快照写回表单，随后自动保存会把它存回去（等于回滚一次） */
+async function undoSave(ev) {
+  moreMenu.value = false;
+  if (!exp.value || exp.value.locked) return toast('这条记录锁定了，先解锁', 'warn');
+  const prev = undoLast();
+  if (!prev) return toast('没有可以撤销的上一次保存', 'warn');
+  for (const k of FIELD_KEYS) if (k in prev) fields[k] = prev[k];
+  reagent.base = prev.base_mmol ?? null;
+  if (Array.isArray(prev.steps) && prev.steps.length) reagent.steps = prev.steps.map((x) => ({ ...x }));
+  if (Array.isArray(prev.reagents)) reagent.rows = prev.reagents.map((r) => toRow(r));
+  notify();
+  try {
+    await flush();
+    toast('已回退到上一次保存之前', 'ok');
+  } catch (e) {
+    toast(e.message || '回退没存上', 'err');
+  }
+}
+
 async function saveNow() {
   if (!exp.value || exp.value.locked) return;
   const id = exp.value.id;
@@ -330,7 +357,7 @@ function applyTlcOcr({ solvent, rf, auto, raw }) {
   if (filled.length) toast(`从图上读到 ${filled.join(' · ')}`, 'ok');
 }
 
-const { state: saveState, dirty, markLoaded, touch: notify, flush } = useAutosave(payload, saveNow, {
+const { state: saveState, dirty, markLoaded, touch: notify, flush, undoLast } = useAutosave(payload, saveNow, {
   delay: 900,
   enabled: () => !gone.value && !!exp.value && !exp.value.locked,
   onError: (e) => {
@@ -1118,6 +1145,7 @@ const openAttachment = (id) => {
             <button @click="snapshotHtml(); moreMenu = false"><Icon name="file" :size="13" /> 导出单文件网页（.html）</button>
             <button @click="snapshotBundle(); moreMenu = false"><Icon name="folder" :size="13" /> 导出打包（.zip：网页 + 原图）</button>
             <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制这条实验</button>
+            <button @click="undoSave()"><Icon name="undo" :size="13" /> 撤销上一次保存（⌘Z）</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验（重复 / 改一个变量）</button>
             <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存入化合物库</button>
             <div class="menu-sep" />

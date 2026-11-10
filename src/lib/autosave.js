@@ -12,11 +12,13 @@ import { savedLabel } from './ui.js';
  * - touch():      手动标记一下（比如改了 payload 读不到的东西）
  * - flush():      立刻存（离开页面前、锁定前）
  */
-export function useAutosave(payload, save, { delay = 850, enabled = () => true, onError } = {}) {
+export function useAutosave(payload, save, { delay = 850, enabled = () => true, onError, keep = 20 } = {}) {
   const state = ref(savedLabel());
   const dirty = ref(false);
   let timer = null;
   let lastSaved = '';
+  // 每次保存前那一版快照：撤销「上一次保存」时按这个还原（只在内存里，刷新就没了）
+  const history = [];
 
   const snap = () => {
     try {
@@ -46,8 +48,13 @@ export function useAutosave(payload, save, { delay = 850, enabled = () => true, 
     state.value = '保存中…';
     // 「已保存」要对的是发出去那一刻的内容：请求在途时又改了，就不能算存完了
     const sent = snap();
+    const before = lastSaved;   // 这次保存之前是什么样
     try {
       await save();
+      if (before && before !== sent && history[history.length - 1] !== before) {
+        history.push(before);
+        if (history.length > keep) history.shift();
+      }
       lastSaved = sent;
       dirty.value = snap() !== sent;
       state.value = dirty.value ? '未保存…' : savedLabel();
@@ -68,5 +75,19 @@ export function useAutosave(payload, save, { delay = 850, enabled = () => true, 
     if (dirty.value) void flush().catch(() => {});
   });
 
-  return { state, dirty, markLoaded, touch, flush };
+  /** 撤销上一次保存：把删掉的那版快照取出来（调用方负责写回表单，watch 会接着存）。
+   *  返回 null 表示没有可撤销的。 */
+  function undoLast() {
+    const prev = history.pop();
+    if (!prev) return null;
+    try {
+      return JSON.parse(prev);
+    } catch {
+      return null;
+    }
+  }
+
+  const canUndo = () => history.length > 0;
+
+  return { state, dirty, markLoaded, touch, flush, undoLast, canUndo };
 }

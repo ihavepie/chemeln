@@ -587,6 +587,7 @@ async function removeProject(p) {  const ok = await confirm({
           <span><kbd>⌘</kbd> <kbd>Enter</kbd> 新增一行</span>
           <span><kbd>⌘</kbd> <kbd>⌫</kbd> 删除本行</span>
           <span><kbd>⌘</kbd> <kbd>S</kbd> 立即保存</span>
+          <span><kbd>⌘</kbd> <kbd>Z</kbd> 撤销上一次保存</span>
           <span><kbd>⌘</kbd> <kbd>N</kbd> 新建实验</span>
           <span><kbd>⌘</kbd> <kbd>K</kbd> 搜索</span>
           <span><kbd>↑</kbd> <kbd>↓</kbd> 平行实验上下切换</span>
