@@ -2050,6 +2050,19 @@ kbd {
 }
 .rtable tr:hover .name-lookup, .name-lookup:focus-visible { opacity: 1; }
 .name-lookup:hover { color: #6f665c; background: #f1ece4; }
+/* 这个名字 PubChem 里没有（自造缩写 / 金属配合物）：右上角一个小暖点，
+   不弹提示、不挡录数据，鼠标移上去才解释「手填 MW 就会记住」 */
+.name-lookup.is-miss { opacity: 1; color: #b9ad96; }
+.name-lookup.is-miss::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--warn);
+}
 /* 结果行右侧的清空按钮 / 产率表头的「不计」开关：默认很淡，不抢正文 */
 .sheet .res-table .del-cell { padding: 1px 2px !important; }
 .row-del {

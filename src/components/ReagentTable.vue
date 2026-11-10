@@ -442,7 +442,8 @@ async function lookupName(r, key0) {
   if (r._mwManual) return;                         // 查的时候用户自己填了
   if (String(r.name || '').trim().toLowerCase() !== key.toLowerCase()) return;   // 名字又改了，这次结果作废
   if (!info || !info.found) {
-    // 查不到（断网/自造缩写）→ 退回「用过的试剂」词典
+    // 查不到（断网 / 自造缩写 / 金属配合物）：不弹 toast，只在放大镜上点一个小点提示
+    r._miss = true;
     const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key.toLowerCase());
     if (d && (num(d.conc) !== null || num(d.mw) !== null)) {
       r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : round(d.mw, 2);
@@ -451,6 +452,7 @@ async function lookupName(r, key0) {
     }
     return;
   }
+  r._miss = false;
   if (num(info.mw) !== null) {
     r.mwText = round(Number(info.mw), 2);
     onMw(r);
@@ -474,7 +476,10 @@ async function recheck(r) {
   const key = String(r.name || '').trim();
   if (!key) return toast('先填试剂名', 'warn');
   const info = await nameInfo(key);
-  if (!info || !info.found) return toast(`PubChem 里查不到「${key}」`, 'warn');
+  if (!info || !info.found) {
+    r._miss = true;
+    return toast(`PubChem 里没有「${key}」：直接手填 MW，下次打这个名字就会自动带出来`, 'warn', 3600);
+  }
   const changed = [];
   if (num(info.mw) !== null) {
     r.mwText = round(Number(info.mw), 2);
@@ -909,6 +914,7 @@ function onDrop(ev) {
                   v-if="!locked && String(r.name || '').trim() && !r.compound_id"
                   type="button"
                   class="name-lookup noprint"
+                  :class="{ 'is-miss': r._miss }"
                   title="按名字去 PubChem 查 MW / 密度"
                   @click.stop="recheck(r)"
                 >
