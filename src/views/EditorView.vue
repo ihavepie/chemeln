@@ -741,7 +741,6 @@ const siblings = computed(() => exp.value?.siblings || []);
 const sheetEl = ref(null);
 const editorEl = ref(null);
 const railStyle = ref({});
-const railInline = ref(false);   // 缝太窄：编号改画在纸面左边距里（只写编号）
 function updateRail() {
   const el = sheetEl.value;
   if (!el || page.value !== 1) return;
@@ -751,8 +750,6 @@ function updateRail() {
   // 编号那一行不占缝：够宽写在缝里，不够就画进纸面自己的左边距（A4 有 44px）。
   const ed = editorEl.value ? editorEl.value.getBoundingClientRect() : { left: 0, right: window.innerWidth };
   const railW = 22;
-  const gutter = r.left - ed.left;
-  railInline.value = gutter < 130;
   railStyle.value = {
     left: `${Math.round(Math.max(r.left - 6 - railW, ed.left + 4))}px`,
     top: `${Math.round(r.top + 42)}px`,
@@ -1202,7 +1199,6 @@ const openAttachment = (id) => {
           <nav
             v-if="siblings.length > 1 && page === 1"
             class="pgroup pgroup--float noprint"
-            :class="{ 'is-inline': railInline }"
             :style="railStyle"
             aria-label="平行实验"
           >
@@ -1220,20 +1216,9 @@ const openAttachment = (id) => {
               @mouseleave="hidePeek()"
               @click="String(s.id) === String(exp.id) ? null : router.push(`/e/${s.id}`)"
             >
-              <!-- 短杠旁边那一行小字：平时只淡淡地写编号（一眼知道这一组有哪几条），
-                   悬停 / 当前那条再多浮出「基准 / 改 X / 产率」——信息量还是靠预览卡 -->
-              <span class="pgroup-lbl" aria-hidden="true">
-                <span class="pgroup-code">{{ s.code }}</span>
-                <span class="pgroup-var">
-                  <span
-                    v-for="(ch, i) in [...sibLine(s)]"
-                    :key="i"
-                    class="pgroup-ch"
-                    :style="{ transitionDelay: `${Math.min(i, 12) * 14}ms` }"
-                    >{{ ch }}</span
-                  >
-                </span>
-              </span>
+              <!-- 编号写在纸面自己的左边距里（短杠右侧）：写在外侧那条缝里会被悬停预览卡盖住。
+                   详细的条件 / 结果还是靠悬停预览卡。 -->
+              <span class="pgroup-lbl" aria-hidden="true">{{ s.code }}</span>
             </button>
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
           </nav>
