@@ -1,9 +1,18 @@
 import { ElMessageBox, ElNotification } from 'element-plus';
 
+/** 最近弹过的那几句：同一句在 1.6 秒内再来一次，就把上一条关掉只留一条
+    （连点两下放大镜、或几行同名试剂同时查不到时，右下角会叠成一摞一样的卡片） */
+const recentToasts = new Map();
+
 /** 右下角的小 toast（轻提示，几秒后自己消失）。
     kind：'ok' 成功 / 'err' 出错 / 'warn' 提醒 / 'info' 中性（像「已切换到 EXP-0082」这种纯通知） */
 export function toast(message, kind = 'ok', duration = 2600) {
-  return ElNotification({
+  const now = Date.now();
+  const prev = recentToasts.get(message);
+  if (prev && now - prev.at < 1600) {
+    try { prev.handle.close(); } catch { /* 已经自己消失了 */ }
+  }
+  const handle = ElNotification({
     message,
     type: kind === 'err' ? 'error' : kind === 'warn' ? 'warning' : kind === 'info' ? 'info' : 'success',
     duration,
@@ -12,6 +21,9 @@ export function toast(message, kind = 'ok', duration = 2600) {
     showClose: false,
     customClass: 'eln-toast',
   });
+  recentToasts.set(message, { handle, at: now });
+  if (recentToasts.size > 40) recentToasts.clear();
+  return handle;
 }
 
 /** 确认框，返回 true / false（替代 v1 的 modal({danger:true}) 那条路） */
