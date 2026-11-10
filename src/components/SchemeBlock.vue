@@ -72,22 +72,20 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
       @mouseleave="onHover('')"
       @click="onPick('scheme')"
     >
-      <!-- 跟随投料表时直接显示现画的（inline SVG，不进附件）；没有可画的就退回存下来的那张 -->
-      <div
-        v-if="live && liveSvg"
-        class="scheme-live"
-        @click.stop
-        v-html="liveSvg"
-      />
+      <!-- 跟随投料表时直接显示现画的（inline SVG，不进附件）；没有可画的就退回存下来的那张。
+           注意：容器在 live 时**一直存在**（固定高度），这样首帧还没有图时也不会把页面顶下去再弹回来 -->
+      <div v-if="live" class="scheme-live" @click.stop>
+        <div v-if="liveSvg" v-html="liveSvg" />
+      </div>
       <img
-        v-else-if="scheme && /\.(png|jpe?g|gif|webp|svg)$/i.test(scheme.original_name || scheme.filename)"
+        v-if="!live && scheme && /\.(png|jpe?g|gif|webp|svg)$/i.test(scheme.original_name || scheme.filename)"
         :src="`/api/files/${scheme.id}`"
         alt=""
         title="点一下看大图"
         style="cursor: zoom-in"
         @click.stop="onOpen && onOpen(scheme.id)"
       />
-      <div v-else class="scheme-empty noprint">
+      <div v-if="!live && !scheme" class="scheme-empty noprint">
         <Icon name="image" :size="22" />
         <span>点击上传反应式，或点右上「画反应式」直接在画板里画</span>
       </div>
