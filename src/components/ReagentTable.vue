@@ -224,7 +224,12 @@ const sum = computed(() => totals(rows.value));
 /** 体系总体积 → 建议的瓶 / 磁子 / 转速（只是提示） */
 const vessel = computed(() => vesselHint({ liquidUl: sum.value.liquidUl, solventUl: sum.value.solventUl }));
 
-const rowsOf = (i) => rows.value.filter((r) => r.step === i + 1);
+// 每一组里「溶剂」永远排在最后一行（表里 Sub / Cat / … / Sol 这样读着顺）。
+// filter 出来的是新数组，排序不动 model.rows 本身（存盘顺序不变）。
+const rowsOf = (i) =>
+  rows.value
+    .filter((r) => r.step === i + 1)
+    .sort((a, b) => Number(isSolvent(a)) - Number(isSolvent(b)));
 
 /** 组分这一列直接显示英文缩写（数据里存的仍是中文，颜色/统计都按中文走） */
 const roleLabel = (r) => ROLE_EN[r.role] || r.role || '';
