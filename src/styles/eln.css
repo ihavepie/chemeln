@@ -7103,50 +7103,49 @@ body.is-pane-resizing * { cursor: col-resize !important; user-select: none !impo
 .sheet-meta .kind-inline input { flex: 1 1 0; }
 
 /* ================================================================
-   内容区左右两条抓手指（DSH 那种分隔条）。
-   拖任一条都只改内容区宽度——内容**始终居中**，两边对称长缩，导航条宽度不动。
-   **平时完全透明**，鼠标靠近才浮出；只留一小段短把手（用户说整列拉满「太丑」）。
-   外面那层是 position: sticky：把手停在屏幕中间，内容多长都抓得到。
+   内容区左右两条抓手指，照 DSH 的 ConversationRoot 那套做的：
+   · 判定区是**整列高、40px 宽**的透明条，内边离内容区 8px，往外铺满 40px
+     （留白只有 48px，所以正好不出界）；
+   · 看得见的东西是条 **3px 宽、圆角**的小竖条，藏在判定区内侧 16px 处
+     （≈ 离内容区 24px），**纵向跟着鼠标走**，不是拉满整列；
+   · 纵向是一段渐变发光：中间 24px 实心、上下各 40px 淡出（共约 104px），
+     位置由 DocGrip 里 mousemove 写进 `--doc-grip-y`。
+   平时整条隐形（opacity 0），hover / 拖动时才浮出来。
    ================================================================ */
-.doc-grip-wrap {
-  position: sticky;
-  top: calc(50vh - 80px);
-  z-index: 6;
-  display: block;
-  height: 0;
-  pointer-events: none;
-}
 .doc-grip {
+  --doc-grip-tint: rgba(74, 66, 52, 0.3);
   position: absolute;
-  top: -180px;
-  width: 34px;
-  height: 360px;          /* 判定区：只负责好点中，本身透明 */
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: 40px;
   cursor: col-resize;
   touch-action: none;
-  pointer-events: auto;
   opacity: 0;
   transition: opacity 0.12s;
 }
-/* 离内容区远一点（参考 DSH 那条：线在留白里，不贴着内容边缘） */
-.doc-grip.is-right { right: -36px; }
-.doc-grip.is-left { left: -36px; }
+.doc-grip.is-left { right: calc(100% + 8px); }
+.doc-grip.is-right { left: calc(100% + 8px); }
 .doc-grip:hover,
 .doc-grip.is-on { opacity: 1; }
-/* 小把手：3px 宽、一小段高，hover 变强调色；判定区比它大得多 */
-.doc-grip::before {
+.doc-grip::after {
   content: '';
   position: absolute;
-  left: 50%;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   width: 3px;
-  height: 40px;
-  margin: -20px 0 0 -1.5px;
-  border-radius: 99px;
-  background: #c3bdad;
-  transition: background 0.12s, height 0.12s;
+  border-radius: 3px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(var(--doc-grip-y, 50%) - 52px),
+    var(--doc-grip-tint) calc(var(--doc-grip-y, 50%) - 12px),
+    var(--doc-grip-tint) calc(var(--doc-grip-y, 50%) + 12px),
+    transparent calc(var(--doc-grip-y, 50%) + 52px)
+  );
 }
-.doc-grip:hover::before,
-.doc-grip.is-on::before { background: var(--accent); height: 52px; margin-top: -26px; }
+.doc-grip.is-left::after { right: 16px; }
+.doc-grip.is-right::after { left: 16px; }
 body.is-doc-resizing,
 body.is-doc-resizing * { cursor: col-resize !important; user-select: none !important; }
 /* 手机上内容本来就只有一屏宽，塞不下这两条线 */
