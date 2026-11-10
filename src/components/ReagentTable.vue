@@ -224,20 +224,37 @@ const sum = computed(() => totals(rows.value));
 /** 体系总体积 → 建议的瓶 / 磁子 / 转速（只是提示） */
 const vessel = computed(() => vesselHint({ liquidUl: sum.value.liquidUl, solventUl: sum.value.solventUl }));
 
-// 每一组里按「相态」排：固体 → 液体 → 溶剂（称量时先称固体、最后量溶剂，跟实验台上的顺序一致）。
-// 相态按行的数据判：有浓度 / 体积的是液体，只有质量的是固体。
-// filter 出来的是新数组，排序不动 model.rows 本身（存盘顺序不变）。
+// 行顺序完全按 model.rows 来（可以拖 ⠿ 自己排）；想按「固体 → 液体 → 溶剂」整理时
+// 点表尾的「按相态整理」，那一下才真的动数据和存盘顺序。
+// 相态：溶剂 3、液体 2、固体 1。**别用 rowKind()**——液体也带质量（质量是按密度折出来的），
+// rowKind 会把 HFIP 判成固体（踩过）。这里只认「按体积量的证据」：浓度 / 体积。
+const isLiquidRow = (r) => {
+  if (isSolvent(r)) return true;
+  if (num(r.conc)) return true;
+  return num(r.volume_ul) !== null;
+};
 const phaseRank = (r) => {
   if (isSolvent(r)) return 3;
-  const kind = rowKind(r);
-  if (kind === 'liquid') return 2;
-  if (kind === 'solid') return 1;
-  return 1; // 还没填的按固体排（一般是要称的）
+  return isLiquidRow(r) ? 2 : 1;
 };
-const rowsOf = (i) =>
-  rows.value
-    .filter((r) => r.step === i + 1)
-    .sort((a, b) => phaseRank(a) - phaseRank(b));
+const rowsOf = (i) => rows.value.filter((r) => r.step === i + 1);
+
+/** 按相态整理：每一步内部「固体 → 液体 → 溶剂」，同相态之间保持现有顺序 */
+function sortByPhase() {
+  const maxStep = Math.max(1, ...rows.value.map((r) => Number(r.step) || 1));
+  const out = [];
+  for (let s = 1; s <= maxStep; s++) {
+    const group = rows.value.filter((r) => (Number(r.step) || 1) === s);
+    const sorted = group
+      .map((r, i) => ({ r, i, rank: phaseRank(r) }))
+      .sort((a, b) => a.rank - b.rank || a.i - b.i)
+      .map((x) => x.r);
+    out.push(...sorted);
+  }
+  props.model.rows = out;
+  props.notify();
+  toast('已按「固体 → 液体 → 溶剂」整理', 'ok', 1800);
+}
 
 /** 组分这一列直接显示英文缩写（数据里存的仍是中文，颜色/统计都按中文走） */
 const roleLabel = (r) => ROLE_EN[r.role] || r.role || '';
@@ -1255,6 +1272,9 @@ function onDrop(ev) {
               <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
               <button class="add-row" @click="addSolvent"><Icon name="plus" :size="12" /> 加溶剂</button>
               <button class="add-row" @click="openLib"><Icon name="flask" :size="12" /> 从试剂库选</button>
+              <button class="add-row" title="按固体 → 液体 → 溶剂重排（会改存盘顺序）" @click="sortByPhase">
+                <Icon name="down" :size="12" /> 按相态整理
+              </button>
               <span class="spacer" />
               <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>
             </div>
