@@ -654,12 +654,6 @@ function removeRow(r) {
   props.notify();
 }
 
-function addStep() {
-  props.model.steps.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '' });
-  props.model.rows.push({ step: props.model.steps.length, role: '试剂', eq: 1, mwText: '', amountText: '', name: '', note: '' });
-  props.notify();
-}
-
 function removeStep(i) {
   if (props.model.steps.length <= 1) return;
   props.model.steps.splice(i, 1);
@@ -1130,7 +1124,6 @@ function onDrop(ev) {
               <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
               <button class="add-row" @click="addSolvent"><Icon name="plus" :size="12" /> 加溶剂</button>
               <button class="add-row" @click="openLib"><Icon name="flask" :size="12" /> 从试剂库选</button>
-              <button class="add-row" @click="addStep"><Icon name="plus" :size="12" /> 加一步</button>
               <span class="spacer" />
               <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>
             </div>
