@@ -152,6 +152,14 @@ export const api = {
     request('/api/groups/adopt', { method: 'POST', body: { ids, title } }),
   groups: (project = '') =>
     request(`/api/groups${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d),
+  /** 试剂库（用过的试剂汇总）：按名字聚合，带组分 / MW / 密度 / 1 mmol 折算量 */
+  reagents: (project = '', q = '') => {
+    const qs = new URLSearchParams();
+    if (project) qs.set('project', project);
+    if (q) qs.set('q', q);
+    const tail = qs.toString();
+    return request(`/api/reagents${tail ? `?${tail}` : ''}`).then((d) => d.items || []);
+  },
   screenings: (project = '') =>
     request(`/api/screenings${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d.items || []),
   // 注意返回的是整个响应：{ screening, rows }——rows 里已经把每条实验的内容解析好了

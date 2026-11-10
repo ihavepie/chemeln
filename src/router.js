@@ -8,6 +8,7 @@ import ScreeningsView from './views/ScreeningsView.vue';
 import ScreeningView from './views/ScreeningView.vue';
 import SettingsView from './views/SettingsView.vue';
 import TrashView from './views/TrashView.vue';
+import ReagentLibView from './views/ReagentLibView.vue';
 import MobileHome from './components/MobileHome.vue';
 
 /** 手机上只放这几页（扫瓶签看档案 / 看记录 / 拍照上传），其它一律送到 `#/m` */
@@ -29,6 +30,7 @@ export const router = createRouter({
     },
     { path: '/screenings', name: 'screenings', component: ScreeningsView },
     { path: '/s/:id', name: 'screening', component: ScreeningView },
+    { path: '/reagents', name: 'reagents', component: ReagentLibView },
     { path: '/trash', name: 'trash', component: TrashView },
     { path: '/settings', name: 'settings', component: SettingsView },
     { path: '/:pathMatch(.*)*', redirect: '/' },

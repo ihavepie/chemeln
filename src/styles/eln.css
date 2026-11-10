@@ -7209,3 +7209,41 @@ body.is-doc-resizing,
 body.is-doc-resizing * { cursor: col-resize !important; user-select: none !important; }
 /* 手机上内容本来就只有一屏宽，塞不下这两条线 */
 @media (max-width: 820px) { .doc-grip { display: none; } }
+
+/* ================================================================
+   试剂库（侧栏「试剂库」那一页）：用过的试剂的汇总表。
+   一张干净的三线感列表——不描边、行 hover 淡底，数字等宽右对齐。
+   ================================================================ */
+.rl-head { align-items: flex-end; }
+.rl-search {
+  width: 210px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 12px;
+  color: var(--ink);
+}
+.rl-search:focus { outline: none; border-color: var(--ink-4); }
+.rl-sum { margin: 4px 0 12px; font-size: 11.5px; color: var(--ink-4); }
+.rl-empty { padding: 40px 0; text-align: center; font-size: 12.5px; color: var(--ink-4); }
+.rl-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rl-table th {
+  padding: 6px 8px;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  text-align: left;
+  border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+.rl-table th.n, .rl-table td.n { text-align: right; }
+.rl-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.rl-table tbody tr { cursor: pointer; }
+.rl-table tbody tr:hover { background: #f8f7f2; }
+.rl-name { color: var(--ink); font-weight: 500; }
+.rl-role { color: var(--ink-3); white-space: nowrap; }
+.rl-last { color: var(--ink-4); white-space: nowrap; }
+.rl-date { margin-left: 6px; color: var(--ink-4); opacity: 0.8; }
