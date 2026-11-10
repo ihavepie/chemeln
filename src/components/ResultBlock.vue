@@ -75,6 +75,9 @@ function syncYield() {
 
 const linked = computed(() => compoundDict().find((c) => Number(c.id) === Number(props.model.product_compound_id)));
 
+/** 外面（比如「按投料表生成」发现产物没挂库）可以直接把这个选择器弹出来 */
+defineExpose({ openPicker });
+
 async function openPicker() {
   list.value = await api.compounds();
   picked.value = props.model.product_compound_id || list.value[0]?.id || null;

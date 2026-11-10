@@ -43,6 +43,7 @@ const page = ref(1);
 const hovered = ref('');
 const statusMenu = ref(false);
 const moreMenu = ref(false);
+const resBlock = ref(null);   // 结果块（「按投料表生成」缺产物时直接调它的选择器）
 const gone = ref(false);   // 删掉了就不再自动保存
 const historyOpen = ref(false);
 const schemeSketcherOpen = ref(false);   // 画反应式（Ketcher 画板，反应物 → 产物）
@@ -623,7 +624,17 @@ async function schemeFromTable() {
       'warn'
     );
   }
-  if (!parts.product) return toast('产物还没挂化合物库——先在结果块里选上', 'warn');
+  if (!parts.product) {
+    // 库里按名字对上了但没有结构（没 SMILES）→ 说清楚是缺结构；否则直接把选择器弹出来
+    const named = (store.compounds || []).find(
+      (c) => String(c.name || '').trim() && String(c.name || '').trim() === String(fields.product_name || '').trim()
+    );
+    if (named) return toast(`库里的「${named.name}」还没有结构（去化合物页补一张结构图）`, 'warn', 3400);
+    if (!String(fields.product_name || '').trim()) return toast('先填产物名称，再从库里选一个（产物名右边的分子图标）', 'warn', 3400);
+    toast('产物还没挂化合物库——挑一个（没有就先「产物存库」）', 'warn', 3400);
+    resBlock.value?.openPicker?.();
+    return;
+  }
 
   let svg;
   try {
@@ -1197,6 +1208,7 @@ const openAttachment = (id) => {
 
           <ResultBlock
             v-if="sheetPrefs.result"
+            ref="resBlock"
             :model="fields"
             :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)" />
 
