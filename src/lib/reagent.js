@@ -82,16 +82,27 @@ export function mwText(r) {
   return '';
 }
 
+/** 密度只认 0.3–3.5 g/mL（液体试剂的正常范围）。PubChem / 词库里偶尔会混进
+ *  「相对密度」「蒸气压」之类的数字（实测 HFIP 被填成 0.069），那样会把 67 mg 算成
+ *  0.97 mL 这种离谱结果，所以超范围的一律当没填。 */
+export const saneDensity = (v) => {
+  const x = num(v);
+  return x !== null && x >= 0.3 && x <= 3.5 ? x : null;
+};
+
 export function amountText(r) {
   const mmol = num(r.mmol);
   const conc = num(r.conc);
   if (conc && mmol) return `${round(mmol / conc, 2)} mL`;
   const mg = num(r.mass_mg);
   if (mg !== null) {
-    const d = num(r.density);
+    // 有密度 = 液体：**够 1 mL 写 mL，不够的写 µL**（HFIP 40 µL 这种，写 0.04 mL 没法量）
+    const d = saneDensity(r.density);
     if (d) {
       const ml = mg / d / 1000;
-      if (ml >= 0.1) return `${round(ml, 2)} mL`;
+      if (ml >= 1) return `${round(ml, 2)} mL`;
+      const ul = ml * 1000;
+      return ul >= 20 ? `${round(ul, 0)} µL` : `${round(ul, 1)} µL`;
     }
     // 用量一律按**克**写（跟合计那行的 `固体 0.0977 g` 对得上）；只有不到 1 mg 才退回 mg
     const g = mg / 1000;
@@ -120,7 +131,7 @@ export function derive(row) {
   if (mmol === null) return row;
   const conc = num(row.conc);
   const mw = num(row.mw);
-  const density = num(row.density);
+  const density = saneDensity(row.density);
   if (conc) return { ...row, volume_ul: Math.round((mmol / conc) * 1000 * 1000) / 1000, mass_mg: null };
   if (mw) {
     const mg = mmol * mw;

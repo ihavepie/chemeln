@@ -5,7 +5,7 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, num, parseMwCell, roleTone, round, rowKind, totals, vesselHint } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, vesselHint } from '../lib/reagent.js';
 import { compoundDict, reagentDict } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
@@ -77,9 +77,12 @@ function applyDict(r, d) {
   r.name = d.name || '';
   if (!String(r.mwText || '').trim()) {
     if (num(d.conc)) r.mwText = `${round(d.conc, 2)}M`;
-    else if (num(d.mw) !== null) r.mwText = round(d.mw, 2);
+    else if (num(d.mw) !== null) r.mwText = Number(d.mw).toFixed(2);
     if (String(r.mwText || '').trim()) onMw(r);
   }
+  // 词库里记着的组分 / 密度也一起带出来（密度只给溶剂，固体带密度会算出 µL）
+  if (d.role && (!r.role || r.role === '试剂')) r.role = d.role;
+  if (num(r.density) === null && r.role === '溶剂' && saneDensity(d.density)) r.density = saneDensity(d.density);
   pickerClose();
   props.notify();
 }
@@ -133,7 +136,7 @@ function dictHits(q) {
   if (!k) return [];
   return reagentDict()
     .filter((d) => d && d.name && d.name.toLowerCase().includes(k))
-    .map((d) => ({ _dict: true, name: d.name, mw: d.mw, conc: d.conc }));
+    .map((d) => ({ _dict: true, name: d.name, mw: d.mw, conc: d.conc, density: d.density, role: d.role }));
 }
 
 async function pickerSearch(q) {
@@ -285,6 +288,16 @@ function onMw(r) {
   if (v.conc) r.mwText = `${round(v.conc, 3)}M`;
   syncAmount(r);
   props.notify();
+}
+
+/** 当量的写法：**小于 1 的用百分数**（0.1 → 10%），1 以上写数字；正在编辑的那格保留原文 */
+function eqDisplay(r) {
+  const raw = String(r.eq ?? '').trim();
+  if (r._eqEditing || !raw) return raw;
+  if (raw.endsWith('%')) return raw;
+  const x = num(raw);
+  if (x !== null && x > 0 && x < 1) return `${round(x * 100, 2)}%`;
+  return raw;
 }
 
 function onEq(r) {
@@ -469,9 +482,10 @@ async function lookupName(r, key0) {
     r.mwText = round(Number(mw), 2);
     onMw(r);
   }
-  if (num(r.density) === null && info.props && info.props.density) {
-    const d = Number(String(info.props.density).replace(/[^\d.]/g, ''));
-    if (d > 0) r.density = d;
+  // 只有「溶剂」这一行才自动带密度（固体试剂带密度会算出 µL 这种没意义的用量），
+  // 而且必须落在合理区间，见 lib/reagent.js 的 saneDensity
+  if (num(r.density) === null && r.role === '溶剂' && info.props && saneDensity(String(info.props.density || '').replace(/[^\d.]/g, ''))) {
+    r.density = saneDensity(String(info.props.density || '').replace(/[^\d.]/g, ''));
   }
   props.notify();
 }
@@ -533,7 +547,7 @@ function onName(r) {
     if (d) {
       if (num(d.conc) !== null) { r.mwText = `${round(d.conc, 2)}M`; onMw(r); }
       else if (num(d.mw) !== null) { r.mwText = Number(d.mw).toFixed(2); onMw(r); }
-      if (num(r.density) === null && num(d.density) !== null) r.density = num(d.density);
+      if (num(r.density) === null && r.role === '溶剂' && saneDensity(d.density)) r.density = saneDensity(d.density);
       // 角色只在还没挑过的时候才替他填（用户自己选的组分不被覆盖）
       if (d.role && (!r.role || r.role === '试剂')) r.role = d.role;
     }
@@ -989,7 +1003,7 @@ function onDrop(ev) {
                     <span v-else class="cmp-pick-fig cmp-pick-fig-empty" />
                     <span class="cmp-pick-code mono">{{ c._dict ? '用过' : (c.code || '—') }}</span>
                     <span class="cmp-pick-name">{{ c.name || '（未命名）' }}</span>
-                    <span class="cmp-pick-meta mono">{{ c.formula || '' }}<template v-if="c.mw"> · {{ round(c.mw, 2) }}</template><template v-else-if="c.conc"> · {{ round(c.conc, 2) }}M</template></span>
+                    <span class="cmp-pick-meta mono"><template v-if="c._dict"><template v-if="c.mw">MW {{ Number(c.mw).toFixed(2) }}</template><template v-else-if="c.conc">{{ round(c.conc, 2) }}M</template><template v-if="saneDensity(c.density)"> · ρ {{ round(c.density, 2) }}</template><template v-if="c.role"> · {{ c.role }}</template></template><template v-else>{{ c.formula || '' }}<template v-if="c.mw"> · {{ round(c.mw, 2) }}</template><template v-else-if="c.conc"> · {{ round(c.conc, 2) }}M</template></template></span>
                   </button>
                   <div v-if="!picker.items.length" class="cmp-pick-empty">化合物库和「用过的试剂」里都没有「{{ picker.q }}」</div>
                 </div>
@@ -998,7 +1012,7 @@ function onDrop(ev) {
                 <input class="n mw-cell" data-f="mwcell" :value="r.mwText" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="focusHint(r, 'mwcell')" @blur="blurHint" @keydown="onKeydown($event, r, 'mwcell')" />
               </td>
               <td>
-                <input class="n" data-f="eq" inputmode="decimal" :value="r.eq ?? ''" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="focusHint(r, 'eq')" @blur="blurHint" @keydown="onKeydown($event, r, 'eq')" />
+                <input class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq')" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
               </td>
               <td>
                 <input class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol')" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
