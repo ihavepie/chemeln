@@ -352,10 +352,11 @@ function applyAmount(r, { rewrite = true } = {}) {
   let mmol = null;
   if (unit === 'g' && num(r.mw)) {
     r.mass_mg = v * 1000;
-    r.volume_ul = num(r.density) ? (v * 1000) / num(r.density) : null;
+    r.volume_ul = null;   // 手填「0.0062 g」= 按质量称的，别再按密度折成 µL
     mmol = (v * 1000) / num(r.mw);
   } else if (unit === 'mg' && num(r.mw)) {
     r.mass_mg = v;
+    r.volume_ul = null;
     mmol = v / num(r.mw);
   } else if ((unit === 'ml' || unit === 'l') && num(r.conc)) {
     const ul = unit === 'l' ? v * 1e6 : v * 1000;

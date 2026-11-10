@@ -94,9 +94,15 @@ export function amountText(r) {
   const mmol = num(r.mmol);
   const conc = num(r.conc);
   if (conc && mmol) return `${round(mmol / conc, 2)} mL`;
+  // 记着体积的（溶剂行、或者你自己按 µL / mL 量的那几行）就按体积显示：
+  // **够 1 mL 写 mL，不够的写 µL**（HFIP 41 µL 这种，写 0.041 mL 没法量）
+  const ulStored = num(r.volume_ul);
+  if (ulStored !== null && ulStored > 0 && num(r.mass_mg) === null) {
+    return ulStored >= 1000 ? `${round(ulStored / 1000, 2)} mL` : `${round(ulStored, ulStored >= 20 ? 0 : 1)} µL`;
+  }
   const mg = num(r.mass_mg);
   if (mg !== null) {
-    // 有密度 = 液体：**够 1 mL 写 mL，不够的写 µL**（HFIP 40 µL 这种，写 0.04 mL 没法量）
+    // 只有「密度可信」才折成体积；密度是垃圾值（0.069 / 给固体硬填的 1.74）就老老实实写 g
     const d = saneDensity(r.density);
     if (d) {
       const ml = mg / d / 1000;
