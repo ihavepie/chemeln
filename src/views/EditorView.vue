@@ -26,7 +26,7 @@ import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
-import { amountText, derive, mwText, num, round } from '../lib/reagent.js';
+import { amountText, derive, mwText, num, round, saneDensity } from '../lib/reagent.js';
 import { schemeParts } from '../lib/expScheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
@@ -147,21 +147,30 @@ function fill(e) {
   reagent.rows = rows;
   ensureSolventRow();     // 老记录：溶剂还在字段里 → 补成投料表的一行
   markLoaded();
-  if (fixCoarseMw(rows)) notify();   // 分子量被修细了，顺手存一次（导出 / 列表才跟页面对得上）
+  if (fixReagentRows(rows)) notify();   // 分子量 / 密度被补上，顺手存一次（导出 / 列表才跟页面对得上）
 }
 
-/** 老数据里的分子量可能只有一位小数（P(Cy)3 = 280.4），词库里有更细的（280.43）就换掉；
- *  手填过两位小数的不动。换完把用量按新分子量重算，跟「1 mmol ≈ x g」对得上。 */
-function fixCoarseMw(rows) {
+/** 打开记录时顺手修两样老数据的毛病（改了就存一次）：
+ *  ① 分子量只有一位小数的粗值（P(Cy)3 = 280.4）→ 换成词库里更细的（280.43）；
+ *  ② 液体没带密度（HFIP 那种只能显示 g）→ 从词库补上，用量就会折成 µL。 */
+function fixReagentRows(rows) {
   const coarse = (v) => v != null && Math.round(Number(v) * 100) % 10 === 0;
   let changed = false;
   for (const r of rows) {
-    if (!r.name || r.compound_id || r._mwManual) continue;
+    if (!r.name || r.compound_id) continue;
     const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === String(r.name).toLowerCase());
-    if (!d || d.mw == null || !coarse(r.mw)) continue;
-    if (Number(d.mw).toFixed(2) === Number(r.mw).toFixed(2)) continue;
-    r.mw = Number(d.mw);
-    r.mwText = Number(d.mw).toFixed(2);
+    if (!d) continue;
+    let touched = false;
+    if (!r._mwManual && d.mw != null && coarse(r.mw) && Number(d.mw).toFixed(2) !== Number(r.mw).toFixed(2)) {
+      r.mw = Number(d.mw);
+      r.mwText = Number(d.mw).toFixed(2);
+      touched = true;
+    }
+    if (num(r.density) === null && saneDensity(d.density)) {
+      r.density = saneDensity(d.density);
+      touched = true;
+    }
+    if (!touched) continue;
     changed = true;
     if (r.role !== '溶剂' && num(r.mmol) !== null) {
       const next = derive({ ...r });

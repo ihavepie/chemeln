@@ -577,7 +577,8 @@ function onName(r) {
     if (d) {
       if (num(d.conc) !== null) { r.mwText = `${round(d.conc, 2)}M`; onMw(r); }
       else if (num(d.mw) !== null) { r.mwText = Number(d.mw).toFixed(2); onMw(r); }
-      if (num(r.density) === null && r.role === '溶剂' && saneDensity(d.density)) r.density = saneDensity(d.density);
+      // 密度不再只管「溶剂」：HFIP 这种液体添加剂也按体积量（否则只能写 g）
+      if (num(r.density) === null && saneDensity(d.density)) r.density = saneDensity(d.density);
       // 角色只在还没挑过的时候才替他填（用户自己选的组分不被覆盖）
       if (d.role && (!r.role || r.role === '试剂')) r.role = d.role;
     }
@@ -660,7 +661,7 @@ function pickFromLib(it, v) {
     name: it.name,
     mw: num(it.mw),
     conc: num(it.conc),
-    density: role === '溶剂' ? saneDensity(it.density) : null,
+    density: saneDensity(it.density),
     eq,
     note: '',
   });
