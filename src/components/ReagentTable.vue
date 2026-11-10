@@ -447,8 +447,9 @@ async function lookupName(r, key0) {
     r._miss = true;
     const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key.toLowerCase());
     if (d && (num(d.conc) !== null || num(d.mw) !== null)) {
-      r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : round(d.mw, 2);
+      r.mwText = num(d.conc) ? `${round(d.conc, 2)}M` : Number(d.mw).toFixed(2);
       onMw(r);
+      if (d.role && (!r.role || r.role === '试剂')) r.role = d.role;
       props.notify();
     }
     return;
@@ -526,7 +527,16 @@ function onName(r) {
       return;
     }
   } else if (!r._mwManual) {
-    // 化合物库里没有 → PubChem 优先（词典里的旧值可能已经错了），查不到才退回词典
+    // 化合物库里没有 → 先按「用过的试剂」词库秒填（名字 / 分子量 / 密度 / 组分角色），
+    // 再让 PubChem 去核对（查不到也不影响：词库的值已经在了）
+    const d = reagentDict().find((x) => String(x.name || '').toLowerCase() === key);
+    if (d) {
+      if (num(d.conc) !== null) { r.mwText = `${round(d.conc, 2)}M`; onMw(r); }
+      else if (num(d.mw) !== null) { r.mwText = Number(d.mw).toFixed(2); onMw(r); }
+      if (num(r.density) === null && num(d.density) !== null) r.density = num(d.density);
+      // 角色只在还没挑过的时候才替他填（用户自己选的组分不被覆盖）
+      if (d.role && (!r.role || r.role === '试剂')) r.role = d.role;
+    }
     void lookupName(r, key);
   }
   props.notify();

@@ -737,12 +737,19 @@ function bootstrap(query = {}) {
 
   // 自己记录本里用过的试剂 → 下次打名字就把 MW / 浓度带出来
   const seen = new Map();
+  // 带上「组分」角色：下次打这个名字，除了 MW / 浓度，连它该当底物还是催化剂一起带出来
   for (const r of db
-    .prepare("SELECT name, mw, conc, density FROM reagents WHERE name <> '' ORDER BY id DESC")
+    .prepare("SELECT name, role, mw, conc, density FROM reagents WHERE name <> '' ORDER BY id DESC")
     .all()) {
     const k = r.name.trim().toLowerCase();
-    if (!k || seen.has(k)) continue;
-    seen.set(k, { name: r.name.trim(), mw: r.mw, conc: r.conc, density: r.density });
+    if (!k) continue;
+    const prev = seen.get(k);
+    if (!prev) {
+      seen.set(k, { name: r.name.trim(), role: str(r.role), mw: r.mw, conc: r.conc, density: r.density });
+      continue;
+    }
+    // 同名的老条目：只补它还空着的角色 / 数值，别把最新的这条盖掉
+    if (!prev.role && str(r.role)) prev.role = str(r.role);
   }
   const reagentDict = [...seen.values()].slice(0, 600);
 

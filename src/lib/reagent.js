@@ -77,7 +77,8 @@ export function parseMwCell(text) {
 
 export function mwText(r) {
   if (num(r.conc)) return `${round(r.conc, 2)}M`;
-  if (num(r.mw) !== null) return round(r.mw, 2);
+  // 分子量**固定两位小数**（280.4 → 280.40、168 → 168.00），同一列对得齐、也不像被截断
+  if (num(r.mw) !== null) return Number(r.mw).toFixed(2);
   return '';
 }
 
