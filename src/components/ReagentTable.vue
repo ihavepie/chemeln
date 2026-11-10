@@ -430,6 +430,7 @@ function onAmount(r) {
    顺手去查词库 / 开候选，会把半成品拼进名字里（出现过「RuP ho sRuPhos」这种乱条目）。
    组字结束后再按最终值走一次。 */
 let composing = false;
+let nameTimer = null;
 function onComposeStart() {
   composing = true;
 }
@@ -438,20 +439,35 @@ function onComposeEnd(ev, r) {
   onNameInput(ev, r);
 }
 
+/** 名字格子失焦：取消延时填充，直接按最终值补全（+ 联网核对） */
+function onNameBlur(r) {
+  clearTimeout(nameTimer);
+  onName(r);
+  verifyName(r);
+}
+
 function onNameInput(ev, r) {
   if (composing || ev.isComposing) return;
   r.name = ev.target.value;
-  onName(r);
 
   const q = String(r.name || '').trim();
   clearTimeout(pickerTimer);
   if (!q) {
+    clearTimeout(nameTimer);
     pickerClose();
     return;
   }
   picker.row = r;
   picker.q = q;
   pickerTimer = setTimeout(() => void pickerSearch(q), 180);
+
+  // 词库（分子量 / 组分）等名字「停手」再填：边打边填会拿半截名字去匹配，
+  // 打「AcOH」时第一下先命中库里的「A」，分子量就按 89.09 记下来了（用户报过：
+  // 还没打完就记录上去了）。停手 500ms 或失焦才真正补全。
+  clearTimeout(nameTimer);
+  nameTimer = setTimeout(() => {
+    if (String(r.name || '').trim() === q) onName(r);
+  }, 500);
 }
 
 function onMwInput(ev, r) {
@@ -1110,7 +1126,7 @@ function onDrop(ev) {
                   @compositionend="onComposeEnd($event, r)"
                   @change="onName(r)"
                   @keydown="onKeydown($event, r, 'name')"
-                  @blur="verifyName(r)"
+                  @blur="onNameBlur(r)"
                   @dblclick.prevent="openBrowse(r)"
                 />
                 <button
@@ -1179,19 +1195,19 @@ function onDrop(ev) {
               <td>
                 <!-- 溶剂只记「用了多少量」：分子量 / 当量 / mmol 三格都不填，也就不会算出 17 µL 那种数 -->
                 <span v-if="isSolvent(r)" class="sol-blank">—</span>
-                <input v-else class="n mw-cell" data-f="mwcell" :value="mwDisplay(r)" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="r._mwEditing = true; focusHint(r, 'mwcell')" @blur="r._mwEditing = false; onMw(r); blurHint()" @keydown="onKeydown($event, r, 'mwcell')" />
+                <input v-else class="n mw-cell" data-f="mwcell" :value="mwDisplay(r)" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="r._mwEditing = true; focusHint(r, 'mwcell'); $event.target.select()" @blur="r._mwEditing = false; onMw(r); blurHint()" @keydown="onKeydown($event, r, 'mwcell')" />
               </td>
               <td>
                 <span v-if="isSolvent(r)" class="sol-blank">—</span>
-                <input v-else class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq')" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
+                <input v-else class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq'); $event.target.select()" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
               </td>
               <td>
                 <span v-if="isSolvent(r)" class="sol-blank">—</span>
-                <input v-else class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol')" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
+                <input v-else class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol'); $event.target.select()" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
               </td>
               <td class="amount-td" :data-kind="rowKind(r)">
                 <!-- 值就是 r.amountText 本身：边打字只解析不回写（回写会把光标顶走、字被吃成「3mL23」），失焦才规整成「3 mL」 -->
-                <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount')" @blur="onAmount(r); blurHint()" @keydown="onKeydown($event, r, 'amount')" />
+                <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount'); $event.target.select()" @blur="onAmount(r); blurHint()" @keydown="onKeydown($event, r, 'amount')" />
               </td>
               <td class="note-td">
                 <input class="note-cell" data-f="note" :value="r.note" :placeholder="firstRow === r ? '说明' : ''" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
