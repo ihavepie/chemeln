@@ -6941,44 +6941,51 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .scr-del { color: var(--bad); }
 
 /* 筛选表：照文献里那种「三线表」（booktabs）——
-   顶上一条粗线、表头下一条细线、表尾一条粗线，中间**不加竖线也不加行线**，
-   只留基准那一行的淡底。正文用衬线，数字和 Entry 用等宽。
+   顶上一条细线、表头下和表尾各一条粗线，中间**不加竖线也不加行线**，
+   基准那一行也不铺底色。正文是衬线（文献表都是 Times 那一路的数字与字母）。
    用户贴的就是这种表，别又加回网格线 / 表格外框 / 列底色。 */
 .sct-table {
   width: 100%;
   border-collapse: collapse;
-  /* 照用户给的那张文献表：**无衬线体**（Helvetica / PingFang）、表头加粗、
-     数字右对齐、基准行不加底色。数字用 tabular-nums 让小数点对齐。 */
-  font-family: var(--sans);
-  font-size: 13px;
+  /* 照用户给的那张文献表：Times 衬线、14px、行距宽松；数字右对齐，
+     用 tabular-nums 让位数对齐。中文落到宋体（Songti）才跟 Times 一排不打架。 */
+  font-family: var(--sct-serif);
+  font-size: 14px;
+  line-height: 1.45;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 .sct-table th,
 .sct-table td {
-  padding: 5px 12px;
+  padding: 7px 14px;
   text-align: left;
   vertical-align: middle;
   border: 0;
 }
+/* 文献的规矩：顶线细（1px）、表头下那条粗（2.5px） */
 .sct-table thead th {
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
   vertical-align: bottom;
-  border-top: 2px solid var(--ink-2);
-  border-bottom: 1px solid var(--ink-3);
-  padding-bottom: 7px;
+  border-top: 1px solid var(--ink-2);
+  border-bottom: 2.5px solid var(--ink);
+  padding: 7px 14px 8px;
 }
-.sct-table tbody tr:last-child td { border-bottom: 2px solid var(--ink-2); }
+.sct-table tbody tr:last-child td { border-bottom: 2.5px solid var(--ink); }
 /* 文献表里基准行不铺底色（用户给的那张就是白的） */
 .sct-table tbody tr.is-base td { background: transparent; }
-.sct-table td.sct-num { text-align: right; font-size: 13px; }
+/* 文献表里第一列的文字是**顶着最左边那条线**起的（没缩进），标题也一样——照它来 */
+.sct-table th:first-child,
+.sct-table td:first-child { padding-left: 0; }
+/* 数字列右对齐（`trace` / `<5` 这类字也贴着右边，跟文献一样） */
+.sct-table td.sct-num { text-align: right; font-size: 14px; }
+/* Entry 那一列窄、靠左，行号用衬线数字 */
 .sct-table .sct-c-entry {
-  width: 1%; text-align: left; padding-right: 18px;
-  font-size: 13px; color: var(--ink);
+  width: 1%; text-align: left; padding-right: 22px;
+  font-size: 14px; color: var(--ink);
 }
 .sct-table tbody tr.is-base .sct-c-entry { color: var(--ink); font-weight: 600; }
 .sct-table .sct-c-x { width: 1%; }
@@ -7000,37 +7007,57 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
   vertical-align: bottom;
 }
 .sct-table td.is-manual { background: transparent; }
-/* 表下面那行脚注：论文里的 ᵃ 注 */
+/* 表下面那行脚注：论文里的 ᵃ 注（上标字母 + 小字衬线） */
 .sct-note {
-  margin: 7px 0 2px;
-  padding: 0 12px;
-  font-size: 11px;
-  line-height: 1.6;
-  color: var(--ink-4);
+  margin: 9px 0 2px;
+  padding: 0;
+  font-family: var(--sct-serif);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--ink-3);
 }
-.sct-note b { font-weight: 700; color: var(--ink-3); margin-right: 3px; }
-.sct-note b + * { margin-left: 0; }
-/* 数字列（产率 / 选择性…）整列居中：以前表头靠左、数字靠右，读着是错位的。
-   长文字的列（相对标准条件、备注）仍旧左对齐，居中会把长短不一的句子甩得很难看。
-   数字列给个宽度上限，不然表头一带上「(%)」它们就把文字列挤成两行。 */
+.sct-note-item { margin-right: 18px; }
+.sct-note sup {
+  font-size: 8.5px;
+  font-weight: 400;
+  color: var(--ink-3);
+  margin-right: 3px;
+  vertical-align: super;
+  line-height: 0;
+}
+/* 数字列（产率 / 选择性…）右对齐：跟文献一样数字贴着列的右边；
+   表头从列左边起头，所以表头比数字宽出一截是正常的（文献那张也一样）。 */
 .sct-table th.sct-num,
-.sct-table td.sct-num { text-align: right; width: 116px; }
+.sct-table td.sct-num { text-align: right; width: 118px; }
 /* 长文字的列保底宽度，句子尽量不折行 */
 .sct-table .sct-wide { min-width: 240px; }
 /* 手动列（备注之类）别被数字列挤没 */
 .sct-table .sct-field.is-manual { min-width: 120px; }
-.sct-table th.sct-num .sct-th { justify-content: center; }
+.sct-table th.sct-num .sct-th { justify-content: flex-start; }
 /* 筛选表不套卡片：论文里的表就是直接铺在纸面上的三线表（用户要的就是这个）。
    `.sct-plain` 只是留白用的壳，别给白底 / 投影 / 圆角。 */
-.sct-plain { padding: 0; margin-bottom: 22px; background: transparent; box-shadow: none; }
-/* 表标题：`表 1　条件优化`，衬线、左对齐，压在表格顶上 */
+.sct-plain {
+  /* 筛选表整块统一走 Times 衬线（中文落宋体，跟 Times 一排不打架） */
+  --sct-serif: 'Times New Roman', Times, 'Songti SC', 'STSong', serif;
+  padding: 0; margin-bottom: 22px; background: transparent; box-shadow: none;
+}
+/* 表标题：`表 1：条件优化`，跟文献的 `Table 1:` 一样——衬线、粗斜体编号 + 粗体标题，
+   后面跟一个上标 [a]（指向表下的脚注），压在表格顶上 */
 .sct-cap {
   margin: 0 0 10px;
-  padding: 0 12px;
-  font-size: 13px;
+  padding: 0;
+  font-family: var(--sct-serif);
+  font-size: 15px;
   color: var(--ink);
 }
+/* 列表页块头也用 .sct-cap-no（那里是个 UI 小标签，别跟着变成斜体） */
 .sct-cap-no { font-weight: 600; margin-right: 0.9em; }
+.sct-cap .sct-cap-no { font-weight: 700; font-style: italic; margin-right: 0.35em; }
+.sct-cap .sct-cap-ti { font-weight: 700; }
+.sct-cap-fn {
+  font-size: 9.5px; font-weight: 400; font-style: normal;
+  color: var(--ink-3); margin-left: 2px; vertical-align: super; line-height: 0;
+}
 /* 卡里面的反应式不再单独套卡（卡片里套卡片），就一块普通内容，压在三线表顶线上面 */
 .sct-std {
   display: flex;
@@ -7046,7 +7073,8 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-std-line {
   margin: 7px 0 0;
   text-align: left;
-  font-size: 11.5px;
+  font-family: var(--sct-serif);
+  font-size: 12px;
   line-height: 1.6;
   color: var(--ink-3);
 }
@@ -7076,13 +7104,12 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 }
 
 .sct-th { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; row-gap: 1px; }
-.sct-th-fn { font-size: 8.5px; font-weight: 400; color: var(--ink-3); margin-left: 2px; white-space: nowrap; }
-/* 标题里的「表 1：」加粗，跟文献的 `Table 1:` 一样 */
-.sct-cap { font-size: 13.5px; }
+/* 表头的脚注上标（`[b]`）：比正文字小一号、不抢眼 */
+.sct-th-fn { font-size: 9px; font-weight: 400; color: var(--ink-3); margin-left: 2px; white-space: nowrap; }
 /* 改名 / 删列只在悬停表头时露出来，平时别占地方 */
 .sct-th-acts { display: inline-flex; gap: 1px; opacity: 0; transition: opacity 0.1s; }
 .sct-table thead th:hover .sct-th-acts { opacity: 1; }
-.sct-th-label { color: var(--ink-2); font-size: 12.5px; letter-spacing: 0.01em; }
+.sct-th-label { color: var(--ink); font-size: 14px; font-weight: 700; }
 .sct-th-src {
   font-size: 8.5px; color: var(--ink-4); line-height: 1.4;
   letter-spacing: 0.02em;
@@ -7094,7 +7121,8 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-var-x:hover { color: var(--ink-2); }
 .sct-var-x.is-del:hover { color: var(--bad); }
 .sct-auto { display: inline-block; white-space: nowrap; }
-.sct-auto.sct-wrap { white-space: normal; max-width: 320px; font-size: 11px; color: var(--ink-2); }
+/* 「相对标准条件」那种长句：跟正文一样是 14px 衬线（小一号就比别的格子虚），只稍微压灰 */
+.sct-auto.sct-wrap { white-space: normal; max-width: 460px; color: var(--ink); }
 .sct-cell {
   width: 100%; box-sizing: border-box; padding: 3px 5px;
   border: 1px solid transparent; border-radius: 4px; background: transparent;

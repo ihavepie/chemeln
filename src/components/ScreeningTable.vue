@@ -31,14 +31,24 @@ const unitOf = (f) => (f.source === 'yield' || f.source === 'sel' ? '%' : '');
 const WIDE = new Set(['variation', 'reagent', 'substrates', 'product', 'appearance', 'tlc_note', 'conclusion', 'notes']);
 const isWide = (f) => WIDE.has(f.source);
 const base = computed(() => props.rows[0]?.exp || null);
+// 有带单位的列（产率 / 选择性）才在标题后挂 [a]、表下挂 [b]，跟文献的脚注锚点对上
+const hasUnit = computed(() => fields.value.some((f) => unitOf(f)));
+const hasStd = computed(() => !!(props.scheme || props.standard));
 
-const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value));
+// 表头已经写了单位（产率 [%]），格子里就不再重复一个 %——文献里的数字是裸的
+const cell = (f, r) => {
+  const v = isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value);
+  return unitOf(f) && typeof v === 'string' ? v.replace(/\s*%\s*$/, '') : v;
+};
 </script>
 
 <template>
   <div class="scope-wrap sct-plain">
     <p v-if="index || caption" class="sct-cap">
-      <span v-if="index" class="sct-cap-no">表 {{ index }}：</span><span v-if="caption" class="sct-cap-ti">{{ caption }}</span>
+      <span v-if="index" class="sct-cap-no">表 {{ index }}：</span><span v-if="caption" class="sct-cap-ti">{{ caption }}</span><sup
+        v-if="hasStd"
+        class="sct-cap-fn"
+      >[a]</sup>
     </p>
     <!-- 反应式 + 条件文字并排一行（像论文里表格上方那张示意图 + 条件说明） -->
     <div v-if="scheme" class="sct-std">
@@ -112,12 +122,10 @@ const cell = (f, r) => (isManual(f) ? r.cells[f.key] || '' : autoValue(f.source,
         </tr>
       </tbody>
     </table>
-    <!-- 文献表下面那行小字脚注 -->
+    <!-- 文献表下面那行小字脚注：上标字母 + 小字，锚点跟标题的 [a]、表头的 [b] 对上 -->
     <p class="sct-note">
-      <b>[a]</b> 标准条件见上方反应式；「相对标准条件」列只写相对基准改动的部分。
-      <template v-if="rows.length > 1">
-        <b>[b]</b> 产率 / 选择性取自记录里填的值，未填记作「—」。
-      </template>
+      <span v-if="hasStd" class="sct-note-item"><sup>[a]</sup>标准条件见上方反应式；「相对标准条件」列只写相对基准改动的部分。</span>
+      <span v-if="hasUnit" class="sct-note-item"><sup>[b]</sup>产率 / 选择性取自记录里填的值，未填记作「—」。</span>
     </p>
   </div>
 </template>
