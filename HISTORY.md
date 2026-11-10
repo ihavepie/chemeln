@@ -248,3 +248,16 @@
 - `AGENTS.md` 去掉本机私钥绝对路径、真实 ChemDraw 文件名、真实实验编号；`HISTORY.md` / `server/index.js` 里的真实课题名、记录编号换成中性说法；
 - 服务器上 `htpasswd` 里的密码轮换过一次（旧密码曾在公开仓库里出现过），新密码只写在本机 `CLOUD-DEPLOY.local.md`（gitignored）。
 - README 顶部加了演示站地址（只有 IP，不含任何凭证）。
+
+## 2026-11-10 · 整段历史脱敏（公开仓库）
+
+起因：`HEAD` 已经不写私钥路径 / 密码了，但**旧提交里还留着**——早期 `scripts/sync-server.sh` 写死了 Basic Auth 的「用户名:密码」明文、本机私钥的绝对路径、`/Users/<本机用户名>`，`vite.config.js` 写死了 tailnet 域名。
+
+做法：`git fast-export --all | 过滤器 | git fast-import` —— 不检出工作区，只把每个 blob 和每条提交信息里的这些串换成占位符（`<本机路径>` / `<用户目录>` / `<tailnet>` / `<私钥>.pem` / `<用户>:<密码>`）。过滤器脚本放在 `.cache/`（不进 git），因为它自己就带着这些串。
+
+- 服务器 IP **没抹**：README 顶部的演示站地址本来就要写它，抹了反而对不上；旧提交里那几处 `root@…` 也就一起留着。
+- 361 个提交、15 个 tag 全部重写，commit hash 全变。改写前打了整库 bundle：`.backup/pre-scrub-20261110-2227.bundle`（`git bundle create --all`，52 MB）——要回到改写前就从这个 bundle 恢复。
+- 顺手清掉 `refs/original/*`（上一轮 `git filter-branch` 的残留）和那个临时提交（`.histfilter.py`，已删）。
+- 验证：`git grep -F <串> $(git rev-list --all)` 每个串都是 0；`git fsck` 干净；重写后的 `HEAD` 树跟工作区一致（`git status` 空）。
+
+**坑**：`fast-export` 的 `data <n>` 载荷后面**跟不跟换行是可选的**，过滤器里硬要求换行会直接断管道。另外 `--tree-filter` 那条老路在这里根本走不通——过滤器文件自己只在最后一个提交里，前面的提交 checkout 出来没有它，等于空跑。

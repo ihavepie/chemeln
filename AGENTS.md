@@ -24,7 +24,7 @@
 - **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。常用：`git diff` 看改了啥、`git checkout -- <文件>` 撤销未提交改动、`git log --oneline` 看历史。**git 只保代码，不保数据**：`data/` 得自己拷走。
   **两个远程**：`backup` = 本机裸仓库 `<项目目录>-backup.git`（`git push backup main` 推一份）；`origin` = `git@github.com:ihavepie/chemeln.git`（公开仓库，HTTPS 地址 https://github.com/ihavepie/chemeln）。
   **这台机器连 github.com 的 HTTPS 会超时**（`curl https://github.com/` 000，但 `api.github.com` 通），所以走 SSH：用本机生成的专用私钥（路径只写在本地的 `CLOUD-DEPLOY.local.md`，公开仓库里不留），仓库 `core.sshCommand` 指到它，公钥在 GitHub 账号里登记过才能推。
-  **脱敏**：`CLOUD-DEPLOY.md` 是模板（占位地址），真实 IP / 私钥 / 密码只在本机 `CLOUD-DEPLOY.local.md`（已 gitignore）；脚本里的连接信息一律走环境变量。**历史已用 `git filter-branch` 重写过**（IP / 密码 / 用户名全抹），**别再把这些写进仓库**；细节见 `HISTORY.md`。
+  **脱敏**：`CLOUD-DEPLOY.md` 是模板（占位地址），真实 IP / 私钥 / 密码只在本机 `CLOUD-DEPLOY.local.md`（已 gitignore）；脚本里的连接信息一律走环境变量。**全部历史已重写过**（私钥路径 / 用户名 / 密码抹掉，hash 全变），**别再把这些写进仓库**；细节见 `HISTORY.md`。
 
 ## 4. 目录结构（一句话一个）
 - `src/main.js` — 入口：挂 router / Element Plus / 全局指令。
