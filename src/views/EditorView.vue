@@ -703,23 +703,15 @@ async function schemeFromTable() {
       'warn'
     );
   }
-  if (!parts.product) {
-    // 库里按名字对上了但没有结构（没 SMILES）→ 说清楚是缺结构；否则直接把选择器弹出来
-    const named = (store.compounds || []).find(
-      (c) => String(c.name || '').trim() && String(c.name || '').trim() === String(fields.product_name || '').trim()
-    );
-    if (named) return toast(`库里的「${named.name}」还没有结构（去化合物页补一张结构图）`, 'warn', 3400);
-    if (!String(fields.product_name || '').trim()) return toast('先填产物名称，再从库里选一个（产物名右边的分子图标）', 'warn', 3400);
-    toast('产物还没挂化合物库——挑一个（没有就先「产物存库」）', 'warn', 3400);
-    resBlock.value?.openPicker?.();
-    return;
-  }
+  // 产物没挂结构也要能画：试反应常常还不知道准确产物，那就只在箭头右边写产物名（或留空）
+  const hasProduct = !!parts.product;
 
   let svg;
   try {
     svg = await composeSchemeSvg({
       reactants: parts.reactants,
       product: parts.product,
+      productLabel: hasProduct ? '' : parts.prodName,
       above: parts.above,
       below: parts.below,
     });
@@ -729,7 +721,9 @@ async function schemeFromTable() {
 
   const ok = await confirm({
     title: '按投料表重画反应式？',
-    body: '会用投料表里的底物画反应物、试剂和条件写在箭头上，产物用结果块里挂的那个；现在这张反应式图会被替换。',
+    body: hasProduct
+      ? '会用投料表里的底物画反应物、试剂和条件写在箭头上，产物用结果块里挂的那个；现在这张反应式图会被替换。'
+      : `产物还没挂化合物库，所以箭头右边${parts.prodName ? `只写名字「${parts.prodName}」` : '留空'}（试反应不知道产物也没关系）；现在这张反应式图会被替换。`,
   });
   if (!ok) return;
 

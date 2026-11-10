@@ -134,14 +134,17 @@ async function molSvg(smiles, id) {
  * @param {boolean} [o.background] 铺一层白底（存成附件 / 打印时要用）；
  *   直接贴在纸面上看（比如筛选表表头那张）就传 false，不然纸面会多出一块白方块。
  */
-export async function composeSchemeSvg({ reactants = [], product = '', above = [], below = [], background = true } = {}) {
+export async function composeSchemeSvg({ reactants = [], product = '', productLabel = '', above = [], below = [], background = true } = {}) {
   const rs = [];
   for (let i = 0; i < reactants.length; i++) {
     if (!String(reactants[i] || '').trim()) continue;
     rs.push(await molSvg(reactants[i], `r${i}`));
   }
   const prod = product ? await molSvg(product, 'p') : null;
-  if (!rs.length || !prod) throw new Error('至少要一个反应物和一个产物');
+  // 试反应常常还不知道产物结构：那就只画「反应物 →（箭头）」，
+  // 有产物名就把名字写在箭头右边（没有就干脆留空），不再因为缺产物拒绝出图。
+  const pLabel = String(productLabel || '').trim();
+  if (!rs.length) throw new Error('至少要一个反应物');
 
   const GAP = 14;          // 结构之间的一般间距
   const PLUS = 18;         // 加号的宽度
@@ -158,7 +161,7 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
   const capTopH = capAbove.length ? capAbove.length * LINE_H + CAP_GAP : 0;
   const capBotH = capBelow.length ? capBelow.length * LINE_H + CAP_GAP : 0;
 
-  const maxMolH = Math.max(...rs.map((r) => r.h), prod.h);
+  const maxMolH = Math.max(...rs.map((r) => r.h), prod ? prod.h : 0);
   const cy = PAD + capTopH + maxMolH / 2; // 所有结构都按这条中轴对齐
   const height = Math.round(cy + maxMolH / 2 + capBotH + PAD);
 
@@ -176,8 +179,11 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
   const arrowX1 = arrowZone + (arrowW - arrowLen) / 2;
   const arrowX2 = arrowX1 + arrowLen;
   x = arrowZone + arrowW + GAP * 2;
-  const prodPos = { ...prod, x, y: cy - prod.h / 2 };
-  x += prod.w + PAD;
+  const PROD_SIZE = 15;
+  const pLabelW = pLabel ? [...pLabel].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? PROD_SIZE : PROD_SIZE * 0.55), 0) : 0;
+  const prodPos = prod ? { ...prod, x, y: cy - prod.h / 2 } : null;
+  x += prod ? prod.w : pLabelW;
+  x += PAD;
   const width = Math.round(x);
 
   const molTag = (m) =>
@@ -232,7 +238,10 @@ export async function composeSchemeSvg({ reactants = [], product = '', above = [
     placed.map(molTag).join('') +
     pluses +
     arrow +
-    molTag(prodPos) +
+    (prodPos ? molTag(prodPos) : '') +
+    (pLabel
+      ? `<text x="${Math.round(arrowZone + arrowW + GAP * 2)}" y="${Math.round(cy + PROD_SIZE * 0.35)}" font-size="${PROD_SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${esc(pLabel)}</text>`
+      : '') +
     cap +
     '</svg>'
   );
