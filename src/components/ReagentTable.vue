@@ -5,7 +5,7 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, num, parseMwCell, roleTone, round, rowKind, totals, vesselHint } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, num, parseMwCell, roleTone, round, rowKind, totals, vesselHint } from '../lib/reagent.js';
 import { compoundDict, reagentDict } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
@@ -262,12 +262,12 @@ function recomputeAll() {
     if (i === 0) {
       if (!b || num(r.mmol) === b) return;
       r.mmol = b;
-      if (!num(r.eq)) r.eq = 1;
+      if (!eqNum(r.eq)) r.eq = 1;
       syncAmount(r);
       return;
     }
-    if (num(r.eq) === null || !b) return;
-    r.mmol = round(b * num(r.eq), 4);
+    if (eqNum(r.eq) === null || !b) return;
+    r.mmol = round(b * eqNum(r.eq), 4);
     syncAmount(r);
   });
 }
@@ -288,7 +288,7 @@ function onMw(r) {
 }
 
 function onEq(r) {
-  const eq = num(r.eq);
+  const eq = eqNum(r.eq);
   const b = num(props.model.base) || 0;
   if (eq !== null && b) {
     r.mmol = round(b * eq, 4);
@@ -393,9 +393,9 @@ function onMwInput(ev, r) {
 }
 
 function onEqInput(ev, r) {
-  applyNumeric(ev.target, '');
+  applyNumeric(ev.target, '%');     // 当量可以写 `10%`（摩尔百分数）
   r.eq = ev.target.value;
-  const eq = num(r.eq);
+  const eq = eqNum(r.eq);
   const b = num(props.model.base) || 0;
   if (eq !== null && b) {
     r.mmol = round(b * eq, 4);
@@ -644,7 +644,7 @@ function hintFor(r, field) {
   const mmol = num(r.mmol);
   const mw = num(r.mw);
   const conc = num(r.conc);
-  const eq = num(r.eq);
+  const eq = eqNum(r.eq);
   const base = num(props.model.base);
   const name = rowLabel(r);
 

@@ -43,6 +43,17 @@ export const num = (v) => {
   return Number.isFinite(x) ? x : null;
 };
 
+/** 当量里的数字：允许写成 `10%`（催化剂常用摩尔百分数）→ 0.1；`2` → 2；空 / 非法 → null */
+export const eqNum = (v) => {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  if (s.endsWith('%')) {
+    const x = num(s.slice(0, -1));
+    return x === null ? null : x / 100;
+  }
+  return num(s);
+};
+
 export const round = (v, d = 2) => {
   const x = num(v);
   if (x === null) return '';
