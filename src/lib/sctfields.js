@@ -115,12 +115,20 @@ export function variations(base, cur) {
     if (a !== b) push(b || '无溶剂');
   }
 
+  // 规模变了就说一下用量（放大 / 缩小本身就是一次筛选）
+  if (cur.base_mmol != null && String(base.base_mmol ?? '') !== String(cur.base_mmol)) {
+    push(`${cur.base_mmol} mmol`);
+  }
+
   const bm = reagentMapOf(base);
   const cm = reagentMapOf(cur);
   const nameOf = (k) => k.split(':')[1];
   const roleOf = (k) => k.split(':')[0];
-  const added = [...cm.keys()].filter((k) => !bm.has(k));
-  const removed = [...bm.keys()].filter((k) => !cm.has(k));
+  // 基准那条的投料表要是没填（老记录只剩溶剂行），拿它比会把整张表都标成「+X」——
+  // 那不是改动，跳过投料部分。用户要的只是「改动部分」。
+  const baseFilled = [...bm.keys()].some((k) => roleOf(k) !== '溶剂' && String(nameOf(k)).trim());
+  const added = baseFilled ? [...cm.keys()].filter((k) => !bm.has(k)) : [];
+  const removed = baseFilled ? [...bm.keys()].filter((k) => !cm.has(k)) : [];
   const usedAdd = new Set();
   const usedDel = new Set();
 
@@ -145,7 +153,7 @@ export function variations(base, cur) {
     push(`− ${nameOf(d)}`);
   }
   // 同一个试剂只改了当量：只写新当量
-  for (const [k, eq] of cm) {
+  for (const [k, eq] of baseFilled ? cm : []) {
     if (!bm.has(k)) continue;
     if (String(bm.get(k) ?? '') !== String(eq ?? '')) push(`${nameOf(k)} ${eqText(eq) || '—'}`);
   }

@@ -116,12 +116,16 @@ const rows = computed(() => {
     // 列表接口没带 variant（那是编辑页用完整投料表算的），这里用列表里有的条件字段自己比
     const withVariant = ordered.map((m) => {
       const diffs = m.id === base.id ? [] : listDiff(base, m);
-      const variant = m.id === base.id ? '基准' : diffs.length === 0 ? '重复' : `改：${diffs.join('、')}`;
       // 规模不同不算改条件（重复实验放大 / 缩小很正常），单独提示
       const scaleNote =
         String(base.base_mmol ?? '') !== String(m.base_mmol ?? '') && m.base_mmol != null
-          ? `${base.base_mmol ?? '—'} → ${m.base_mmol} mmol`
+          ? base.base_mmol == null
+            ? `${m.base_mmol} mmol`   // 基准那条没记规模，就别写「— → 0.2」
+            : `${base.base_mmol} → ${m.base_mmol} mmol`
           : '';
+      // 只差规模也算「另一种条件」（不然整摞会被读成「重复 ×2」），但卡片上不再重复写一遍——
+      // 规模本来就有自己那行小注
+      const variant = m.id === base.id ? '基准' : diffs.length ? `改：${diffs.join('、')}` : scaleNote ? '改：规模' : '重复';
       return { ...m, diffs, variant, scaleNote };
     });
     const allRepeat = withVariant.every((m) => m.variant === '基准' || m.variant === '重复');
@@ -257,27 +261,35 @@ function eqSame(a, b) {
 
 function listDiff(base, m) {
   const diffs = [];
+  const parse = (sig) =>
+    Object.fromEntries(
+      String(sig || '')
+        .split('|')
+        .filter(Boolean)
+        .map((one) => {
+          const [role, name, eq] = one.split(':');
+          return [`${role}:${name}`, { role, name, eq }];
+        })
+    );
+  const a = parse(base.reagent_sig);
+  const b = parse(m.reagent_sig);
+  // 溶剂现在就是投料表里 role=溶剂 的一行：有那一行就只看投料表，
+  // 不再额外冒一颗「溶剂」——否则「加 DCM / 去 THF」把溶剂讲了两遍
+  const solInTable = [...Object.keys(a), ...Object.keys(b)].some((k) => k.startsWith('溶剂:'));
   // 规模变了，浓度多半是被动跟着变的（放大时溶剂不一定等比加）——不算改条件
   const scaleChanged = String(base.base_mmol ?? '') !== String(m.base_mmol ?? '');
   for (const [k, label] of LIST_VARS) {
     if (k === 'concentration' && scaleChanged) continue;
+    if (k === 'solvent' && solInTable) continue;
     if (String(base[k] ?? '') !== String(m[k] ?? '')) diffs.push(label);
   }
-  if (String(base.substrates || '') !== String(m.substrates || '')) diffs.push('底物');
+  // 基准那条的投料表要是压根没填（老记录只剩空行 / 只有溶剂），拿它比会把整张表都标成「加」——
+  // 那不是改动，跳过；用户要的只是「改动部分」。
+  const baseFilled = Object.values(a).some((r) => String(r.role || '') !== '溶剂' && String(r.name || '').trim());
+  const baseSub = String(base.substrates || '').trim();
+  if (baseSub && baseSub !== String(m.substrates || '').trim()) diffs.push('底物');
   // 投料表：签名一样就跳过；不一样就点出「加 / 去 / 当量」哪种变化
-  if (String(base.reagent_sig || '') !== String(m.reagent_sig || '')) {
-    const parse = (sig) =>
-      Object.fromEntries(
-        String(sig || '')
-          .split('|')
-          .filter(Boolean)
-          .map((one) => {
-            const [role, name, eq] = one.split(':');
-            return [`${role}:${name}`, { role, name, eq }];
-          })
-      );
-    const a = parse(base.reagent_sig);
-    const b = parse(m.reagent_sig);
+  if (baseFilled && String(base.reagent_sig || '') !== String(m.reagent_sig || '')) {
     const nm = (r) => r.name || '（未命名）';
     const eqTxt = (v) => {
       const t = String(v ?? '').trim();
@@ -499,7 +511,7 @@ function onStackFace(row) {
                   <span v-if="m.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                   <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
                   <span v-if="rxnDesc(m)" class="stack-rxn">{{ rxnDesc(m) }}</span>
-                  <span v-if="!m.diffs || !m.diffs.length" class="stack-variant">{{ m.variant }}</span>
+                  <span v-if="(!m.diffs || !m.diffs.length) && m.variant !== '改：规模'" class="stack-variant">{{ m.variant }}</span>
                   <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
                   <span class="exp-date">{{ m.date }}</span>
                   <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>

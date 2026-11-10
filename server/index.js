@@ -2021,12 +2021,20 @@ function diffItems(baseRow, baseMap, row, map) {
     if (a === b) continue;
     out.push(key === 'solvent' && !b ? '无溶剂' : `${label} ${b || '空'}`);
   }
-  for (const [key, eq] of map) {
-    const [role, name] = key.split(':');
-    if (!baseMap.has(key)) out.push(`${role} +${name}${eq ? ` ${eq} eq` : ''}`);
-    else if (String(baseMap.get(key)) !== String(eq)) out.push(`${name} ${eq || '—'} eq`);
+  // 基准那条的投料表要是没填（老记录只剩溶剂行），拿它比会把整张表都标成「+X」——
+  // 那不是改动，跳过投料部分，只比条件字段。
+  if ([...baseMap.keys()].some((k) => !k.startsWith('溶剂:'))) {
+    for (const [key, eq] of map) {
+      const [role, name] = key.split(':');
+      if (!baseMap.has(key)) out.push(`${role} +${name}${eq ? ` ${eq} eq` : ''}`);
+      else if (String(baseMap.get(key)) !== String(eq)) out.push(`${name} ${eq || '—'} eq`);
+    }
+    for (const [key] of baseMap) if (!map.has(key)) out.push(`去掉 ${key.split(':')[1]}`);
   }
-  for (const [key] of baseMap) if (!map.has(key)) out.push(`去掉 ${key.split(':')[1]}`);
+  // 规模单独算一项：投料表没填全的基准（老记录）跟本条比，唯一能看出来的改动就是用量
+  const aMol = baseRow.base_mmol ?? null;
+  const bMol = row.base_mmol ?? null;
+  if (bMol != null && String(aMol ?? '') !== String(bMol)) out.push(`用量 ${bMol} mmol`);
   return out;
 }
 
