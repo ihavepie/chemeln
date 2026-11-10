@@ -531,10 +531,20 @@ body {
 }
 /* 题目和描述之间拉一根极淡的横线，描述靠右（像稿纸上「题目 —— 副题」那种排法） */
 .exp-title .exp-rule {
-  /* 固定一小段横线，不跟着卡片宽度伸缩——拉成一条长线会把题目和描述拽成两半 */
-  flex: 0 0 14px;
-  height: 1px;
+  /* 题目和描述之间那段空白里，画一小段横线、并且在空白正中（不贴着题目）。
+     横线本身固定 18px，不跟着卡片宽度拉长——拉长了就把一行拽成两半。 */
+  flex: 1 1 auto;
+  min-width: 18px;
   align-self: center;
+  display: flex;
+  justify-content: center;
+  height: 1px;
+}
+.exp-title .exp-rule::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 1px;
   background: var(--line-2);
   opacity: 0.9;
 }
