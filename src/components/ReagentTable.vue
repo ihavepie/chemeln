@@ -246,11 +246,19 @@ const isBaseRow = (r) => baseRow.value === r;
 /** 表里真正显示的第一行（rows 的顺序按 position，可能不是第一步在前） */
 const firstRow = computed(() => rowsOf(0)[0] || rows.value[0] || null);
 
-/** 只有一步、而且这一步什么都没填时，整条「第 1 步」标题行都不显示 */
+/** 只有一步时，整条「第 1 步」标题行都不显示（用户说多余）——时间写条件那行的「时间节点」就够了。
+ *  但 条件 / 之后 / 加料 / 搅拌 只要写过一样就还露出来，不然那些字会藏进看不见的地方。
+ *  起止时间不算：单步时它就只是把「时间节点」再抄一遍。 */
 const singleStep = computed(() => steps.value.length <= 1);
-const stepHasInfo = (s) =>
-  !!(String(s.label || '').trim() || String(s.condition || '').trim() || String(s.workup || '').trim() || s.start || s.end);
-const showStepHead = (s) => !singleStep.value || stepHasInfo(s);
+const stepHasExtras = (s) =>
+  !!(
+    String(s.label || '').trim() ||
+    String(s.condition || '').trim() ||
+    String(s.workup || '').trim() ||
+    String(s.addition || '').trim() ||
+    String(s.stir || '').trim()
+  );
+const showStepHead = (s) => !singleStep.value || stepHasExtras(s);
 
 function syncAmount(r) {
   const next = derive(r);
