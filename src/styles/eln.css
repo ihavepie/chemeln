@@ -5772,17 +5772,31 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   align-items: flex-end;
 }
 .pgroup--float.is-right { align-items: flex-start; }
-/* 挤的时候：只留短杠、不写编号（编号在悬停预览卡里，纸面右上也有） */
-.pgroup--float.is-compact .pgroup-lbl { display: none; }
+/* 编号那行画在**纸面自己的左边距**里（`left: calc(100% + 6px)` 就是纸的起点），
+   不占中栏列表那侧那 20 多 px 的缝，所以窗口窄也不会压到列表卡片。 */
 /* 靠右时短杠左端贴齐、编号挪到短杠**右边**，方向全部镜像过来 */
 .pgroup--float.is-right .pgroup-tab,
 .pgroup--float.is-right .pgroup-add { justify-content: flex-start; }
 .pgroup--float.is-right .pgroup-tab::before { order: -1; }
 .pgroup--float.is-right .pgroup-lbl {
-  right: auto;
   left: calc(100% + 8px);
+  right: auto;
   flex-direction: row-reverse;
 }
+/* 缝太窄（<130px）时把编号改画进**纸面自己的左边距**里（A4 有 44px），
+   只写编号、不写变化——那一段留给悬停预览卡。 */
+.pgroup--float.is-inline .pgroup-lbl {
+  right: auto;
+  left: calc(100% + 7px);
+  flex-direction: row;
+  opacity: 0.8;
+}
+.pgroup--float.is-right.is-inline .pgroup-lbl {
+  left: auto;
+  right: calc(100% + 7px);
+  flex-direction: row-reverse;
+}
+.pgroup--float.is-inline .pgroup-var { display: none; }
 .pgroup--float.is-right .pgroup-add { padding-right: 0; padding-left: 3px; }
 
 .pgroup-cap {

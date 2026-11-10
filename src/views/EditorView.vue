@@ -751,35 +751,28 @@ function toggleRailSide() {
 }
 const railStyle = ref({});
 const railPlace = ref(railSide.value);   // 实际生效的那一侧（留白不够时会换边）
-const railCompact = ref(false);          // 挤的时候只留短杠、不显示编号
+const railInline = ref(false);           // 缝太窄：编号改画在纸面左边距里（只写编号）
 function updateRail() {
   const el = sheetEl.value;
   if (!el || page.value !== 1) return;
   const r = el.getBoundingClientRect();
-  // 别贴着纸：整排在纸面旁边留出 18px 空隙，漂在内容区旁边的白底上。
-  // 但不能越出「编辑区」那条边界——越过去就压在中栏列表的卡片上了（窄窗口就是这样）。
+  // 短杠贴着纸边（6px 缝）站在“缝”里；编号那行不占缝——它画在**纸面自己的左边距**里
+  // （A4 纸左边距 44px，够写一行 9.5px 小字），所以窗口窄也不会压到中栏列表。
   const ed = editorEl.value ? editorEl.value.getBoundingClientRect() : { left: 0, right: window.innerWidth };
-  const gapL = r.left - ed.left;
-  const gapR = window.innerWidth - r.right;
-  // 先按偏好选边；那一侧连 12px 都挤不出来才换另一侧（换边比贴着列表好，但别乱换）
-  const roomOf = (side) => (side === 'right' ? gapR : gapL);
+  const railW = 22;
   let side = railSide.value;
-  if (roomOf(side) < 12) {
-    const other = side === 'right' ? 'left' : 'right';
-    if (roomOf(other) >= 12) side = other;
-  }
-  const room = roomOf(side);
-  const compact = room < 110;          // 放不下「编号」那一行时只留短杠
-  const railW = compact ? 22 : 42;
-  let left = side === 'right' ? r.right + 18 : r.left - 18 - railW;
+  if (side === 'right' && window.innerWidth - r.right < 34) side = 'left';
+  if (side === 'left' && r.left - ed.left < 12) side = 'right';
+  // 那一侧的缝够宽（≥130px）就把编号写在缝里；不够就写进纸面自己的左边距（只写编号）
+  const gutter = side === 'right' ? window.innerWidth - r.right : r.left - ed.left;
+  railInline.value = gutter < 130;
+  let left = side === 'right' ? r.right + 6 : r.left - 6 - railW;
   if (side === 'left') {
-    left = Math.max(left, ed.left + 4);            // 不许压到中栏列表
-    if (left + railW > r.left - 4) left = r.left - railW - 4;  // 实在挤，就只留 4px 缝
+    left = Math.max(left, ed.left + 4);                          // 不许压到中栏列表
   } else {
     left = Math.min(left, window.innerWidth - railW - 4);
   }
   railPlace.value = side;
-  railCompact.value = compact;
   railStyle.value = {
     left: `${Math.round(left)}px`,
     top: `${Math.round(r.top + 42)}px`,
@@ -1232,7 +1225,7 @@ const openAttachment = (id) => {
           <nav
             v-if="siblings.length > 1 && page === 1"
             class="pgroup pgroup--float noprint"
-            :class="{ 'is-right': railPlace === 'right', 'is-compact': railCompact }"
+            :class="{ 'is-right': railPlace === 'right', 'is-inline': railInline }"
             :style="railStyle"
             aria-label="平行实验"
           >
