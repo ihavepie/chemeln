@@ -26,7 +26,7 @@ import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
-import { amountText, derive, mwText, num, round, saneDensity } from '../lib/reagent.js';
+import { amountText, derive, eqNum, mwText, num, round, saneDensity, volText } from '../lib/reagent.js';
 import { schemeParts } from '../lib/expScheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
@@ -788,10 +788,24 @@ async function applyRecipe() {
   // 套用配方 = 把这套投料方案按「当前反应规模」重新算一遍（弹窗上就是这么写的）。
   // 以前只把 mmol/用量清空，表里剩下一个个空格，得逐行重填。
   const scale = num(reagent.base);
+  const srcScale = num(full.base_mmol);   // 源记录的规模：溶剂量按比例搬
   reagent.rows = (full.reagents || []).map((r) => {
     const row = { ...toRow(r), mmol: null, mass_mg: null, volume_ul: null, amountText: '' };
-    if (scale && row.role !== '溶剂' && num(row.eq) !== null) {
-      row.mmol = round(scale * num(row.eq), 4);
+    // 溶剂：用量不按当量算，直接照源记录等比缩放（以前一律清空，套完配方溶剂量是空的）
+    if (row.role === '溶剂') {
+      const ul = num(r.volume_ul);
+      if (ul !== null && ul > 0) {
+        const k = scale && srcScale ? scale / srcScale : 1;
+        row.volume_ul = round(ul * k, 1);
+        row.amountText = volText(row.volume_ul);
+      }
+      return row;
+    }
+    // 当量要认 `10%` 这种摩尔百分数（eqNum：10% → 0.1）；以前用 num() 得到 null，
+    // 于是催化剂那行 mmol / 质量 / 用量 全空——「套用配方」出来一个空格子
+    const e = eqNum(row.eq);
+    if (scale && e !== null) {
+      row.mmol = round(scale * e, 4);
       const d = derive({ ...row });
       row.mass_mg = d.mass_mg ?? null;
       row.volume_ul = d.volume_ul ?? null;
