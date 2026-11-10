@@ -366,7 +366,8 @@ function applyAmount(r, { rewrite = true } = {}) {
     r.mass_mg = null;
     r.mmol = null;
     r.eq = '';
-    r.amountText = `${round(ul / 1000, 2)} mL`;
+    // 只有失焦 / 回车才把「3」规整成「3 mL」；边打字不动，否则光标乱跳、字会被吃成「3mL23」
+    if (rewrite) r.amountText = amountText(r);
     props.notify();
     return true;
   }
@@ -808,6 +809,9 @@ function hintFor(r, field) {
   }
 
   if (field === 'amount') {
+    if (isSolvent(r)) {
+      return `${name}：溶剂直接填量（mL / µL 都能写，比如 3 mL）`;
+    }
     if (mmol === null) return `${name}：先填当量或 mmol，用量将自动计算`;
     const math = amountMath(r, mmol);
     return math ? `${name}：${math}` : `${name}：${round(mmol, 3)} mmol`;
@@ -1133,7 +1137,8 @@ function onDrop(ev) {
                 <input v-else class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol')" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
               </td>
               <td class="amount-td" :data-kind="rowKind(r)">
-                <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount')" @blur="blurHint" @keydown="onKeydown($event, r, 'amount')" />
+                <!-- 值就是 r.amountText 本身：边打字只解析不回写（回写会把光标顶走、字被吃成「3mL23」），失焦才规整成「3 mL」 -->
+                <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount')" @blur="onAmount(r); blurHint()" @keydown="onKeydown($event, r, 'amount')" />
               </td>
               <td class="note-td">
                 <input class="note-cell" data-f="note" :value="r.note" :placeholder="firstRow === r ? '说明' : ''" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
