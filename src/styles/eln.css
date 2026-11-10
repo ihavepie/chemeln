@@ -7354,6 +7354,29 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 }
 .rl-allcheck:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
 .rl-allcheck:disabled { opacity: 0.45; cursor: default; }
+/* 试剂库里「这个试剂用过的当量」小签（用得最多的那颗是强调色） */
+.rl-nm { display: block; }
+.rl-vars { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.rl-var,
+.lib-var {
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 14px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f4f2ee;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.rl-var.is-on,
+.lib-var.is-on { background: #f8f0e9; color: var(--accent-ink); }
+.rl-var em,
+.lib-var em { font-style: normal; opacity: 0.65; margin-left: 1px; }
+.lib-vars { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.lib-var { cursor: pointer; }
+.lib-var:hover { background: #f8f0e9; color: var(--accent-ink); }
+.lib-var.is-none { opacity: 0.7; }
+
 /* 核过了、三个库都没有：写「查无」并压淡，跟「还没查过」的一横区分开 */
 .rl-miss { color: var(--ink-4); opacity: 0.7; font-size: 11px; letter-spacing: 0.02em; }
 

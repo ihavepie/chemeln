@@ -624,8 +624,15 @@ const libShown = computed(() => {
   return libItems.value.filter((it) => !k || String(it.name || '').toLowerCase().includes(k) || String(it.role || '').includes(k));
 });
 
-function pickFromLib(it) {
-  const role = it.role || '试剂';
+/**
+ * 从试剂库插一行。eq 默认取这个试剂**用得最多的那个当量**（10% / 0.18 / 2…），
+ * 不是硬写 1 —— 不然选个 Pd(OPiv)2 会被填成 1.0 eq 这种离谱值。
+ * 点某颗当量小签时就用那颗（`v`）。
+ */
+function pickFromLib(it, v) {
+  const role = (v && v.role) || it.role || '试剂';
+  const eqRaw = v && v.eq !== '' && v.eq != null ? v.eq : it.defaultEq;
+  const eq = eqRaw === '' || eqRaw == null ? 1 : (/^[\d.]+$/.test(String(eqRaw)) ? Number(eqRaw) : String(eqRaw));
   const row = toRow({
     step: steps.value.length,
     role,
@@ -633,7 +640,7 @@ function pickFromLib(it) {
     mw: num(it.mw),
     conc: num(it.conc),
     density: role === '溶剂' ? saneDensity(it.density) : null,
-    eq: 1,
+    eq,
     note: '',
   });
   props.model.rows.push(row);
@@ -1155,7 +1162,24 @@ function onDrop(ev) {
       <div v-else-if="!libShown.length" class="lib-empty">试剂库里没有匹配的条目。</div>
       <div v-else class="lib-list">
         <button v-for="it in libShown" :key="it.name" type="button" class="lib-row" @click="pickFromLib(it)">
-          <span class="lib-name">{{ it.name }}</span>
+          <span class="lib-name">
+            {{ it.name }}
+            <!-- 这个试剂用过的当量；点哪颗就用哪颗（点整行 = 用得最多的那个） -->
+            <span v-if="it.variants && it.variants.length" class="lib-vars">
+              <span
+                v-for="v in it.variants"
+                :key="v.eq + '|' + v.role"
+                class="lib-var"
+                :class="{ 'is-on': it.defaultEq === v.eq, 'is-none': !v.eq }"
+                role="button"
+                tabindex="0"
+                @click.stop="pickFromLib(it, v)"
+                @keydown.enter.stop="pickFromLib(it, v)"
+              >
+                {{ v.eq || '不带当量' }}<em v-if="v.n > 1">×{{ v.n }}</em>
+              </span>
+            </span>
+          </span>
           <span class="lib-role">{{ it.role || '试剂' }}</span>
           <span class="lib-meta mono"><template v-if="it.conc">= {{ Number(it.conc).toFixed(2) }} M</template><template v-else-if="it.mw != null">{{ Number(it.mw).toFixed(2) }}<template v-if="it.per_mmol_g"> · 1 mmol {{ it.per_mmol_g }} g</template><template v-if="it.per_mmol_ul"> / {{ it.per_mmol_ul }} µL</template></template></span>
         </button>

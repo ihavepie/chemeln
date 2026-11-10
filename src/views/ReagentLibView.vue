@@ -178,7 +178,20 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
           </thead>
           <tbody>
             <tr v-for="it in shown" :key="it.name" @click="copyName(it)" :title="`点一下复制「${it.name}」`">
-              <td class="rl-name">{{ it.name }}</td>
+              <td class="rl-name">
+                <span class="rl-nm">{{ it.name }}</span>
+                <!-- 同一个试剂用过的当量（一条记录填一条，这里按试剂归拢） -->
+                <span v-if="it.variants && it.variants.length" class="rl-vars">
+                  <span
+                    v-for="v in it.variants"
+                    :key="v.eq + '|' + v.role"
+                    class="rl-var"
+                    :class="{ 'is-on': it.defaultEq === v.eq }"
+                  >
+                    {{ v.eq || '不带当量' }}<em v-if="v.n > 1">×{{ v.n }}</em>
+                  </span>
+                </span>
+              </td>
               <td class="rl-role">{{ it.role || '—' }}</td>
               <td class="n mono">
                 <span v-if="it.mw == null" :class="{ 'rl-miss': it.checkState === 'miss' }">{{ it.checkState === 'miss' ? '查无' : '—' }}</span>

@@ -3974,6 +3974,45 @@ function reagentLibRows(project, kw) {
     )
     .all(...(project ? [...projectArgs, ...projectArgs, ...projectArgs] : []));
 
+  // 同一个试剂在不同记录里的用法（当量 / 组分）→ 一个试剂一条，用法挂在它下面。
+  // 从投料行直接汇总，不另建表：改一条记录的当量，这里跟着变。
+  const useRows = db
+    .prepare(
+      `SELECT lower(trim(r.name)) AS key, r.eq AS eq, r.role AS role, r.exp_id AS exp_id,
+              e.date AS last_at, e.code AS code
+         FROM reagents r JOIN experiments e ON e.id = r.exp_id
+        WHERE trim(r.name) <> '' ${project ? 'AND e.project = ?' : ''}
+        ORDER BY r.id`
+    )
+    .all(...projectArgs);
+  const normEq = (v) => {
+    const t = str(v).trim();
+    if (!t) return '';
+    const x = Number(t);
+    // 「1」「1.0」算同一种用法；「10%」这种百分数原样留着
+    return Number.isFinite(x) ? String(x) : t;
+  };
+  const variantsByKey = new Map();
+  for (const u of useRows) {
+    const eq = normEq(u.eq);
+    const role = str(u.role).trim();
+    const vk = `${eq}|${role}`;
+    let m = variantsByKey.get(u.key);
+    if (!m) variantsByKey.set(u.key, (m = new Map()));
+    let v = m.get(vk);
+    if (!v) m.set(vk, (v = { eq, role, exps: new Set(), lastAt: '', lastCode: '' }));
+    v.exps.add(u.exp_id);
+    if (str(u.last_at) >= v.lastAt) {
+      v.lastAt = str(u.last_at);
+      v.lastCode = str(u.code);
+    }
+  }
+  const variantsOf = (key) =>
+    [...(variantsByKey.get(key) || new Map()).values()]
+      .map((v) => ({ eq: v.eq, role: v.role, n: v.exps.size, lastAt: v.lastAt, lastCode: v.lastCode }))
+      .sort((x, y) => y.n - x.n || String(y.lastAt).localeCompare(String(x.lastAt)))
+      .slice(0, 8);
+
   const k = str(kw).trim().toLowerCase();
   return lib
     .filter((it) => !k || it.name.toLowerCase().includes(k) || str(it.role).includes(k))
@@ -3991,6 +4030,9 @@ function reagentLibRows(project, kw) {
         live: it.live,
         lastAt: it.last_at || '',
         lastCode: it.last_code || '',
+        // 这个试剂用过的所有「当量 / 组分」组合，用得最多的排前面；defaultEq 给「从试剂库选」用
+        variants: variantsOf(it.key),
+        defaultEq: (variantsOf(it.key)[0] || {}).eq ?? null,
         // checkedAt 空 = 还没联网核过；miss = 核了，三个库都没有（下次别再自动去敲）
         checkedAt: it.checked_at || '',
         checkState: it.check_state || '',
