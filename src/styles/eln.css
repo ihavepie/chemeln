@@ -7601,3 +7601,19 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; align-items: center; justify-content: center; }
 .list-cat.is-drop-target .list-cat-head { color: var(--accent-ink); }
 .list-cat.is-drop-target .list-cat-blank { border-color: var(--accent); color: var(--accent-ink); background: #fbf4ee; }
+
+/* ================================================================
+   手机端（≤820px）补几处图片
+   - 反应式：记录页那张「按投料表画的」只在 scheme_cache 里，是把内联 SVG 贴进
+     `.phone-struct-svg`（跟附件图同一个白底框），要让它自己按宽度缩放；
+   - TLC：板子又高又窄，铺满宽度会顶出一整屏，改成限高居中。
+   ================================================================ */
+.phone-struct-svg { padding: 10px 8px; }
+.phone-struct-svg svg { display: block; width: 100%; height: auto; }
+.phone-spectra.is-tlc img {
+  width: auto;
+  max-width: 100%;
+  max-height: 58vh;
+  margin: 0 auto;
+  display: block;
+}

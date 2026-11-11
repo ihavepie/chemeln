@@ -25,6 +25,9 @@ onMounted(async () => {
 const scheme = computed(
   () => (e.value?.attachments || []).find((a) => a.category === 'scheme') || null
 );
+/* 很多记录的反应式是「按投料表画的」那张，只在 scheme_cache 里、没存成附件：
+   手机上直接把这段内联 SVG 贴出来，不然这类记录在手机上没有反应式可看 */
+const schemeSvg = computed(() => (scheme.value ? '' : String(e.value?.scheme_cache?.svg || '')));
 
 /* ---------------- 手机上唯一要「写」的事：拍照上传 ---------------- */
 const busy = ref('');
@@ -81,7 +84,7 @@ async function onShotPicked(ev) {
   }
 }
 
-const SHOT_LABEL = { tlc: 'TLC', photo: '照片', nmr_other: '谱图' };
+const SHOT_LABEL = { tlc: 'TLC', photo: '照片', nmr_other: '谱图', literature: '文献图' };
 const shots = computed(() =>
   (e.value?.attachments || []).filter(
     (a) => SHOT_LABEL[a.category] && /\.(png|jpe?g|gif|webp)$/i.test(a.original_name || a.filename)
@@ -146,6 +149,7 @@ const amount = (r) => amountText(r) || (num(r.amount_ul) ? `${round(num(r.amount
       <div v-if="scheme" class="phone-struct">
         <img :src="`/api/files/${scheme.id}`" alt="反应式" />
       </div>
+      <div v-else-if="schemeSvg" class="phone-struct phone-struct-svg" v-html="schemeSvg" />
 
       <div v-if="rows.length" class="phone-block">
         <div class="phone-label">投料</div>
@@ -183,16 +187,16 @@ const amount = (r) => amountText(r) || (num(r.amount_ul) ? `${round(num(r.amount
       <div class="phone-block">
         <div class="phone-label">拍照 / 上传</div>
         <div class="phone-shoot">
-          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('tlc')">拍 TLC</button>
-          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('photo')">拍实验照片</button>
-          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('nmr_other')">拍谱图</button>
+          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('tlc')">TLC 图</button>
+          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('photo')">实验照片</button>
+          <button type="button" class="phone-btn" :disabled="!!busy" @click="pickShot('nmr_other')">谱图</button>
         </div>
+        <!-- 不要加 capture：加了 iOS 会直接跳相机、没有「照片图库」可选 -->
         <input
           ref="fileInput"
           class="phone-file"
           type="file"
           accept="image/*"
-          capture="environment"
           multiple
           @change="onShotPicked"
         />
@@ -205,7 +209,7 @@ const amount = (r) => amountText(r) || (num(r.amount_ul) ? `${round(num(r.amount
           </figure>
         </div>
         <p class="phone-hint">
-          <template v-if="!shots.length">拍完自动缩到长边 1600 再上传，回电脑上能直接用。</template>
+          <template v-if="!shots.length">点按钮可以现拍，也可以从相册选；图会先缩到长边 1600 再上传。</template>
         </p>
       </div>
 

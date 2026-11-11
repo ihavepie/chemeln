@@ -29,6 +29,10 @@ const structure = computed(() => file('structure'));
 const nmrs = computed(() =>
   ['h1', 'c13', 'nmr_other'].map((k) => ({ key: k, label: { h1: '¹H NMR', c13: '¹³C NMR', nmr_other: '其他谱图' }[k], f: file(k) })).filter((x) => x.f)
 );
+/* TLC 板也放上来：站在通风橱前最常翻的就是它（一张化合物可能有好几块板） */
+const tlcs = computed(() =>
+  (c.value?.files || []).filter((f) => f.category === 'tlc' && isImageName(f.original_name || f.filename))
+);
 
 const rows = computed(() => {
   const d = c.value;
@@ -78,6 +82,14 @@ const rows = computed(() => {
         <figure v-for="n in nmrs" :key="n.key">
           <img :src="`/api/compound-files/${n.f.id}`" :alt="n.label" />
           <figcaption>{{ n.label }}</figcaption>
+        </figure>
+      </div>
+
+      <div v-if="tlcs.length" class="phone-spectra is-tlc">
+        <div class="phone-label">TLC 板</div>
+        <figure v-for="f in tlcs" :key="f.id">
+          <img :src="`/api/compound-files/${f.id}`" alt="TLC 板" />
+          <figcaption v-if="f.note">{{ f.note }}</figcaption>
         </figure>
       </div>
 

@@ -422,3 +422,12 @@
 - 那枚小框是**平行书签排的折叠按钮**（`railOpen` 为假时显示「平行 ▸」，外面那圈黑边是浏览器的焦点环）。折叠是我之前自己加的（commit `575d254`），用户并不是要它。
 - 现在这排书签**常驻**：「平行 ×N」从按钮改成静态 `<span>`（不可聚焦、没有 hover 变色、`cursor: default`），书签和末尾「＋」一直显示；`railOpen` 状态和切换逻辑一起删掉。
 - 验证（4780）：`.pgroup-cap` 是 `SPAN`「平行 ×3」、`tabIndex=-1`、`outlineStyle=none`，书签 3 枚常显；截图确认纸面左上角没有那个小框了。
+
+## 2026-11-11 · 手机端补图：相册选图、反应式、TLC 板
+
+用户：「手机端的几乎再稍微做一下，就是支持相册选取图片，然后就是化合物的图片和实验的反应式需要在手机端显示」。
+
+- **相册**：`ExperimentMobile` 里那个 `<input type="file">` 带着 `capture="environment"`，iOS 会**直接跳相机**、根本没有「照片图库」。去掉 `capture`，现在点按钮先弹系统菜单（拍照 / 照片图库 / 浏览），三个按钮也改成「TLC 图 / 实验照片 / 谱图」，提示写明「可以现拍，也可以从相册选」。上传前仍然先缩到长边 1600 再传。
+- **实验的反应式**：`ExperimentMobile` 以前只找 `category='scheme'` 的附件图；而「按投料表生成」那张其实只存在 `scheme_cache`（`GET /api/experiments/:id` 会带上 `scheme_cache.svg`），这类记录在手机上完全没有反应式。现在附件图优先，没有就把 `scheme_cache.svg` 内联贴进同一个白底框（`.phone-struct-svg`，`svg{width:100%}`）；图片分类里也补了「文献图」。
+- **化合物的图**：结构式和 ¹H/¹³C 谱图本来就在 `CompoundMobile` 里，这次把 **TLC 板**也加上（`.phone-spectra.is-tlc`：限高 58vh 居中，板子不会被拉成一整屏）。`figcaption` 只在有图注时显示，别和区块标题重复。
+- 验证：临时记录 + `PUT /api/experiments/:id/scheme-cache` 塞一段测试 SVG → 手机宽度截图（390×844）里反应式正常显示；临时化合物 + `POST /api/compounds/:id/files` 传一张真实 TLC 板 → 手机宽度截图里 TLC 段正常、限高、居中；构建产物里已无 `capture:"environment"`。临时实验/化合物删了 + 彻底删除（实验 19、化合物 9）。
