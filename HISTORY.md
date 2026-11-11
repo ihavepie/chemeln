@@ -405,3 +405,12 @@
 - 卡片里原来那颗分类小胶囊（`.cat-tag`）在分段模式下不再显示（头上已经有分类名了）。
 - 验证：临时记录 + 真实鼠标序列（mousedown → 几次 mousemove → mouseup）从「未分类」拖到「321」那一段 → 接口里 `category_id` 变成 8、`project` 跟着变成分类所属的课题（服务端本来就这么做），再拖回「未分类」→ `category_id` 变回 null；点「321」小标题 → 下拉变成 321、列表平铺、显示「暂无实验记录」；再选回「全部分类」→ 五个分段都回来。临时记录删了 + 彻底删除。
 - 没做：化合物那边（`CmpListPane`）还是原来的平铺——要的话照同一套改。
+
+## 2026-11-11 · 去掉列表↔纸面那条拖拽分隔线
+
+用户截图指着列表和纸面之间那条竖条：「这个拖拽条还是去掉吧」。
+
+- 删掉 `PaneGrip.vue`（列表↔纸面那条：`.pane-grip`，14px 宽的透明命中区 + hover 才浮出的强调色细线，宽度存 `eln:listw`），四处挂载点都摘了：`EditorView` / `EmptyEditor` / `CompoundsView` / `CompoundDetail`。
+- `.panes` 的列宽改成固定 `grid-template-columns: var(--panes-w) 1fr`（336px，窄屏 292），不再读 `--listw`；`panesize.js` 里的列表宽那一段（`usePaneSize` / apply / resetWidth）一并删了，只剩内容区左右两条 `.doc-grip`（`eln:docw`，用户没提，保留）。
+- 顺手清掉 `.pane-grip::before/::after`、`body.is-pane-resizing` 那些规则；`--listw` 已经没有任何地方设置/读取，老用户 localStorage 里那条记录不再生效（无害）。
+- 验证：`/e/129`、`/list`、`/compounds`、`/c/80` 四个页面读出来都是 `grip=false cols=336px 732px`、`rootListw=(none)`；截图确认列表右边缘之后直接就是内容区，没有那条竖带。内容宽度那两条 `.doc-grip` 仍在。

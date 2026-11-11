@@ -3,7 +3,6 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import CmpListPane from '../components/CmpListPane.vue';
-import PaneGrip from '../components/PaneGrip.vue';
 import CmpGrid from '../components/CmpGrid.vue';
 import CmpTable from '../components/CmpTable.vue';
 import LabelBatchPanel from '../components/LabelBatchPanel.vue';
@@ -48,7 +47,6 @@ async function create() {
 <template>
   <div class="panes">
     <CmpListPane />
-    <PaneGrip />
     <div class="editor">
       <div class="grid-tools">
         <button class="btn btn-sm btn-ghost" :title="table ? '切成卡片墙' : '切成一行一条的表格'" @click="toggleView">

@@ -3,7 +3,6 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import ExpListPane from '../components/ExpListPane.vue';
-import PaneGrip from '../components/PaneGrip.vue';
 import ExpGrid from '../components/ExpGrid.vue';
 import ExpTable from '../components/ExpTable.vue';
 import { viewOf, setView, createExperiment, addCategory } from '../store.js';
@@ -43,7 +42,6 @@ async function create() {
 <template>
   <div class="panes">
     <ExpListPane />
-    <PaneGrip />
     <div class="editor">
       <div class="grid-tools">
         <button class="btn btn-sm btn-ghost" :title="table ? '切成卡片墙' : '切成一行一条的表格'" @click="toggleView">

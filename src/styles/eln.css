@@ -92,11 +92,11 @@ body {
 
 /* three panes */
 .panes {
-  /* 列宽可以拖（见 .pane-grip）：拖过就按 :root 的 --listw 走，没拖过用 --panes-w 的默认值 */
+  /* 列表列固定宽（那条可拖的分隔线去掉了）：手机 / 窄屏另有 --panes-w 覆盖 */
   --panes-w: 336px;
   position: relative;
   display: grid;
-  grid-template-columns: var(--listw, var(--panes-w)) 1fr;
+  grid-template-columns: var(--panes-w) 1fr;
   width: 100%;
   overflow: hidden;
 }
@@ -7299,60 +7299,6 @@ body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; us
 .sct-block-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 2px; }
 .sct-block-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .sct-block-head .spacer { flex: 1 1 auto; }
-
-/* ================================================================
-   列表列和纸面之间的分隔线可以拖（跟 DSH 布局里那条面板分隔条一个路数）：
-   平时就是列表自己那道 1px 边线，鼠标靠近才浮出一条强调色细线；
-   拖动时整页 col-resize 光标 + 禁选字。宽度存 localStorage `eln:listw`。
-   ================================================================ */
-.pane-grip {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 8;
-  left: var(--listw, var(--panes-w));
-  width: 14px;
-  margin-left: -7px;
-  cursor: col-resize;
-  touch-action: none;
-}
-.pane-grip::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  margin-left: -0.5px;
-  /* 平时**不画线**（用户嫌这条线一直在）：hover / 拖动才浮出来，跟 .doc-grip 一致 */
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity 0.12s, width 0.12s;
-}
-/* 中线上一小段「抓手」，跟导轨那条一致 */
-.pane-grip::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 4px;
-  height: 44px;
-  margin: -22px 0 0 -2px;
-  border-radius: 99px;
-  background: #a8a396;
-  opacity: 0;                       /* 抓手也只在 hover 时出现 */
-  transition: background 0.12s, height 0.12s, opacity 0.12s;
-}
-.pane-grip:hover::before,
-.pane-grip.is-on::before { opacity: 1; }
-.pane-grip:hover::after,
-.pane-grip.is-on::after { opacity: 1; }
-.pane-grip:hover::before,
-.pane-grip.is-on::before { background: var(--accent); height: 56px; margin-top: -28px; }
-.pane-grip:hover::after,
-.pane-grip.is-on::after { background: var(--accent); width: 2px; margin-left: -1px; }
-body.is-pane-resizing,
-body.is-pane-resizing * { cursor: col-resize !important; user-select: none !important; }
 
 /* ================================================================
    记录页「类型」那一格：记录类型 + 化学类型**并排**（以前上下堆着，
