@@ -231,7 +231,8 @@ watch(
     }
     moreMenu.value = false;
     statusMenu.value = false;
-    page.value = String(route.query.p) === '2' ? 2 : 1;
+    // 正停在附件那一屏（在看谱图），切记录就接着看那条的附件；否则按 URL / 回第 1 页
+    if (!(page.value === 3 && sheetPrefs.attachments)) page.value = String(route.query.p) === '2' ? 2 : 1;
     await load();
     // 切完弹一个气泡通知（只在这条记录是从别处切过来时提示，第一次打开不提示）
     if (exp.value?.code) toast(`已切换到 ${exp.value.code}`, 'info', 1800);
@@ -1174,6 +1175,15 @@ const openAttachment = (id) => {
         <div class="page-tabs noprint" role="tablist">
           <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" @click="page = 1">第 1 页 · 主记录</button>
           <button class="ptab" :aria-selected="page === 2 ? 'true' : 'false'" @click="page = 2">第 2 页 · 续页</button>
+          <button
+            v-if="sheetPrefs.attachments"
+            class="ptab"
+            :aria-selected="page === 3 ? 'true' : 'false'"
+            :title="`原始文件都在这儿：谱图、TLC、照片、文献图（${(exp.attachments || []).length} 个）`"
+            @click="page = 3"
+          >
+            附件 · {{ (exp.attachments || []).length }}
+          </button>
         </div>
         <CatPick
           class="toolbar-cat"
@@ -1509,15 +1519,21 @@ const openAttachment = (id) => {
             </div>
           </section>
 
+        </article>
+
+        <!-- ============ 附件（不占纸面：原始文件不是记录正文，打印 / 存 PDF 也不带它） ============ -->
+        <article v-if="sheetPrefs.attachments && page === 3" class="sheet sheet-att">
+          <div class="sheet-runner">
+            <span>{{ store.boot?.settings?.lab_heading || '方法学实验记录' }} · 附件</span>
+            <span>{{ exp.code }}</span>
+          </div>
           <AttachmentsBlock
-            v-if="sheetPrefs.attachments"
             :exp-id="exp.id"
             :attachments="exp.attachments || []"
             :locked="exp.locked"
             @refresh="refreshAttachments"
           />
-
-          <div class="sheet-foot noprint">
+          <div class="sheet-foot">
             <button class="btn btn-sm btn-danger" :disabled="exp.locked" @click="removeExperiment"><Icon name="trash" :size="13" /> 移入回收站</button>
             <span class="hint">数据目录 <span class="mono">{{ store.boot?.dataDir }}</span></span>
           </div>

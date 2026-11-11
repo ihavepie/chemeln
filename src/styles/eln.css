@@ -6878,6 +6878,11 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .hist-changes .chg-restore:hover { color: var(--accent-ink); }
 .hist-changes .chg-restore:disabled { cursor: default; color: var(--ink-4); }
 
+/* 附件那一屏：不在记录纸上（打印 / 存 PDF 都不带），所以不画 A4 纸的感觉，当一块管理面板 */
+.sheet-att { padding: 26px 30px 40px; }
+.sheet-att .sec-att, .sheet-att .att-block { box-shadow: none; }
+.sheet-att .sheet-foot { margin-top: 22px; }
+
 /* ===== 拖动排序（2026-11）=====
    卡片是 <button>，拖动走 `lib/pointdrag.js`（普通 mouse 事件）。
    **这里必须显式 `-webkit-user-drag: none`**：WebKit 里只要元素被当成可原生拖拽

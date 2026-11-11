@@ -109,7 +109,7 @@ const openFile = (a) => {
 
 <template>
   <section class="sec sec-att">
-    <h2 class="sec-title"><span class="num">附</span>谱图与附件<span class="hint">{{ attachments.length }} 个</span></h2>
+    <h2 class="sec-title">谱图与附件<span class="hint">{{ attachments.length }} 个</span></h2>
 
     <div v-if="!locked" class="att-tools noprint">
       <select v-model="cat" class="select">
