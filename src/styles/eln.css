@@ -7599,3 +7599,22 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   margin: 0 auto;
   display: block;
 }
+
+/* 预览弹窗里的图片：框跟着图走（小图别再留一大片灰底），大图仍夹在视口里 */
+.fp.is-image {
+  width: fit-content;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px;
+  margin: 0 auto;
+  max-width: 100%;
+}
+.fp.is-image .fp-img { display: block; margin: 0 auto; }
+/* 窄弹窗（图小、框跟着小）时文件名那一行别把按钮挤成两行：省略号收尾 */
+.fp-foot > .hint:first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

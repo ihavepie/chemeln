@@ -47,14 +47,27 @@ watch(
   { immediate: true }
 );
 
+/* 弹窗宽度跟着图片走：小图（粘贴截屏常常只有一百多像素宽）别再撑成一个空荡荡的大框，
+   大图仍然夹在 1180px / 92vw 里。图片加载出来才知道原始尺寸，所以先按默认宽渲染。 */
+const size = ref(null);
+function onImgLoad(ev) {
+  const el = ev.target;
+  if (el?.naturalWidth) size.value = { w: el.naturalWidth, h: el.naturalHeight };
+}
+const modalWidth = computed(() => {
+  if (kind.value !== 'image' || !size.value) return 'min(1180px, 92vw)';
+  const want = Math.max(360, Math.min(1180, size.value.w + 64));
+  return `min(${want}px, 92vw)`;
+});
+
 const openTab = () => window.open(props.src, '_blank');
 const download = () => window.open(`${props.src}${props.src.includes('?') ? '&' : '?'}download=1`, '_blank');
 </script>
 
 <template>
-  <AppModal :title="name" :show-confirm="false" cancel-text="关闭" width="min(1180px, 92vw)" @close="emit('close')">
-    <div class="fp">
-      <img v-if="kind === 'image'" class="fp-img" :src="src" :alt="name" />
+  <AppModal :title="name" :show-confirm="false" cancel-text="关闭" :width="modalWidth" @close="emit('close')">
+    <div class="fp" :class="{ 'is-image': kind === 'image' }">
+      <img v-if="kind === 'image'" class="fp-img" :src="src" :alt="name" @load="onImgLoad" />
       <iframe v-else-if="kind === 'pdf'" class="fp-pdf" :src="src" :title="name" />
       <pre v-else-if="kind === 'text'" class="fp-text">{{ err || text || '读取中…' }}</pre>
       <div v-else class="fp-other">
