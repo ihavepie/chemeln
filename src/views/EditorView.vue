@@ -70,6 +70,7 @@ const fields = reactive({
   no_yield: 0,
   scheme_rxn: '',
   scheme_smiles: '',
+  lit_note: '',
   kind: '',
 });
 
@@ -1475,6 +1476,37 @@ const openAttachment = (id) => {
           <section v-if="sheetPrefs.conclusion" class="sec">
             <h2 class="sec-title"><span class="num">四</span>讨论与结论</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.conclusion" :disabled="exp.locked" placeholder="本组条件的结论与下一轮拟考察的变量" />
+          </section>
+
+          <!-- 文献：文献里的反应式 / 条件表截图（可多张、带图注）+ 一段要点。出处仍是第 1 页抬头那格「文献」 -->
+          <section v-if="sheetPrefs.lit" class="sec">
+            <h2 class="sec-title"><span class="num">五</span>文献</h2>
+            <textarea
+              class="sheet-text"
+              rows="2"
+              v-autogrow
+              v-model="fields.lit_note"
+              :disabled="exp.locked"
+              placeholder="文献里的标准条件 / 产率 / 跟我们做法的差别"
+            />
+            <div class="op-shots">
+              <span class="op-cap">文献图</span>
+              <div class="sec-shots is-lit" @mouseenter="onHover('lit')" @mouseleave="onHover('')">
+                <TlcStrip
+                  category="literature"
+                  captions
+                  cap-placeholder="图注，如：文献 Table 2 / Scheme 1"
+                  :attachments="exp.attachments || []"
+                  :locked="exp.locked"
+                  :hovered="hovered"
+                  :on-hover="onHover"
+                  :on-pick="pickFile"
+                  :on-open="openAttachment"
+                  :on-caption="saveCaption"
+                  :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
+                />
+              </div>
+            </div>
           </section>
 
           <AttachmentsBlock

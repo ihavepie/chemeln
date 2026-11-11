@@ -36,6 +36,7 @@ const vol = (ul) => {
 const CELL_CATEGORY = {
   scheme: '反应式',
   tlc: 'TLC 板',
+  literature: '文献图',
   h1: '¹H NMR',
   c13: '¹³C NMR',
   nmr_other: '其他核磁',
@@ -226,6 +227,7 @@ function experimentToMarkdown(exp, { reagents = [], attachments = [], settings =
     L.push('');
   }
 
+  block('文献要点', exp.lit_note);
   block('表征数据', exp.characterization);
   block('现象与观察', exp.notes);
   block('结论', exp.conclusion);

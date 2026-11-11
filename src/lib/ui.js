@@ -19,7 +19,7 @@ export const STATUS_TONE = {
   重复: 'accent',
 };
 
-export const CATEGORY_ORDER = ['scheme', 'tlc', 'h1', 'c13', 'nmr_other', 'nmr_raw', 'nmr_pdf', 'hrms', 'ir', 'photo', 'other'];
+export const CATEGORY_ORDER = ['scheme', 'tlc', 'literature', 'h1', 'c13', 'nmr_other', 'nmr_raw', 'nmr_pdf', 'hrms', 'ir', 'photo', 'other'];
 
 export const CATEGORY_LABEL = {
   scheme: '反应式',
@@ -32,6 +32,7 @@ export const CATEGORY_LABEL = {
   hrms: 'HRMS',
   ir: 'IR',
   photo: '实验照片',
+  literature: '文献图',
   other: '其他附件',
 };
 

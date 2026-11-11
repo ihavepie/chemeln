@@ -342,6 +342,7 @@ ensureColumn('experiments', 'group_id', "group_id TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'scheme_rxn', "scheme_rxn TEXT NOT NULL DEFAULT ''");
 // 同一条反应式的 SMILES（`A.B>>C`）：RXN 用来还原画板版式，SMILES 用来认反应物 / 产物
 ensureColumn('experiments', 'scheme_smiles', "scheme_smiles TEXT NOT NULL DEFAULT ''");
+ensureColumn('experiments', 'lit_note', "lit_note TEXT NOT NULL DEFAULT ''");
 // 化合物的「标准实验」：当初在哪条实验里做出来的
 ensureColumn('compounds', 'standard_exp_id', 'standard_exp_id INTEGER');
 // 记录可以归到一个分类里（没归就是未分类）

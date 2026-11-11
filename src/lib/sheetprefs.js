@@ -19,6 +19,7 @@ export const SHEET_BLOCKS = {
   workup: '二 · 后处理',
   characterization: '三 · 表征数据',
   conclusion: '四 · 讨论与结论',
+  lit: '五 · 文献',
   attachments: '附件',
 };
 

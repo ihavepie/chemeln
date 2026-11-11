@@ -12,8 +12,9 @@ const props = defineProps({
   onPick: Function,
   onOpen: Function,
   onDelete: Function,
-  /** 图片下面给不给写一行说明（实验照片用；TLC 不写） */
+  /** 图片下面给不给写一行说明（实验照片 / 文献图用；TLC 不写） */
   captions: Boolean,
+  capPlaceholder: { type: String, default: '图注，如：滴加 10 min 后' },
   onCaption: Function,
 });
 
@@ -33,7 +34,7 @@ const shots = computed(() =>
         v-if="captions"
         class="tlc-cap"
         :value="s.note || ''"
-        placeholder="图注，如：滴加 10 min 后"
+        :placeholder="capPlaceholder"
         :disabled="locked"
         @click.stop
         @change="onCaption && onCaption(s.id, $event.target.value)"

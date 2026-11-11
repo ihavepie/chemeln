@@ -138,7 +138,7 @@ const EXP_COLUMNS = [
   'product_name', 'appearance', 'yield_pct', 'dr_ee', 'characterization', 'notes', 'conclusion',
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
-  'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles',
+  'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles', 'lit_note',
   'no_yield', 'apparatus', 'light', 'kind',
 ];
 
@@ -214,7 +214,7 @@ function liveCompoundId(value) {
 
 /* 改动留痕：字段名 → 界面上的叫法（「改了 产率、表征数据」比「改了 yield_pct」好读） */
 const EXP_FIELD_LABELS = {
-  scheme_rxn: '反应式（画板）', scheme_smiles: '反应式（文本）', title: '题目', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
+  scheme_rxn: '反应式（画板）', scheme_smiles: '反应式（文本）', lit_note: '文献要点', title: '题目', date: '日期', status: '状态', operator: '实验人', ambient_temp: '环境温度',
   ambient_humid: '湿度', project: '课题', rxn_type: '反应类型', literature: '文献', objective: '实验目的',
   solvent: '溶剂', concentration: '浓度', temperature: '温度', duration: '时间', atmosphere: '气氛',
   apparatus: '装置 / 器皿', light: '光照 / 波长', kind: '记录类型',

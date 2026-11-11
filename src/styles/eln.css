@@ -4099,6 +4099,11 @@ kbd {
 .sec-shots .tlc-shot { width: 124px; height: auto; flex: 0 0 auto; flex-direction: column; }
 .sec-shots .tlc-shot img { width: 124px; height: 164px; object-fit: contain; background: #fbfaf7; }
 .sec-shots .tlc-cap { width: 124px; height: 18px; font-size: 9px; }
+/* 文献图通常是「反应式 + 条件表」那种横图，框给大一点（200×140），小格子看不清 */
+.sec-shots.is-lit .tlc-shot { width: 200px; }
+.sec-shots.is-lit .tlc-shot img { width: 200px; height: 140px; }
+.sec-shots.is-lit .tlc-cap { width: 200px; }
+.sec-shots.is-lit .tlc-empty { width: 200px; height: 140px; }
 .tlc-cap {
   width: 100%; margin-top: 3px; border: none; border-bottom: 1px dashed var(--line-2);
   background: transparent; font-size: 10px; color: var(--ink-2); padding: 1px 2px; text-align: center;
