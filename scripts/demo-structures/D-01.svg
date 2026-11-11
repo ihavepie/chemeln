@@ -1,0 +1,32 @@
+<svg id="st-D-01" xmlns="http://www.w3.org/2000/svg" version="1.1" width="86px" height="96px" viewBox="-6 -6 86 96">
+  <style> #st-D-01 text {font-family: sans-serif;} #st-D-01 { pointer-events:none; } #st-D-01 .event  { pointer-events:all; } #st-D-01 line { stroke-linecap:round; } #st-D-01 polygon { stroke-linejoin:round; } </style>
+  <text x="3.6" y="14.17" stroke="none" font-size="14" fill="rgb(255,13,13)">O</text>
+  <line x1="10.85" y1="30.94" x2="10.85" y2="16.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="7.25" y1="33.5" x2="7.25" y2="16.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="29.83" y1="45.5" x2="29.83" y2="69.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="33.43" y1="48.06" x2="33.43" y2="66.94" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="50.62" y1="81.5" x2="71.4" y2="69.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="51.03" y1="77.1" x2="67.38" y2="67.66" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="71.4" y1="45.5" x2="50.62" y2="33.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="67.38" y1="47.34" x2="51.03" y2="37.9" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="7.25" y1="33.5" x2="29.83" y2="45.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="29.83" y1="69.5" x2="50.62" y2="81.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="71.4" y1="69.5" x2="71.4" y2="45.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line x1="29.83" y1="45.5" x2="50.62" y2="33.5" stroke="rgb(0,0,0)" stroke-width="1.44" />
+  <line id="st-D-01:Bond:0" class="event" x1="9.05" y1="9.5" x2="9.05" y2="33.5" stroke-width="1.44" opacity="0" />
+  <line id="st-D-01:Bond:2" class="event" x1="29.83" y1="45.5" x2="29.83" y2="69.5" stroke-width="1.44" opacity="0" />
+  <line id="st-D-01:Bond:4" class="event" x1="50.62" y1="81.5" x2="71.4" y2="69.5" stroke-width="1.44" opacity="0" />
+  <line id="st-D-01:Bond:6" class="event" x1="71.4" y1="45.5" x2="50.62" y2="33.5" stroke-width="1.44" opacity="0" />
+  <line id="st-D-01:Bond:1" class="event" x1="9.05" y1="33.5" x2="29.83" y2="45.5" stroke-width="1.44" opacity="0" />
+  <line id="st-D-01:Bond:3" class="event" x1="29.83" y1="69.5" x2="50.62" y2="81.5" stroke-width="1.44" opacity="0" />
+  <line id="st-D-01:Bond:5" class="event" x1="71.4" y1="69.5" x2="71.4" y2="45.5" stroke-width="1.44" opacity="0" />
+  <line id="st-D-01:Bond:7" class="event" x1="29.83" y1="45.5" x2="50.62" y2="33.5" stroke-width="1.44" opacity="0" />
+  <circle id="st-D-01:Atom:0" class="event" cx="9.05" cy="9.5" r="8" opacity="0" />
+  <circle id="st-D-01:Atom:1" class="event" cx="9.05" cy="33.5" r="8" opacity="0" />
+  <circle id="st-D-01:Atom:2" class="event" cx="29.83" cy="45.5" r="8" opacity="0" />
+  <circle id="st-D-01:Atom:3" class="event" cx="29.83" cy="69.5" r="8" opacity="0" />
+  <circle id="st-D-01:Atom:4" class="event" cx="50.62" cy="81.5" r="8" opacity="0" />
+  <circle id="st-D-01:Atom:5" class="event" cx="71.4" cy="69.5" r="8" opacity="0" />
+  <circle id="st-D-01:Atom:6" class="event" cx="71.4" cy="45.5" r="8" opacity="0" />
+  <circle id="st-D-01:Atom:7" class="event" cx="50.62" cy="33.5" r="8" opacity="0" />
+</svg>

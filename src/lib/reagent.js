@@ -116,7 +116,8 @@ export function amountText(r) {
     return ulStored >= 1000 ? `${round(ulStored / 1000, 2)} mL` : `${round(ulStored, ulStored >= 20 ? 0 : 1)} µL`;
   }
   const mg = num(r.mass_mg);
-  if (mg !== null) {
+  // 0 就是「没填」：老代码遇到空 mmol 会算成 0 mg，再按密度折成 0 µL 显示出来（演示站踩到）
+  if (mg !== null && mg !== 0) {
     // 只有「密度可信 + 这个组分本来就按体积量」才折成体积；固体（配体 / 碱 / 催化剂）
     // 和垃圾密度值（0.069 / 硬填的 1.74）都老老实实写 g
     const d = densityUsable(r);

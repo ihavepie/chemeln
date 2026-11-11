@@ -23,6 +23,21 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const log = (...a) => console.log('  ' + a.join(' '));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * 给演示化合物挂一张结构式图（素材是 scripts/demo-structures/<编号>.svg，由 openchemlib 出图后存进来的）。
+ * 没有这些图，演示站的化合物卡片就是一排空框——看起来像还没做完。
+ */
+async function uploadStructure(compoundId, code) {
+  const file = path.join(ROOT, 'scripts', 'demo-structures', `${code}.svg`);
+  if (!fs.existsSync(file)) return;
+  const fd = new FormData();
+  fd.append('file', new Blob([fs.readFileSync(file)], { type: 'image/svg+xml' }), `${code}.svg`);
+  fd.append('category', 'structure');
+  fd.append('original_name', `${code}.svg`);
+  const res = await fetch(`${BASE}/api/compounds/${compoundId}/files`, { method: 'POST', body: fd });
+  if (!res.ok) throw new Error(`结构式上传失败 ${code} → ${res.status} ${String(await res.text()).slice(0, 160)}`);
+}
+
 async function api(method, p, body) {
   const res = await fetch(BASE + p, {
     method,
@@ -56,9 +71,12 @@ const BASES = [
   { name: 'Cs2CO3', mw: 325.82, eq: 1.5, yield: 88 },
 ];
 
-function reagent({ name, role, eq, mw, mmol, compoundId = null, density = null, conc = null }) {
+function reagent({ name, role, eq, mw, mmol, compoundId = null, density = null, conc = null, volumeUl = null }) {
   const base = { name, role, eq, mw, mmol, compound_id: compoundId };
+  // 溶剂这种「只记体积」的行：别走当量→质量那条路（mmol 是 null，乘出来就是 0，会显示「0 µL」）
+  if (volumeUl) return { ...base, volume_ul: volumeUl };
   if (conc) return { ...base, conc, volume_ul: Math.round((mmol / conc) * 1000 * 1000) / 1000 };
+  if (mmol == null) return base;
   if (density) return { ...base, density, mass_mg: mmol * mw };
   return { ...base, mass_mg: Math.round(mmol * mw * 1e4) / 1e4 };
 }
@@ -104,6 +122,7 @@ async function main() {
     for (const c of COMPOUNDS) {
       const r = await api('POST', '/api/compounds', c);
       ids[c.code] = (r.compound || r).id;
+      await uploadStructure(ids[c.code], c.code);
       log('化合物', c.code, c.name);
     }
 
@@ -131,7 +150,7 @@ async function main() {
       reagents: [
         reagent({ name: '苯甲醛', role: '底物', eq: 1, mw: 106.12, mmol: 0.2, compoundId: ids['D-01'] }),
         reagent({ name: BASES[0].name, role: '碱', eq: BASES[0].eq, mw: BASES[0].mw, mmol: 0.3 }),
-        reagent({ name: '二甲基亚砜', role: '溶剂', eq: '', mw: 78.13, mmol: null, density: 1.1 }),
+        reagent({ name: '二甲基亚砜', role: '溶剂', eq: '', mw: 78.13, mmol: null, volumeUl: 2000 }),
       ],
     });
     const baseId = (base.experiment || base).id;
@@ -147,7 +166,7 @@ async function main() {
         reagents: [
           reagent({ name: '苯甲醛', role: '底物', eq: 1, mw: 106.12, mmol: 0.2, compoundId: ids['D-01'] }),
           reagent({ name: b.name, role: '碱', eq: b.eq, mw: b.mw, mmol: 0.3 }),
-          reagent({ name: '二甲基亚砜', role: '溶剂', eq: '', mw: 78.13, mmol: null, density: 1.1 }),
+          reagent({ name: '二甲基亚砜', role: '溶剂', eq: '', mw: 78.13, mmol: null, volumeUl: 2000 }),
         ],
       });
       log('平行记录', id, b.name, `${b.yield}%`);
@@ -172,7 +191,7 @@ async function main() {
       reagents: [
         reagent({ name: '4-甲氧基苯甲醛', role: '底物', eq: 1, mw: 136.15, mmol: 0.2, compoundId: ids['D-02'] }),
         reagent({ name: 'Cs2CO3', role: '碱', eq: 1.5, mw: 325.82, mmol: 0.3 }),
-        reagent({ name: '二甲基亚砜', role: '溶剂', eq: '', mw: 78.13, mmol: null, density: 1.1 }),
+        reagent({ name: '二甲基亚砜', role: '溶剂', eq: '', mw: 78.13, mmol: null, volumeUl: 2000 }),
       ],
     });
     log('底物扩展记录');
