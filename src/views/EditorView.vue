@@ -263,17 +263,54 @@ onMounted(async () => {
   document.addEventListener('paste', onPaste);
   document.addEventListener('click', closeMenus);
   document.addEventListener('keydown', onShortcut);
+  document.addEventListener('keydown', onPageKey);
   document.addEventListener('keydown', onParallelKey);
   // 等这一帧渲染完再量纸面位置
   requestAnimationFrame(updateRail);
 });
-/** 键盘 ↑/↓ 在这组平行实验里上下切（在输入框 / 文本域里打字时不接管） */
-function onParallelKey(ev) {
-  if (siblings.value.length < 2 || page.value !== 1) return;
-  if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+/** 现在能翻的几页（文献 / 附件两页在设置里关掉后就不参与左右翻页） */
+const pageTabs = computed(() => {
+  const tabs = [1, 2];
+  if (sheetPrefs.lit) tabs.push(3);
+  if (sheetPrefs.attachments) tabs.push(4);
+  return tabs;
+});
+
+/**
+ * 方向键什么时候让给别人：正在打字、有弹窗 / 菜单开着、带修饰键、手机版、记录已删除。
+ * 输入框里左右是移光标、上下是移行，绝不能被接管。
+ */
+function arrowBusy(ev) {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return true;
+  if (isPhone.value || gone.value) return true;
   const t = ev.target;
-  if (t && (t.closest?.('input, textarea, [contenteditable="true"]') || t.isContentEditable)) return;
-  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (t && (t.closest?.('input, textarea, select, [contenteditable="true"]') || t.isContentEditable)) return true;
+  // 弹层 / 菜单开着时方向键归它们（自绘菜单那几个类名 + Element Plus 的遮罩与 popper）
+  const overlays = document.querySelectorAll('.el-overlay, .el-popper, .cat-menu, .kind-menu, .proj-menu, .role-menu');
+  for (const el of overlays) if (el.getClientRects().length) return true;
+  return false;
+}
+
+/** 键盘 ←/→ 翻页（第 1 页 / 第 2 页 / 文献 / 附件，到头就停、不绕回去） */
+function onPageKey(ev) {
+  if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+  if (arrowBusy(ev)) return;
+  const tabs = pageTabs.value;
+  if (tabs.length < 2) return;
+  const i = tabs.indexOf(page.value);
+  const next = i < 0 ? tabs[0] : tabs[i + (ev.key === 'ArrowRight' ? 1 : -1)];
+  if (next == null || next === page.value) return;
+  ev.preventDefault();
+  page.value = next;
+  // 翻页跟翻纸一样回到顶部，不然停在上一页滚到的位置很像「没翻」
+  void nextTick(() => editorEl.value?.scrollTo({ top: 0 }));
+}
+
+/** 键盘 ↑/↓ 在这组平行实验里上下切（哪一页都能切，跟左右翻页互不干扰） */
+function onParallelKey(ev) {
+  if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+  if (siblings.value.length < 2) return;
+  if (arrowBusy(ev)) return;
   const i = siblings.value.findIndex((s) => String(s.id) === String(exp.value?.id));
   if (i < 0) return;
   const next = siblings.value[ev.key === 'ArrowUp' ? i - 1 : i + 1];
@@ -288,6 +325,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('paste', onPaste);
   document.removeEventListener('click', closeMenus);
   document.removeEventListener('keydown', onShortcut);
+  document.removeEventListener('keydown', onPageKey);
   document.removeEventListener('keydown', onParallelKey);
 });
 
@@ -1181,8 +1219,8 @@ const openAttachment = (id) => {
       <div v-if="exp" class="editor-bar">
         <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">{{ exp.code }}</span>
         <div class="page-tabs noprint" role="tablist">
-          <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" @click="page = 1">第 1 页 · 主记录</button>
-          <button class="ptab" :aria-selected="page === 2 ? 'true' : 'false'" @click="page = 2">第 2 页 · 续页</button>
+          <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" title="← → 翻页，↑ ↓ 切平行实验" @click="page = 1">第 1 页 · 主记录</button>
+          <button class="ptab" :aria-selected="page === 2 ? 'true' : 'false'" title="← → 翻页，↑ ↓ 切平行实验" @click="page = 2">第 2 页 · 续页</button>
           <button
             v-if="sheetPrefs.lit"
             class="ptab"
