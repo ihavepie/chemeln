@@ -1436,7 +1436,6 @@ const openAttachment = (id) => {
             :style="railStyle"
             aria-label="平行实验"
           >
-            <span class="pgroup-cap">平行 ×{{ siblings.length }}</span>
             <button
               v-for="s in siblings"
               :key="s.id"

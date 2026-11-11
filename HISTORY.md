@@ -431,3 +431,10 @@
 - **实验的反应式**：`ExperimentMobile` 以前只找 `category='scheme'` 的附件图；而「按投料表生成」那张其实只存在 `scheme_cache`（`GET /api/experiments/:id` 会带上 `scheme_cache.svg`），这类记录在手机上完全没有反应式。现在附件图优先，没有就把 `scheme_cache.svg` 内联贴进同一个白底框（`.phone-struct-svg`，`svg{width:100%}`）；图片分类里也补了「文献图」。
 - **化合物的图**：结构式和 ¹H/¹³C 谱图本来就在 `CompoundMobile` 里，这次把 **TLC 板**也加上（`.phone-spectra.is-tlc`：限高 58vh 居中，板子不会被拉成一整屏）。`figcaption` 只在有图注时显示，别和区块标题重复。
 - 验证：临时记录 + `PUT /api/experiments/:id/scheme-cache` 塞一段测试 SVG → 手机宽度截图（390×844）里反应式正常显示；临时化合物 + `POST /api/compounds/:id/files` 传一张真实 TLC 板 → 手机宽度截图里 TLC 段正常、限高、居中；构建产物里已无 `capture:"environment"`。临时实验/化合物删了 + 彻底删除（实验 19、化合物 9）。
+
+## 2026-11-11 · 平行书签排去掉「平行」两个字
+
+用户圈着那行小字：「把平行那个字去掉好了干脆，遮挡标签了」——`.pgroup-cap`（「平行 ×3」）是绝对定位在书签排顶上的，正好压在第一条书签的编号 `SJ-2-2` 上。
+
+- 整段删掉：模板里的 `<span class="pgroup-cap">`、CSS 里 `.pgroup-cap` 那一组规则。书签排现在只有「短杠 + 编号」和末尾的「＋」，顶上不再有字。
+- 验证（4780）：截图与 DOM 都确认没有 `.pgroup-cap`，三条书签的编号完整、不再被遮。

@@ -5935,24 +5935,6 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .pgroup--float.is-inline .pgroup-var { display: none; }
 
 
-/* 「平行 ×5」：按钮，点一下收起 / 展开这一排。
-   它**画在纸面左边距里**、跟编号那列同一个起点（不塞进 22px 宽的短杠列里，
-   不然「平行 ×5」会折成两行，看着很碎）。 */
-.pgroup-cap {
-  position: absolute;
-  left: calc(100% + 10px);
-  top: -3px;
-  font-family: var(--mono);
-  font-size: 8.5px;
-  letter-spacing: 0.1em;
-  line-height: 1;
-  white-space: nowrap;
-  color: var(--ink-4);
-  user-select: none;
-  /* 只是标签（不再能点着折叠）：不做 hover 变色、不给 pointer，免得看着像按钮 */
-  cursor: default;
-}
-
 /* 一枚书签 = 一根**小短杠**（照 DSH 的 turn 导航那排 mark）：
    12~22px 宽、2px 高、圆角，右侧贴着纸面对齐；不用卡片、不写字。
    当前这条最宽最黑，悬停放大一档；编号什么的挪进原生 title / 悬停预览卡里。 */
