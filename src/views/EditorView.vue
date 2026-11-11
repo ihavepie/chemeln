@@ -906,8 +906,8 @@ const siblings = computed(() => exp.value?.siblings || []);
  */
 const sheetEl = ref(null);
 const editorEl = ref(null);
-/** 这排书签收起来没有（点「平行 ×N」那行切换，只在这次会话里记） */
-const railOpen = ref(true);
+/* 这排书签不再折叠：以前点「平行 ×N」能收成一枚「平行 ▸」，收起后纸面左上角
+   只剩一个带焦点圈的小框，用户说没必要——现在它只是个静态标签，书签常驻。 */
 /** 短杠长度按产率来：14–22px（没填产率就是 14） */
 function tickW(s) {
   const y = Number(s.yield_pct);
@@ -1436,10 +1436,7 @@ const openAttachment = (id) => {
             :style="railStyle"
             aria-label="平行实验"
           >
-            <button type="button" class="pgroup-cap" @click="railOpen = !railOpen">
-              {{ railOpen ? `平行 ×${siblings.length}` : '平行 ▸' }}
-            </button>
-            <template v-if="railOpen">
+            <span class="pgroup-cap">平行 ×{{ siblings.length }}</span>
             <button
               v-for="s in siblings"
               :key="s.id"
@@ -1459,7 +1456,6 @@ const openAttachment = (id) => {
               <span class="pgroup-lbl" aria-hidden="true">{{ s.code }}</span>
             </button>
             <button type="button" class="pgroup-add" title="从这条实验新建平行实验" @click="newParallel">＋</button>
-            </template>
           </nav>
           <!-- 悬停预览卡：挂到 body 上、放在书签外侧（左边），绝不压在纸面上 -->
           <Teleport to="body">

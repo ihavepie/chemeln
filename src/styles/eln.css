@@ -5948,14 +5948,10 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   line-height: 1;
   white-space: nowrap;
   color: var(--ink-4);
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
   user-select: none;
-  transition: color 0.12s;
+  /* 只是标签（不再能点着折叠）：不做 hover 变色、不给 pointer，免得看着像按钮 */
+  cursor: default;
 }
-.pgroup-cap:hover { color: var(--accent-ink); }
 
 /* 一枚书签 = 一根**小短杠**（照 DSH 的 turn 导航那排 mark）：
    12~22px 宽、2px 高、圆角，右侧贴着纸面对齐；不用卡片、不写字。

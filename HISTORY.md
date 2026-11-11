@@ -414,3 +414,11 @@
 - `.panes` 的列宽改成固定 `grid-template-columns: var(--panes-w) 1fr`（336px，窄屏 292），不再读 `--listw`；`panesize.js` 里的列表宽那一段（`usePaneSize` / apply / resetWidth）一并删了，只剩内容区左右两条 `.doc-grip`（`eln:docw`，用户没提，保留）。
 - 顺手清掉 `.pane-grip::before/::after`、`body.is-pane-resizing` 那些规则；`--listw` 已经没有任何地方设置/读取，老用户 localStorage 里那条记录不再生效（无害）。
 - 验证：`/e/129`、`/list`、`/compounds`、`/c/80` 四个页面读出来都是 `grip=false cols=336px 732px`、`rootListw=(none)`；截图确认列表右边缘之后直接就是内容区，没有那条竖带。内容宽度那两条 `.doc-grip` 仍在。
+
+## 2026-11-11 · 平行书签不再折叠（去掉纸面左上角那枚「平行 ▸」小框）
+
+用户圈出纸面左上角那个带框的小方块：「这个感觉没什么必要」。
+
+- 那枚小框是**平行书签排的折叠按钮**（`railOpen` 为假时显示「平行 ▸」，外面那圈黑边是浏览器的焦点环）。折叠是我之前自己加的（commit `575d254`），用户并不是要它。
+- 现在这排书签**常驻**：「平行 ×N」从按钮改成静态 `<span>`（不可聚焦、没有 hover 变色、`cursor: default`），书签和末尾「＋」一直显示；`railOpen` 状态和切换逻辑一起删掉。
+- 验证（4780）：`.pgroup-cap` 是 `SPAN`「平行 ×3」、`tabIndex=-1`、`outlineStyle=none`，书签 3 枚常显；截图确认纸面左上角没有那个小框了。
