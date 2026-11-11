@@ -64,7 +64,9 @@ async function buildSchemes() {
       const { composeSchemeSvg } = await import('../lib/scheme.js');
       out[t.id] = await composeSchemeSvg({
         reactants: parts.reactants,
+        reactantIds: parts.reactantIds,
         product: parts.product,
+        productId: parts.productId,
         above: parts.above,
         below: parts.below,
         background: false,

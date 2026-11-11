@@ -1814,6 +1814,19 @@ route('GET', '/api/compounds/:id', async (req, res, params) => {
   ok(res, { compound });
 });
 
+/**
+ * 反应式里要「怎么画的就怎么显示」：底物 / 产物是带基团缩写（S-group / 原子别名）画的时，
+ * 把库里存的那份 molfile 交给前端，让它走 Indigo 出图，Ts / Bn / Ph 这些标签就留着了。
+ * 没缩写的返回空串——前端拿不到就还按 SMILES 画（那套排版更好看，别为了一致去用 molfile）。
+ */
+route('GET', '/api/compounds/:id/abbrev-mol', async (req, res, params) => {
+  const row = db.prepare('SELECT mol FROM compounds WHERE id = ?').get(Number(params.id));
+  if (!row) return fail(res, 404, '化合物不存在');
+  const mol = String(row.mol || '');
+  const hasAbbrev = /M {1,3}(STY|ALS|SMT)/.test(mol);
+  ok(res, { mol: hasAbbrev ? mol : '' });
+});
+
 route('POST', '/api/compounds/:id/move', async (req, res, params) => {
   const id = Number(params.id);
   const row = db.prepare('SELECT id FROM compounds WHERE id = ?').get(id);
@@ -1874,8 +1887,24 @@ route('PUT', '/api/compounds/:id', async (req, res, params) => {
     `UPDATE compounds SET ${keys.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`
   ).run(...keys.map((k) => data[k]), nowISO(), id);
   logEdit('compound', id, changedFields(before, data, CMP_FIELD_LABELS));
+  // 结构 / SMILES 变了，画过这个化合物的那些记录页反应式缓存就过期了（不然会一直显示旧结构）
+  if (('mol' in data || 'smiles' in data) && (data.mol !== before.mol || data.smiles !== before.smiles)) {
+    dropSchemeCacheForCompound(id);
+  }
   ok(res, { compound: getCompound(id) });
 });
+
+/** 把引用这个化合物的记录的反应式缓存清掉（底物行 + 产物） */
+function dropSchemeCacheForCompound(compoundId) {
+  const ids = new Set();
+  for (const r of db.prepare('SELECT DISTINCT exp_id FROM reagents WHERE compound_id = ?').all(compoundId)) {
+    ids.add(Number(r.exp_id));
+  }
+  for (const r of db.prepare('SELECT id FROM experiments WHERE product_compound_id = ?').all(compoundId)) {
+    ids.add(Number(r.id));
+  }
+  for (const x of ids) db.prepare('DELETE FROM scheme_cache WHERE exp_id = ?').run(x);
+}
 
 route('DELETE', '/api/compounds/:id', async (req, res, params) => {
   const id = Number(params.id);

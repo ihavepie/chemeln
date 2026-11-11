@@ -56,6 +56,7 @@ export function schemeParts(model, compounds) {
   };
 
   const reactants = [];
+  const reactantIds = []; // 与 reactants 平行：反应式要按库里那份「带缩写的画」出图时用
   const others = []; // 试剂 / 催化剂 / 碱……能塞进箭头上方就塞，塞不下挪到下方
   const loose = [];  // 写了名字但挂不上化合物库的底物：画不出结构，名字放箭头上，别默默吞掉
   for (const r of model.reagents || []) {
@@ -64,6 +65,7 @@ export function schemeParts(model, compounds) {
     const text = label(r, c);
     if (r.role === '底物' && c && c.smiles) {
       reactants.push(c.smiles);
+      reactantIds.push(Number(c.id));
       continue;
     }
     if (r.role === '底物') {
@@ -103,7 +105,9 @@ export function schemeParts(model, compounds) {
 
   return {
     reactants,
+    reactantIds,
     product: prod && prod.smiles ? prod.smiles : '',
+    productId: prod ? Number(prod.id) : null,
     prodName: prod ? str(prod.name || prod.code) : str(model.product_name),
     loose: loose.length, // 有名字但挂不上库的底物，记录页据此提示
     // 试剂名按组分上色（Sub 棕 / Cat 紫 / Base 蓝 / Lig 绿 / Add 金…），跟投料表一致

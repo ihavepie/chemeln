@@ -69,7 +69,9 @@ async function buildStandard() {
     // 不铺白底：这张图是直接贴在纸面上的，白底会把三线表托成一块方格
     const svg = await composeSchemeSvg({
       reactants: parts.reactants,
+      reactantIds: parts.reactantIds,
       product: parts.product,
+      productId: parts.productId,
       above: parts.above,
       below: parts.below,
       background: false,

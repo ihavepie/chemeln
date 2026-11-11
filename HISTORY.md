@@ -279,3 +279,18 @@
 - 验证：206 号连续打开两次，`scheme_cache.at` 完全没变（第二次没重画）；临时记录改当量 / 时间后 sig 变了、自动重画并写回，画出来的 SVG 里确实有 `3 eq` / `4 h`；临时记录删掉 + 彻底删除后缓存行也清了。
 - 补一句单位：箭头上摩尔百分数原来写 `(10%)`，容易被读成产率，改成 `(10 mol%)`；`eq` 不变。带上单位后四个试剂一行放不下（一行放不下就会被挤到箭头下方、跟条件混在一起），所以箭头上方改成**最多两行**（`MAX_ABOVE_LINES = 2`，一行 `MAX_ABOVE = 34` 照旧），两行还放不下才挪到下方。
 - **改出图规则记得把 `EditorView` 的 `SCHEME_SIG_VERSION` 加一**（现在 `v5`）——缓存是按 sig 存的，不 bump 的话老记录会一直显示旧图。
+
+## 2026-11-11 · 反应式用「库里画的那份」（带缩写）
+
+用户原话：「反应式里的底物和产物可以用化合物库引入的那个缩写形式吗，就是怎么画的就怎么显示，反应式这边也是」。
+
+以前反应式的结构是**从 SMILES 重画的**：带 Ts / Bn / Ph 缩写的结构一律被展开成一整棵，跟库里画的完全不是一个样子。
+
+- 化合物表本来就有 `mol` 列（Ketcher / Indigo 存的那份，带 S-group + 手写坐标）。新增 `GET /api/compounds/:id/abbrev-mol`：**只在这个 molfile 真有缩写**（`M  STY` / `ALS` / `SMT`）时才把 molfile 还回去，没有就回空串——不然所有结构都改走 Indigo，反而丢了 openchemlib + `relayout` 那套更规整的排版。
+- `lib/scheme.js` 的 `molSvg()` 多了第三个参数：给了 molfile 就 `indigoSvgSized(molfile, BOND_PX)`（Indigo 照抄坐标、画出 S-group 标签），失败再退回原来的 SMILES 那条路。取回来的 molfile 在 `abbrevMolCache` 里按化合物 id 缓存，编辑表时不会反复拉。
+- `lib/expScheme.js` 的 `schemeParts()` 多回 `reactantIds` / `productId`，`composeSchemeSvg()` 多收 `reactantIds` / `productId`；记录页（`renderLive` / 「按投料表生成」）和两个筛选表视图都把 id 传下去。
+- **结构改了要顺手作废缓存**：`PUT /api/compounds/:id` 里 `mol` / `smiles` 真变了的时候，把引用这个化合物的记录（底物行 + 产物）的 `scheme_cache` 删掉，否则记录页会一直显示旧结构。
+- `SCHEME_SIG_VERSION` → `v6`（出图规则变了，旧缓存要失效）。
+- 验证：206 号的底物 / 产物现在显示 `Ph` / `Bn` / `Ts` / `H3C`，跟化合物库里一模一样；临时化合物 + 临时记录改一次 mol，那条记录的缓存行立刻清掉、周围别的记录不受影响（验完都删了 + 彻底删除）。
+
+**副作用**：缩写之后分子本身键数少了，同样的 `BOND_PX = 26` 画出来，结构在纸上会比原来（展开式）小一圈——这是缩写本来的样子，跟库里缩略图的比例一致。
