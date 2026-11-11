@@ -346,19 +346,25 @@ async function editProjectPrefix(p) {
   }
 }
 
-async function removeProject(p) {  const ok = await confirm({
+async function removeProject(p) {
+  const n = Number(p.n) || 0;
+  const cmp = Number(p.cmp) || 0;
+  const empty = !n && !cmp;
+  // 有东西的课题把后果写清楚：记录 / 化合物进回收站（能恢复），分类直接删
+  const body = empty
+    ? '该课题暂无记录。删除仅从清单中移除，记录与文件均不受影响。'
+    : `里面有 ${n} 条实验${cmp ? `、${cmp} 个化合物` : ''}。连它们一起移到回收站（分类也删掉），回收站里还能恢复。`;
+  const ok = await confirm({
     title: `删除课题「${p.name}」？`,
-    body: p.n
-      ? `里面有 ${p.n} 条实验，删不掉。先把那些记录的「课题」格改到别的课题。`
-      : '该课题暂无记录。删除仅从清单中移除，记录与文件均不受影响。',
-    confirmText: '删除',
+    body,
+    confirmText: empty ? '删除' : '连记录一起删',
     danger: true,
   });
   if (!ok) return;
   try {
-    await api.deleteProject(p.name);
+    await api.deleteProject(p.name, { withRecords: !empty });
     await loadBoot();
-    toast('课题删掉了');
+    toast(empty ? '课题删掉了' : `课题和 ${n + cmp} 条内容已经移到回收站`);
   } catch (e) {
     toast(e.message, 'err');
   }

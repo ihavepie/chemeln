@@ -1570,24 +1570,40 @@ route('PUT', '/api/projects/:name', async (req, res, params) => {
   ok(res, { items: listProjects(), name: r.name });
 });
 
-route('DELETE', '/api/projects/:name', async (req, res, params) => {
+route('DELETE', '/api/projects/:name', async (req, res, params, url) => {
   const name = decodeURIComponent(params.name);
   const n = db.prepare('SELECT COUNT(*) AS n FROM experiments WHERE project = ?').get(name).n;
   const cmp = db.prepare('SELECT COUNT(*) AS n FROM compounds WHERE project = ?').get(name).n;
   const cats = db.prepare('SELECT COUNT(*) AS n FROM categories WHERE project = ?').get(name).n;
   // 化合物和分类也要数：只数实验的话，删掉一个只有化合物/分类的课题，
   // 它们就变成「有 project 值但课题清单里没有」的孤儿，只能在「全部课题」里看到
-  if (n || cmp || cats) {
+  const withRecords = String(url.searchParams.get('withRecords') || '') === '1';
+  if ((n || cmp || cats) && !withRecords) {
     const bits = [];
     if (n) bits.push(`${n} 条记录`);
     if (cmp) bits.push(`${cmp} 个化合物`);
     if (cats) bits.push(`${cats} 个分类`);
-    return fail(res, 409, `还有 ${bits.join('、')}在这个课题里，先处理掉再删`);
+    return fail(res, 409, `还有 ${bits.join('、')}在这个课题里；要连它们一起删就再确认一次`);
+  }
+  let goneExp = 0;
+  let goneCmp = 0;
+  if (withRecords) {
+    // 锁着的记录先拦下来：半删一半会让人以为「没删掉」
+    const locked = db.prepare('SELECT COUNT(*) AS n FROM experiments WHERE project = ? AND locked = 1').get(name).n;
+    if (locked) return fail(res, 423, `有 ${locked} 条实验被锁定，先在记录页解锁再连记录删课题`);
+    // 记录 / 化合物走软删除（进回收站，文件留到「彻底删除」才真删）
+    for (const r of db.prepare('SELECT id FROM experiments WHERE project = ?').all(name)) {
+      if (trashExperiment(r.id)) goneExp += 1;
+    }
+    for (const r of db.prepare('SELECT id FROM compounds WHERE project = ?').all(name)) {
+      if (trashCompound(r.id)) goneCmp += 1;
+    }
+    db.prepare('DELETE FROM categories WHERE project = ?').run(name);
   }
   setSetting('projects_json', JSON.stringify(knownProjectNames().filter((x) => x !== name)));
   // 课题自己的前缀和覆盖设置一起清掉，免得同名重建时又冒出来
   db.prepare('DELETE FROM settings WHERE key = ? OR key LIKE ?').run(`prefix:${name}`, `proj:${name}:%`);
-  ok(res, { items: listProjects() });
+  ok(res, { items: listProjects(), deleted: { experiments: goneExp, compounds: goneCmp } });
 });
 
 route('PUT', '/api/settings', async (req, res) => {
@@ -1952,11 +1968,10 @@ function dropSchemeCacheForCompound(compoundId) {
   for (const x of ids) db.prepare('DELETE FROM scheme_cache WHERE exp_id = ?').run(x);
 }
 
-route('DELETE', '/api/compounds/:id', async (req, res, params) => {
-  const id = Number(params.id);
+/** 软删除一个化合物（结构图 / 谱图文件留到「彻底删除」）。删课题（连记录）也走这一条 */
+function trashCompound(id) {
   const row = db.prepare('SELECT * FROM compounds WHERE id = ?').get(id);
-  if (!row) return fail(res, 404, '化合物不存在');
-  // 跟实验一样走回收站：结构图 / 谱图文件留在盘上，「彻底删除」时才真删
+  if (!row) return null;
   pushToTrash('compound', id, `${row.code || '（未编号）'}${row.name ? ` · ${row.name}` : ''}`, {
     compound: row,
     files: db.prepare('SELECT * FROM compound_files WHERE compound_id = ? ORDER BY id').all(id),
@@ -1967,6 +1982,14 @@ route('DELETE', '/api/compounds/:id', async (req, res, params) => {
   db.prepare('UPDATE experiments SET product_compound_id = NULL WHERE product_compound_id = ?').run(id);
   db.prepare('DELETE FROM compounds WHERE id = ?').run(id); // 文件行跟外键级联删掉
   logEvent('compound', id, 'trash', { detail: `移到回收站：${row.code || '（未编号）'}` });
+  return row;
+}
+
+route('DELETE', '/api/compounds/:id', async (req, res, params) => {
+  const id = Number(params.id);
+  const row = db.prepare('SELECT * FROM compounds WHERE id = ?').get(id);
+  if (!row) return fail(res, 404, '化合物不存在');
+  trashCompound(id);
   ok(res, {});
 });
 
@@ -2377,13 +2400,11 @@ route('PUT', '/api/experiments/:id', async (req, res, params) => {
   ok(res, { experiment: getExperiment(id) });
 });
 
-route('DELETE', '/api/experiments/:id', async (req, res, params) => {
-  const id = Number(params.id);
+/** 软删除一条实验：整条记录（投料表 / 附件清单 / 被断开的引用）拍成快照进回收站，
+    表里的行真删、附件文件留在盘上等「彻底删除」。删课题（连记录）也走这一条。 */
+function trashExperiment(id) {
   const row = db.prepare('SELECT * FROM experiments WHERE id = ?').get(id);
-  if (!row) return fail(res, 404, '实验不存在');
-  if (row.locked) return fail(res, 423, '实验已锁定，解锁后才能删除');
-  // 软删除：整条记录（含投料表 / 附件清单 / 被断开的引用）先拍成快照放进回收站，
-  // 表里的行真删（查询就不用到处加过滤），附件文件留在盘上，等「彻底删除」再真删。
+  if (!row) return null;
   pushToTrash('experiment', id, `${row.code}${row.title ? ` · ${row.title}` : ''}`, {
     experiment: row,
     reagents: db.prepare('SELECT * FROM reagents WHERE exp_id = ? ORDER BY position').all(id),
@@ -2395,6 +2416,15 @@ route('DELETE', '/api/experiments/:id', async (req, res, params) => {
   db.prepare('UPDATE compounds SET standard_exp_id = NULL WHERE standard_exp_id = ?').run(id);
   db.prepare('DELETE FROM experiments WHERE id = ?').run(id); // 投料行 / 附件行跟外键级联删掉
   logEvent('experiment', id, 'trash', { detail: `移到回收站：${row.code}` });
+  return row;
+}
+
+route('DELETE', '/api/experiments/:id', async (req, res, params) => {
+  const id = Number(params.id);
+  const row = db.prepare('SELECT * FROM experiments WHERE id = ?').get(id);
+  if (!row) return fail(res, 404, '实验不存在');
+  if (row.locked) return fail(res, 423, '实验已锁定，解锁后才能删除');
+  trashExperiment(id);
   ok(res, {});
 });
 

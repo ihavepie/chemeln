@@ -73,8 +73,11 @@ export const api = {
   createProject: (body) => request('/api/projects', { method: 'POST', body }).then((d) => d.items || []),
   renameProject: (name, newName) =>
     request(`/api/projects/${encodeURIComponent(name)}`, { method: 'PUT', body: { name: newName } }).then((d) => d.items || []),
-  deleteProject: (name) =>
-    request(`/api/projects/${encodeURIComponent(name)}`, { method: 'DELETE' }).then((d) => d.items || []),
+  /** withRecords = 连这个课题里的记录 / 化合物一起移到回收站（分类一并删掉） */
+  deleteProject: (name, opts = {}) =>
+    request(`/api/projects/${encodeURIComponent(name)}${opts.withRecords ? '?withRecords=1' : ''}`, {
+      method: 'DELETE',
+    }).then((d) => d.items || []),
 
   /** 列表带总数：items 可能被服务端的 LIMIT 截断，total 是「符合筛选的全部条数」 */
   experimentsPage: (query = {}) => {
