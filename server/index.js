@@ -233,21 +233,64 @@ const CMP_FIELD_LABELS = {
   category_id: '分类', project: '课题', standard_exp_id: '标准实验',
 };
 
-/** 存进历史的值：太长就截断，别让一条表征数据把留痕撑爆 */
+/** 给人看的值：太长就截断（列表里读着舒服） */
 const shortVal = (v) => {
   const s = v === null || v === undefined ? '' : String(v).trim();
   if (!s) return '';
   return s.length <= 80 ? s : `${s.slice(0, 60)}…（共 ${s.length} 字）`;
 };
 
+/** 真要能「恢复」，历史里得留**完整且原类型**的值（null 不能变成 ''），长文本上限 8000 字 */
+const fullVal = (v) => {
+  if (v === undefined) return null;
+  if (typeof v === 'string') return v.length > 8000 ? v.slice(0, 8000) : v;
+  return v;
+};
+
+/** 步骤与条件（steps_json）在历史里别甩一坨 JSON：写成 `1. HCl 4 M / 搅拌 12 h；2. …` */
+function stepsText(raw) {
+  let list = [];
+  try {
+    list = typeof raw === 'string' ? JSON.parse(raw) : Array.isArray(raw) ? raw : [];
+  } catch {
+    return String(raw || '');
+  }
+  if (!Array.isArray(list) || !list.length) return '';
+  return list
+    .map((s, i) => {
+      const bits = [str(s.label), str(s.condition), str(s.workup)].map((x) => x.trim()).filter(Boolean);
+      return `${i + 1}. ${bits.join(' · ') || '（空）'}`;
+    })
+    .join('；');
+}
+
+/** 一行字概括整张投料表：`Pd(OPiv)2 10 mol% / CsOPiv 10 mol% / dioxane 2 mL`（历史里给人读） */
+function reagentTableText(rows) {
+  return (rows || [])
+    .map((r) => {
+      const name = str(r.name) || '（未命名）';
+      const eq = eqLabel(r.eq);
+      const mmol = numOrNull(r.mmol);
+      const tail = mmol !== null ? `（${mmol} mmol）` : '';
+      if (eq) return `${name} ${eq}${tail}`;
+      const ul = numOrNull(r.volume_ul);
+      if (ul) return `${name} ${ul >= 1000 ? `${Math.round((ul / 1000) * 100) / 100} mL` : `${Math.round(ul * 10) / 10} µL`}`;
+      return `${name}${tail}`;
+    })
+    .join(' / ');
+}
+
 /**
  * 这次 PUT 改到了哪些字段，各自的改前 / 改后值。
  * 数字按字符串比，避免 71 与 "71" 算成两次改动。
  */
-function changedFields(before, after, labels) {
+function changedFields(before, after, labels, opts = {}) {
   const out = [];
+
   for (const [k, v] of Object.entries(after)) {
     if (!(k in labels)) continue;
+    // 溶剂现在是投料表里的一行：有 reagent 行时，老字段 `solvent` 的变化只是迁移噪音，不记
+    if (k === 'solvent' && opts.hasSolventRow) continue;
     const a = before[k];
     const b = v;
     const same =
@@ -256,7 +299,10 @@ function changedFields(before, after, labels) {
         : b === null || b === undefined
           ? a === ''
           : String(a) === String(b);
-    if (!same) out.push({ f: k, o: shortVal(a), n: shortVal(b) });
+    if (!same) {
+      const show = k === 'steps_json' ? (x) => shortVal(stepsText(x)) : shortVal;
+      out.push({ f: k, o: show(a), n: show(b), of: fullVal(a), nf: fullVal(b) });
+    }
   }
   return out;
 }
@@ -2244,7 +2290,10 @@ route('PUT', '/api/experiments/:id', async (req, res, params) => {
 
   const body = await readJson(req);
   const data = normalizeExperiment(body);
-  const changed = changedFields(exp, data, EXP_FIELD_LABELS);
+  const hasSolventRow =
+    Array.isArray(body.reagents) &&
+    body.reagents.some((r) => str(r.role).trim() === '溶剂' && str(r.name).trim());
+  const changed = changedFields(exp, data, EXP_FIELD_LABELS, { hasSolventRow });
   const sets = Object.keys(data).map((k) => `${k} = ?`);
   const values = Object.values(data);
 
@@ -2307,8 +2356,16 @@ route('PUT', '/api/experiments/:id', async (req, res, params) => {
         db.prepare('SELECT role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, step FROM reagents WHERE exp_id = ? ORDER BY position').all(id)
       );
       if (before !== after) {
-        const n = (s) => JSON.parse(s).length;
-        changed.push({ f: 'reagents', o: `${n(before)} 行`, n: `${n(after)} 行` });
+        // 以前这里只记「6 行 → 2 行」——真丢表的时候根本看不出丢了什么（踩过）。
+        // 现在把两边的表都写进历史：o/n 是给人读的一行字，of/nf 是完整数据（「恢复」用它）
+        const rowsOf = (json) => JSON.parse(json);
+        changed.push({
+          f: 'reagents',
+          o: shortVal(reagentTableText(rowsOf(before))),
+          n: shortVal(reagentTableText(rowsOf(after))),
+          of: fullVal(before),
+          nf: fullVal(after),
+        });
       }
     }
     db.exec('COMMIT');
@@ -2895,13 +2952,102 @@ route('GET', '/api/history/:entity/:id', async (req, res, params) => {
       at: r.at,
       text: historyLine(r),
       changes: raw.map((c) => ({
+        f: c.f,
         label: EXP_FIELD_LABELS[c.f] || CMP_FIELD_LABELS[c.f] || c.f,
         from: c.o || '',
         to: c.n || '',
+        // 能「恢复」的才算：编号不恢复（唯一性 / 引用都会乱）
+        can:
+          c.f !== 'code' &&
+          (c.f === 'reagents'
+            ? typeof c.of === 'string' && c.of.startsWith('[')   // 老历史只记了「6 行」，没法恢复
+            : c.f in EXP_FIELD_LABELS || c.f in CMP_FIELD_LABELS),
       })),
     };
   });
   ok(res, { items });
+});
+
+/**
+ * 把某个历史条目里的字段改回「改之前」的值——历史不只是看的，要能回溯。
+ * body: { event: 事件 id, field?: 字段名 }（不给 field 就把这条里所有能恢复的字段一起改回去）
+ */
+route('POST', '/api/history/:entity/:id/restore', async (req, res, params) => {
+  const entity = params.entity === 'compound' ? 'compound' : 'experiment';
+  const id = Number(params.id);
+  const body = await readJson(req);
+  const ev = db
+    .prepare('SELECT * FROM events WHERE id = ? AND entity = ? AND entity_id = ?')
+    .get(Number(body.event), entity, id);
+  if (!ev) return fail(res, 404, '找不到这条历史');
+  const table = entity === 'experiment' ? 'experiments' : 'compounds';
+  const labels = entity === 'experiment' ? EXP_FIELD_LABELS : CMP_FIELD_LABELS;
+  const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+  if (!row) return fail(res, 404, entity === 'experiment' ? '实验不存在' : '化合物不存在');
+  if (entity === 'experiment' && row.locked) return fail(res, 423, '记录已锁定，解锁后才能改');
+
+  let raw = [];
+  try {
+    raw = JSON.parse(ev.changes || '[]');
+  } catch {
+    raw = [];
+  }
+  const want = (body.field ? raw.filter((c) => c.f === body.field) : raw).filter(
+    (c) => c.f !== 'code' && (c.f === 'reagents' || c.f in labels)
+  );
+  if (!want.length) return fail(res, 400, '这条历史里没有能恢复的字段');
+
+  const done = [];
+  db.exec('BEGIN');
+  try {
+    for (const c of want) {
+      // 投料表：整张表按历史里那份覆盖（只有当时真存了完整数据才恢复）
+      if (c.f === 'reagents') {
+        if (entity !== 'experiment') continue;
+        let rows = null;
+        try {
+          rows = JSON.parse(c.of ?? 'null');
+        } catch {
+          rows = null;
+        }
+        if (!Array.isArray(rows)) continue;
+        const before = db
+          .prepare('SELECT role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, step FROM reagents WHERE exp_id = ? ORDER BY position')
+          .all(id);
+        db.prepare('DELETE FROM reagents WHERE exp_id = ?').run(id);
+        insertReagents(id, normalizeReagents(rows));
+        done.push({
+          f: 'reagents',
+          o: shortVal(reagentTableText(before)),
+          n: shortVal(reagentTableText(rows)),
+          of: fullVal(JSON.stringify(before)),
+          nf: fullVal(JSON.stringify(rows)),
+        });
+        continue;
+      }
+      const old = c.of !== undefined ? c.of : (c.o ?? null);
+      const before = row[c.f];
+      if (String(before ?? '') === String(old ?? '')) continue;
+      const numeric = ['base_mmol', 'yield_pct', 'product_mass', 'product_mw', 'ee_pct', 'category_id', 'product_compound_id', 'standard_exp_id'].includes(c.f);
+      db.prepare(`UPDATE ${table} SET ${c.f} = ?, updated_at = ? WHERE id = ?`).run(
+        numeric ? numOrNull(old) : str(old),
+        nowISO(),
+        id
+      );
+      done.push({ f: c.f, o: shortVal(before), n: shortVal(old), of: fullVal(before), nf: fullVal(old) });
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  if (!done.length) return fail(res, 400, '这些字段现在已经是那个值了');
+  logEvent(entity, id, 'restore-history', {
+    detail: `按 ${new Date(ev.at).toLocaleString('zh-CN')} 那次改动之前的值恢复了：${done.map((d) => labels[d.f] || d.f).join('、')}`,
+    fields: done.map((d) => d.f),
+    changes: done,
+  });
+  ok(res, entity === 'experiment' ? { experiment: getExperiment(id) } : { compound: getCompound(id) });
 });
 
 route('GET', '/api/trash', async (req, res) => {
@@ -4610,6 +4756,59 @@ async function zipDirectory(dir, res) {
   res.end(end);
 }
 
+/**
+ * 每天自动备份一次（用户：「历史记录千万要做好，就是能回溯」）。
+ * 用的是 scripts/backup.js 那一套（`VACUUM INTO` + 拷附件），写进 `.backups/<日期>/`，留 7 份。
+ * 只在「本机装的那套」上跑：`ELN_DATA_DIR` 指到别处（云端演示站）时数据目录不是这个仓库，
+ * 备份脚本对不上地方；那种环境用 `ELN_AUTO_BACKUP=0` 或者本来就有自己的重置策略。
+ */
+const AUTO_BACKUP = process.env.ELN_AUTO_BACKUP !== '0' && !process.env.ELN_DATA_DIR;
+const BACKUP_DIR = path.join(__dirname, '..', '.backups');
+// 默认 20 小时一次（一天一次，留 4 小时余量——不是精确 24h，开关机也能落上）；ELN_AUTO_BACKUP_HOURS 可调
+const AUTO_BACKUP_EVERY_MS =
+  Math.max(0.01, Number(process.env.ELN_AUTO_BACKUP_HOURS || 20)) * 60 * 60 * 1000;
+
+function lastBackupTime() {
+  try {
+    const dirs = fs
+      .readdirSync(BACKUP_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => {
+        const db = path.join(BACKUP_DIR, d.name, 'eln.db');
+        try {
+          return fs.statSync(db).mtimeMs;
+        } catch {
+          return 0;
+        }
+      })
+      .filter(Boolean);
+    return dirs.length ? Math.max(...dirs) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function maybeAutoBackup() {
+  if (!AUTO_BACKUP) return;
+  if (Date.now() - lastBackupTime() < AUTO_BACKUP_EVERY_MS) return;
+  const script = path.join(__dirname, '..', 'scripts', 'backup.js');
+  if (!fs.existsSync(script)) return;
+  try {
+    const { spawn } = require('node:child_process');
+    // 后台跑，别让启动/请求等它；输出丢弃（失败了下一次还会再试）
+    spawn(process.execPath, [script], { detached: true, stdio: 'ignore' }).unref();
+    console.log('  自动备份        → 正在写 .backups/（每天一次，留 7 份）');
+  } catch {
+    /* 备份失败不影响服务 */
+  }
+}
+
+function scheduleAutoBackup() {
+  if (!AUTO_BACKUP) return;
+  setTimeout(maybeAutoBackup, 8000);          // 起来 8 秒后再动手，别跟首屏抢 IO
+  setInterval(maybeAutoBackup, 3 * 60 * 60 * 1000).unref();
+}
+
 function listen(port, attempt = 0) {
   server.once('error', (err) => {
     if (err.code === 'EADDRINUSE' && attempt < 20) {
@@ -4672,5 +4871,6 @@ ensurePrintRenderer()
   .then(() => console.log('  打印渲染器      →  就绪（自己生成 A4 PDF）'))
   .catch((e) => console.log('  打印渲染器      →  不可用，只能用系统打印：' + e.message));
 
+scheduleAutoBackup();
 scheduleAutoSync();
 listen(PORT);

@@ -564,8 +564,12 @@ function logEdit(entity, entityId, changes) {
     const merged = [...prevChanges];
     for (const c of changes) {
       const hit = merged.find((x) => x.f === c.f);
-      if (hit) hit.n = c.n;
-      else merged.push(c);
+      if (hit) {
+        // 合并时「改后」要连完整值一起换掉——只换显示文字的话，
+        // `nf` 会停在第一次的值上，「改回去」就拿错数据（踩过）
+        hit.n = c.n;
+        hit.nf = c.nf;
+      } else merged.push(c);
     }
     db.prepare('UPDATE events SET fields = ?, changes = ?, at = ? WHERE id = ?').run(
       JSON.stringify([...new Set([...prevFields, ...fields])]),

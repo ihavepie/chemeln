@@ -100,6 +100,8 @@ export const api = {
   parallel: (id) => request(`/api/experiments/${id}/parallel`, { method: 'POST', body: {} }).then((d) => d.experiment),
   moveExperiment: (id, body) => request(`/api/experiments/${id}/move`, { method: 'POST', body }).then((d) => d.experiment),
 
+  // 把历史里某个条目改回「改之前」的值（改不回去的字段服务端会跳过）
+  historyRestore: (entity, id, body) => request(`/api/history/${entity}/${id}/restore`, { method: 'POST', body }),
   upload: (id, formData) => request(`/api/experiments/${id}/attachments`, { method: 'POST', body: formData }),
   uploadPath: (id, body) => request(`/api/experiments/${id}/attachments/path`, { method: 'POST', body }),
   updateAttachment: (id, body) => request(`/api/attachments/${id}`, { method: 'PUT', body }),

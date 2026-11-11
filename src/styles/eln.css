@@ -6861,6 +6861,23 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .scheme-head .spacer { flex: 1; }
 .scheme-head .btn-sm { padding: 2px 8px; }
 
+/* 历史弹窗里每格的「改回去」：平时淡、hover 才明显，别抢「改前 → 改后」的注意力 */
+.hist-changes .chg-restore {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.45;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.hist-changes .chg:hover .chg-restore { opacity: 1; }
+.hist-changes .chg-restore:hover { color: var(--accent-ink); }
+.hist-changes .chg-restore:disabled { cursor: default; color: var(--ink-4); }
+
 /* ===== 拖动排序（2026-11）=====
    卡片是 <button>，拖动走 `lib/pointdrag.js`（普通 mouse 事件）。
    **这里必须显式 `-webkit-user-drag: none`**：WebKit 里只要元素被当成可原生拖拽
