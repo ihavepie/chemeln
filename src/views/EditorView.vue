@@ -40,6 +40,12 @@ const router = useRouter();
 const exp = ref(null);
 const error = ref('');
 const page = ref(1);
+/* 第 3 页（文献）有没有内容：没内容时打印 / 存 PDF 不带这一页，不留一张白纸 */
+const litHasContent = computed(
+  () =>
+    String(fields.lit_note || '').trim() !== '' ||
+    (exp.value?.attachments || []).some((a) => a.category === 'literature')
+);
 const hovered = ref('');
 const statusMenu = ref(false);
 const rxnMenu = ref(false);   // 抬头「反应类型」那格的候选菜单
@@ -502,6 +508,8 @@ function runPrint(opts) {
   const marks = {
     'print-page-1': opts.pages === 'p1',
     'print-page-2': opts.pages === 'p2',
+    'print-page-3': opts.pages === 'lit',
+    'print-no-lit': !litHasContent.value,
     'print-no-attach': !opts.attachments,
     'print-no-header': !opts.header,
     'print-mono': opts.mono,
@@ -1176,11 +1184,20 @@ const openAttachment = (id) => {
           <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" @click="page = 1">第 1 页 · 主记录</button>
           <button class="ptab" :aria-selected="page === 2 ? 'true' : 'false'" @click="page = 2">第 2 页 · 续页</button>
           <button
-            v-if="sheetPrefs.attachments"
+            v-if="sheetPrefs.lit"
             class="ptab"
             :aria-selected="page === 3 ? 'true' : 'false'"
-            :title="`原始文件都在这儿：谱图、TLC、照片、文献图（${(exp.attachments || []).length} 个）`"
+            title="文献：要点 + 文献里的反应式 / 条件表截图（算记录的第 3 页，打印 / 存 PDF 会带上）"
             @click="page = 3"
+          >
+            第 3 页 · 文献
+          </button>
+          <button
+            v-if="sheetPrefs.attachments"
+            class="ptab"
+            :aria-selected="page === 4 ? 'true' : 'false'"
+            :title="`原始文件都在这儿：谱图、TLC、照片、文献图（${(exp.attachments || []).length} 个）`"
+            @click="page = 4"
           >
             附件 · {{ (exp.attachments || []).length }}
           </button>
@@ -1370,7 +1387,6 @@ const openAttachment = (id) => {
             :model="fields"
             :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)" />
 
-
         </article>
 
         <!-- 平行书签是浮层：挂在 body 上、按纸面位置钉住，滚动容器裁不到它 -->
@@ -1488,41 +1504,52 @@ const openAttachment = (id) => {
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.conclusion" :disabled="exp.locked" placeholder="本组条件的结论与下一轮拟考察的变量" />
           </section>
 
-          <!-- 文献：文献里的反应式 / 条件表截图（可多张、带图注）+ 一段要点。出处仍是第 1 页抬头那格「文献」 -->
-          <section v-if="sheetPrefs.lit" class="sec">
-            <h2 class="sec-title"><span class="num">五</span>文献</h2>
-            <textarea
-              class="sheet-text"
-              rows="2"
-              v-autogrow
-              v-model="fields.lit_note"
-              :disabled="exp.locked"
-              placeholder="文献里的标准条件 / 产率 / 跟我们做法的差别"
-            />
-            <div class="op-shots">
-              <span class="op-cap">文献图</span>
-              <div class="sec-shots is-lit" @mouseenter="onHover('lit')" @mouseleave="onHover('')">
-                <TlcStrip
-                  category="literature"
-                  captions
-                  cap-placeholder="图注，如：文献 Table 2 / Scheme 1"
-                  :attachments="exp.attachments || []"
-                  :locked="exp.locked"
-                  :hovered="hovered"
-                  :on-hover="onHover"
-                  :on-pick="pickFile"
-                  :on-open="openAttachment"
-                  :on-caption="saveCaption"
-                  :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
-                />
-              </div>
-            </div>
-          </section>
 
         </article>
 
+
+        <!-- ============ 第 3 页 · 文献（可选；没内容时打印不带这一页） ============ -->
+          <article v-if="sheetPrefs.lit" class="sheet sheet-p3" :class="{ 'is-hidden': page !== 3 }">
+            <div class="sheet-runner">
+              <span>{{ store.boot?.settings?.lab_heading || '方法学实验记录' }} · 文献</span>
+              <span>{{ exp.code }}</span>
+            </div>
+            <section class="sec">
+              <h2 class="sec-title">文献</h2>
+              <textarea
+                class="sheet-text"
+                rows="2"
+                v-autogrow
+                v-model="fields.lit_note"
+                :disabled="exp.locked"
+                placeholder="文献里的标准条件 / 产率 / 跟我们做法的差别"
+              />
+              <div class="op-shots">
+                <span class="op-cap">文献图</span>
+                <div class="sec-shots is-lit" @mouseenter="onHover('lit')" @mouseleave="onHover('')">
+                  <TlcStrip
+                    category="literature"
+                    captions
+                    cap-placeholder="图注，如：文献 Table 2 / Scheme 1"
+                    :attachments="exp.attachments || []"
+                    :locked="exp.locked"
+                    :hovered="hovered"
+                    :on-hover="onHover"
+                    :on-pick="pickFile"
+                    :on-open="openAttachment"
+                    :on-caption="saveCaption"
+                    :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
+                  />
+                </div>
+              </div>
+            </section>
+            <div class="sheet-foot noprint">
+              <span class="hint">文献里的标准条件 / 产率写在这一页；出处仍写第 1 页抬头那格「文献」。</span>
+            </div>
+          </article>
+
         <!-- ============ 附件（不占纸面：原始文件不是记录正文，打印 / 存 PDF 也不带它） ============ -->
-        <article v-if="sheetPrefs.attachments && page === 3" class="sheet sheet-att">
+        <article v-if="sheetPrefs.attachments && page === 4" class="sheet sheet-att">
           <div class="sheet-runner">
             <span>{{ store.boot?.settings?.lab_heading || '方法学实验记录' }} · 附件</span>
             <span>{{ exp.code }}</span>
@@ -1584,6 +1611,7 @@ const openAttachment = (id) => {
       :title="`打印 · ${exp?.code || ''}`"
       :filename="`${exp?.code || '记录'}.pdf`"
       @close="printPanel = false"
+      :lit="litHasContent"
       @print="runPrint"
     />
 

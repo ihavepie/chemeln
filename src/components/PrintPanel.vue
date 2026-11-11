@@ -18,16 +18,19 @@ const props = defineProps({
   title: { type: String, default: '打印' },
   /** 存成 PDF 时的文件名，比如 EXP-0046.pdf */
   filename: { type: String, default: '记录.pdf' },
+  /** 第 3 页（文献）有没有内容：没有就不出现在预览和 PDF 里 */
+  lit: { type: Boolean, default: false },
 });
 const emit = defineEmits(['close', 'print']);
 
 const opts = reactive({ pages: 'both', attachments: true, header: true, mono: false });
 
-const PAGE_CHOICES = [
-  { key: 'both', label: '两页' },
+const PAGE_CHOICES = computed(() => [
+  { key: 'both', label: props.lit ? '全部页' : '两页' },
   { key: 'p1', label: '只第 1 页' },
   { key: 'p2', label: '只第 2 页' },
-];
+  ...(props.lit ? [{ key: 'lit', label: '只文献页' }] : []),
+]);
 
 /** 输入框/文本域 clone 只带 attribute，得把当前值搬过去（Vue 改的是 property） */
 function syncFields(from, to) {
@@ -53,11 +56,16 @@ function exportCss() {
 }
 
 /** 要打哪几页（'p1' / 'p2' / 两页），预览、计量、导出共用一处判断 */
-const pickIdx = computed(() => (opts.pages === 'p1' ? [0] : opts.pages === 'p2' ? [1] : [0, 1]));
+const pickIdx = computed(() => {
+  if (opts.pages === 'p1') return [0];
+  if (opts.pages === 'p2') return [1];
+  if (opts.pages === 'lit') return [2];
+  return props.lit ? [0, 1, 2] : [0, 1];
+});
 
 /** 按选项挑出要打的那几页，克隆成独立 HTML 片段（克隆里没有 .editor 祖先，print 规则照常命中） */
 function buildPages() {
-  const sheets = [...document.querySelectorAll('.editor .sheet')];
+  const sheets = [...document.querySelectorAll('.editor .sheet:not(.sheet-att)')];
   const out = [];
   for (const i of pickIdx.value) {
     const sheet = sheets[i];
@@ -76,7 +84,7 @@ function buildPages() {
 }
 
 /** 这一页有没有比 A4 还长（PDF 是按 A4 一页页出的，超出 = 被裁掉） */
-const overflow = ref([false, false]);
+const overflow = ref([false, false, false]);
 const overflowing = computed(() => pickIdx.value.some((i) => overflow.value[i]));
 
 /** 预览 iframe 和 PDF 是同一份 HTML/CSS，所以在 iframe 里量出来的就是最终结果 */
@@ -171,6 +179,24 @@ const print = () => emit('print', { ...opts });
           />
         </div>
         <div class="pp-cap">第 2 页 · 续页</div>
+      </div>
+      <div
+        v-if="props.lit"
+        class="pp-thumb"
+        :class="{ 'is-off': pageDocs[2] && (opts.pages === 'p1' || opts.pages === 'p2') }"
+        @click="opts.pages = opts.pages === 'lit' ? 'both' : 'lit'"
+      >
+        <div class="pp-thumb-inner">
+          <iframe
+            v-if="pageDocs[2]"
+            class="pp-frame"
+            :srcdoc="pageDocs[2]"
+            tabindex="-1"
+            title="第 3 页预览"
+            @load="measurePage(2, $event)"
+          />
+        </div>
+        <div class="pp-cap">第 3 页 · 文献</div>
       </div>
     </div>
 

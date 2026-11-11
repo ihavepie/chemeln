@@ -4861,8 +4861,12 @@ kbd {
 /* 打印面板选出来的选项：只打某一页 / 不带附件 / 不带页眉 / 图片黑白
    （在原有 @media print 之后，专门加 !important 盖过 .sheet.is-hidden 的 display:block） */
 @media print {
-  body.print-page-1 .sheet-p2 { display: none !important; }
-  body.print-page-2 .sheet-p1 { display: none !important; }
+  body.print-page-1 .sheet-p2, body.print-page-1 .sheet-p3 { display: none !important; }
+  body.print-page-2 .sheet-p1, body.print-page-2 .sheet-p3 { display: none !important; }
+  body.print-page-3 .sheet-p1, body.print-page-3 .sheet-p2 { display: none !important; }
+  /* 文献页没内容时别印一张白纸；附件那一屏永远不打印 */
+  body.print-no-lit .sheet-p3 { display: none !important; }
+  .sheet-att { display: none !important; }
   body.print-no-attach .sec-att,
   body.print-no-attach .tlc-strip { display: none !important; }
   body.print-no-header .sheet-runner { display: none !important; }
