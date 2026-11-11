@@ -7596,3 +7596,27 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .lib-name { color: var(--ink); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-role { flex: 0 0 auto; color: var(--ink-4); font-size: 11px; }
 .lib-meta { flex: 0 0 auto; color: var(--ink-3); font-size: 11px; }
+
+/* ================================================================
+   TLC 图不裁切（用户报「这边的图片还是有点截断」）
+   原来 92×132（化合物页 76×104）的方框配 object-fit: cover，板子是 74×167 这种
+   薄长比例，cover 会把上下各切掉四成——底部的基准线和顶部的展开前沿都没了。
+   现在改成「高度定、宽度跟原图比例」，一排图顶上对齐，一像素都不裁。
+   照片那一条（.sec-shots）本来就是 contain，不动。
+   ================================================================ */
+.sec-tlc .tlc-strip,
+.cmp-sheet .tlc-strip { align-items: flex-start; }
+.sec-tlc .tlc-shot { width: auto; height: 150px; flex: 0 0 auto; }
+.cmp-sheet .tlc-shot { width: auto; height: 120px; flex: 0 0 auto; }
+.sec-tlc .tlc-shot img,
+.cmp-sheet .tlc-shot img { width: auto; height: 100%; max-width: 240px; object-fit: contain; }
+/* 空位跟板子的宽度对齐（板子 0.45–0.5 的宽高比，放 150 高就是 70 出头宽） */
+.sec-tlc .tlc-empty { width: 72px; height: 150px; flex: 0 0 auto; }
+
+@media print {
+  /* 纸面上矮一点，一页装得下 */
+  .sec-tlc .tlc-shot { height: 140px; }
+  .sec-tlc .tlc-empty { height: 140px; }
+  .cmp-sheet .tlc-shot,
+  .cmp-sheet .tlc-empty { height: 104px; }
+}
