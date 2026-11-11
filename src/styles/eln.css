@@ -6837,18 +6837,19 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
 .qmenu.cat-menu::-webkit-scrollbar,
 .kind-menu::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
-/* 反应式「跟随投料表」：inline SVG 居中放在一个固定高度的容器里——
-   高度固定，所以「刷新后先空一下再出图」不会把下面的内容顶来顶去（用户报过跳动） */
+/* 反应式「跟随投料表」：inline SVG 居中显示。
+   以前高度写死 220px（怕刷新后先空一下再出图会顶来顶去），结果图只有 150px 高，
+   上下各空一截（用户圈出来让压缩）。现在**盒子跟着图的高度走**——缓存命中时首帧就有图，
+   不会有跳动；第一次画的极少数情况由外层 `.scheme-slot` 的 min-height 兜着，只跳几十像素。 */
 .scheme-live {
   width: 100%;
-  height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.scheme-live > div { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-.scheme-live svg { max-width: 100%; max-height: 100%; width: auto; height: auto; }
-@media print { .scheme-live { height: 200px; } .scheme-live svg { max-height: 196px; } }
+.scheme-live > div { width: 100%; display: flex; align-items: center; justify-content: center; }
+.scheme-live svg { display: block; max-width: 100%; max-height: 240px; width: auto; height: auto; }
+@media print { .scheme-live svg { max-height: 210px; } }
 
 /* 反应式格子右上角的「画反应式」按钮：字号跟着这一带走，别把标签挤歪 */
 .scheme-head { align-items: center; }
