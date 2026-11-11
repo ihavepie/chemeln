@@ -7620,3 +7620,42 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
   .cmp-sheet .tlc-shot,
   .cmp-sheet .tlc-empty { height: 104px; }
 }
+
+/* ================================================================
+   中栏列表按分类分段（「全部分类」时）
+   分类名本身就是拖放落点：把卡片拖到别的分类那一段里 = 换分类。
+   ================================================================ */
+.list-cat { display: block; }
+.list-cat + .list-cat { margin-top: 6px; }
+.list-cat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 4px 5px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.list-cat-head:hover { color: var(--ink); }
+.list-cat-name { font-family: var(--mono); }
+.list-cat-count { font-family: var(--mono); font-size: 9.5px; color: var(--ink-4); }
+/* 空分类：一行淡淡的提示，拖东西过来时这一行会变高，别只有 20px 的落区 */
+.list-cat-blank {
+  display: none;
+  margin: 0 0 4px;
+  padding: 5px 8px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  text-align: center;
+  transition: border-color 130ms var(--ease), color 130ms var(--ease), background 130ms var(--ease);
+}
+body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; align-items: center; justify-content: center; }
+.list-cat.is-drop-target .list-cat-head { color: var(--accent-ink); }
+.list-cat.is-drop-target .list-cat-blank { border-color: var(--accent); color: var(--accent-ink); background: #fbf4ee; }

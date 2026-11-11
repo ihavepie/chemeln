@@ -157,18 +157,47 @@ const rows = computed(() => {
    一摞（平行组）拖起来是整摞一起动——只挪面子会把同一个组拆到两个分类里。
    行身份用 `anchor`（这一行最早那条的 id）认，一摞的位置本来就按它算。 */
 const dragId = ref(null);
-const dropIdx = ref(-1);
+const drop = ref(null);       // 落点：{ key: 哪一段, at: 这一段里第几行前面 }
 const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高度
 
-/* 落到它自己原位（含它后面那一格）时不再画线 */
-const dragIdx = computed(() => rows.value.findIndex((r) => r.anchor === dragId.value));
-const slotIdx = computed(() => {
-  const at = dropIdx.value;
-  if (at < 0) return -1;
-  const src = dragIdx.value;
-  if (src >= 0 && (at === src || at === src + 1)) return -1;
-  return at;
-});      // 落点线插在第几行前面（= 行数 = 放最后）
+/* 分类分组：下拉停在「全部分类」时，列表就按分类分段显示（顺序跟设置页 / 卡片墙一致），
+   没记录的分类也留一行——那一行就是拖拽换分类的落点。
+   在下拉里选了具体分类才平铺，不然看不出自己在看哪一段。 */
+const grouping = computed(() => !store.filters.category);
+
+const sections = computed(() => {
+  const all = rows.value;
+  if (!grouping.value) return [{ key: 'list', name: '', catId: undefined, rows: all }];
+  const byCat = new Map();
+  for (const r of all) {
+    const cid = rowCategory(r);
+    const k = cid == null || cid === '' ? 'none' : String(cid);
+    if (!byCat.has(k)) byCat.set(k, []);
+    byCat.get(k).push(r);
+  }
+  const out = [];
+  for (const c of recordCategories('experiment')) {
+    const k = String(c.id);
+    out.push({ key: `cat:${k}`, name: c.name, catId: Number(c.id), rows: byCat.get(k) || [] });
+    byCat.delete(k);
+  }
+  // 列表里有、分类表里没有的（老记录挂在已删的分类上）也得有落处，别让它们消失
+  for (const [k, rs] of [...byCat]) {
+    if (k === 'none' || !rs.length) continue;
+    out.push({ key: `cat:${k}`, name: rs[0].category_name || '其他分类', catId: Number(k), rows: rs });
+    byCat.delete(k);
+  }
+  out.push({ key: 'cat:none', name: '未分类', catId: null, rows: byCat.get('none') || [] });
+  return out;
+});
+
+/* 拖它自己那一格、或者紧后头那一格，都不用再画落点格（原地没动） */
+function showSlot(sec, at) {
+  const d = drop.value;
+  if (!d || d.key !== sec.key || d.at !== at) return false;
+  const s = sec.rows.findIndex((r) => r.anchor === dragId.value);
+  return !(s >= 0 && (at === s || at === s + 1));
+}
 
 const sorter = createPointerSort({
   name: 'exp-list',
@@ -177,17 +206,19 @@ const sorter = createPointerSort({
     const el = document.querySelector(`[data-drag-card="${id}"]`);
     if (el) dragH.value = Math.round(el.getBoundingClientRect().height);
   },
-  // 列表是一列：gap 指向「插到第几行前面」，那里放一块占位格，下面的行让位
+  // 每一段（一个分类）自己是一个落区：gap = 插到这一段的第几行前面
   onTarget: (id, groupKey, gap) => {
-    const at = Math.min(gap, rows.value.length);
-    if (at === dropIdx.value) return;
+    const sec = sections.value.find((s) => s.key === groupKey);
+    if (!sec) return;
+    const at = Math.min(gap, sec.rows.length);
+    if (drop.value && drop.value.key === sec.key && drop.value.at === at) return;
     // 占位格一插进去，下面的卡片就要下移：用 FLIP 滑过去，别瞬移
     withFlip([...document.querySelectorAll('.listpane .exp-card')], () => {
-      dropIdx.value = at;
+      drop.value = { key: sec.key, at };
     });
   },
-  onDrop: (id, groupKey, gap) => dropRow(id, gap),
-  onCancel: () => { dragId.value = null; dropIdx.value = -1; },
+  onDrop: (id, groupKey, gap) => dropRow(id, groupKey, gap),
+  onCancel: () => { dragId.value = null; drop.value = null; },
 });
 
 function onRowDown(ev, row) {
@@ -206,34 +237,36 @@ function rowCategory(row) {
   return (row.one ? row.one.category_id : row.face.category_id) ?? null;
 }
 
-async function dropRow(anchor, at) {
+async function dropRow(anchor, groupKey, gap) {
   dragId.value = null;
-  dropIdx.value = -1;
-  const list = rows.value;
-  const row = list.find((r) => r.anchor === anchor);
-  if (!row) return;
+  drop.value = null;
+  const sec = sections.value.find((s) => s.key === groupKey);
+  const row = rows.value.find((r) => r.anchor === anchor);
+  if (!row || !sec) return;
 
-  const rest = list.filter((r) => r.anchor !== anchor);
+  const at = Math.min(gap, sec.rows.length);
+  const rest = sec.rows.filter((r) => r.anchor !== anchor);
   let pos = 0;
-  for (let i = 0; i < at && i < list.length; i += 1) if (list[i].anchor !== anchor) pos += 1;
+  for (let i = 0; i < at && i < sec.rows.length; i += 1) if (sec.rows[i].anchor !== anchor) pos += 1;
   const nextRow = rest[pos] || null;
 
-  const cat = rowCategory(row);
-  if (nextRow && rowCategory(nextRow) !== cat) {
-    toast('列表里只能在同一分类内排序；换分类请到卡片视图拖', 'warn');
-    return;
-  }
-  // 原地没动（落点还是它下面那一行）就不发请求
-  const curIdx = list.findIndex((r) => r.anchor === anchor);
-  if ((list[curIdx + 1] || null) === nextRow) return;
+  const curCat = rowCategory(row);
+  // 平铺（正在按分类 / 状态筛）时 sec.catId 是 undefined，按「不换分类」处理
+  const nextCat = sec.catId === undefined ? curCat : sec.catId;
+  const changing = (curCat ?? null) !== (nextCat ?? null);
+
+  // 原地没动（落点还是它自己后面那一行）就不发请求
+  const curIdx = sec.rows.findIndex((r) => r.anchor === anchor);
+  if (!changing && (sec.rows[curIdx + 1] || null) === nextRow) return;
 
   const ids = row.one ? [row.one.id] : row.members.map((m) => m.id);
   const before = nextRow ? nextRow.anchor : null;
   try {
     // 整摞按顺序插到同一个 before 前面：先面子、再组员，顺序就不会被打乱
-    for (const one of ids) await api.moveExperiment(one, { category_id: cat, before_id: before });
+    for (const one of ids) await api.moveExperiment(one, { category_id: nextCat, before_id: before });
     await loadList();
     await loadBoot();
+    if (changing) toast(`已移到「${sec.name || '未分类'}」`, 'info', 1600);
   } catch (e) {
     toast(e.message || '移动不了', 'err');
   }
@@ -428,15 +461,29 @@ function onStackFace(row) {
       </div>
     </div>
 
-    <div
-      class="listpane-body"
-      ref="bodyEl"
-      data-drag-group="list"
-      :data-drag-count="rows.length"
-      @scroll="saveScroll"
-    >
-      <template v-for="(row, ri) in rows" :key="row.key">
-        <div v-if="slotIdx === ri" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
+    <div class="listpane-body" ref="bodyEl" @scroll="saveScroll">
+      <!-- 「全部分类」时按分类分段：每段自己就是一个拖放落区（拖进去 = 换分类） -->
+      <section
+        v-for="sec in sections"
+        :key="sec.key"
+        class="list-cat"
+        :class="{ 'is-drop-target': drop && drop.key === sec.key }"
+        :data-drag-group="sec.key"
+        :data-drag-count="sec.rows.length"
+      >
+        <!-- 分类名点一下就把下拉切到这一类（再点一次别的分类才能回来） -->
+        <button
+          v-if="grouping"
+          type="button"
+          class="list-cat-head"
+          :title="`只看「${sec.name}」`"
+          @click="setFilter(sec.catId == null ? 'none' : String(sec.catId))"
+        >
+          <span class="list-cat-name">{{ sec.name }}</span>
+          <span class="list-cat-count">{{ sec.rows.length }}</span>
+        </button>
+        <template v-for="(row, ri) in sec.rows" :key="row.key">
+          <div v-if="showSlot(sec, ri)" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
         <!-- 普通记录 -->
         <button
           v-if="row.one"
@@ -444,7 +491,7 @@ function onStackFace(row) {
           :class="{ 'is-dragging': dragId === row.anchor }"
           :aria-current="row.one.id === activeId() ? 'true' : 'false'"
           :data-drag-card="row.anchor"
-          data-drag-group="list"
+          :data-drag-group="sec.key"
           :data-drag-index="ri"
           @mousedown="onRowDown($event, row)"
           @click="goRow(row.one.id)"
@@ -465,7 +512,7 @@ function onStackFace(row) {
             </template>
           </div>
           <div class="exp-meta">
-            <span v-if="catName(row.one)" class="cat-tag">{{ catName(row.one) }}</span>
+            <span v-if="!grouping && catName(row.one)" class="cat-tag">{{ catName(row.one) }}</span>
             <span v-if="row.one.project">{{ row.one.project }}</span>
             <template v-if="rxnDesc(row.one)"><span class="sep">·</span><span>{{ rxnDesc(row.one) }}</span></template>
             <template v-if="row.one.yield_pct != null"><span class="sep">·</span><span style="color: var(--ok)">{{ row.one.yield_pct }}%</span></template>
@@ -478,7 +525,7 @@ function onStackFace(row) {
           v-else
           class="exp-stack"
           :class="{ 'is-active': isGroupActive(row) }"
-          data-drag-group="list"
+          :data-drag-group="sec.key"
           :data-drag-count="ri + 1"
         >
           <!-- 两张垫纸挂在 stack-top 上，只跟着面子那张卡片，不跟着展开出来的组员行 -->
@@ -490,7 +537,7 @@ function onStackFace(row) {
               role="button"
               tabindex="0"
               :data-drag-card="row.anchor"
-              data-drag-group="list"
+              :data-drag-group="sec.key"
               :data-drag-index="ri"
               @mousedown="onRowDown($event, row)"
               @click="onStackFace(row)"
@@ -522,7 +569,7 @@ function onStackFace(row) {
                 </template>
               </div>
               <div class="exp-meta">
-                <span v-if="catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
+                <span v-if="!grouping && catName(row.face)" class="cat-tag">{{ catName(row.face) }}</span>
                 <span v-if="row.face.project">{{ row.face.project }}</span>
                 <span class="sep">·</span><span class="stack-kind">{{ row.kindLabel }}</span>
                 <template v-if="row.face.rxn_type"><span class="sep">·</span><span class="stack-kind">{{ row.face.rxn_type }}</span></template>
@@ -582,7 +629,9 @@ function onStackFace(row) {
         </div>
       </template>
 
-      <div v-if="slotIdx === rows.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
+        <div v-if="showSlot(sec, sec.rows.length)" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
+        <div v-if="grouping && !sec.rows.length" class="list-cat-blank">拖一条记录到这里</div>
+      </section>
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}
