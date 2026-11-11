@@ -1425,23 +1425,23 @@ const openAttachment = (id) => {
                 <span class="op-cap">现象</span>
                 <textarea class="sheet-text" rows="3" v-autogrow v-model="fields.notes" :disabled="exp.locked" placeholder="颜色、放热、气体、析出…" />
               </label>
-              <!-- 照片放在最右边一栏（相机图、TLC 板、反应液颜色）：操作和现象挨在一起读，图单独一列 -->
-              <div class="op-shots">
-                <span class="op-cap">照片</span>
-                <div class="sec-shots" @mouseenter="onHover('photo')" @mouseleave="onHover('')">
-                  <TlcStrip
-                    category="photo"
-                    captions
-                    :attachments="exp.attachments || []"
-                    :locked="exp.locked"
-                    :hovered="hovered"
-                    :on-hover="onHover"
-                    :on-pick="pickFile"
-                    :on-open="openAttachment"
-                    :on-caption="saveCaption"
-                    :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
-                  />
-                </div>
+            </div>
+            <!-- 照片单独一整行：以前是右边一窄栏竖着堆，图一高「操作 / 现象」下面就是一大片空白（用户提的） -->
+            <div class="op-shots">
+              <span class="op-cap">照片</span>
+              <div class="sec-shots" @mouseenter="onHover('photo')" @mouseleave="onHover('')">
+                <TlcStrip
+                  category="photo"
+                  captions
+                  :attachments="exp.attachments || []"
+                  :locked="exp.locked"
+                  :hovered="hovered"
+                  :on-hover="onHover"
+                  :on-pick="pickFile"
+                  :on-open="openAttachment"
+                  :on-caption="saveCaption"
+                  :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
+                />
               </div>
             </div>
           </section>
