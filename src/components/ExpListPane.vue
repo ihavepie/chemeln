@@ -6,6 +6,7 @@ import CatPick from './CatPick.vue';
 import { store, loadList, loadBoot, recordCategories, addCategory } from '../store.js';
 import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
+import { eqLabel } from '../lib/reagent.js';
 import { prompt, toast } from '../lib/feedback.js';
 import { createPointerSort } from '../lib/pointdrag.js';
 import { withFlip } from '../lib/flip.js';
@@ -297,11 +298,7 @@ function listDiff(base, m) {
   // 投料表：签名一样就跳过；不一样就点出「加 / 去 / 当量」哪种变化
   if (baseFilled && String(base.reagent_sig || '') !== String(m.reagent_sig || '')) {
     const nm = (r) => r.name || '（未命名）';
-    const eqTxt = (v) => {
-      const t = String(v ?? '').trim();
-      if (!t) return '—';
-      return /%$/.test(t) ? t : `${t} eq`;
-    };
+    const eqTxt = (v) => eqLabel(v) || '—';
     // 一条一条列，不要再折成「投料（加 X，去 Y 等）」——这里最想看的就是试剂到底动没动。
     // 但「一进一出、角色相同」（配体换配体、碱换碱、溶剂换溶剂）要合成一条
     // 「旧 → 新」，否则两颗粒子（加 RuPhos / 去 P(Cy)3）说的是同一件事。

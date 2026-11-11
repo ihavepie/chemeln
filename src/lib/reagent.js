@@ -54,6 +54,15 @@ export const eqNum = (v) => {
   return num(s);
 };
 
+/** 当量写成人看的那种：不到 1 的按投料表口径折百分数并带单位（0.2 → 20 mol%），
+ *  其余一位小数（1 → 1.0 eq、2 → 2.0 eq）。箭头、列表、筛选表的改动项都用这一份，别再各写一套。 */
+export function eqLabel(v) {
+  const x = eqNum(v);
+  if (x == null) return '';
+  if (x > 0 && x < 1) return `${round(x * 100, 2)} mol%`;
+  return `${x.toFixed(1)} eq`;
+}
+
 export const round = (v, d = 2) => {
   const x = num(v);
   if (x === null) return '';

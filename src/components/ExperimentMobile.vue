@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { api } from '../api.js';
 import { toast } from '../lib/feedback.js';
 import { STATUS_TONE } from '../lib/ui.js';
-import { amountText, num, round } from '../lib/reagent.js';
+import { amountText, eqLabel, num, round } from '../lib/reagent.js';
 
 /**
  * 手机端（≤820px）扫实验二维码后看到的：只读、只这一页、没有任何链接。
@@ -154,7 +154,7 @@ const amount = (r) => amountText(r) || (num(r.amount_ul) ? `${round(num(r.amount
             <tr v-for="r in rows" :key="r.id">
               <td>{{ r.name }}</td>
               <td class="muted">{{ r.role || '' }}</td>
-              <td class="num mono">{{ r.eq ? `${round(r.eq, 2)} eq` : '' }}</td>
+              <td class="num mono">{{ eqLabel(r.eq) }}</td>
               <td class="num mono">{{ amount(r) }}</td>
             </tr>
           </tbody>

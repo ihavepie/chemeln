@@ -5,7 +5,7 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, variantText, vesselHint, volText } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqLabel, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, variantText, vesselHint, volText } from '../lib/reagent.js';
 import { compoundDict, reagentDict, store } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
@@ -890,7 +890,7 @@ function hintFor(r, field) {
       const extra = amountMath({ ...r, mmol: mmolOut }, mmolOut);
       return `${name}：${round(base, 3)} mmol × ${round(eq, 3)} eq = ${round(mmolOut, 4)} mmol${extra ? ` → ${extra.split(' = ').pop()}` : ''}`;
     }
-    return `${name}：${eq === null ? '未填当量' : `${round(eq, 3)} eq`}，规模 ${base ? `${round(base, 3)} mmol` : '未填'}`;
+    return `${name}：${eq === null ? '未填当量' : eqLabel(r.eq)}，规模 ${base ? `${round(base, 3)} mmol` : '未填'}`;
   }
 
   if (field === 'mmol') {

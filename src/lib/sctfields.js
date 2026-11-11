@@ -1,4 +1,4 @@
-import { round } from './reagent.js';
+import { eqLabel, round } from './reagent.js';
 
 /**
  * 筛选表的「字段」：一列要么**自动**（从记录里取某个值，改了记录这边就跟着变），
@@ -42,7 +42,7 @@ const isEmpty = (v) => v === null || v === undefined || v === '';
 export const reagentText = (exp) =>
   (exp?.reagents || [])
     .filter((r) => r.name)
-    .map((r) => `${r.name}${isEmpty(r.eq) || r.eq === '' ? '' : ` ${r.eq} eq`}`)
+    .map((r) => `${r.name}${isEmpty(r.eq) || r.eq === '' ? '' : ` ${eqLabel(r.eq)}`}`)
     .join(' · ');
 
 /** 自动列在某一行的值 */
@@ -88,7 +88,7 @@ const COND_LABEL = {
 const reagentMapOf = (exp) =>
   new Map((exp?.reagents || []).filter((r) => r.name).map((r) => [`${r.role}:${r.name}`, r.eq]));
 
-const eqText = (v) => (v === null || v === undefined || v === '' ? '' : `${v} eq`);
+const eqText = (v) => (v === null || v === undefined || v === '' ? '' : eqLabel(v));
 
 /** 溶剂现在就是投料表里 role=溶剂 的一行，`solvent` 字段只是老记录留下的壳。
  *  有投料行时一律以投料行为准，否则同一件事会在格子里写两遍（踩过）。 */

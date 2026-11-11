@@ -2041,6 +2041,17 @@ function reagentMap(expId) {
  *  会冒出「溶剂 空」这种假差异（记录里 THF 一直没动也会被标成改了溶剂）。 */
 const mapHasSolventRow = (m) => [...m.keys()].some((k) => k.startsWith('溶剂:'));
 
+/** 当量写成人看的那种：不到 1 的折百分数带单位（0.1 → 10 mol%），其余一位小数（1 → 1.0 eq）。
+ *  跟前端 `lib/reagent.js` 的 `eqLabel()` 一套，两边的文字才对得上。 */
+function eqLabel(v) {
+  const t = str(v).trim();
+  if (!t) return '';
+  const x = t.endsWith('%') ? Number(t.slice(0, -1)) / 100 : Number(t);
+  if (!Number.isFinite(x) || x <= 0) return '';
+  if (x < 1) return `${Math.round(x * 10000) / 100} mol%`;
+  return `${x.toFixed(1)} eq`;
+}
+
 /** 一条记录相对基准改了什么：条件字段 + 投料表（加减试剂 / 改当量）。返回 ['温度 -40 °C', 'LDA 1.2 eq'] */
 function diffItems(baseRow, baseMap, row, map) {
   const out = [];
@@ -2057,8 +2068,8 @@ function diffItems(baseRow, baseMap, row, map) {
   if ([...baseMap.keys()].some((k) => !k.startsWith('溶剂:'))) {
     for (const [key, eq] of map) {
       const [role, name] = key.split(':');
-      if (!baseMap.has(key)) out.push(`${role} +${name}${eq ? ` ${eq} eq` : ''}`);
-      else if (String(baseMap.get(key)) !== String(eq)) out.push(`${name} ${eq || '—'} eq`);
+      if (!baseMap.has(key)) out.push(`${role} +${name}${eq ? ` ${eqLabel(eq)}` : ''}`);
+      else if (String(baseMap.get(key)) !== String(eq)) out.push(`${name} ${eqLabel(eq) || '—'}`);
     }
     for (const [key] of baseMap) if (!map.has(key)) out.push(`去掉 ${key.split(':')[1]}`);
   }
