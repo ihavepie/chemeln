@@ -7,21 +7,22 @@
  */
 import { eqNum, round } from './reagent.js';
 
-const MAX_ABOVE = 34; // 箭头上方一行大约放得下多少「字」（中文按 1、西文按 0.55 估）
+const MAX_ABOVE = 34;   // 箭头上方**一行**大约放得下多少「字」（中文按 1、西文按 0.55 估）
+const MAX_ABOVE_LINES = 2; // 试剂多了就往上排两行（两行都放不下才挪到箭头下方），别把箭头拉太长——拉长以后整张图会被缩小，字反而看不清
 const str = (v) => (v == null ? '' : String(v).trim());
 /** 名字比对前先抹掉空格 / 括号 / 标点：库里叫「环丁酮甲酯」、表里写成「环丁酮甲酯 (1)」也能对上 */
 const norm = (v) => str(v).replace(/[\s()（）\[\]【】·,，、\-—_]/g, '').toLowerCase();
 const widthOf = (t) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 1 : 0.55), 0);
 
 /**
- * 试剂名 / 当量写成箭头上那种标签：`LDA (2 eq)`、`RuPhos (20%)`。
- * 写法跟投料表的当量格一致：不到 1 的用百分数（0.2 → 20%），其余写 `X eq`。
- * 以前 `10%` 这种摩尔百分数用 num() 读出来是 null，箭头上干脆不写当量（用户报过）。
+ * 试剂名 / 当量写成箭头上那种标签：`LDA (2 eq)`、`RuPhos (20 mol%)`。
+ * 不到 1 的当量按投料表的口径折成百分数，但**箭头上要带单位 mol%**（光写 `20%` 会被读成产率）；
+ * 其余写 `X eq`。以前 `10%` 这种摩尔百分数用 num() 读出来是 null，箭头上干脆不写当量（用户报过）。
  */
 function eqText(v) {
   const x = eqNum(v);
   if (x == null) return '';
-  if (x > 0 && x < 1) return `${round(x * 100, 2)}%`;
+  if (x > 0 && x < 1) return `${round(x * 100, 2)} mol%`;
   return `${round(x, 2)} eq`;
 }
 
@@ -84,17 +85,20 @@ export function schemeParts(model, compounds) {
     .filter(Boolean)
     .join('，');
 
-  const fit = [];
-  const over = [];
-  let used = 0;
+  const fit = [];      // 箭头上方的几行
+  const over = [];     // 两行都放不下的，挪到箭头下方
   for (const t of others) {
-    const need = (fit.length ? 1 : 0) + widthOf(t.text);
-    if (used + need <= MAX_ABOVE) {
-      fit.push(t);
-      used += need;
-    } else {
-      over.push(t);
+    let row = fit[fit.length - 1];
+    const need = row && row.length ? 1 + widthOf(t.text) : widthOf(t.text);
+    if (!row || widthOf(row.map((x) => x.text).join(', ')) + need > MAX_ABOVE) {
+      if (fit.length >= MAX_ABOVE_LINES) {
+        over.push(t);
+        continue;
+      }
+      row = [];
+      fit.push(row);
     }
+    row.push(t);
   }
 
   return {
@@ -103,7 +107,7 @@ export function schemeParts(model, compounds) {
     prodName: prod ? str(prod.name || prod.code) : str(model.product_name),
     loose: loose.length, // 有名字但挂不上库的底物，记录页据此提示
     // 试剂名按组分上色（Sub 棕 / Cat 紫 / Base 蓝 / Lig 绿 / Add 金…），跟投料表一致
-    above: fit.length ? [fit] : [],
+    above: fit,
     below: [over.length ? over : '', cond].filter(Boolean),
   };
 }
