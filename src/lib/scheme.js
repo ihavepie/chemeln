@@ -30,7 +30,7 @@ const TONE_COLOR = {
 const roleColor = (role) => (role ? TONE_COLOR[roleTone(role)] || '#1b1a17' : '#1b1a17');
 /** 一行字可以是纯字符串，也可以是 [{ text, role }] 的分段（分段按组分上色） */
 const lineParts = (line) => (Array.isArray(line) ? line.filter((p) => p && String(p.text || '').trim()) : String(line || '').trim() ? [{ text: String(line) }] : []);
-const lineText = (line) => lineParts(line).map((p) => p.text).join('，');
+const lineText = (line) => lineParts(line).map((p) => p.text).join(', ');
 
 const BOND_PX = 26; // 一根键的像素长度，整张图的尺度基准
 const PAD = 16;
@@ -284,7 +284,7 @@ export async function composeSchemeSvg({
     const parts = lineParts(line);
     parts.forEach((part, pi) => {
       const fill = roleColor(part.role);
-      const text = pi ? `，${part.text}` : part.text;   // 段与段之间用顿号分开
+      const text = pi ? `, ${part.text}` : part.text;   // 段与段之间用西文逗号（跟「Name (20 mol%)」的括号配套）
       for (const r of splitScript(text)) {
         const want = r.kind === 'sub' ? 3 : r.kind === 'sup' ? -4 : 0;
         const dy = want - cur;
