@@ -15,7 +15,7 @@ const props = defineProps({
   notify: { type: Function, required: true },
   locked: { type: Boolean, default: false },
 });
-const emit = defineEmits(['recipe']);
+const emit = defineEmits(['recipe', 'promote-var']);
 
 const roleMenuFor = ref(-1);
 
@@ -468,7 +468,30 @@ function onComposeEnd(ev, r) {
 }
 
 /** 名字格子失焦：取消延时填充，直接按最终值补全（+ 联网核对） */
+/**
+ * 「同一个变量槽只该有一行」：`[Cat]` 已经有一行了，再加一行同类试剂，那第二行的名字
+ * 其实是**这个槽的另一个候选**，不是「同一锅里的第二个催化剂」。
+ * 所以名字填完（blur / 选角色后）就把它交给条件表，并从投料表删掉——不然投料表和条件表
+ * 各说一套，看着割裂（用户原话）。
+ */
+function slotRows(slot, self) {
+  return props.model.rows.filter((x) => x !== self && x.variable && x.variable === slot);
+}
+function maybePromote(r) {
+  const slot = String(r.variable || '').trim();
+  const name = String(r.name || '').trim();
+  if (!slot || !name) return false;
+  if (!slotRows(slot, r).length) return false;   // 这个槽只有它自己 → 它就是标准条件，留着
+  emit('promote-var', { slot, name });
+  const i = props.model.rows.indexOf(r);
+  if (i >= 0) props.model.rows.splice(i, 1);
+  roleMenuFor.value = -1;
+  props.notify();
+  return true;
+}
+
 function onNameBlur(r) {
+  if (maybePromote(r)) return;
   clearTimeout(nameTimer);
   onName(r);
   verifyName(r);
@@ -694,6 +717,7 @@ function setRole(r, role) {
   // 同角色的变量跟着走：这一行还没标变量、而别的同角色行是变量 → 继承占位符
   if (!r.variable) r.variable = inheritedVar(role, r);
   roleMenuFor.value = -1;
+  if (maybePromote(r)) return;
   props.notify();
 }
 

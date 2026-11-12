@@ -834,6 +834,19 @@ async function renderLive() {
  * 为什么：筛催化剂/配体时连着加两个同类试剂，本来就是「两个候选」的意思，
  * 不该让人再手动去条件组里敲一遍，也不该让投料表里同时躺着两个催化剂。
  */
+/** 投料表里同槽的第二行被「收编」时调用：把它当这个变量槽的一个候选写进条件组 */
+function promoteVarCandidate({ slot, name }) {
+  const key = String(slot || '').trim();
+  const val = String(name || '').trim();
+  if (!key || !val) return;
+  const has = conds.value.some((c) => String((c.vars || {})[key] || '').trim() === val);
+  if (!has) {
+    conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [key]: val } });
+    notify();
+    toast(`已作为候选加进条件组：[${key}] = ${val}`, 'ok');
+  }
+}
+
 function syncVarCandidates() {
   const bySlot = new Map();
   for (const r of reagent.rows) {
@@ -1558,7 +1571,14 @@ const openAttachment = (id) => {
             :live-svg="liveScheme"
           />
 
-          <ReagentTable v-if="sheetPrefs.reagents" :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
+          <ReagentTable
+            v-if="sheetPrefs.reagents"
+            :model="reagent"
+            :notify="notify"
+            :locked="exp.locked"
+            @recipe="openRecipe"
+            @promote-var="promoteVarCandidate"
+          >
             <template #cond>
               <CondRow
                 :model="fields"
