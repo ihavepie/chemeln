@@ -1338,10 +1338,13 @@ function getCompound(id) {
   if (!c) return null;
   c.files = db.prepare('SELECT * FROM compound_files WHERE compound_id = ? ORDER BY id').all(id);
   c.usedIn = compoundUsage(id);
-  c.standardExp = c.standard_exp_id
-    ? db
-        .prepare('SELECT id, code, title, date, status FROM experiments WHERE id = ?')
-        .get(c.standard_exp_id) || null
+  // 来源记录：standard_exp_id 没指着就反查「哪条记录的产物是它」（老数据只有那一侧）
+  const srcId =
+    numOrNull(c.standard_exp_id) ||
+    (db.prepare('SELECT id FROM experiments WHERE product_compound_id = ? ORDER BY id LIMIT 1').get(id) || {}).id ||
+    null;
+  c.standardExp = srcId
+    ? db.prepare('SELECT id, code, title, date, status, kind FROM experiments WHERE id = ?').get(srcId) || null
     : null;
   return c;
 }
@@ -1380,7 +1383,16 @@ function listCompounds(query) {
            -- smiles 一起回去：反应式 ↔ 投料表互认（按结构对化合物）要靠它，详情页那一路是另一条查询
            c.smiles,
            (SELECT name FROM categories g WHERE g.id = c.category_id) AS category_name,
-           (SELECT code FROM experiments WHERE id = c.standard_exp_id) AS standard_code,
+           -- 来源那条记录：优先 standard_exp_id，没有就反查「哪条记录的产物是它」
+           -- （老数据里没有正手的指针，只有记录那边指着化合物）
+           (SELECT e.code FROM experiments e
+             WHERE e.id = COALESCE(NULLIF(c.standard_exp_id, ''),
+                                   (SELECT e2.id FROM experiments e2 WHERE e2.product_compound_id = c.id ORDER BY e2.id LIMIT 1)))
+             AS standard_code,
+           (SELECT e.kind FROM experiments e
+             WHERE e.id = COALESCE(NULLIF(c.standard_exp_id, ''),
+                                   (SELECT e2.id FROM experiments e2 WHERE e2.product_compound_id = c.id ORDER BY e2.id LIMIT 1)))
+             AS source_kind,
            (SELECT COUNT(*) FROM compound_files f WHERE f.compound_id = c.id) AS file_count,
            (SELECT f.id FROM compound_files f
              WHERE f.compound_id = c.id AND f.category = 'structure'

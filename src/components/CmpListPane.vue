@@ -7,10 +7,10 @@ import { loadBoot, loadCompounds, setProject, store, recordCategories, addCatego
 import { api } from '../api.js';
 import { createPointerSort } from '../lib/pointdrag.js';
 import { withFlip } from '../lib/flip.js';
-import { COMPOUND_KINDS } from '../lib/ui.js';
 import { prompt, toast } from '../lib/feedback.js';
 import { compoundMenu } from '../lib/rowmenu.js';
 import { round } from '../lib/reagent.js';
+import { compoundSourceLabel } from '../lib/ui.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -146,7 +146,6 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
         <CatPick
           :value="filterValue"
           :categories="recordCategories('compound')"
-          :kinds="COMPOUND_KINDS"
           count-key="cmp_count"
           @change="setFilter"
           @create="newCategory"
@@ -174,7 +173,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
       >
         <div class="top">
           <span class="exp-code">{{ c.code || '—' }}</span>
-          <span class="tag plain" style="font-size: 9px; padding: 1px 6px">{{ c.kind || '' }}</span>
+          <span v-if="compoundSourceLabel(c)" class="tag plain" style="font-size: 9px; padding: 1px 6px">{{ compoundSourceLabel(c) }}</span>
           <span class="exp-date">{{ c.file_count ? `${c.file_count} 文件` : '' }}</span>
         </div>
         <div class="exp-title">{{ c.name || '（未命名）' }}</div>
@@ -190,7 +189,7 @@ const activeId = () => (route.name === 'compound' ? Number(route.params.id) : nu
       <div v-if="slotIdx === store.compounds.length" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
 
       <div v-if="!store.compounds.length" class="empty-note">
-        <template v-if="store.compoundFilters.q || store.compoundFilters.kind">无匹配化合物</template>
+        <template v-if="store.compoundFilters.q">无匹配化合物</template>
         <template v-else>暂无化合物。<br />点右上角「新建化合物」，或在实验中将产物存入化合物库。</template>
       </div>
     </div>

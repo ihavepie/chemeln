@@ -53,21 +53,27 @@ export const CMP_CAT_LABEL = {
   other: '其他',
 };
 
-/** 化合物的「类型」：按一条合成路线的顺序排（原料 → 中间体 → 粗品 → 成品），后面几个是工具型角色。
-    注意「中间体」就是用户说的「中间产物」，别再加一个同义的选项。 */
-export const COMPOUND_KINDS = [
-  '底物',
-  '试剂',
-  '中间体',
-  '粗产物',
-  '纯化产物',
-  '产物',
-  '催化剂',
-  '配体',
-  '添加剂',
-  '标准品',
-  '其他',
-];
+/**
+ * 化合物的「来源」：不再手选类型（用户说「没必要按类型分类」），改成看它从哪条记录来的：
+ * 原料记录 → 原料产物；试反应 → 小反应产物；条件筛选 → 筛选产物；底物扩展 → 扩展产物。
+ * 没有来源记录、但类型是「试剂」的，就是试剂库里那些试剂。
+ */
+export const SOURCE_LABEL = {
+  原料: '原料产物',
+  试反应: '小反应产物',
+  条件筛选: '筛选产物',
+  底物扩展: '扩展产物',
+};
+export const compoundSourceLabel = (c) => {
+  if (!c) return '';
+  const k = String(c.source_kind || (c.standardExp && c.standardExp.kind) || '').trim();
+  if (k) return SOURCE_LABEL[k] || `${k}产物`;
+  if (String(c.kind || '').trim() === '试剂') return '试剂';
+  return '';
+};
+
+// （化合物的「类型」已撤：不再手选，改成按来源记录标「原料产物 / 小反应产物…」，
+//   见上面的 compoundSourceLabel。`compounds.kind` 这一列还留着，只是界面上不编辑、不分组了。）
 
 export const isImageName = (name) => /\.(png|jpe?g|gif|webp|svg|bmp|heic)$/i.test(String(name || ''));
 

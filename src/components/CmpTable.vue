@@ -7,6 +7,7 @@ import { round } from '../lib/reagent.js';
 import { downloadBlob } from '../lib/print.js';
 import { toast } from '../lib/feedback.js';
 import { useColResize } from '../lib/colresize.js';
+import { compoundSourceLabel } from '../lib/ui.js';
 
 /**
  * 化合物库的表格视图（卡片墙的另一种看法）：一行 = 一个化合物。
@@ -26,7 +27,7 @@ const COLS = [
   { key: 'structure', label: '结构', nosort: true },
   { key: 'code', label: '编号' },
   { key: 'name', label: '名称' },
-  { key: 'kind', label: '类型' },
+  { key: 'source', label: '来源' },
   { key: 'formula', label: '分子式' },
   { key: 'mw', label: 'MW', align: 'right' },
   { key: 'tlc_rf', label: 'Rf', align: 'right' },
@@ -40,7 +41,7 @@ const COLDEFS = [
   { key: 'structure', w: 76 },
   { key: 'code', w: 80 },
   { key: 'name', w: 300 },
-  { key: 'kind', w: 62 },
+  { key: 'source', w: 78 },
   { key: 'formula', w: 96 },
   { key: 'mw', w: 72 },
   { key: 'tlc_rf', w: 52 },
@@ -119,12 +120,12 @@ function exportCsv() {
   const list = exportRows.value;
   if (!list.length) return toast('没有可以导出的行', 'err');
   const origin = window.location.origin;
-  const head = ['编号', '名称', '类型', '分子式', 'MW', 'Rf', '分类', '引用次数', '结构图URL', '记录链接'];
+  const head = ['编号', '名称', '来源', '分子式', 'MW', 'Rf', '分类', '引用次数', '结构图URL', '记录链接'];
   const body = list.map((c) =>
     [
       c.code,
       c.name,
-      c.kind,
+      compoundSourceLabel(c),
       c.formula,
       c.mw ?? '',
       c.tlc_rf ?? '',
@@ -145,11 +146,11 @@ function exportMd() {
   const list = exportRows.value;
   if (!list.length) return toast('没有可以导出的行', 'err');
   const body = list.map((c) => {
-    const cells = [c.code || '', c.name || '', c.kind || '', c.formula || '', mwText(c) === '—' ? '' : mwText(c), c.tlc_rf || '']
+    const cells = [c.code || '', c.name || '', compoundSourceLabel(c), c.formula || '', mwText(c) === '—' ? '' : mwText(c), c.tlc_rf || '']
       .map((v) => String(v).replace(/\|/g, '\\|'));
     return `| ${cells.join(' | ')} |`;
   });
-  const md = ['| 编号 | 名称 | 类型 | 分子式 | MW | Rf |', '|---|---|---|---|---:|---:|', ...body].join('\n');
+  const md = ['| 编号 | 名称 | 来源 | 分子式 | MW | Rf |', '|---|---|---|---|---:|---:|', ...body].join('\n');
   const title = `## 化合物库${store.project ? `（${store.project}）` : ''}\n\n`;
   downloadBlob(new Blob([`${title}${md}\n`], { type: 'text/markdown;charset=utf-8' }), `化合物库-${store.project || '全部'}-${stamp()}.md`);
   toast(`导出了 ${list.length} 个`);
@@ -211,7 +212,7 @@ function exportMd() {
             <div class="sub-line"><span class="sub-name">{{ c.name || '（未命名）' }}</span></div>
             <div v-if="c.standard_code" class="sub-title">标准实验 {{ c.standard_code }}</div>
           </td>
-          <td class="c-kind">{{ c.kind || '—' }}</td>
+          <td class="c-kind">{{ compoundSourceLabel(c) || '—' }}</td>
           <td class="c-formula mono">{{ c.formula || '—' }}</td>
           <td class="c-mw is-right mono">{{ mwText(c) }}</td>
           <td class="c-tlc_rf is-right mono">{{ c.tlc_rf || '—' }}</td>

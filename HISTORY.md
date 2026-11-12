@@ -46,3 +46,8 @@
   **踩了个 TDZ 坑**：`sheetFx = reactive({...fxDefaultsFor('')})` 在模块初始化时就跑，而 `fxDefaultsFor` 里要读 `SHEET_KINDS`——那段被放在 `SHEET_KINDS` 之前，于是整站白屏（`Cannot access uninitialized variable`，用 `_probe-err.html` 抓到的）。顺序改成 `SHEET_KINDS` → `normKind` → `SHEET_FX/fxDefaultsFor/sheetFx`。
   验证：设置里选「原料」勾上「计产率」→ 打开 SJ-2-10，产率格变成可填的「自动」；再取消「计产率」「选择性测定」→ 表头回到「不计」、产率格禁用、`.res-sel` 那行消失，`sheetFx` 存成 `{"原料":{"yield":false,"sel":false,"check":true}}`。`ui_prefs` 白名单补了 `sheetFx` / `reagentPrec`。
 - **条件行去掉「长得像真值」的占位文字**：用户圈着投料表上面那条条件行说「不要这些灰色占位字符，有误导」——那几格原本有 `placeholder`：`−78 ℃` / `8:45 → 15:11` / `N₂，封管` / `封管 / Schlenk / 微波` / `365 nm / 蓝光 LED`，灰字放在那儿看着像已经填过。现在五格 `ph` 全清空（`CondRow` 的 `fields`），只剩上方的小标签 + 右边那个出候选的小箭头；空着就空着，点一下照样能选。验证：SJ-2-10 的条件行 `placeholder` 全是 `''`、页面上没有灰字。
+- **化合物不再「按类型分类」，改成按来源标「原料产物 / 小反应产物」**（用户截着那个类型菜单说「这边感觉没什么必要按类型分类，先移除吧，然后就是小反应产物和原料产物怎么区别」）。
+  撤掉的：①化合物页的「类型」下拉（`KindPick.vue` 已删，`COMPOUND_KINDS` 也删了）；②化合物卡片墙的「按类型分组」（`groupOf()` 恒为 `'cat'`，`CmpGrid` 里那段按 `kind` 分桶的死代码一并删）；③中栏化合物筛选下拉里的「类型」那一节；④化合物表格视图的「类型」列。`compounds.kind` 这一列**没删**，只是界面不编辑、不分组了。
+  换上的 `compoundSourceLabel(c)`（`lib/ui.js`）：看化合物**从哪条记录来的**——`standard_exp_id` 那条记录的 `kind`（原料 → 原料产物、试反应 → 小反应产物、条件筛选 → 筛选产物、底物扩展 → 扩展产物）；`standard_exp_id` 空的话反查 `experiments.product_compound_id`（老数据只有记录那一侧指着化合物）；老类型是「试剂」的显示「试剂」。列表 SQL 多返回 `source_kind`，`getCompound` 的 `standardExp` 也用同一个「正手 / 反查」拿。
+  **坑**：`compounds.standard_exp_id` 是 TEXT 列、空值是 `''` 而不是 NULL，`COALESCE(c.standard_exp_id, …)` 会取到 `''` → 反查永远不生效（`NULLIF(c.standard_exp_id, '')` 才对）。
+  验证：`/api/compounds` 里 B-Cr→原料、1→试反应、C/D→原料；卡片上显示「试剂」/「原料产物」，化合物页那格显示「来源=原料产物」；卡片墙工具行只剩 表格视图 / 批量标签 / 新建分类 / 新建化合物。

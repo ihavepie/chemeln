@@ -63,7 +63,8 @@ export function setView(kind, mode) {
   uiSetIfChanged(VIEW_KEY, store.views);
 }
 
-export const groupOf = (kind) => (store.groups?.[kind] === 'kind' ? 'kind' : 'cat');
+// 化合物墙只按分类分组了（「按类型分组」已撤：类型不再手工选，见 lib/ui.js 的 compoundSourceLabel）
+export const groupOf = () => 'cat';
 
 export function setGroup(kind, mode) {
   store.groups = { ...store.groups, [kind]: mode === 'kind' ? 'kind' : 'cat' };

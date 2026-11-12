@@ -14,8 +14,7 @@ import { api } from '../api.js';
 import { loadBoot, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
 import { structureInfo, pubchemUrl, describeInfo, LOOKUP_SITES } from '../lib/lookup.js';
-import { CMP_CAT_LABEL, CMP_CAT_ORDER, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
-import KindPick from '../components/KindPick.vue';
+import { CMP_CAT_LABEL, CMP_CAT_ORDER, compoundSourceLabel, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { analyzeSmiles, analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
@@ -39,6 +38,11 @@ const recat = ref(null);
 const pathModal = ref(false);
 const pathValue = ref('');
 const cat = ref('auto');
+
+// 化合物的「来源」（类型不再手选）：来源记录 → 记录类型；没有来源记录就看老类型是不是「试剂」
+const sourceLabel = computed(() =>
+  compoundSourceLabel({ source_kind: c.value?.standardExp?.kind || '', kind: c.value?.kind || form.kind })
+);
 
 const form = reactive({
   code: '', name: '', kind: '底物', category_id: '', project: '', formula: '', mw: '', cas: '', appearance: '', mp: '', smiles: '',
@@ -901,8 +905,8 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
             <label class="c-field"><span>编号</span><input class="mono" v-model="form.code" placeholder="1a" /></label>
             <label class="c-field wide"><span>名称</span><input v-model="form.name" placeholder="4-甲基苯甲醛" /></label>
             <label class="c-field">
-              <span>类型</span>
-              <KindPick v-model="form.kind" />
+              <span>来源</span>
+              <span class="c-src" :title="'这条化合物从哪条记录来的：原料产物 / 小反应产物 / 筛选产物 / 扩展产物'">{{ sourceLabel || '—' }}</span>
             </label>
             <label class="c-field">
               <span>课题</span>
