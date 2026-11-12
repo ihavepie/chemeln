@@ -85,6 +85,30 @@ function onInput(ev, f) {
   props.model[f.key] = ev.target.value;
 }
 
+/**
+ * **单击 = 出选择（轮盘 / 胶囊），双击 = 直接改文字。**
+ * 以前单击就落进输入框，想点开候选得去够右边那个小箭头；现在整格都能点。
+ * 单击要等 220ms 再开，不然双击时它会先弹一下再被双击关掉（闪一下）。
+ */
+let clickTimer = 0;
+function onFieldClick(f, ev) {
+  if (props.locked) return;
+  const el = ev.target;
+  clearTimeout(clickTimer);
+  clickTimer = setTimeout(() => {
+    el.blur?.();               // 别顺手进打字状态（光标闪在那儿会让人以为要输入）
+    if (open.value !== f.key) open.value = f.key;
+  }, 220);
+}
+
+function onFieldDblClick(f, ev) {
+  clearTimeout(clickTimer);
+  open.value = '';
+  const el = ev.target;
+  el.focus?.();
+  el.select?.();
+}
+
 function pick(key, v) {
   props.model[key] = v;
   open.value = '';
@@ -94,7 +118,13 @@ function pick(key, v) {
 /* 点外面 / 按 Esc 就把下拉收起来（之前只能再点一次箭头，很卡手） */
 function onDocClick(ev) {
   if (!open.value) return;
-  if (ev.target.closest?.('.cond-menu') || ev.target.closest?.('.cond-caret')) return;
+  if (
+    ev.target.closest?.('.cond-menu') ||
+    ev.target.closest?.('.cond-caret') ||
+    ev.target.closest?.('.ruler-pop') ||
+    ev.target.closest?.('.cond-f')
+  )
+    return;
   open.value = '';
 }
 function onDocKey(ev) {
@@ -138,6 +168,8 @@ onBeforeUnmount(() => {
             :title="model[f.key] || ''"
             :placeholder="f.ph"
             :disabled="locked"
+            @click="onFieldClick(f, $event)"
+            @dblclick="onFieldDblClick(f, $event)"
             spellcheck="false"
             @input="onInput($event, f)"
             @change="model[f.key] = $event.target.value; notify()"
