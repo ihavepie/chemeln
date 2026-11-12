@@ -1,6 +1,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from './Icon.vue';
+import WheelPick from './WheelPick.vue';
 import { QUICK } from '../lib/ui.js';
 import { api } from '../api.js';
 import { loadBoot, quickExtra } from '../store.js';
@@ -31,6 +32,10 @@ const fields = [
 ];
 
 const open = ref('');
+/** 温度和时间的候选是**有序刻度**，用轮盘（一档一档转）；其余字段还是一排胶囊 */
+const WHEEL_KEYS = new Set(['temperature', 'duration']);
+const isWheel = (key) => WHEEL_KEYS.has(key);
+
 const builtin = (key) => QUICK[`f-${key}`] || [];
 /** 下拉里列什么：内置那几条 + 自己加的（去重，自己加的在后面） */
 const optionsFor = (key) => {
@@ -147,7 +152,16 @@ onBeforeUnmount(() => {
             <Icon name="down" :size="10" />
           </button>
 
-          <div v-if="open === f.key" class="qmenu cond-menu" @click.stop>
+          <WheelPick
+            v-if="open === f.key && isWheel(f.key)"
+            :items="optionsFor(f.key)"
+            :model-value="String(model[f.key] || '')"
+            :locked="locked"
+            @update:model-value="(v) => { model[f.key] = v; notify(); }"
+            @close="open = ''"
+            @add="addOption(f)"
+          />
+          <div v-else-if="open === f.key" class="qmenu cond-menu" @click.stop>
             <button
               v-for="v in optionsFor(f.key)"
               :key="v"
