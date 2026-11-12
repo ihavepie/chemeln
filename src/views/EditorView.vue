@@ -1838,10 +1838,14 @@ const openAttachment = (id) => {
                     </div>
                   </td>
                 </tr>
+                <!-- 这一行的格子数必须**正好 9 列**（跟 rtable 的 colgroup 对齐）：
+                     试剂类 = grip + 序号 + 试剂 + MW/当量/mmol/用量 + 说明 + ×；
+                     字段类 = grip + 序号 + 合并 6 格 + ×。多一格整张表就会多出一条空列，
+                     页面上表现为一块空白的「框」（踩过）。 -->
                 <tr v-for="row in varRows" :key="`v${row.i}`" class="rt-var">
                   <td class="grip-cell" />
                   <td class="var-idx-cell">Entry {{ row.i + 1 }}</td>
-                  <td class="var-name-cell" :colspan="row.isMol ? 1 : 7">
+                  <td class="var-name-cell" :colspan="row.isMol ? 1 : 6">
                     <span v-if="!row.isMol" class="var-field-lbl">{{ row.fieldName }}</span>
                     <span v-if="condVars.length" class="var-vals">
                       <template v-for="(v, vi) in condVars" :key="v.key">
@@ -1880,7 +1884,7 @@ const openAttachment = (id) => {
                   </td>
                   <td v-if="row.isMol" class="n var-mmol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</td>
                   <td v-if="row.isMol" class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">{{ row.info.amount }}</td>
-                  <td />
+                  <td v-if="row.isMol" class="var-note-cell" />
                   <td class="noprint">
                     <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个变量" @click="removeCond(row.i)">×</button>
                   </td>
