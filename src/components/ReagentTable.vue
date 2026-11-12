@@ -426,6 +426,21 @@ function applyAmount(r, { rewrite = true } = {}) {
   }
   const unit = (m[2] || 'g').toLowerCase();
   let mmol = null;
+  // 「解析出来的数」跟已经记着的质量/体积其实一样（差别只在显示时四舍五入）→ 别重算，
+  // 否则 0.0867 g ÷ 433.57 这种反算会把 mmol 拖成 0.1999677…（点一下用量就跳的元凶）
+  const sameAmount = (mg, ul) => {
+    if (mg != null && num(r.mass_mg) != null && Math.abs(num(r.mass_mg) - mg) < 0.05) return true;
+    if (ul != null && num(r.volume_ul) != null && Math.abs(num(r.volume_ul) - ul) < 0.5) return true;
+    return false;
+  };
+  if (unit === 'g' && num(r.mw) && sameAmount(v * 1000, null)) {
+    if (rewrite) r.amountText = amountText(r);
+    return true;
+  }
+  if (unit === 'mg' && num(r.mw) && sameAmount(v, null)) {
+    if (rewrite) r.amountText = amountText(r);
+    return true;
+  }
   if (unit === 'g' && num(r.mw)) {
     r.mass_mg = v * 1000;
     r.volume_ul = null;   // 手填「0.0062 g」= 按质量称的，别再按密度折成 µL
@@ -442,20 +457,26 @@ function applyAmount(r, { rewrite = true } = {}) {
   } else {
     return false;
   }
-  r.mmol = round(mmol, 4);
+  const mmol4 = round(mmol, 4);      // 反应规模只留 4 位，别把 0.19996770943 写进去
+  r.mmol = mmol4;
   const b = num(props.model.base) || 0;
   if (isBaseRow(r)) {
-    props.model.base = mmol;
+    props.model.base = mmol4;
     r.eq = 1;
     recomputeAll();
   } else if (b) {
-    r.eq = round(mmol / b, 3);
+    r.eq = round(mmol4 / b, 3);
   }
   if (rewrite) r.amountText = amountText(r);
   return true;
 }
 
 function onAmount(r) {
+  // 只是点进这一格再点出去（没动过字）：**不要再反算一遍**。
+  // 反算读的是显示出来的四舍五入结果（0.0867 g），除掉 MW 得 0.1999677…，
+  // 反应规模被写成这个数、下面每一行的 mmol 跟着抖（用户报过：点一下用量就变了）。
+  if (!r._amtDirty) return props.notify();
+  r._amtDirty = false;
   applyAmount(r);
   props.notify();
 }
@@ -573,6 +594,7 @@ function onMmolInput(ev, r) {
 function onAmountInput(ev, r) {
   applyNumeric(ev.target, 'mgLlUµu');
   r.amountText = ev.target.value;
+  r._amtDirty = true;      // 真的手动改过这格
   applyAmount(r, { rewrite: false });
   props.notify();
 }

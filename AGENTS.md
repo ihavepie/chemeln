@@ -141,7 +141,7 @@
 - **「课题」和「分类」不是一回事**：课题是 `experiments.project` 文本字段，决定了**全站空间**（侧栏切换，统计/列表/导出跟着走），课题表本身不存在——清单来自 `GROUP BY project` 加 settings 里的 `projects_json`（用来记还没写记录的课题），每个课题的编号前缀存 `prefix:<课题>`（没设就按课题名自动生成，见 `derivedPrefix()`；实验编号按课题分开数）。分类是卡片墙里的分组，仍按分类走，两者叠加。
 - **课题级设置覆盖**：01 记录本信息里，**课题名就是「标题」**——在课题里改标题等于改名（会走 `renameProject` 把记录一起搬），标题不再单独存覆盖值；编号前缀/记录人/课题组/二维码地址可以每个课题覆盖。存法：`prefix:<课题>`（编号前缀）+ `proj:<课题>:<字段>`（其余三项），空值就不落盘（= 跟着全局）。服务端 `settingsFor(project)` 做合并，bootstrap 同时返回 `settings`（已合并）、`settingsGlobal`（占位符用）、`projectOverrides`（表单编辑用）；`PUT /api/settings` 带 `project` 才写课题级（共用开关已经不存在了）。删课题时会把这两个前缀的键一起清掉。
 - **Node 自己不认系统代理**：本机开着 Clash（`scutil --proxy` 里 HTTP/HTTPS 都是 127.0.0.1:7892），`curl` 走代理一秒就回来，Node 的 `https.get` 直连 wikidata.org 却一路超时（connect 事件都不出现）。`fetchJson` 现在自己读 `HTTPS_PROXY` 或 `scutil --proxy`，手搭 CONNECT 隧道，并按主机记「直连 / 代理」；启动日志里有一行 `联网查询 → 系统代理 …`。查不到东西先看这行。
-- **投料表被「没加载完的页面」清空过**：`PUT /api/experiments/:id` 现在防呆，整表突然 0 行带名字的就 409 拦下。
+- **投料表被「没加载完的页面」清空过**：`PUT /api/experiments/:id` 现在防呆，整表突然 0 行带名字的就 409 拦下。**点一下格子不能改数据**（`onAmount` 只在 `_amtDirty` 时反算）。
 - **不要在用户正编辑时用 API 改他的记录**（他页面里的自动保存会把改动覆盖回去）；验证只用临时记录，验完删掉。
 - 打开实验页本身会触发保存（`fill()` 会补算 mmol、补起始行）→ 「只看不动」的验证要用临时记录，或在该页拦掉非 GET 请求。
 - SQLite 子查询的 `ORDER BY` 里引用不到外层表的列 → 拆成「主查询 + 一条补数据查询」。
