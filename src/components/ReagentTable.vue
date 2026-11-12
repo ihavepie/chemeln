@@ -984,6 +984,12 @@ function removeRow(r) {
   props.notify();
 }
 
+/** 再开一步：投料表按步分段，反应式会自动画成两段箭头（第一步的产物写在「第 1 步」那行的产物格） */
+function addStep() {
+  props.model.steps.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '', product_name: '' });
+  props.notify();
+}
+
 function removeStep(i) {
   if (props.model.steps.length <= 1) return;
   props.model.steps.splice(i, 1);
@@ -1286,6 +1292,17 @@ function onDrop(ev) {
                   <span class="step-tag">之后</span>
                   <input class="step-after" :value="s.workup" :disabled="locked" @change="onStepField(si, 'workup', $event.target.value)" />
                 </template>
+                <!-- 这一步的产物（中间体）：一条记录串两步时，反应式靠它画中间那道桥 -->
+                <template v-if="steps.length > 1 && si < steps.length - 1">
+                  <span class="step-tag">产物</span>
+                  <input
+                    class="step-prod"
+                    :value="s.product_name"
+                    placeholder="中间体（写上名字就能画出结构）"
+                    :disabled="locked"
+                    @change="onStepField(si, 'product_name', $event.target.value)"
+                  />
+                </template>
                 <span class="step-spacer" />
                 <button type="button" class="step-add noprint" title="在这一步加一行投料" @click="addRow(si + 1)"><Icon name="plus" :size="11" /></button>
                 <button type="button" class="step-del noprint" title="删除这一步" @click="removeStep(si)"><Icon name="x" :size="11" /></button>
@@ -1526,6 +1543,9 @@ function onDrop(ev) {
             <div class="add-cell">
               <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
               <button class="add-row" @click="addSolvent"><Icon name="plus" :size="12" /> 加溶剂</button>
+              <button class="add-row" title="再开一步：一条记录里连做两步（第二步的产物就是结果块里那个）" @click="addStep">
+                <Icon name="plus" :size="12" /> 加一步
+              </button>
               <button class="add-row" @click="openLib"><Icon name="flask" :size="12" /> 从试剂库选</button>
               <button class="add-row" title="按固体 → 液体 → 溶剂重排（会改存盘顺序）" @click="sortByPhase">
                 <Icon name="down" :size="12" /> 按相态整理

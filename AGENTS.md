@@ -49,7 +49,7 @@
 - `src/views/EmptyEditor.vue` — `/list` 的容器：中栏列表 + `.editor`（里面是 `.grid-tools` 工具行 + `ExpTable` 或 `ExpGrid`）。工具行三个按钮：**表格视图 / 卡片视图**（`setView('exp', …)`）· **新建分类**（建在当前课题下，墙上立刻多一格空分类）· **新建实验**。
 - `src/views/CompoundsView.vue` — `/compounds` 的容器：跟实验页同构，工具行是 **表格视图 / 卡片视图 · 批量标签 · 新建分类 · 新建化合物**，`LabelBatchPanel` 也挂在这里（`batchOpen`）。**「按类型分组」已撤**（`groupOf()` 恒为 `'cat'`），卡片墙只按分类分。
 - `src/views/EditorView.vue` — 实验编辑器：两页 A4 版式、自动保存；**第 1 页纸外左侧浮着一排平行书签**（`.pgroup--float`：`Teleport to="body"` 的固定浮层，钉在纸面左边缘，**纸白实底 + 投影**——纸面左边只有 ~30px 空地，它本来就是浮在中栏列表上的，没实底就跟底下卡片糊在一起；里面是**一排小短杠**（当前那条最长最黑、悬停放大一档），悬停出预览卡、点了才切记录，末尾「＋」从当前这条再建一条；**没有标题、也不能折叠**（那句「平行 ×N」会压住第一条编号））；**纸面大标题是实验名 `title`**，右边那颗小格写「描述」（`objective`）；反应类型 `rxn_type` 在抬头表格「类型」格里、挨着记录类型 `kind`；列表卡片名 `title || objective`，描述（`objective`）**跟题目同一行**、更淡更小（`.exp-desc-inline`）；卡片墙一列太窄，那边仍放题目下面。工具栏只剩 已保存 / 保存 / 重置 / **⋯ 菜单**，**二维码、打印、锁定·解锁、导出、复制、绑定产物、删除**都在菜单里（删除是红色项，删前先 `gone = true` 停自动保存）。**手机上（≤820px）直接渲染 `ExperimentMobile`** 并跳过 `load()`（反应式优先用附件图，没有就内联贴 `scheme_cache.svg`；上传框**不写 `capture`**，iOS 才给「照片图库」可选；`CompoundMobile` 也带 TLC 板图）。二维码弹窗里的「打印这张码」打的是独立纸片 `.exp-qr-sheet`（40mm 码 + 编号），**没有动记录本身的版式**——别往 `.sheet-runner` 里塞码，会破坏「打印恒 2 页」。第 2 页顺序是 一 操作与现象（含照片整幅一行）/ 二 后处理 / TLC / 三 表征 / 四 讨论；**文献是第 3 页**（`sheet-p3`：`lit_note` 要点 + `literature` 图条 200×140；没内容时打印不带它，`PrintPanel` 的 `lit` prop + `print-no-lit`），附件列表是**第 4 个页签**（`.sheet-att`，不在纸上）；**←/→ 翻页、↑/↓ 切平行实验**（`onPageKey`/`onParallelKey`：输入框里、弹窗/菜单开着时不接管，左右到头就停）。
-- `src/components/ReagentTable.vue` — 投料表（最复杂的组件：组分/角色菜单、试剂名自动带库、当量 mmol 用量联动、结构卡与解绑、多步）。**「组分」那个胶囊菜单点空白处也要有反应**：以前菜单里除胶囊外全是死区（用户报「有时候点不生效」）——现在 `.role-menu` 上挂 `@click.stop="closeRoleMenu"`（点空白 = 关菜单），并且 `.role-menu .qchip` 改成 `flex: 1 1 auto` **按行撑满**（`gap: 4px`），最后一行的「其他」会独占一整行。**单步记录不显示「第 1 步」标题行**（`showStepHead`：多步照旧；单步时只有写了 条件 / 之后 / 加料 / 搅拌 才露出来，起止时间不算）。**「加一步」按钮已撤**。
+- `src/components/ReagentTable.vue` — 投料表（最复杂的组件：组分/角色菜单、试剂名自动带库、当量 mmol 用量联动、结构卡与解绑、多步）。**「组分」那个胶囊菜单点空白处也要有反应**：以前菜单里除胶囊外全是死区（用户报「有时候点不生效」）——现在 `.role-menu` 上挂 `@click.stop="closeRoleMenu"`（点空白 = 关菜单），并且 `.role-menu .qchip` 改成 `flex: 1 1 auto` **按行撑满**（`gap: 4px`），最后一行的「其他」会独占一整行。**单步记录不显示「第 1 步」标题行**（`showStepHead`：多步照旧；单步时只有写了 条件 / 之后 / 加料 / 搅拌 才露出来，起止时间不算）。**「加一步」在表尾**；一步以上时「第 N 步」行右侧有「产物」格（`product_name` 中间体）。
 - `src/components/CondRow.vue` — 条件行（温度 / 时间节点 / 气氛 / 装置 / 光照）。**这五格不给占位文字**：以前 placeholder 长得跟真值一样（「−78 ℃」「N₂，封管」），灰字容易被当成已填（用户说「有误导」）；格子上方本来就有标签，空着就空着，右边小箭头照样点得出候选。
 - 投料表里双击试剂名弹出的 **「从化合物库选一个」**（`ReagentTable` 的 `browse`，`.cmp-browse`）：每行左边一栏是结构式缩略图，**尺寸 96×64**（以前 64×40 被用户说「结构式还是有点小」）。
 - `src/components/ResultBlock.vue` — 结果块（产物、MW、质量、收率、dr/ee、产物挂库）。「产物是库里的哪个化合物」那个弹窗（`.recipe-list` / `.recipe-opt`，跟「套用已有投料表」共用）**每条前面挂一张 52×52 的结构式缩略图**（`c.structure_id` → `/api/compound-files/:id`，没有结构图就给 `molecule` 图标；`.recipe-opt` 的 `align-items` 从 `baseline` 改成 `center`）。**「绑定产物」是 `ProductBind.vue`**（`⋯` 菜单进）：反应式里读产物（`productSmilesOf`）→ 有同结构就绑、没有就建一份带结构图的；或从库里挑；或开画板画一个，全写回 `product_compound_id`。
@@ -87,7 +87,7 @@
   走 `/api/lookup`（链式查 **PubChem → OPSIN → Wikidata**，带缓存）：OPSIN 回 SMILES（前端本地算 MW），Wikidata 认**中文名**；失败一律 null。
 - `src/lib/uiprefs.js` — **「页面设置」的唯一存法：浏览器当缓存、数据库当长期存储**。本地一份 `eln:ui` = `{key:{v,t}}`（`uiGet` / `uiSet` / `uiSetIfChanged`；头一次跑把老的 `eln:sheet` 这些单键搬进来）；开本子时 `uiMerge(boot.uiPrefs)` 两边按 key 比时间戳、谁新用谁的，改完防抖 1.2s 推 `PUT /api/uiprefs`、关页面再补推一次（`keepalive`）。能同步的 key 就是 `view` / `group` / `sheet` / `sheetFx` / `peek` / `docw` / `reagentPrec` / `colw:<表名>`（服务端白名单，加新 key 记得同步改 `UI_PREF_KEY_RE`）；**当前课题 `eln:project` 故意不同步**。都用 `uiSetIfChanged`：值没变别刷时间戳，否则每开一条记录都推一次、还盖掉别的设备那份。
 - `src/lib/sheetprefs.js` / `src/lib/peek.js` — 「记录页显示哪几块」的偏好，走 `uiprefs`；`EditorView` 用 `v-if` 挂着，关掉的块页面和打印都没有。**两层，都按记录类型各记一套**：块（`{类型:{块:bool}}`，没改过的类用 `KIND_BLOCKS` 默认）+ **块里的功能**（`sheetFx`：计产率 / 选择性那一行 / 说明格「核对」，存 `sheetFx` 键）；设置页 06 里逐类改，`useSheetBlocks(kind)` 一次灌两套、**只选不写**。**`SHEET_KINDS`/`normKind` 必须排在 `fxDefaultsFor` 前面**——`sheetFx = reactive({...fxDefaultsFor('')})` 模块初始化时就会跑，写反了 TDZ 报 `Cannot access uninitialized variable`、整站白屏（踩过）。
-- `src/lib/expScheme.js` — **一条记录的「标准条件」**：`schemeParts(model, compounds)` 把投料表 + 结果块拆成反应式要的几条（反应物 / 产物 SMILES、箭头上下的字，规则跟记录页原来那段一样），箭头上的字跟记录页共用，**每个试剂都带当量**（`eqLabel`；四个以内挤一行，再多挪到下面）；另有 `reactantIds` / `productId`，反应式据此取库里「带缩写的那份画」。**多底物**：都有结构就画成「结构1 + 结构2」；有画不出的，那几行挪到箭头下面写成「底物1 + 底物2」，不再当试剂写在箭头上。找化合物**先按 `compound_id`、再按名字**（抹掉空格括号后比对，重名不认）。
+- `src/lib/expScheme.js` — **一条记录的「标准条件」**：`schemeParts(model, compounds)` 把投料表 + 结果块拆成反应式要的几条（反应物 / 产物 SMILES、箭头上下的字，规则跟记录页原来那段一样），箭头上的字跟记录页共用，**每个试剂都带当量**（`eqLabel`；四个以内挤一行，再多挪到下面）；另有 `reactantIds` / `productId`，反应式据此取库里「带缩写的那份画」。**多底物**：都有结构就画成「结构1 + 结构2」；有画不出的，那几行挪到箭头下面写成「底物1 + 底物2」，不再当试剂写在箭头上。**多步**：按 `reagents.step` 分段各出一段（条件取那步的溶剂行 + 条件格，产物取那步的 `product_name`），返回 `stages`；单步摊平。三处调用都要传 `steps`。找化合物**先按 `compound_id`、再按名字**（抹掉空格括号后比对，重名不认）。
 - `src/lib/sctfields.js` — 筛选表的字段来源：`SOURCES`（自动列的选项，第一个是 `variation`「相对标准条件改了什么」）、`DEFAULT_FIELDS`（新建表默认 相对标准条件 / 产率 / 选择性，照文献优化表）、`variations(base, cur)`（**只写「变成什么」**：`-40 °C` / `底物 X` / `DCM` / `+ HFIP 2 eq` / `− PPh3` / `LDA 1.2 eq`；溶剂以投料行为准，基准 = 第一行）、`autoValue(source, exp)`（按 source 取记录里的值，投料那格拼「名 + eq」）。**`tlc_rf` 不在 experiments 表里**（只有 `tlc_note`），写 SQL 取它必 500，踩过。
 - `src/lib/colresize.js` — `useColResize(name, defaults)`：表格视图表头拖拽改列宽。**拖出来的增量在「这一列」和「它旁边那列」之间搬**（最后一列吃左边那列）；内部按 px 记、`colStyle()` 渲染成百分比。宽度走 `uiprefs`（`colw:<表名>`）；只吃 mouse 事件（WebKit 里表格上的 pointer 事件常被拖选文字吞掉）。拖动中 `body` 挂 `is-col-resizing`（整页 col-resize 光标）。
 - `src/lib/pagemenu.js` — **空白处右键的页面菜单**：`openPageMenu()` 的第一项是**刷新当前列表**，然后四个导航页，**「新建…」收进子菜单放最底下**（右键多半是想刷新）；`keepNativeMenu()` 判断这一下要不要让给系统（输入框、文本域、`contenteditable`、**选中了文字** → 让给系统，否则「复制粘贴」就没了）。挂在 `ContextMenu.vue` 的**冒泡**阶段 `document` contextmenu 上——卡片 / 组头 / 列表行自己会 `preventDefault + stopPropagation`，轮不到它，所以两者的菜单不会打架。
@@ -131,20 +131,20 @@
 - **纸放得下就不许滚**：`EditorView` 量 `scrollHeight − paddingBottom`，够一屏就给 `.editor` 挂 `is-fit`（`overflow-y:hidden`）；底部 120px 呼吸位以前会让页面白滚。
 - **`.editor` 是滚动容器，会把伸出纸外的书签裁掉**（`overflow-y:auto` 等于两轴 auto）：书签 / 预览卡这种要「漂在纸外」的东西一律 `Teleport to="body"` + `position: fixed`，位置由 `getBoundingClientRect()` 算，并在 `.editor` 的 `scroll`、`window.resize`、切记录/切页时重算。
 - **编辑页的异步响应必须校验 id**：`load()` / `saveNow()` / `refreshAttachments()` 都是「发请求 → 等回来 → 写进 `exp`」，等待期间用户可能已经切到别的记录。回来时先比 `route.params.id` / `exp.id` 还是不是发请求时那一条，不是就整份丢弃——否则旧记录的附件会显示到新记录上，此时点 TLC 的 × 删的是那条旧记录的附件行和磁盘文件。**savedLabel / autosave 也是对同一个坑**：`flush()` 里 `lastSaved` 要记「请求发出那一刻」的快照，不能用返回时的（返回时可能已经又改了）。
-- **记录页第 1 页现在多了一行**：结果表格下面是 `.res-sel`（选择性测定），在 `.sec-tight` 里跟着结果块一起打印。加别的行前先想想第 1 页还有多少余量。
+- **第 1 页很满**：结果块下面是 `.res-sel`（选择性测定）；加新行前先想余量。
 - **化合物编号**：新建时留空会由服务端 `nextCompoundCode()` 自动给号（库里最大的纯数字 + 1）；`POST /api/compounds` 带显式编号撞号仍然报 409（别改成自动加后缀，用户填的就该报错）；只有「产物存库」走 `uniqueCompoundCode()` 自动加 `-2`。**曾经踩过**：产物存库直接用实验编号当化合物编号，加了唯一索引后会撞号 500。
 - **`events` 是所有留痕的唯一来源**（**要能回溯**：每条 `changes` 带 `of/nf` 完整原值，`POST /api/history/:entity/:id/restore` 把某格改回去、投料表整表还原，恢复本身也留痕；`.backups/` 每天自动备一次，`ELN_AUTO_BACKUP=0` 关、`ELN_AUTO_BACKUP_HOURS` 调间隔）：新签名 `logEvent(entity, entityId, kind, { detail, fields, changes })`，老签名 `logEvent(expId, kind, detail)` 已废弃；`kind='edit'` 一定走 `logEdit(changes)`（`[{f,o,n}]`，服务端 5 分钟内合并，界面用 `fields` + `EXP_FIELD_LABELS/CMP_FIELD_LABELS` 拼中文、用 `changes` 展开改前改后）。**加新字段记得往这两个 label 表里补**，否则历史里显示英文字段名。
 - `node:sqlite` 需要 Node ≥ 22 且是实验特性，启动带 `NODE_OPTIONS=--disable-warning=ExperimentalWarning`。
-- 服务端 `listen` 失败会自动换下一个端口 → 见多余 node 进程先 `lsof -nP -iTCP:4780 -sTCP:LISTEN` 查，别乱杀。
+- 服务端 `listen` 失败会换端口 → 有多个 node 先 `lsof -nP -iTCP:4780 -sTCP:LISTEN` 查。
 - **「课题」和「分类」不是一回事**：课题是 `experiments.project` 文本字段，决定了**全站空间**（侧栏切换，统计/列表/导出跟着走），课题表本身不存在——清单来自 `GROUP BY project` 加 settings 里的 `projects_json`（用来记还没写记录的课题），每个课题的编号前缀存 `prefix:<课题>`（没设就按课题名自动生成，见 `derivedPrefix()`；实验编号按课题分开数）。分类是卡片墙里的分组，仍按分类走，两者叠加。
 - **课题级设置覆盖**：01 记录本信息里，**课题名就是「标题」**——在课题里改标题等于改名（会走 `renameProject` 把记录一起搬），标题不再单独存覆盖值；编号前缀/记录人/课题组/二维码地址可以每个课题覆盖。存法：`prefix:<课题>`（编号前缀）+ `proj:<课题>:<字段>`（其余三项），空值就不落盘（= 跟着全局）。服务端 `settingsFor(project)` 做合并，bootstrap 同时返回 `settings`（已合并）、`settingsGlobal`（占位符用）、`projectOverrides`（表单编辑用）；`PUT /api/settings` 带 `project` 才写课题级（共用开关已经不存在了）。删课题时会把这两个前缀的键一起清掉。
 - **Node 自己不认系统代理**：本机开着 Clash（`scutil --proxy` 里 HTTP/HTTPS 都是 127.0.0.1:7892），`curl` 走代理一秒就回来，Node 的 `https.get` 直连 wikidata.org 却一路超时（connect 事件都不出现）。`fetchJson` 现在自己读 `HTTPS_PROXY` 或 `scutil --proxy`，手搭 CONNECT 隧道，并按主机记「直连 / 代理」；启动日志里有一行 `联网查询 → 系统代理 …`。查不到东西先看这行。
-- **投料表被「没加载完的页面」清空过**：`PUT /api/experiments/:id` 现在防呆，整表突然 0 行带名字的就 409 拦下。**点一下格子不能改数据**（`onAmount` 只在 `_amtDirty` 时反算）。
+- **投料表被没加载完的页面清空过**：`PUT` 防呆（整表突然 0 行带名字 → 409）。**点一下格子不能改数据**。
 - **不要在用户正编辑时用 API 改他的记录**（他页面里的自动保存会把改动覆盖回去）；验证只用临时记录，验完删掉。
-- 打开实验页本身会触发保存（`fill()` 会补算 mmol、补起始行）→ 「只看不动」的验证要用临时记录，或在该页拦掉非 GET 请求。
+- 打开实验页会触发一次保存（`fill()` 补算）→ 「只看不动」要用临时记录。
 - SQLite 子查询的 `ORDER BY` 里引用不到外层表的列 → 拆成「主查询 + 一条补数据查询」。
 - **缩写基团的键会被渲染器截短**：给标签留位、截掉约 0.28 键长，**只跟标签字号有关**（放大图 / 调 bond-length 都没用），补法见 `lib/abbrevspread.js`；改 SVG 必须重算 `viewBox`，否则外移的标签被裁。
-- **TLC 图不许裁**：`.sec-tlc` / `.cmp-sheet` 高度定、宽度跟原图比例；`.sec-shots` 照片本来 `contain`。
+- **TLC 图不许裁**（高度定、宽度按原图比例；照片 `contain`）。
 - **切记录时反应式不许闪**：画好的 SVG 就存在 `scheme_cache`（等同附件），只认「新鲜 + sig 一致」那份、直接贴不重画；过期才重画（`.is-busy` 藏掉提示）。**别贴旧图再换**。
 - **反应式缓存会「莫名其妙变了」**：`sig` 只看投料表字段，产物结构在画板里改过（加/去缩写标签）它不变 → 缓存里那张旧图会一直被贴出来。缓存行现在另存结构指纹 `fp`（用到的化合物 `id:updated_at`），读缓存对不上就当没有；前端 `liveFp` 同理，`abbrevMol` 的键带 `updated_at`、空结果不缓存。**指纹别塞进 `sig`**：化合物库是打开页面后才读完的，塞进去首帧永远对不上、每次打开都重画。
 - **两步反应 = 两条记录串成链**：`experiments.prev_exp_id` + `chain_draw`（反应式要不要连上一步一起画）；`⋯` 菜单「接上一步…」，`SchemeBlock` 标题行显示「第 N 步 · 上一步 / 下一步」和「连上一步画」胶囊，列表 / 卡片墙标「第 N 步」。**拦环、删记录清指针、三条 INSERT 路径都要给 `chain_draw` 0、缓存 `fp` 要带上一步**——细节见 HISTORY「两步反应链」。
@@ -152,7 +152,7 @@
 - 改版式后必须 `--print-to-pdf` 数页数，确认仍是 2 页。
 - **溶剂是投料表的一行**（role=`溶剂`，「＋ 加溶剂」），`CondRow` 只剩温度/时间/气氛/装置/光照。老记录的 `fields.solvent` 由 `ensureSolventRow()` 补成表行；删光溶剂行时 `watch(solventFromTable)` 清字段。**溶剂行只填「量」**：MW / 当量 / mmol 三格是 `—` 也不参与计算（那三个计算里都跳过溶剂行），别再按当量折出 17 µL 那种数。**「用量」那格边打字只解析不回写**，失焦才规整成 `3 mL`（回写会吃字成「3mL23」）。
 - 结果区（`ResultBlock`）：`.row-del` 清空整行；产率表头 `∅` 切「不计产率」（`experiments.no_yield`，粗品用）。新列走 `ensureColumn`。
-- Element Plus 的提示/确认框要覆盖类名（`eln-toast` / `eln-messagebox`）才符合纸感配色。
+- Element Plus 的提示框要覆盖类名（`eln-toast` / `eln-messagebox`）。
 - **本机只有 Safari**：看版式用 `.cache/` 里 `swiftc` 编的 WKWebView 工具。
 - 依赖别升：Vue 3.5 / Vite 6 / EP 2.8 / openchemlib 9.25。
 

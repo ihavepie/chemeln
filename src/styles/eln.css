@@ -9072,3 +9072,6 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 
 /* 反应式正在画（切换记录 / 改了投料表）：空着就空着，别让「点击上传」那行灰字闪一下 */
 .scheme-slot.is-busy .scheme-empty { visibility: hidden; }
+
+/* 「第 N 步」那行里的「产物（中间体）」格：宽一点，名字往往比试剂名长 */
+.step-line .step-prod { width: 168px; }

@@ -159,6 +159,8 @@ function normalizeSteps(list) {
     end: str(s && s.end).slice(0, 24),
     addition: str(s && s.addition).slice(0, 60),   // 这一步怎么加的（滴加/分批…）
     stir: str(s && s.stir).slice(0, 60),           // 这一步怎么搅的（500 rpm…）
+    // 这一步的产物（中间体）：一条记录里串两步时，反应式要靠它画中间那道桥
+    product_name: str(s && s.product_name).slice(0, 120),
   }));
 }
 

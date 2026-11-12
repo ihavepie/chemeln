@@ -368,9 +368,12 @@ function fill(e) {
     end: s.end || '',
     addition: s.addition || '',
     stir: s.stir || '',
+    product_name: s.product_name || '',   // 这一步的产物（中间体）
   }));
   const need = (e.reagents || []).reduce((m, r) => Math.max(m, Number(r.step) || 1), 1);
-  while (list.length < Math.max(1, need)) list.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '' });
+  while (list.length < Math.max(1, need)) {
+    list.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '', product_name: '' });
+  }
   const rows = (e.reagents || []).map(toRow);
   // 一条试剂都还没有时，第一步给一行空行当起点；其余步骤不再自动补空行
   if (!rows.length) rows.push({ step: 1, role: '底物', eq: 1, mwText: '', amountText: '', name: '', note: '' });
@@ -1034,7 +1037,7 @@ const liveScheme = ref('');
 const liveSigShown = ref('');
 /* sig 只看「会进这张图的字段」，别把密度 / 用量那些也塞进来——它们一变就白重画一次，
    页面一打开就能对得上缓存（化合物库还没读进来也不影响）。版本号用来让旧缓存失效。 */
-const SCHEME_SIG_VERSION = 'v12';  // 改了出图规则就加一，让旧缓存失效（v12：箭头上只排一行；v10：条件行折行 + 箭头封顶 + 结构放大）
+const SCHEME_SIG_VERSION = 'v13';  // 改了出图规则就加一，让旧缓存失效（v13：多步记录按步分段；v12：箭头上只排一行）
 const liveSig = computed(() =>
   SCHEME_SIG_VERSION +
   JSON.stringify({
@@ -1049,6 +1052,14 @@ const liveSig = computed(() =>
     // 两步反应：接的是哪条、要不要连起来画（都进 sig，不然切开关不重画）
     pv: fields.prev_exp_id ?? '',
     cd: Number(fields.chain_draw) === 1 ? 1 : 0,
+    // 一条记录里有好几步时，每步的条件 / 中间体产物 / 行归属都要进 sig，
+    // 不然改了第一步的条件，那张两段箭头不会重画。单步记录不加（sig 不变，缓存照样命中）
+    ...(multiStep.value
+      ? {
+          sp: (reagent.rows || []).map((r) => Number(r.step) || 1),
+          st: (reagent.steps || []).map((s) => [s.condition || '', s.product_name || '']),
+        }
+      : {}),
   })
 );
 /* 这张图用到的化合物「结构改过没有」：`id:updated_at` 拼一串。
@@ -1069,6 +1080,10 @@ const liveFp = computed(() => {
   return out.join('|');
 });
 const liveFpShown = ref('');
+/* 这条记录是不是「一步里分了好几步」（投料表按第 N 步分段） */
+const multiStep = computed(
+  () => (reagent.steps || []).length > 1 || (reagent.rows || []).some((r) => Number(r.step) > 1)
+);
 /* 正在画这张图：没有旧图可贴的时候，反应式格子里先别冒出「点击上传」那行提示 */
 const liveDrawing = ref(false);
 
@@ -1148,7 +1163,7 @@ async function prevParts(id) {
   const e = await api.experiment(id).catch(() => null);
   if (!e) return null;
   if (!(store.compounds && store.compounds.length)) await loadCompounds();
-  return schemeParts({ ...e, field_vars: e.field_vars || [], reagents: e.reagents || [] }, store.compounds || []);
+  return schemeParts({ ...e, field_vars: e.field_vars || [], steps: e.steps || [], reagents: e.reagents || [] }, store.compounds || []);
 }
 let liveTimer = null;
 function scheduleLive(ms = 700) {
@@ -1190,7 +1205,10 @@ async function drawLive() {
     if (!(store.compounds && store.compounds.length)) await loadCompounds();
     // 画这张图实际用到的结构状态（可能是刚读进来的，跟进去时那个 fp 不一样）
     const fpUsed = liveFp.value;
-    const parts = schemeParts({ ...fields, field_vars: fieldVars.value, reagents: reagent.rows }, store.compounds || []);
+    const parts = schemeParts(
+      { ...fields, field_vars: fieldVars.value, steps: reagent.steps, reagents: reagent.rows },
+      store.compounds || []
+    );
     if (!parts.reactants.length) {
       liveScheme.value = '';
       liveSigShown.value = '';
@@ -1205,13 +1223,14 @@ async function drawLive() {
       product: p.product,
       productId: p.productId,
       productVer: p.productVer,
-      productLabel: p.product ? '' : p.prodName,   // 还不知道产物结构就把名字写在箭头右边
+      productLabel: p.product ? '' : (p.productLabel || p.prodName),   // 还不知道产物结构就把名字写在箭头右边
       above: p.above,
       below: p.below,
     });
-    const stages = [stage(parts)];
+    // 一条记录里有好几步（投料表按「第 N 步」分段）→ 每步一段箭头，中间体只画一次
+    const stages = (parts.stages || []).length > 1 ? parts.stages.map(stage) : [stage(parts)];
     // 「连上一步一起画」：把上一步那条也算进这张图（中间体只画一次，两段箭头各带各的条件）
-    if (Number(fields.chain_draw) === 1 && prevExp.value?.id) {
+    if (stages.length === 1 && Number(fields.chain_draw) === 1 && prevExp.value?.id) {
       const pp = await prevParts(prevExp.value.id);
       if (pp && pp.reactants.length) stages.unshift(stage(pp));
     }
@@ -1292,7 +1311,7 @@ async function schemeFromTable() {
     return toast(e.message || '化合物库没读出来', 'err');
   }
   // 构件（反应物 / 产物 / 箭头上下的字）跟筛选表共用一份，见 lib/expScheme.js
-  const parts = schemeParts({ ...fields, reagents: reagent.rows }, store.compounds || []);
+  const parts = schemeParts({ ...fields, steps: reagent.steps, reagents: reagent.rows }, store.compounds || []);
   if (!parts.reactants.length) {
     return toast(
       reactantHint() || '投料表里还没有挂化合物库的底物——双击试剂名选一个',
@@ -1311,12 +1330,12 @@ async function schemeFromTable() {
       product: p.product,
       productId: p.productId,
       productVer: p.productVer,
-      productLabel: p.product ? '' : p.prodName,
+      productLabel: p.product ? '' : (p.productLabel || p.prodName),
       above: p.above,
       below: p.below,
     });
-    const stages2 = [stage2(parts)];
-    if (Number(fields.chain_draw) === 1 && prevExp.value?.id) {
+    const stages2 = (parts.stages || []).length > 1 ? parts.stages.map(stage2) : [stage2(parts)];
+    if (stages2.length === 1 && Number(fields.chain_draw) === 1 && prevExp.value?.id) {
       const pp = await prevParts(prevExp.value.id);
       if (pp && pp.reactants.length) stages2.unshift(stage2(pp));
     }
