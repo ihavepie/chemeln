@@ -7,12 +7,17 @@ import { peekPrefs, setPeekPref, PEEK_LABELS } from '../lib/peek.js';
 import {
   sheetPrefs,
   setSheetPref,
+  setSheetFx,
   showAllSheetBlocks,
   useSheetBlocks,
   currentSheetKind,
+  sheetFx,
   SHEET_BLOCKS,
+  SHEET_FX,
   SHEET_KINDS,
 } from '../lib/sheetprefs.js';
+import { amountDecimals, setAmountDecimals } from '../lib/reagent.js';
+import { uiSetIfChanged } from '../lib/uiprefs.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickExtra } from '../store.js';
 import { QUICK } from '../lib/ui.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -308,6 +313,18 @@ async function removeCategory(g) {
 /* ---- 课题 ---- */
 
 const projects = computed(() => store.boot?.projects || []);
+
+/** 「用量」小数位（跟投料表工具行那颗按钮同一个设置） */
+const DECIMAL_OPTS = [
+  { v: 0, t: '自适应' },
+  { v: 2, t: '2 位' },
+  { v: 3, t: '3 位' },
+  { v: 4, t: '4 位' },
+];
+function pickDecimals(v) {
+  setAmountDecimals(v);
+  uiSetIfChanged('reagentPrec', v);
+}
 
 /* ---- 记录页显示：按记录类型各一套（和 `lib/sheetprefs.js` 的键一致）---- */
 const editKind = ref(currentSheetKind());
@@ -714,6 +731,42 @@ async function removeProject(p) {
             <input type="checkbox" :checked="sheetPrefs[key]" @change="setSheetPref(key, $event.target.checked)" />
             {{ label }}
           </label>
+        </div>
+
+        <!-- 第三层：块里面的功能（也是按记录类型各记一套） -->
+        <div class="sheet-fx">
+          <div class="sheet-fx-head">
+            块里的功能
+            <span class="sheet-fx-hint">只影响「{{ SHEET_KINDS.find((k) => k.key === editKind)?.label || '通用' }}」这一类记录</span>
+          </div>
+          <label
+            v-for="f in SHEET_FX"
+            :key="f.key"
+            class="sheet-fx-row"
+            :class="{ 'is-off': !sheetPrefs[f.group] }"
+          >
+            <input type="checkbox" :checked="sheetFx[f.key]" @change="setSheetFx(f.key, $event.target.checked)" />
+            <span class="sheet-fx-name">{{ f.label }}</span>
+            <span class="sheet-fx-sub">{{ f.hint || '' }}</span>
+            <span v-if="!sheetPrefs[f.group]" class="sheet-fx-note">所在那一块关着</span>
+          </label>
+
+          <div class="sheet-fx-row is-static">
+            <span class="sheet-fx-name">投料表「用量」小数位</span>
+            <span class="sheet-fx-chips">
+              <button
+                v-for="opt in DECIMAL_OPTS"
+                :key="opt.v"
+                type="button"
+                class="qchip"
+                :class="{ 'is-on': amountDecimals() === opt.v }"
+                @click="pickDecimals(opt.v)"
+              >
+                {{ opt.t }}
+              </button>
+            </span>
+            <span class="sheet-fx-sub">所有记录类型共用；投料表工具行那颗按钮也是它</span>
+          </div>
         </div>
       </section>
 

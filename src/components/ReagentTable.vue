@@ -21,6 +21,8 @@ const props = defineProps({
   varCandidates: { type: Object, default: () => ({}) },
   // 变量行「挪下去」：开了变量块的时候，标成变量的那几行不在投料表里显示（值在下面的变量行里）
   dropVarRows: { type: Boolean, default: false },
+  /** 说明格那颗「核对」要不要出现（设置页按记录类型配的功能开关） */
+  showCheck: { type: Boolean, default: true },
 });
 const emit = defineEmits(['recipe', 'promote-var', 'focus-var', 'var-toggled']);
 
@@ -1477,7 +1479,7 @@ function onDrop(ev) {
               <td class="note-td">
                 <input class="note-cell" data-f="note" :value="r.note" :placeholder="firstRow === r ? '说明' : ''" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
                 <button
-                  v-if="!locked && hasName(r)"
+                  v-if="!locked && showCheck && hasName(r)"
                   type="button"
                   class="note-check noprint"
                   :title="`核对「${r.name}」在试剂库里的分子量 / 密度 / 固体还是液体`"

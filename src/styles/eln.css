@@ -8922,3 +8922,44 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .rl-state.is-solid { color: #8a5a3a; background: #f3e7dc; border-color: rgba(168, 71, 31, 0.25); }
 /* 「核对」浮层翻到上方（表格底部那几行下面放不下时） */
 .check-menu.is-up { top: auto; bottom: calc(100% + 4px); }
+
+/* 设置页 06「块里的功能」：块下面的第三层开关 */
+.sheet-fx {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dotted var(--line-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sheet-fx-head {
+  font-size: 12px;
+  color: var(--ink-2);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sheet-fx-hint { font-size: 10.5px; color: var(--ink-4); }
+.sheet-fx-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.sheet-fx-row.is-static { cursor: default; }
+.sheet-fx-row.is-off { opacity: 0.55; }
+.sheet-fx-name { min-width: 0; }
+.sheet-fx-sub { font-size: 10.5px; color: var(--ink-4); }
+.sheet-fx-note {
+  font-size: 10px;
+  color: var(--accent-ink);
+  background: #f7f0ea;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.sheet-fx-chips { display: inline-flex; gap: 4px; }
+.sheet-fx-chips .qchip { font-size: 10.5px; padding: 1px 8px; }
+.sheet-fx-chips .qchip.is-on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.32); background: #f7f0ea; }

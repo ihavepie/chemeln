@@ -12,8 +12,12 @@ const props = defineProps({
   base: { type: [Number, String], default: null },
   notify: { type: Function, required: true },
   locked: Boolean,
-  /** 记录类型：`原料` 这类「制备中间体」的默认**不计产率**（见下面 isMaterial） */
+  /** 记录类型（现在只用来显示 / 兼容；「算不算产率」改由 `yieldDefault` 决定） */
   kind: { type: String, default: '' },
+  /** 这一类的默认：计产率吗（设置页 06 里按记录类型各记一套） */
+  yieldDefault: { type: Boolean, default: true },
+  /** 「选择性测定」那行要不要出现（同一套设置里的开关） */
+  showSel: { type: Boolean, default: true },
 });
 const emit = defineEmits(['open-compound']);
 
@@ -24,13 +28,13 @@ const picked = ref(null);
 const yieldTyped = ref(num(props.model.yield_pct) !== null);
 /** 粗产物 / 中间体：只记质量，不算也不显示产率（存到 experiments.no_yield） */
 /**
- * 「原料」这类记录（`kind=原料`，制起始原料 / 中间体）**默认就不计产率**：
- * 用户问过「这种中间体产物是不是就不用加产率了」。已经手填过产率的老记录照旧显示，
- * 不把已有数据藏起来；真要产率就换记录类型。
+ * 计不计产率：**按记录类型在设置页里配**（`sheetFx.yield`，见 `lib/sheetprefs.js`），
+ * 以前的写死规则（kind === '原料' 就不计）已经搬进默认值。
+ * 类型默认不计、但这条记录已经手填过产率的，照旧显示——不把已有数据藏起来。
  */
-const isMaterial = computed(() => props.kind === '原料');
+const kindNoYield = computed(() => !props.yieldDefault);
 const noYield = computed(
-  () => Number(props.model.no_yield) === 1 || (isMaterial.value && num(props.model.yield_pct) === null)
+  () => Number(props.model.no_yield) === 1 || (kindNoYield.value && num(props.model.yield_pct) === null)
 );
 
 function toggleNoYield() {
@@ -153,12 +157,12 @@ function onYieldInput(ev) {
           <th class="n">
             <span class="th-with-btn"
               >产率 / %<!-- 「原料」类记录是算出来的「不计」，不给点（要产率就换类型）；其余照旧一颗 ∅ 小开关 --><span
-                v-if="isMaterial && noYield"
+                v-if="kindNoYield && noYield"
                 class="th-mini is-static"
                 title="原料类记录默认不计产率；要产率就把记录类型换成「试反应」"
                 >不计</span
               ><button
-                v-else-if="!isMaterial"
+                v-else-if="!kindNoYield"
                 type="button"
                 class="th-mini noprint"
                 :class="{ on: noYield }"
@@ -206,7 +210,7 @@ function onYieldInput(ev) {
         </tr>
       </tbody>
     </table>
-    <div class="res-sel">
+    <div v-if="showSel" class="res-sel">
       <span class="sel-cap">选择性测定</span>
       <label class="sel-f">
         <span>ee / %</span>

@@ -36,3 +36,12 @@
 - **投料表「用量」的小数位可调（自适应 / 2 / 3 / 4 位）**（用户：「这边需要小数点后四位，或者可以弄一个每个模块单独的内部设置」）。`lib/reagent.js` 加了 `amountDecimals()` / `setAmountDecimals(0|2|3|4)`（0 = 老行为：按量级 2/3/4 位），所有 `round(...)` 出数的地方统一走 `dec()`（`toFixed` 后去掉多余的 0，12.3400 → 12.34、4.9625 保持）；`amountText` / `volText` 都吃这个设置，所以 ml / µL / g / mg、试剂库小签、汇报卡也跟着一致。投料表工具行多一颗 `# 4 位小数` 的小按钮，点一下循环切（自适应 → 2 → 3 → 4）；存 `uiprefs` 的 `reagentPrec`（服务端白名单补了这个 key，跟着数据库走），`store.js` 开机就套上、合并后重套。
   **两个坑**：①精度是模块级状态，用普通变量的话按钮标签不跟着变 → 改成 `ref`；②改完精度要**逐行 `syncAmount()`**，直接用 `recomputeAll()` 会跳过第一行（第一行的量不跟着变，看着像没生效）。
   验证：SJ-2-10 切到 4 位后 `苄基环丁烷醇 3.6628 g / TsCl 3.5461 g / DMAP 0.9468 g / Et3N 4.3119 mL / DCM 25 mL`；`amountText` 单测：4 位 → `4.9625 g`，自适应 → `4.96 g`。
+- **设置页三层：记录类型 → 模块 → 模块里的功能**（用户：「就是可以针对页面的模块单独设置吗，第一层就是反应类型分类，然后就内部模块分类，然后模块内部功能可以添加或者不添加…然后就是这边设置是产物，但还是没计入产率」）。原来「原料 → 不计产率」是**写死在 ResultBlock 里**的（`kind === '原料'`），用户在设置里打开结果块也一样不记产率。
+  现在 06 卡是三段：**改哪一类**（通用 / 原料 / 试反应 / 条件筛选 / 底物扩展）→ **A4 上哪几块** → **块里的功能**（新 `sheetFx`，也是按类型各记一套）：
+  · 计产率（取消 = 只记质量和选择性；「原料」默认取消，其它类型默认勾上 —— 也就是把写死的那条规则搬成了默认值）
+  · 选择性测定那行（ee / 方法 / 柱子 / tR）
+  · 说明格的「核对」（查 MW / 密度 / 固体）
+  · 「用量」小数位（自适应 / 2 / 3 / 4，跟投料表工具行那颗按钮同一个设置）
+  `ResultBlock` 不再看 `kind` 字符串，改收 `yieldDefault` / `showSel` 两个 prop；`ReagentTable` 收 `showCheck`；`useSheetBlocks(kind)` 一次把块和功能两套都灌进去。
+  **踩了个 TDZ 坑**：`sheetFx = reactive({...fxDefaultsFor('')})` 在模块初始化时就跑，而 `fxDefaultsFor` 里要读 `SHEET_KINDS`——那段被放在 `SHEET_KINDS` 之前，于是整站白屏（`Cannot access uninitialized variable`，用 `_probe-err.html` 抓到的）。顺序改成 `SHEET_KINDS` → `normKind` → `SHEET_FX/fxDefaultsFor/sheetFx`。
+  验证：设置里选「原料」勾上「计产率」→ 打开 SJ-2-10，产率格变成可填的「自动」；再取消「计产率」「选择性测定」→ 表头回到「不计」、产率格禁用、`.res-sel` 那行消失，`sheetFx` 存成 `{"原料":{"yield":false,"sel":false,"check":true}}`。`ui_prefs` 白名单补了 `sheetFx` / `reagentPrec`。

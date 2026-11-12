@@ -38,10 +38,34 @@ const ALL_ON = Object.fromEntries(BLOCK_KEYS.map((k) => [k, true]));
 /** 设置页那排类型切换用：通用 + 四个记录类型 */
 export const SHEET_KINDS = [{ key: '', label: '通用' }, ...KINDS.map((k) => ({ key: k.key, label: k.key }))];
 
-const normKind = (kind) => {
+function normKind(kind) {
   const s = String(kind || '');
   return SHEET_KINDS.some((k) => k.key === s) ? s : '';
-};
+}
+
+/* ---------- 模块内部的「功能开关」 ----------
+   第三层：块开着，块里还有几样东西可以不要。跟块一样**按记录类型各记一套**。
+   只列真的会改行为的；`group` 决定它挂在哪个块下面显示。 */
+export const SHEET_FX = [
+  {
+    key: 'yield',
+    group: 'result',
+    label: '计产率',
+    hint: '取消 = 只记质量和选择性（原料 / 粗产物 / 中间体这种不称产率的）',
+  },
+  { key: 'sel', group: 'result', label: '选择性测定那行（ee / 方法 / 柱子 / tR）' },
+  { key: 'check', group: 'reagents', label: '说明格的「核对」（查 MW / 密度 / 固体）' },
+];
+const FX_KEYS = SHEET_FX.map((f) => f.key);
+/** 某一类的默认：只有「原料」默认不记产率（以前是写死在 ResultBlock 里的） */
+export const fxDefaultsFor = (kind) => ({
+  yield: normKind(kind) !== '原料',
+  sel: true,
+  check: true,
+});
+/** 当前这一套的功能开关（设置页改它，记录页读它） */
+export const sheetFx = reactive({ ...fxDefaultsFor('') });
+const FX_STORE = 'sheetFx';
 
 /** 某一类的默认：通用全开，其余照 `KIND_BLOCKS` */
 export function defaultBlocksFor(kind) {
@@ -67,6 +91,26 @@ function readAll() {
   return out;
 }
 
+function readFxAll() {
+  const raw = uiGet(FX_STORE, null);
+  const out = {};
+  for (const { key } of SHEET_KINDS) {
+    const set = raw && typeof raw === 'object' ? raw[key] : null;
+    out[key] = { ...fxDefaultsFor(key), ...(set && typeof set === 'object' ? set : {}) };
+  }
+  return out;
+}
+
+/** 改一个功能开关（写库，只改当前这一类） */
+export function setSheetFx(key, value) {
+  const v = !!value;
+  if (sheetFx[key] === v) return;
+  sheetFx[key] = v;
+  const all = readFxAll();
+  all[activeKind] = { ...sheetFx };
+  uiSetIfChanged(FX_STORE, all);
+}
+
 /** 当前在用的那一套（记录页渲染读它） */
 export const sheetPrefs = reactive({ ...ALL_ON });
 
@@ -80,6 +124,8 @@ export function useSheetBlocks(kind) {
   activeKind = normKind(kind);
   const set = readAll()[activeKind] || defaultBlocksFor(activeKind);
   for (const k of BLOCK_KEYS) sheetPrefs[k] = !!set[k];
+  const fx = readFxAll()[activeKind] || fxDefaultsFor(activeKind);
+  for (const k of FX_KEYS) sheetFx[k] = !!fx[k];
 }
 
 export function setSheetPref(key, value) {

@@ -23,7 +23,7 @@ import SyncConflicts from '../components/SyncConflicts.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
-import { sheetPrefs, useSheetBlocks } from '../lib/sheetprefs.js';
+import { sheetFx, sheetPrefs, useSheetBlocks } from '../lib/sheetprefs.js';
 import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
@@ -2052,6 +2052,7 @@ const openAttachment = (id) => {
             :var-counts="varCounts"
             :var-candidates="varCandidates"
             :drop-var-rows="sheetPrefs.conds"
+            :show-check="sheetFx.check"
             @recipe="openRecipe"
             @promote-var="promoteVarCandidate"
             @focus-var="scrollToConds"
@@ -2152,7 +2153,9 @@ const openAttachment = (id) => {
             v-if="sheetPrefs.result"
             ref="resBlock"
             :model="fields"
-            :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind" @open-compound="(id) => router.push(`/compounds/${id}`)"
+            :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind"
+            :yield-default="sheetFx.yield" :show-sel="sheetFx.sel"
+            @open-compound="(id) => router.push(`/compounds/${id}`)"
           >
             <template #conds>
               <div v-if="conds.length && sheetPrefs.conds" class="condres">
