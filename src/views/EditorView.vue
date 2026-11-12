@@ -1963,7 +1963,7 @@ const openAttachment = (id) => {
             v-if="sheetPrefs.result"
             ref="resBlock"
             :model="fields"
-            :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)"
+            :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind" @open-compound="(id) => router.push(`/compounds/${id}`)"
           >
             <template #conds>
               <div v-if="conds.length && sheetPrefs.conds" class="condres">

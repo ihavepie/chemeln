@@ -8633,3 +8633,7 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .qchip-acts button:hover { color: var(--accent); }
 .qchip-acts button.is-del:hover { color: #b4381c; }
 .qchip-acts button:disabled { opacity: 0.28; cursor: default; }
+
+/* 产率表头上那个「不计」：原料类记录是**算出来的**默认值（不是开关），所以不给点，
+   样子沿用 `.th-mini.on`，只是没有 hover。 */
+.th-mini.is-static { cursor: default; color: #8a5a3a; background: #f3e7dc; }

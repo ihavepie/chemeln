@@ -12,6 +12,8 @@ const props = defineProps({
   base: { type: [Number, String], default: null },
   notify: { type: Function, required: true },
   locked: Boolean,
+  /** 记录类型：`原料` 这类「制备中间体」的默认**不计产率**（见下面 isMaterial） */
+  kind: { type: String, default: '' },
 });
 const emit = defineEmits(['open-compound']);
 
@@ -21,7 +23,15 @@ const picked = ref(null);
 /** 产率格用户手填过没有：手填过就不再自动覆盖（和「手填过就不动」的约定一致） */
 const yieldTyped = ref(num(props.model.yield_pct) !== null);
 /** 粗产物 / 中间体：只记质量，不算也不显示产率（存到 experiments.no_yield） */
-const noYield = computed(() => Number(props.model.no_yield) === 1);
+/**
+ * 「原料」这类记录（`kind=原料`，制起始原料 / 中间体）**默认就不计产率**：
+ * 用户问过「这种中间体产物是不是就不用加产率了」。已经手填过产率的老记录照旧显示，
+ * 不把已有数据藏起来；真要产率就换记录类型。
+ */
+const isMaterial = computed(() => props.kind === '原料');
+const noYield = computed(
+  () => Number(props.model.no_yield) === 1 || (isMaterial.value && num(props.model.yield_pct) === null)
+);
 
 function toggleNoYield() {
   if (props.locked) return;
@@ -142,7 +152,13 @@ function onYieldInput(ev) {
           <th class="n">质量 / g</th>
           <th class="n">
             <span class="th-with-btn"
-              >产率 / %<button
+              >产率 / %<!-- 「原料」类记录是算出来的「不计」，不给点（要产率就换类型）；其余照旧一颗 ∅ 小开关 --><span
+                v-if="isMaterial && noYield"
+                class="th-mini is-static"
+                title="原料类记录默认不计产率；要产率就把记录类型换成「试反应」"
+                >不计</span
+              ><button
+                v-else-if="!isMaterial"
                 type="button"
                 class="th-mini noprint"
                 :class="{ on: noYield }"
