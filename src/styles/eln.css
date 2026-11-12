@@ -7999,3 +7999,17 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
    小签放那儿会把名字挤成「Pd((」）。这一行因此比其他行高一点，只有变量行会这样。 */
 .rtable .role-wrap + .var-chip { margin: 2px 0 0 0; }
 .rtable tr.is-var .role-cell { padding-top: 4px; padding-bottom: 4px; }
+
+/* 投料表里变量行的「试剂」格：只读的候选摘要（`Pd(OPiv)2 / dppe / Ni(COD)2`），
+   点一下跳条件组。具体名字不再当固定试剂显示，避免跟条件表各说一套。 */
+.var-cands {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;      /* 最多两行，第三行起省略（详细名单在下面的条件组里） */
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  line-height: 1.3;
+  cursor: pointer;
+}
+.var-cands:hover { color: var(--accent-ink); }

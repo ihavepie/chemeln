@@ -126,6 +126,18 @@ const varCounts = computed(() => {
   }
   return m;
 });
+/** 每个变量槽的候选名单（按条件组顺序，给投料表那行显示摘要用） */
+const varCandidates = computed(() => {
+  const m = {};
+  for (const c of conds.value) {
+    for (const [k, v] of Object.entries(c.vars || {})) {
+      const val = String(v || '').trim();
+      if (!val) continue;
+      (m[k] = m[k] || []).push(val);
+    }
+  }
+  return m;
+});
 const condsEl = ref(null);
 function scrollToConds() {
   condsEl.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -1592,6 +1604,7 @@ const openAttachment = (id) => {
             :notify="notify"
             :locked="exp.locked"
             :var-counts="varCounts"
+            :var-candidates="varCandidates"
             @recipe="openRecipe"
             @promote-var="promoteVarCandidate"
             @focus-var="scrollToConds"

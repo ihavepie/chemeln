@@ -16,6 +16,8 @@ const props = defineProps({
   locked: { type: Boolean, default: false },
   /** 每个变量槽在条件组里有几个候选：`{Cat: 3}` —— 变量行后面显示「N 个候选」 */
   varCounts: { type: Object, default: () => ({}) },
+  /** 每个变量槽的候选名单（按条件组顺序）：`{Cat: ['Pd(OPiv)2','dppe']}` —— 变量行那格显示摘要 */
+  varCandidates: { type: Object, default: () => ({}) },
 });
 const emit = defineEmits(['recipe', 'promote-var', 'focus-var']);
 
@@ -1232,7 +1234,15 @@ function onDrop(ev) {
 
               </td>
               <td class="name-cell" @click="pinPreview(r)">
+                <!-- 变量行：这格不放「具体试剂」，只放占位符 + 候选摘要（详细信息在下面的条件组里） -->
+                <span
+                  v-if="r.variable"
+                  class="var-cands"
+                  :title="(varCandidates[r.variable] || []).length ? `候选：${(varCandidates[r.variable] || []).join(' / ')}（详细在下面的条件组）` : '还没有候选：在下面的条件组里填'"
+                  @click.stop="emit('focus-var', r.variable)"
+                >{{ (varCandidates[r.variable] || []).join(' / ') || '（条件组里填候选）' }}</span>
                 <input
+                  v-else
                   data-f="name"
                   :value="r.name"
                   :title="r.name || ''"
