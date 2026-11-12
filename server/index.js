@@ -1936,6 +1936,12 @@ route('PUT', '/api/compounds/:id', async (req, res, params) => {
   }
   const body = await readJson(req);
   const data = normalizeCompound(body);
+  // 编号可以留空（新建时服务端会给号），但**不能把已有的号清掉**：
+  // 清掉之后这条化合物在库里、卡片墙和二维码上就只剩「(未命名)」，找不回来（踩过）
+  if ('code' in data && !str(data.code).trim()) {
+    const old = db.prepare('SELECT code FROM compounds WHERE id = ?').get(id);
+    if (str(old?.code).trim()) return fail(res, 400, '编号不能清空：要换号就直接改成新的编号');
+  }
   if ('code' in data) {
     const taken = compoundCodeOwner(data.code, id);
     if (taken) {
