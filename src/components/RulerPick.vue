@@ -105,6 +105,31 @@ function onUp() {
   goTo(idx.value, true);
 }
 
+/**
+ * 滚轮 / 触控板也能拨：一格一格走，攒够 60px 才算一格 ——
+ * 鼠标滚轮一格通常是 100~120，触控板会连发很多小 delta（攒着走，不然一下子飞到底）。
+ * 只用正负号，每次最多走一格。
+ */
+let wheelAcc = 0;
+let wheelTimer = 0;
+function onWheel(ev) {
+  if (props.locked) return;
+  ev.preventDefault();
+  clearTimeout(wheelTimer);
+  wheelTimer = setTimeout(() => {
+    wheelAcc = 0;
+  }, 200);
+  wheelAcc += ev.deltaY;
+  if (Math.abs(wheelAcc) < 60) return;
+  const dir = wheelAcc > 0 ? 1 : -1;
+  wheelAcc = 0;
+  const next = clampi(idx.value + dir);
+  if (next === idx.value) return;
+  goTo(next, true);
+  const v = list.value[next];
+  if (v != null) emit('update:modelValue', v);
+}
+
 function onItemClick(i) {
   if (moved > 6) return;   // 刚才是在拖，不是点
   goTo(i, true);
@@ -155,7 +180,7 @@ watch(
 </script>
 
 <template>
-  <div ref="wrap" class="ruler-pop" @mousedown.stop>
+  <div ref="wrap" class="ruler-pop" @mousedown.stop @wheel="onWheel">
     <div ref="track" class="ruler-track" @mousedown="onDown">
       <div class="ruler-strip" :style="stripStyle">
         <button

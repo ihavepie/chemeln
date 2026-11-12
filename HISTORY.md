@@ -1,2 +1,2 @@
 
-- **单击不许进光标：要在 `mousedown` 上拦，不能等 click 再 blur**（用户：「单击还是会光标进去」）：输入框是**按下那一刻**就拿焦点的，`click` 阶段再 `blur()` 已经晚了一拍，光标先闪进去了。现在 `CondRow` 的 `onFieldDown(f, ev)` 在 `mousedown` 里判：①这一格**已经在编辑**（`document.activeElement === el`）→ 什么都不做，正常点、正常选字；②离上一次按下 < 340ms（第二下 = 双击）→ 清定时器、`open=''`、`focus + select()`，**并且不 preventDefault**，让光标落进去；③否则（单击）→ `preventDefault()`（不给焦点、光标不闪）+ 180ms 后开选择。原来的 `@click` / `@dblclick` 两个手势都撤了。
+- **刻度滑条也能用滚轮拨**（用户：「鼠标滚轮能滚动这个」）：`RulerPick` 根节点挂 `@wheel="onWheel"`，**攒够 60px 才算一格、每次最多走一格**（鼠标滚轮一格 100~120，触控板连发小 delta 会攒着走；只用正负号，不然一滚就飞到底），`preventDefault()` 挡住页面滚动；停手 200ms 清掉余量。**验证**：`0 ℃` 滚一格 → `rt`（已存盘）。**探针注意**：Vue 是异步渲染的，`dispatchEvent` 之后**同步**读 `.ruler-item.is-on` / `style` 拿到的是旧值，看起来像「没生效」——要等一拍（`setTimeout`）再读。
