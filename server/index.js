@@ -2694,13 +2694,17 @@ route('GET', '/api/experiments/:id', async (req, res, params) => {
   ok(res, { experiment: exp });
 });
 
-/** 反应式缓存：`{ sig, svg }`，没有就 null（结构改过 / 对不上指纹的旧缓存当没有） */
+/**
+ * 反应式缓存：`{ sig, svg, fp, stale }`，没有就 null。
+ * 指纹对不上（结构 / 上一步改过）时**也把旧图给它**、只标 `stale`：
+ * 前端先贴这张、后台重画再换，这样切换记录时不会先空一下（用户报过「切换实验反应式会闪」）。
+ */
 function readSchemeCache(id) {
   const row = db.prepare('SELECT sig, svg, fp FROM scheme_cache WHERE exp_id = ?').get(id);
-  if (!row) return null;
+  if (!row || !row.svg) return null;
   const fp = schemeFp(id);
-  if (String(row.fp || '') !== fp) return null;
-  return { sig: row.sig, svg: row.svg, fp };
+  const stale = String(row.fp || '') !== fp;
+  return { sig: row.sig, svg: row.svg, fp: row.fp || '', stale };
 }
 
 /**

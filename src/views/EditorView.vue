@@ -401,11 +401,13 @@ function fill(e) {
   if (fixReagentRows(rows)) notify();   // 分子量 / 密度被补上，顺手存一次（导出 / 列表才跟页面对得上）
   // 服务端存着上次画好的那张：数据没变（sig 一样）就直接贴上去，连重画都省了
   const cache = e.scheme_cache;
-  if (cache && cache.sig === liveSig.value) {
+  if (cache && cache.svg) {
+    // 先把它贴出来：**哪怕这张已经旧了**（`stale`）也先贴——切换记录时先空一下、
+    // 再冒出来，看着就是「闪」（用户报过）。旧的马上会被重画那张换掉。
     liveScheme.value = cache.svg;
     liveSigShown.value = cache.sig;
-    // 服务端已经核过结构指纹了；这里记下来，化合物库读进来后对得上就不再重画
     liveFpShown.value = cache.fp || '';
+    if (cache.sig !== liveSig.value || cache.stale) scheduleLive(0);
   } else {
     liveScheme.value = '';
     liveSigShown.value = '';
@@ -1067,6 +1069,8 @@ const liveFp = computed(() => {
   return out.join('|');
 });
 const liveFpShown = ref('');
+/* 正在画这张图：没有旧图可贴的时候，反应式格子里先别冒出「点击上传」那行提示 */
+const liveDrawing = ref(false);
 
 /* ---------- 两步反应：一条记录接在「上一步」后面 ---------- */
 const prevExp = ref(null);      // 上一步那条记录（id / code / title）
@@ -1193,6 +1197,7 @@ async function drawLive() {
       liveFpShown.value = '';
       return;
     }
+    liveDrawing.value = true;
     const stage = (p) => ({
       reactants: p.reactants,
       reactantIds: p.reactantIds,
@@ -1218,12 +1223,14 @@ async function drawLive() {
     liveScheme.value = svg;
     liveSigShown.value = sig;
     liveFpShown.value = fpUsed ?? '';
+    liveDrawing.value = false;
     api.saveSchemeCache(id, { sig, svg }).catch(() => {});   // 存不下也不影响显示
   } catch {
     if (exp.value?.id === id) {
       liveScheme.value = '';
       liveSigShown.value = '';
       liveFpShown.value = '';
+      liveDrawing.value = false;
     }
   }
 }
@@ -2236,6 +2243,7 @@ const openAttachment = (id) => {
             :on-sketch="openSchemePad"
             :on-from-table="schemeFromTable"
             :live-svg="liveScheme"
+            :busy="liveDrawing"
             :chain="chainInfo"
             @open-prev="openRecord"
             @open-next="openRecord"

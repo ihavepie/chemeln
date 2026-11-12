@@ -82,3 +82,8 @@
 - **箭头上只排一行**（用户：「然后反应式箭头上最好不要两行」）。以前两处会摞两行：①`expScheme` 的 `MAX_ABOVE_LINES = 2`（第一行装不下就把剩下的排第二行）②`scheme.js` 的 `wrapPhrases(..., maxLines=2)`（一行字超过 250px 就折成两行）。现在：**箭头上只排一行**——`MAX_ABOVE_LINES = 1`（装不下的试剂直接挪到箭头下方，跟「放不下的那几行」原来那条路一起）、`caps(list, 1)`（不折行），`MAX_ARROW` 320 → 360 让一行字放得下（再长也是截在 360，字稍微出箭头两头一点点，比摞两行好看）。箭头**下面**还是最多两行（溶剂 / 温度 + 放不下的试剂）。
   `SCHEME_SIG_VERSION` v11 → **v12**：出图规则改了，旧缓存必须失效，否则还是贴两行那版。
   验证（只读探针）：SJ-2-1（LDA + BnBr）单行 `LDA (1.2 eq), BnBr (1.2 eq)`；SJ-2-11（TsNH2 + Cs2CO3）单行；合成的「四个带当量试剂」那种 → 一行排开、箭头跟着变长（约 300px），下面仍是 `THF, -78 °C, 12 h`。
+- **切换记录时反应式会闪一下**（用户：「每次切换实验，反应式都会闪烁」）。用 60ms 轮询记 `.scheme-live` 的 innerHTML 长度，实测出两种情况：
+  ①**缓存能对上**（同一套出图规则、结构没改）→ 切过去是 0ms 直接换图，**本来就不闪**（`len 30590 → 20848`，中间没有 0）；
+  ②**缓存对不上**（结构改过 / 出图规则改过，例如我刚把 sig 升到 v12）→ `fill()` 走 else 分支把 `liveScheme` 清空，格子里先冒出「点击上传反应式」那行灰字，过 240–800ms 才画出新图 —— **这才是用户看到的闪**。
+  改法：**旧的也先贴**（stale-while-revalidate）。服务端 `readSchemeCache` 指纹对不上时不再返回 null，而是照给 `{sig, svg, fp, stale: true}`；前端 `fill()` 只要有 `cache.svg` 就先贴上去（记下它的 sig / fp），`stale` 或 sig 不同再 `scheduleLive(0)` 在后台重画，画完悄悄换掉；同时给 `SchemeBlock` 一个 `busy` 标记，**正在画的时候格子空着就空着**，别让「点击上传」那行提示闪（`.scheme-slot.is-busy .scheme-empty { visibility: hidden }`）。
+  验证：把 `scheme_cache.fp` 全部清空（模拟「全都不新鲜」）再连切 4 条记录，日志里只有 `len X → Y`、**没有一次 `→ 0`**，`empty` 那一项也一直是 `-`（提示行没出现）；单独开一条 stale 记录，6 秒后 `fp` 被重画写回（fplen=55）。踩了一个坑：新加的状态名 `liveBusy` 跟 `renderLive` 的单飞标志重名，Vite 直接报 `Identifier 'liveBusy' has already been declared`（整页红屏），改名 `liveDrawing`。

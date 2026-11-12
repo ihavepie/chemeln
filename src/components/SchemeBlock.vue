@@ -12,6 +12,7 @@ const props = defineProps({
   onSketch: Function,
   onFromTable: Function,   // 投料表 + 产物 → 反应式（存成附件，给导出用）
   liveSvg: String,         // 按投料表算出来的那张图（inline SVG，不落盘；有它就显示它）
+  busy: Boolean,           // 正在画：这时候空着就空着，别闪「点击上传」那行提示
   // 两步反应那条链：`{ step, prev:{id,code}, next:[{id,code}], join }`，没接就是 null
   chain: { type: Object, default: null },
 });
@@ -76,7 +77,7 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
     </div>
     <div
       class="scheme-slot"
-      :class="{ 'is-hover': hovered === 'scheme', has: !!liveSvg || !!scheme }"
+      :class="{ 'is-hover': hovered === 'scheme', has: !!liveSvg || !!scheme, 'is-busy': busy && !liveSvg }"
       @mouseenter="onHover('scheme')"
       @mouseleave="onHover('')"
       @click="onPick('scheme')"
