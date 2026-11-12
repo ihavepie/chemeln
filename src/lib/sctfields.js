@@ -52,8 +52,17 @@ export function autoValue(source, exp, base, cond) {
   if (source === 'variation') {
     // 这一行是记录「条件组」里的某个条件：用它自己的变量取值（或手写的「改了什么」）
     if (cond) {
-      const vals = Object.values(cond.vars || {}).map((v) => String(v || '').trim()).filter(Boolean);
+      // 变量取值 + 这个条件自己的当量（会变的话）：`dppe 1.0 eq` / `−40 °C`
+      const eqs = cond.varEq || {};
+      const keys = Object.keys(cond.vars || {}).filter((k) => String((cond.vars || {})[k] || '').trim());
+      const vals = keys.map((k) => {
+        const v = String(cond.vars[k]).trim();
+        const e = String(eqs[k] || '').trim();
+        return e ? `${v} ${e}` : v;
+      });
       if (vals.length) return vals.join(' · ');
+      const onlyEq = Object.values(eqs).map((v) => String(v || '').trim()).filter(Boolean);
+      if (onlyEq.length) return onlyEq.join(' · ');
       return String(cond.label || '').trim() || 'same';
     }
     if (!base || base.id === exp.id) return 'none';

@@ -226,12 +226,12 @@ function parseFieldVars(text) {
 }
 
 /** 条件组里每条条件的「变量取值」：`{L:'XPhos', T:'−40 °C'}`（键短、值短，别塞大段文字） */
-function normalizeCondVars(obj) {
+function normalizeCondVars(obj, maxLen = 120) {
   if (!obj || typeof obj !== 'object') return {};
   const out = {};
   for (const [k, v] of Object.entries(obj).slice(0, 6)) {
     const key = str(k).slice(0, 8);
-    const val = str(v).slice(0, 120);
+    const val = str(v).slice(0, maxLen);
     if (key && val) out[key] = val;
   }
   return out;
@@ -258,8 +258,11 @@ function normalizeConds(list) {
       sel: str(o.sel).slice(0, 60),                      // 「94:6」「99% ee」这种，手填
       note: str(o.note).slice(0, 200),
       vars: normalizeCondVars(o.vars),   // 每个变量的取值（L / T / t…）
+      varEq: normalizeCondVars(o.varEq, 24),   // 「筛当量」：这个候选用自己的当量（空 = 用投料表的标准当量）
     };
-  }).filter((c) => c.label || c.yield_pct !== null || c.sel || c.note || Object.keys(c.vars).length);
+  }).filter(
+    (c) => c.label || c.yield_pct !== null || c.sel || c.note || Object.keys(c.vars).length || Object.keys(c.varEq).length
+  );
 }
 
 function normalizeExperiment(input) {

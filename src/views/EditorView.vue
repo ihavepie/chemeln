@@ -203,6 +203,7 @@ function fill(e) {
   fields.product_compound_id = e.product_compound_id ?? null;
 
   applyKindBlocks(String(e.kind || ''));
+
   fieldVars.value = (Array.isArray(e.field_vars) ? e.field_vars : []).map((v) => ({ key: v.key, label: v.label || v.key }));
   conds.value = (Array.isArray(e.conds) ? e.conds : []).map((c) => ({
     label: c.label || '',
@@ -210,6 +211,7 @@ function fill(e) {
     sel: c.sel || '',
     note: c.note || '',
     vars: { ...(c.vars || {}) },
+    varEq: { ...(c.varEq || {}) },
   }));
 
   const raw = Array.isArray(e.steps) ? e.steps : [];
@@ -248,6 +250,8 @@ function fill(e) {
   reagent.steps = list;
   reagent.rows = rows;
   ensureSolventRow();     // 老记录：溶剂还在字段里 → 补成投料表的一行
+  // **必须在 rows / conds 都装好之后**再收编（早一步是上一条记录的数据，会白忙一场）
+  collapseVarRows();
   markLoaded();
   if (fixReagentRows(rows)) notify();   // 分子量 / 密度被补上，顺手存一次（导出 / 列表才跟页面对得上）
   // 服务端存着上次画好的那张：数据没变（sig 一样）就直接贴上去，连重画都省了
@@ -506,13 +510,45 @@ function payload() {
       sel: c.sel || '',
       note: c.note || '',
       vars: Object.fromEntries(Object.entries(c.vars || {}).filter(([, v]) => String(v || '').trim())),
+      varEq: Object.fromEntries(Object.entries(c.varEq || {}).filter(([, v]) => String(v || '').trim())),
     }));
   return body;
 }
 
 /** 条件组：加一行 / 删一行（删除前把焦点那格的值也一并丢掉） */
+/**
+ * 同一变量槽只该留一行（`Cat [Cat]`）：老数据里可能已经躺着两行（用户截图里那个红框）。
+ * 打开记录时把第 2 行起收进条件组（名字当候选），并从投料表删掉；改名 / 加行的实时收编
+ * 在 `ReagentTable.maybePromote` 里（那条是用户手动加行时触发）。
+ */
+function collapseVarRows() {
+  const seen = new Map();   // slot → 第一个占用它的行
+  const drop = [];
+  for (const r of reagent.rows) {
+    const slot = String(r.variable || '').trim();
+    if (!slot) continue;
+    if (!seen.has(slot)) {
+      seen.set(slot, r);
+      continue;
+    }
+    const name = String(r.name || '').trim();
+    if (name) {
+      const has = conds.value.some((c) => String((c.vars || {})[slot] || '').trim() === name);
+      if (!has) conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name }, varEq: {} });
+    }
+    drop.push(r);
+  }
+  if (!drop.length) return;
+  for (const r of drop) {
+    const i = reagent.rows.indexOf(r);
+    if (i >= 0) reagent.rows.splice(i, 1);
+  }
+  toast(`同一变量槽只留一行：多出来的 ${drop.length} 行已收进条件组当候选`, 'ok');
+  notify();
+}
+
 function addCond() {
-  conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: {} });
+  conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: {}, varEq: {} });
   notify();
 }
 function removeCond(i) {
@@ -530,7 +566,7 @@ async function undoSave(ev) {
   reagent.base = prev.base_mmol ?? null;
   if (Array.isArray(prev.steps) && prev.steps.length) reagent.steps = prev.steps.map((x) => ({ ...x }));
   if (Array.isArray(prev.reagents)) reagent.rows = prev.reagents.map((r) => toRow(r));
-  if (Array.isArray(prev.conds)) conds.value = prev.conds.map((c) => ({ ...c, vars: { ...(c.vars || {}) } }));
+  if (Array.isArray(prev.conds)) conds.value = prev.conds.map((c) => ({ ...c, vars: { ...(c.vars || {}) }, varEq: { ...(c.varEq || {}) } }));
   if (Array.isArray(prev.field_vars)) fieldVars.value = prev.field_vars.map((v) => ({ ...v }));
   notify();
   try {
@@ -889,7 +925,7 @@ function syncVarCandidates() {
     for (const name of names) {
       const has = conds.value.some((c) => String((c.vars || {})[slot] || '').trim() === name);
       if (has) continue;
-      conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name } });
+      conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name }, varEq: {} });
       added = true;
     }
   }
@@ -1662,13 +1698,24 @@ const openAttachment = (id) => {
                   <td class="cond-idx">{{ i + 1 }}</td>
                   <template v-if="condVars.length">
                     <td v-for="v in condVars" :key="v.key">
-                      <input
-                        v-model="c.vars[v.ph]"
-                        class="cond-in"
-                        :disabled="exp.locked"
-                        :placeholder="v.ph === 'T' ? '−40 °C' : v.ph === 't' ? '6 h' : v.ph === 'L' ? 'XPhos' : v.ph"
-                        @input="notify()"
-                      />
+                      <span class="cond-var-cell">
+                        <input
+                          v-model="c.vars[v.ph]"
+                          class="cond-in"
+                          :disabled="exp.locked"
+                          :placeholder="v.ph === 'T' ? '−40 °C' : v.ph === 't' ? '6 h' : v.ph === 'L' ? 'XPhos' : v.ph"
+                          @input="notify()"
+                        />
+                        <!-- 当量也能作为变量（筛当量：10% / 20% / 1.0 eq…）；空着就用投料表的标准当量 -->
+                        <input
+                          v-model="c.varEq[v.ph]"
+                          class="cond-eq"
+                          :disabled="exp.locked"
+                          :title="`${v.ph} 这个条件用的当量（空 = 用投料表的标准当量）`"
+                          placeholder="eq"
+                          @input="notify()"
+                        />
+                      </span>
                     </td>
                   </template>
                   <td v-else>

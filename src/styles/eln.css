@@ -8013,3 +8013,22 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   cursor: pointer;
 }
 .var-cands:hover { color: var(--accent-ink); }
+
+/* 条件组每一格里「候选名 + 当量」并排：当量那格窄一点、淡一点（空着就用投料表的标准当量） */
+.cond-var-cell { display: flex; align-items: center; gap: 4px; }
+.cond-var-cell .cond-in { flex: 0 1 auto; min-width: 90px; max-width: 240px; }
+.cond-eq {
+  flex: 0 0 46px;
+  width: 46px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  padding: 3px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: right;
+}
+.cond-eq:hover { background: #f8f7f2; }
+.cond-eq:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
