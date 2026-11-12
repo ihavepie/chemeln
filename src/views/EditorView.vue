@@ -19,7 +19,7 @@ import HistoryModal from '../components/HistoryModal.vue';
 import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
-import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, reagentDict } from '../store.js';
+import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
 import { sheetPrefs, setSheetPref, showAllSheetBlocks, SHEET_BLOCKS } from '../lib/sheetprefs.js';
 import { KINDS, RXN_TYPES, KIND_BLOCKS } from '../lib/kind.js';
@@ -141,7 +141,58 @@ const varCandidates = computed(() => {
 });
 const condsEl = ref(null);
 function scrollToConds() {
-  condsEl.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  condsEl.value?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+/** 变量行的占位提示（跟以前条件表一样，按槽猜一个例句） */
+function varPlaceholder(v) {
+  if (v.ph === 'T') return '−40 °C';
+  if (v.ph === 't') return '6 h';
+  if (v.ph === 'L') return 'XPhos';
+  if (v.ph === 'atm') return 'N2 / 空气';
+  return v.ph;
+}
+
+/**
+ * 一行「变量」的分子量 / 当量 / mmol / 用量。
+ * 只有「一个变量槽」时才算得出来（多个槽一行里混着几样东西，数字没意义，就写 —）。
+ */
+function varInfo(c) {
+  const empty = { mw: null, mmol: null, amount: '—' };
+  const slot = condVars.value.length === 1 ? condVars.value[0] : null;
+  if (!slot) return empty;
+  const name = String(c.vars?.[slot.ph] || '').trim().toLowerCase();
+  if (!name) return empty;
+  let mw = null;
+  const cmp = compoundDict().find((x) => String(x.name || '').trim().toLowerCase() === name || String(x.code || '').trim().toLowerCase() === name);
+  if (cmp && cmp.mw != null) mw = Number(cmp.mw);
+  if (mw == null) {
+    const d = reagentDict().find((x) => String(x.name || '').trim().toLowerCase() === name);
+    if (d && d.mw != null) mw = Number(d.mw);
+  }
+  const eq = eqNum(c.varEq?.[slot.ph]);
+  const base = num(reagent.base) || 0;
+  const mmol = eq != null && base ? round(base * eq, 4) : null;
+  let amount = '—';
+  if (mw != null && mmol != null) amount = amountText(derive({ role: '试剂', mw, mmol, density: null, conc: null })) || '—';
+  return { mw, mmol, amount };
+}
+/** 变量行（连下标 / 算好的数一起给模板） */
+const varRows = computed(() => conds.value.map((c, i) => ({ c, i, info: varInfo(c) })));
+/** 结果块里那一行「这个条件改了什么」 */
+function condWhat(c) {
+  const parts = [];
+  for (const v of condVars.value) {
+    const val = String(c.vars?.[v.ph] || '').trim();
+    if (val) parts.push(`[${v.ph}] ${val}`);
+  }
+  if (parts.length) return parts.join(' · ');
+  return String(c.label || '').trim() || '（还没填变量）';
+}
+function setVarEq(c, ph, v) {
+  if (!c.varEq) c.varEq = {};
+  c.varEq[ph] = v;
+  notify();
 }
 
 const condVars = computed(() => {
@@ -1666,96 +1717,115 @@ const openAttachment = (id) => {
                 @toggle-var="toggleFieldVar"
               />
             </template>
-          </ReagentTable>
 
-          <ResultBlock
-            v-if="sheetPrefs.result"
-            ref="resBlock"
-            :model="fields"
-            :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)" />
-
-          <!-- 条件组：一次筛选批次里的 N 个条件。一行一个条件，只写「改了什么」+ 结果；
-               投料表 / 操作 / TLC 是整条记录共享的（一起做的、一起点的板）。
-               没有条件时只露一行「＋ 加条件」，不占平常记录的版面。 -->
-          <section v-if="sheetPrefs.conds" ref="condsEl" class="sec sec-tight cond-group">
-            <div class="sec-head">
-              <h3>条件组</h3>
-              <span v-if="conds.length" class="cond-count">{{ conds.length }} 个条件</span>
-              <span v-if="condVars.length" class="cond-vars">
-                变量
-                <span v-for="v in condVars" :key="v.key" class="cond-var" :title="v.src ? `来自：${v.src}` : ''">
-                  [{{ v.ph }}]
-                </span>
-              </span>
-              <span class="spacer" />
-              <button v-if="!exp.locked" type="button" class="cond-add" @click="addCond">＋ 加条件</button>
-            </div>
-            <table v-if="conds.length" class="cond-table">
-              <thead>
-                <tr>
-                  <th class="cond-idx">#</th>
-                  <template v-if="condVars.length">
-                    <th v-for="v in condVars" :key="v.key">[{{ v.ph }}]</th>
-                  </template>
-                  <th v-else>改了什么</th>
-                  <th class="cond-num">产率 %</th>
-                  <th class="cond-num">选择性</th>
-                  <th>备注</th>
-                  <th class="cond-del" />
+            <!-- 变量：接在投料表合计线下面、用一条虚线隔开——一行一个条件，只写「换了什么」；
+                 产率 / 选择性在下面的结果块里，别混在这张投料表里 -->
+            <template #vars>
+              <template v-if="sheetPrefs.conds">
+                <tr ref="condsEl" class="rt-vars-head" :class="{ noprint: !conds.length }">
+                  <td class="grip-cell" />
+                  <td colspan="8">
+                    <div class="vars-head">
+                      <span class="vars-lbl">变量</span>
+                      <span class="vars-rule" />
+                      <span v-if="!conds.length" class="vars-hint">要筛条件就一行一个</span>
+                      <button v-if="!exp.locked" type="button" class="vars-add" @click="addCond">＋ 加变量</button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(c, i) in conds" :key="i">
-                  <td class="cond-idx">{{ i + 1 }}</td>
-                  <template v-if="condVars.length">
-                    <td v-for="v in condVars" :key="v.key">
-                      <span class="cond-var-cell">
+                <tr v-for="row in varRows" :key="`v${row.i}`" class="rt-var">
+                  <td class="grip-cell" />
+                  <td class="var-slot-cell">
+                    <span v-if="!condVars.length" class="var-slot">变量</span>
+                    <span v-for="v in condVars" :key="v.key" class="var-slot">[{{ v.ph }}]</span>
+                  </td>
+                  <td class="var-name-cell">
+                    <span v-if="condVars.length" class="var-vals">
+                      <template v-for="(v, vi) in condVars" :key="v.key">
+                        <span v-if="vi" class="var-val-sep">·</span>
                         <CondCand
-                          v-model="c.vars[v.ph]"
+                          v-model="row.c.vars[v.ph]"
                           :role="v.role || ''"
                           :cands="varCandidates[v.ph] || []"
                           :disabled="exp.locked"
-                          :placeholder="v.ph === 'T' ? '−40 °C' : v.ph === 't' ? '6 h' : v.ph === 'L' ? 'XPhos' : v.ph"
-                          @pick="(it) => pickCondCand(c, v.ph, it)"
+                          :placeholder="varPlaceholder(v)"
+                          @pick="(it) => pickCondCand(row.c, v.ph, it)"
                         />
-                        <!-- 当量也能作为变量（筛当量：10% / 20% / 1.0 eq…）；空着就用投料表的标准当量 -->
-                        <input
-                          v-model="c.varEq[v.ph]"
-                          class="cond-eq"
-                          :disabled="exp.locked"
-                          :title="`${v.ph} 这个条件用的当量（空 = 用投料表的标准当量）`"
-                          placeholder="eq"
-                          @input="notify()"
-                        />
-                      </span>
-                    </td>
-                  </template>
-                  <td v-else>
+                      </template>
+                    </span>
                     <input
-                      v-model="c.label"
+                      v-else
+                      v-model="row.c.label"
                       class="cond-in"
                       :disabled="exp.locked"
                       placeholder="−40 °C / LDA 1.2 eq / DCM 代替 THF"
                       @input="notify()"
                     />
                   </td>
-                  <td class="cond-num">
-                    <input v-model="c.yield_pct" class="cond-in is-num" type="number" min="0" max="100" step="1" :disabled="exp.locked" placeholder="—" @input="notify()" />
+                  <td class="n var-mw">{{ row.info.mw != null ? round(row.info.mw, 2) : '—' }}</td>
+                  <td class="n var-eq">
+                    <input
+                      v-if="condVars.length === 1"
+                      class="cond-eq"
+                      :value="row.c.varEq?.[condVars[0].ph] ?? ''"
+                      :disabled="exp.locked"
+                      placeholder="—"
+                      :title="`这个条件的当量（空 = 用投料表里的标准当量）`"
+                      @input="setVarEq(row.c, condVars[0].ph, $event.target.value)"
+                    />
+                    <span v-else>—</span>
                   </td>
-                  <td class="cond-num">
-                    <input v-model="c.sel" class="cond-in" :disabled="exp.locked" placeholder="94:6 / 99% ee" @input="notify()" />
-                  </td>
-                  <td>
-                    <input v-model="c.note" class="cond-in" :disabled="exp.locked" placeholder="（选填）" @input="notify()" />
-                  </td>
-                  <td class="cond-del">
-                    <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个条件" @click="removeCond(i)">×</button>
+                  <td class="n var-mmol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</td>
+                  <td class="n var-amt">{{ row.info.amount }}</td>
+                  <td />
+                  <td class="noprint">
+                    <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个变量" @click="removeCond(row.i)">×</button>
                   </td>
                 </tr>
-              </tbody>
-            </table>
-            <p v-else class="cond-hint">一次筛多个条件时用这张小表：一行一个条件，投料表 / 操作 / TLC 共用。</p>
-          </section>
+              </template>
+            </template>
+          </ReagentTable>
+
+          <ResultBlock
+            v-if="sheetPrefs.result"
+            ref="resBlock"
+            :model="fields"
+            :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)"
+          >
+            <template #conds>
+              <div v-if="conds.length && sheetPrefs.conds" class="condres">
+                <span class="condres-lbl">各条件结果</span>
+                <div v-for="(c, i) in conds" :key="`r${i}`" class="condres-row">
+                  <span class="condres-n mono">{{ i + 1 }}</span>
+                  <span class="condres-what">{{ condWhat(c) }}</span>
+                  <label class="condres-f">
+                    <span>产率</span>
+                    <input
+                      v-model="c.yield_pct"
+                      class="condres-in condres-num"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      :disabled="exp.locked"
+                      placeholder="—"
+                      @input="notify()"
+                    />
+                    <span class="condres-u">%</span>
+                  </label>
+                  <label class="condres-f is-wide">
+                    <span>选择性</span>
+                    <input v-model="c.sel" class="condres-in" :disabled="exp.locked" placeholder="94:6 / 99% ee" @input="notify()" />
+                  </label>
+                  <label class="condres-f is-note">
+                    <span>备注</span>
+                    <input v-model="c.note" class="condres-in" :disabled="exp.locked" placeholder="（选填）" @input="notify()" />
+                  </label>
+                </div>
+              </div>
+            </template>
+          </ResultBlock>
+
 
         </article>
 

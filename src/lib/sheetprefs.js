@@ -13,7 +13,7 @@ export const SHEET_BLOCKS = {
   literature: '文献',
   scheme: '反应式',
   reagents: '投料表 + 条件',
-  conds: '条件组（一次筛选里的多个条件）',
+  conds: '变量 / 各条件结果（投料表下面那几行）',
   result: '结果与选择性',
   tlc: 'TLC',
   procedure: '一 · 实验操作与现象',

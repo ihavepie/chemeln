@@ -1269,15 +1269,9 @@ function onDrop(ev) {
 
               </td>
               <td class="name-cell" @click="pinPreview(r)">
-                <!-- 变量行：这格不放「具体试剂」，只放占位符 + 候选摘要（详细信息在下面的条件组里） -->
-                <span
-                  v-if="r.variable"
-                  class="var-cands"
-                  :title="(varCandidates[r.variable] || []).length ? `候选：${(varCandidates[r.variable] || []).join(' / ')}（详细在下面的条件组）` : '还没有候选：在下面的条件组里填'"
-                  @click.stop="emit('focus-var', r.variable)"
-                >{{ (varCandidates[r.variable] || []).join(' / ') || '（条件组里填候选）' }}</span>
+                <!-- 变量行：这格写「标准条件」用的那个试剂（跟同一行的 MW / 当量 对得上）；
+                     要换的几个候选在投料表下面那条虚线以下，一格一个 -->
                 <input
-                  v-else
                   data-f="name"
                   :value="r.name"
                   :title="r.compound_id && cmpById(r.compound_id) ? `${r.name}（库里 ${cmpById(r.compound_id).code || '无编号'}）` : r.name || ''"
@@ -1403,6 +1397,8 @@ function onDrop(ev) {
             </div>
           </td>
         </tr>
+        <!-- 变量（一次筛选里换的那几样）：接在合计线下面，跟投料表同一套格子 -->
+        <slot name="vars" />
         <tr v-if="!locked" class="rtable-add noprint">
           <td colspan="9">
             <div class="add-cell">

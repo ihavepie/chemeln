@@ -8077,3 +8077,116 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .condc-name { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .condc-sub { margin-left: auto; flex: 0 0 auto; font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
 .condc-none { margin: 0; padding: 8px; font-size: 12px; color: var(--ink-4); }
+
+/* ── 变量（条件）改成「投料表的续篇」 ──────────────────────────────────
+   用户要的是笔记本那张纸的样子：标准条件照常写投料表，换的那几样接在合计线
+   下面、用一条虚线断开，产率不混在这张表里（挪到结果块）。所以这里全部走
+   `.rtable` 的同一套格子（列宽由原表的 colgroup 给），只把字号 / 间隔压轻。 */
+.sheet .rtable tr.rt-vars-head > td { padding: 0; border: 0; }
+.vars-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px 3px;
+}
+.vars-lbl {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-4);
+  flex: 0 0 auto;
+}
+.vars-rule {
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 1px dashed var(--line-2);
+}
+.vars-hint { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-4); }
+.vars-add {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  padding: 1px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.vars-add:hover { color: var(--accent); }
+
+/* 变量行：跟上面投料行一样高，但整体淡一档（纸上是「续写」不是「又一张表」） */
+.sheet .rtable tr.rt-var > td { padding: 2px 4px; vertical-align: middle; }
+.sheet .rtable tr.rt-var + tr.rt-var > td { border-top: 1px dotted #efeee9; }
+.sheet .rtable tr.rt-var td.n { text-align: right; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.sheet .rtable tr.rt-var td.var-slot-cell { white-space: nowrap; }
+.var-slot {
+  display: inline-block;
+  margin-right: 3px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 15px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.sheet .rtable tr.rt-var td.var-name-cell { position: relative; }
+.var-vals { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.var-val-sep { color: var(--ink-4); font-size: 11px; }
+.sheet .rtable tr.rt-var .cond-in { font-size: 12.5px; }
+.sheet .rtable tr.rt-var .cond-eq { text-align: right; }
+
+/* 结果块里的「各条件结果」：变量在投料表下面，数字在这儿 */
+.condres { margin-top: 8px; padding-top: 7px; border-top: 1px dotted var(--line-2); }
+.condres-lbl { display: block; font-size: 10px; letter-spacing: 0.12em; color: var(--ink-4); margin-bottom: 3px; }
+.condres-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 1px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.condres-n { flex: 0 0 16px; font-size: 10px; color: var(--ink-4); }
+.condres-what {
+  flex: 1 1 130px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-1);
+}
+.condres-f { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; color: var(--ink-4); font-size: 10.5px; }
+.condres-f.is-wide .condres-in { width: 112px; }
+/* 备注吃剩下的宽度：一行的信息量刚好塞得下，不会把「备注」挤到第二行 */
+.condres-f.is-note { flex: 1 1 88px; min-width: 70px; }
+.condres-f.is-note .condres-in { width: 100%; }
+.condres-in {
+  width: 46px;
+  height: 21px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-1);
+  text-align: left;
+}
+.condres-num { width: 40px; text-align: right; font-family: var(--mono); }
+.condres-in:hover { background: #f8f7f2; }
+.condres-in:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
+.condres-u { font-size: 10.5px; color: var(--ink-4); }
+/* 「各条件结果」这几个小格：标签别折行、数字输入也别露出系统步进箭头 */
+.condres-f > span { white-space: nowrap; }
+.condres-f.is-note { flex: 1 1 120px; min-width: 96px; }
+.condres-in[type='number'] { -moz-appearance: textfield; }
+.condres-in[type='number']::-webkit-outer-spin-button,
+.condres-in[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* 「备注」让宽度自己缩（窄屏也留在一行里），条件多的时候结果块才不会翻倍变高 */
+.condres-f.is-note { flex: 0 1 96px; min-width: 56px; }
+/* 一行放得下的最小基准宽：摘要 100 / 选择性 104 / 备注 84（合计 456 < 纸面内宽），
+   再宽了就由「摘要」那格吸收，窄屏才会折行 */
+.condres-what { flex: 1 1 100px; }
+.condres-f.is-wide .condres-in { width: 104px; }
+.condres-f.is-note { flex: 0 1 84px; min-width: 46px; }

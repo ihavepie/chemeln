@@ -234,5 +234,8 @@ function onYieldInput(ev) {
       </div>
       <div class="hint" style="margin-top: 10px">选中后将带入名称与分子量，本实验亦与该化合物建立关联。</div>
     </AppModal>
+
+    <!-- 一次筛好几个条件时，每个条件的产率 / 选择性放在这里（变量在投料表下面） -->
+    <slot name="conds" />
   </section>
 </template>
