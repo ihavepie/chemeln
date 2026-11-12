@@ -156,8 +156,9 @@ export function amountText(r) {
     // 用量一律按**克**写（跟合计那行的 `固体 0.0977 g` 对得上）；只有不到 1 mg 才退回 mg
     const g = mg / 1000;
     if (AMOUNT_DEC()) {
-      // 固定位数：小到 0 了才退回 mg
-      const t = trimZeros(g.toFixed(AMOUNT_DEC()));
+      // 固定位数：**尾零留着**（2.671 → 2.6710）—— 设了四位就是四位，称量精度本身是信息，
+      // 补零后整列的数位也对得齐；只有小到 0 了才退回 mg
+      const t = g.toFixed(AMOUNT_DEC());
       return Number(t) > 0 ? `${t} g` : `${dec(mg, 2)} mg`;
     }
     if (g >= 1) return `${round(g, 2)} g`;
