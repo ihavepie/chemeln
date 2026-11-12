@@ -87,3 +87,9 @@
   ②**缓存对不上**（结构改过 / 出图规则改过，例如我刚把 sig 升到 v12）→ `fill()` 走 else 分支把 `liveScheme` 清空，格子里先冒出「点击上传反应式」那行灰字，过 240–800ms 才画出新图 —— **这才是用户看到的闪**。
   改法：**旧的也先贴**（stale-while-revalidate）。服务端 `readSchemeCache` 指纹对不上时不再返回 null，而是照给 `{sig, svg, fp, stale: true}`；前端 `fill()` 只要有 `cache.svg` 就先贴上去（记下它的 sig / fp），`stale` 或 sig 不同再 `scheduleLive(0)` 在后台重画，画完悄悄换掉；同时给 `SchemeBlock` 一个 `busy` 标记，**正在画的时候格子空着就空着**，别让「点击上传」那行提示闪（`.scheme-slot.is-busy .scheme-empty { visibility: hidden }`）。
   验证：把 `scheme_cache.fp` 全部清空（模拟「全都不新鲜」）再连切 4 条记录，日志里只有 `len X → Y`、**没有一次 `→ 0`**，`empty` 那一项也一直是 `-`（提示行没出现）；单独开一条 stale 记录，6 秒后 `fp` 被重画写回（fplen=55）。踩了一个坑：新加的状态名 `liveBusy` 跟 `renderLive` 的单飞标志重名，Vite 直接报 `Identifier 'liveBusy' has already been declared`（整页红屏），改名 `liveDrawing`。
+- **补正：不要「旧图→新图」，切记录就应该是 0ms 直达**（用户：「所以就不能把正常的先存附件里，然后直接取吗，不要其他的旧的占位，不然感觉还是闪烁，就是从旧的闪到新的」）。
+  **先说清楚一件事**：画好的那张反应式**本来就存在服务器上**（`scheme_cache` 里就是完整 SVG，跟存附件是一回事），打开记录时随 `/api/experiments/:id` 一起回来，直接贴——不重画、不重新加载图片。上一条加的「先贴旧图、后台重画」（stale-while-revalidate）不干了：用户说得对，从旧图换成新图照样是闪。
+  现在的规则：**只认「就是现在这份数据画的」那份缓存**（`stale === false && sig 一致`）→ 直接贴、一次都不重画；过期就清空重画，空的那一小段由 `.is-busy` 把「点击上传」那行提示也藏起来（一片纸白，不闪字）。
+  **根因（我自己作的）**：上一条测试时把 `scheme_cache.fp` 全部清空过（`UPDATE scheme_cache SET fp=''`），等于把所有记录都判成「过期」，于是每次切换都走「重画」那条路 —— 用户看到的「从旧闪到新」就是它。现在写了个脚本按服务端的算法（`compoundFp` + `纯文本签名 schemeTextSig` + `prev`）把 9 行缓存指纹全部重算回去。
+  验证：连切 281 → 280 → 286 → 121 → 286，日志里每次只有一次 `len X → Y`（都是**正确那张**），既没有 `→ 0`，`scheme_cache.at` 也一直不变（说明根本没重画）。
+  **教训**：调试缓存别再直接清库里的指纹（会连累用户的全部记录）；要复现过期，用临时记录。

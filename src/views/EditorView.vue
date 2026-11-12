@@ -401,13 +401,13 @@ function fill(e) {
   if (fixReagentRows(rows)) notify();   // 分子量 / 密度被补上，顺手存一次（导出 / 列表才跟页面对得上）
   // 服务端存着上次画好的那张：数据没变（sig 一样）就直接贴上去，连重画都省了
   const cache = e.scheme_cache;
-  if (cache && cache.svg) {
-    // 先把它贴出来：**哪怕这张已经旧了**（`stale`）也先贴——切换记录时先空一下、
-    // 再冒出来，看着就是「闪」（用户报过）。旧的马上会被重画那张换掉。
+  // 只认「这张就是现在这份数据画的」缓存：新鲜的话照贴、一次都不用重画（切换记录 0ms 到位）。
+  // 旧图不贴（用户：「不要旧的那个占位，从旧的闪到新的还是闪」）——真过期了就清空重画，
+  // 这一小段空窗由 `.is-busy` 把「点击上传」那行提示也藏起来。
+  if (cache && cache.svg && !cache.stale && cache.sig === liveSig.value) {
     liveScheme.value = cache.svg;
     liveSigShown.value = cache.sig;
     liveFpShown.value = cache.fp || '';
-    if (cache.sig !== liveSig.value || cache.stale) scheduleLive(0);
   } else {
     liveScheme.value = '';
     liveSigShown.value = '';
