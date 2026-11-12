@@ -1269,7 +1269,14 @@ function onDrop(ev) {
       <slot name="cond" :step="0" />
     </div>
 
-    <table class="rtable" id="rtable">
+    <!-- 一步一张表：每步自带外框和表头，两步各是一个框（用户：别用一个外框把两步包在一起） -->
+    <table
+      v-for="(s, si) in steps"
+      :key="`tb${si}`"
+      class="rtable"
+      :class="{ 'is-step-table': !singleStep }"
+      :id="si === 0 ? 'rtable' : undefined"
+    >
       <colgroup>
         <col class="c-grip" /><col class="c-role" /><col class="c-name" /><col class="c-mw" />
         <col class="c-eq" /><col class="c-mmol" /><col class="c-amt" /><col class="c-note" /><col class="c-del" />
@@ -1284,7 +1291,6 @@ function onDrop(ev) {
         </tr>
       </thead>
       <tbody @drop="onDrop" @dragover.prevent>
-        <template v-for="(s, si) in steps" :key="si">
           <tr
             v-if="showStepHead(s)"
             class="step-head"
@@ -1546,40 +1552,41 @@ function onDrop(ev) {
               </td>
             </tr>
           </template>
-        </template>
-            </tbody>
-      <tfoot>
+      </tbody>
+      <!-- 表尾那排操作只挂在最后一张表下面（它管整条记录，不用每步一份） -->
+      <tfoot v-if="si === steps.length - 1">
         <!-- 原来这里有一行「合计」（规模 / 固体 / 溶剂 / 瓶与磁子 + 右下角算式）。
              用户说没什么用处、圈出来让删，就整行撤了：规模在右上角「反应规模」里本来就有，
              溶剂、用量每行都写着。-> 变量块直接接在最后一条试剂下面。 -->
         <!-- 变量（一次筛选里换的那几样）：接在合计线下面，跟投料表同一套格子 -->
         <slot name="vars" />
-        <tr v-if="!locked" class="rtable-add noprint">
-          <td colspan="9">
-            <div class="add-cell">
-              <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
-              <button class="add-row" @click="addSolvent"><Icon name="plus" :size="12" /> 加溶剂</button>
-              <button class="add-row" title="再开一步：一条记录里连做两步（第二步的产物就是结果块里那个）" @click="addStep">
-                <Icon name="plus" :size="12" /> 加一步
-              </button>
-              <button class="add-row" @click="openLib"><Icon name="flask" :size="12" /> 从试剂库选</button>
-              <button class="add-row" title="按固体 → 液体 → 溶剂重排（会改存盘顺序）" @click="sortByPhase">
-                <Icon name="down" :size="12" /> 按相态整理
-              </button>
-              <button
-                class="add-row"
-                :title="`用量显示：${precLabel}（点一下切：自适应 → 2 → 3 → 4 位）`"
-                @click="cyclePrec"
-              >
-                <Icon name="hash" :size="12" /> {{ precLabel }}
-              </button>
-              <span class="spacer" />
-              <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>
-            </div>
-          </td>
-        </tr>
       </tfoot>
     </table>
+
+    <!-- 表尾那排操作管的是整条记录（加试剂 / 加一步 / 套用配方…），
+         所以放在所有步骤表外面：别跟着最后一步的框一起被圈进去 -->
+    <div v-if="!locked" class="rtable-tools noprint">
+      <div class="add-cell">
+        <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
+        <button class="add-row" @click="addSolvent"><Icon name="plus" :size="12" /> 加溶剂</button>
+        <button class="add-row" title="再开一步：一条记录里连做两步（第二步的产物就是结果块里那个）" @click="addStep">
+          <Icon name="plus" :size="12" /> 加一步
+        </button>
+        <button class="add-row" @click="openLib"><Icon name="flask" :size="12" /> 从试剂库选</button>
+        <button class="add-row" title="按固体 → 液体 → 溶剂重排（会改存盘顺序）" @click="sortByPhase">
+          <Icon name="down" :size="12" /> 按相态整理
+        </button>
+        <button
+          class="add-row"
+          :title="`用量显示：${precLabel}（点一下切：自适应 → 2 → 3 → 4 位）`"
+          @click="cyclePrec"
+        >
+          <Icon name="hash" :size="12" /> {{ precLabel }}
+        </button>
+        <span class="spacer" />
+        <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>
+      </div>
+    </div>
 
     <AppModal v-if="libOpen" :model-value="libOpen" title="从试剂库选一个" :show-footer="false" width="520px" @close="libOpen = false">
       <input v-model="libQ" class="lib-search" placeholder="搜试剂名 / 组分…" spellcheck="false" />
