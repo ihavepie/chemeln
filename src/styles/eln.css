@@ -8231,3 +8231,19 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .vars-head .var-slot { flex: 0 0 auto; }
 .vars-add.vars-drop { color: var(--ink-4); }
 .vars-add.vars-drop:hover { color: var(--accent); }
+
+/* 反应规模从投料表右上角挪到「条件」那一行的最后一格：标签在上、值在下，
+   跟 反应温度 / 时间节点 / 气氛 那几格同一个长相（宽度固定，剩下的给前面那五格） */
+.cond-above .cond-f-scale { flex: 0 0 118px; }
+.cond-f-scale .cond-f-val input { text-align: right; padding-right: 30px; }
+.cond-f-unit {
+  position: absolute;
+  right: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  pointer-events: none;
+}
+.cond-f-scale .cond-f-val input::-webkit-outer-spin-button,
+.cond-f-scale .cond-f-val input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cond-f-scale .cond-f-val input { -moz-appearance: textfield; }

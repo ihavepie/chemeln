@@ -1148,17 +1148,28 @@ function onDrop(ev) {
     <div class="block-head">
       <span class="lbl">投料表</span>
       <span class="spacer" />
-      <label class="scale-inline">
-        <span>反应规模</span>
-        <input type="number" step="any" :value="model.base ?? ''" placeholder="0.00" :disabled="locked" @input="setBase($event.target.value)" />
-        <span class="unit">mmol</span>
-      </label>
     </div>
 
     <!-- 「条件」在投料表**上面**：纸质记录里也是先写反应条件、再列投料，少一截来回找 -->
     <div v-if="$slots.cond" class="cond-above">
       <span class="cond-above-label">条件</span>
       <slot name="cond" />
+      <!-- 反应规模：原来是投料表右上角孤零零一格，跟条件那几样放一起更像一回事
+           （它本来就是「这次做多大规模」的条件之一）。计算还归这里：改规模要连带重算每一行的 mmol/用量 -->
+      <label class="cond-f cond-f-scale">
+        <span class="cond-f-label">反应规模</span>
+        <span class="cond-f-val">
+          <input
+            type="number"
+            step="any"
+            :value="model.base ?? ''"
+            placeholder="0.00"
+            :disabled="locked"
+            @input="setBase($event.target.value)"
+          />
+          <span class="cond-f-unit">mmol</span>
+        </span>
+      </label>
     </div>
 
     <table class="rtable" id="rtable">
