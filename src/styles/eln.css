@@ -9103,6 +9103,9 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 
 /* 多步记录：一步一条条件行（第 N 步 + 温度 / 时间 / 气氛…），行与行之间留一点缝 */
 .cond-step { display: flex; align-items: flex-start; gap: 8px; }
+/* 条件那一块本身是个 6 列 grid（给单步那行对齐用）：多步的每一条要自己占满一整行，
+   否则第 2 步会被塞进第 2 列、跟第 1 步挤在同一排 */
+.cond-above .cond-step { grid-column: 1 / -1; }
 .cond-step + .cond-step { margin-top: 6px; padding-top: 6px; border-top: 1px dotted #eeede8; }
 .cond-step-lbl {
   flex: 0 0 auto;
@@ -9116,4 +9119,6 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .cond-step .cond-row { flex: 1 1 auto; min-width: 0; }
 
 /* 多步记录的第 2 步起：条件行不再重复那排小标签（上面那条已经标过了），值跟上一行对齐 */
-.cond-f.no-label .cond-f-label { visibility: hidden; height: 0; overflow: hidden; }
+/* 标签藏起来但**留着高度**：第 2 步起不用再写一遍「反应温度」这些字，
+   但值要跟上一行对齐，读起来才像一张表（高度塌掉的话数字会往上跳一截） */
+.cond-f.no-label .cond-f-label { visibility: hidden; }
