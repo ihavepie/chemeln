@@ -558,3 +558,13 @@
 - 实现位置：`ExpGrid.vue`（`peek` / `peekEnter` / `peekLeave` / `peekItemOf` + 模板末尾的 Teleport 块），样式 `.scheme-peek` 追加在 `eln.css` 末尾。
 - 坑：Vue 里 `@mouseenter="peekEnter($event)"` 的**原生事件过了那一拍 `currentTarget` 就变 null**，必须在入口同步存下元素引用，否则 400ms 后算位置时崩。
 - 验证：用 `jssnap` + 合成 `mouseenter` 截图核对了两处（普通卡片 `SJ-2-1`、平行堆 `SJ-2-2`）——浮层都在、图完整、条件可读。
+
+## 2026-11-12 · 手机端列表也显示「改了什么」胶囊
+
+用户发来桌面中栏展开的平行组截图（组员行上的 `CsOPiv 10 mol% → 1.0 eq` / `P(Cy)3 → RuPhos`），说「手机端也要加上这样的胶囊」。
+
+- **把算法抽出来共用**：`listDiff()`（「相对基准改了什么」）原来写在 `ExpListPane.vue` 里，现在搬到 `src/lib/expDiff.js`（纯逻辑），桌面中栏和手机 `MobileHome` 都 import 它——两边各写一份迟早长歪。`rxnDesc` / `rxnType` 是 UI 小助手，留在组件里。
+- 手机端（`MobileHome.vue`）：按 `group_id` 找出平行组，**基准 = 组里最早那条**（跟桌面同一规则）；每行挂胶囊 `基准` / `重复` / `改：规模` / `相对基准改了什么`（文案直接来自 `listDiff`），行首状态标签旁边再加一颗 `平行 ×N`。
+- **组没取全就不显示胶囊**：手机只拉最近 40 条，基准可能不在这批里，拿错基准比出来的结论是假的（`arr.length >= group_size` 才放行）。
+- 样式：`.phone-chips` + 复用 `.member-diff-item`（字号 10.5px、允许换行）；`基准` 走中性灰、`重复` 更淡，强调色只留给真改动。
+- **踩坑**：抽 `listDiff` 时按「行区间」删的代码块，把夹在中间的 `rxnDesc` / `rxnType` 一起删了 —— 编译期看不出来（模板里只是引用），运行时组件直接渲染失败，**桌面中栏整栏空白**。教训：删区块前先 grep 一下区块内定义的每个标识符还有没有别处用。

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { api } from '../api.js';
 import { STATUS_TONE } from '../lib/ui.js';
 import { round } from '../lib/reagent.js';
+import { listDiff } from '../lib/expDiff.js';
 
 /**
  * 手机端的门：`#/m`。
@@ -53,6 +54,45 @@ const rows = computed(() => {
   return list.value.filter((e) => `${e.code || ''} ${e.title || ''}`.toLowerCase().includes(k));
 });
 
+/** 平行组：同 `group_id` 才算。基准 = 组里最早那条（跟桌面中栏一个规则） */
+const groupOf = computed(() => {
+  const byGid = new Map();
+  for (const e of list.value) {
+    const gid = e.group_id || '';
+    if (!gid) continue;
+    if (!byGid.has(gid)) byGid.set(gid, []);
+    byGid.get(gid).push(e);
+  }
+  const out = new Map();          // 实验 id → { base, size, complete }
+  for (const arr of byGid.values()) {
+    const ordered = [...arr].sort((a, b) => a.id - b.id);
+    const base = ordered[0];
+    const size = Number(base.group_size) || arr.length;
+    for (const e of arr) out.set(e.id, { base, size, complete: arr.length >= size });
+  }
+  return out;
+});
+
+/** 一条记录该挂哪些胶囊：基准 / 重复 / 相对基准改了什么（跟桌面组员行同一套文案） */
+function chipsFor(e, g) {
+  if (!g || g.size < 2) return [];
+  // 手机只取最近 40 条，组没取全时基准可能不在这批里 → 宁可不显示，也别拿错基准比
+  if (!g.complete) return [];
+  if (e.id === g.base.id) return [{ text: '基准', kind: 'base' }];
+  const diffs = listDiff(g.base, e);
+  if (diffs.length) return diffs.map((d) => ({ text: d }));
+  const scaled = String(g.base.base_mmol ?? '') !== String(e.base_mmol ?? '') && e.base_mmol != null;
+  return [{ text: scaled ? '改：规模' : '重复', kind: scaled ? '' : 'repeat' }];
+}
+
+/** 实验列表带上「组大小 + 胶囊」，模板里别反复算 */
+const expRows = computed(() =>
+  rows.value.map((e) => {
+    const g = groupOf.value.get(e.id);
+    return { ...e, groupSize: g && g.size > 1 ? g.size : 0, chips: chipsFor(e, g) };
+  })
+);
+
 const colors = computed(() => cmpList.value.filter((c) => String(c.name || c.code || '').trim()));
 </script>
 
@@ -75,14 +115,25 @@ const colors = computed(() => cmpList.value.filter((c) => String(c.name || c.cod
     <div v-else-if="loading" class="phone-note">读取中…</div>
 
     <ul v-else-if="tab === 'exp'" class="phone-list">
-      <li v-for="e in rows" :key="e.id">
+      <li v-for="e in expRows" :key="e.id">
         <a class="phone-item" :href="`#/e/${e.id}`">
           <span class="phone-item-top">
             <b class="mono">{{ e.code }}</b>
             <span class="tag" :class="STATUS_TONE[e.status]">{{ e.status }}</span>
+            <span v-if="e.groupSize" class="tag plain">
+              平行 ×{{ e.groupSize }}
+            </span>
           </span>
           <span class="phone-item-title">{{ e.title || '（未命名实验）' }}</span>
           <span class="phone-item-sub mono">{{ e.date || '' }}<template v-if="e.reagent_count"> · {{ e.reagent_count }} 行投料</template></span>
+          <span v-if="e.chips.length" class="phone-chips">
+            <span
+              v-for="(c, i) in e.chips"
+              :key="i"
+              class="member-diff-item"
+              :class="c.kind ? `is-${c.kind}` : ''"
+            >{{ c.text }}</span>
+          </span>
         </a>
       </li>
     </ul>

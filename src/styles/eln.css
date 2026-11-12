@@ -7669,3 +7669,26 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: none; }
 }
+
+/* 手机端列表：平行组的胶囊（基准 / 重复 / 改了什么）——
+   跟桌面中栏组员行同一套文案（`lib/expDiff.js`），只是字号放大一档、允许换行。 */
+.phone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.phone-chips .member-diff-item {
+  font-size: 10.5px;
+  line-height: 19px;
+  padding: 0 7px;
+}
+/* 「基准」是同一套条件的锚点，别用强调色；「重复」比基准更淡 */
+.phone-chips .member-diff-item.is-base {
+  color: var(--ink-2);
+  background: #f2f0ea;
+}
+.phone-chips .member-diff-item.is-repeat {
+  color: var(--ink-3);
+  background: #f5f3ee;
+}
