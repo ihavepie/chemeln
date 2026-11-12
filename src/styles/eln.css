@@ -7864,10 +7864,11 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .role-menu .qchip.is-var { flex: 1 1 auto; }
 .role-menu .qchip.is-var[aria-selected='true'] { color: var(--accent-ink); background: var(--accent-soft); }
 
-/* 「变量」那一行：`[L]` 小签放在试剂名左边（组分格太窄，放那儿会把 Lig 挤成 L） */
-.rtable tr.is-var .name-cell { display: flex; align-items: center; gap: 5px; }
-.rtable tr.is-var .name-cell input { flex: 1 1 auto; min-width: 0; }
-.rtable tr.is-var .var-chip { margin-left: 0; flex: 0 0 auto; }
+/* 「变量」那一行：`[L]` 小签放在试剂名左边（组分格太窄，放那儿会把 Lig 挤成 L）。
+   **别在这里写 display:flex** —— td 一旦不是 table-cell，`colspan` 就不参与表格布局了，
+   变量行合并 6 列会失效（只剩自己那一列的宽度、里面的说明被挤成两行，踩过）。 */
+.rtable tr.is-var .name-cell { display: table-cell; vertical-align: middle; }
+.rtable tr.is-var .var-chip { margin-left: 0; }
 
 /* 条件组里的数字格：隐藏 number input 的上下箭头（一行条件表，箭头太吵） */
 .cond-in[type='number'] { -moz-appearance: textfield; }
@@ -8212,3 +8213,15 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   bottom: 15%;
   border-left: 1px dotted var(--line-2);
 }
+
+/* 投料表里的「变量行」现在是一整行的一句话（`[Cat] 变量 · 下面有 3 个候选`）：
+   以前小签挂在组分格下面，把这一行撑成两行；后面 MW/当量/mmol/用量 还留一排空「—」。 */
+.sheet .rtable .var-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.sheet .rtable .var-chip.is-inline { margin-left: 0; }
+.sheet .rtable .var-note-txt { font-size: 11.5px; color: var(--ink-3); }
+.sheet .rtable .var-note:hover .var-note-txt { color: var(--accent-ink); }
