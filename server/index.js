@@ -614,7 +614,11 @@ function listExperiments(query) {
              LIMIT 1) AS preview_id,
            -- 记录页里「按投料表拼好的那张」有没有缓存：有就让卡片直接显示它。
            -- 附件是生成那一刻的快照，改过投料表以后卡片和记录页就对不上了（用户报过）。
-           EXISTS(SELECT 1 FROM scheme_cache c WHERE c.exp_id = e.id) AS has_scheme
+           EXISTS(SELECT 1 FROM scheme_cache c WHERE c.exp_id = e.id) AS has_scheme,
+           -- 这张卡的缩略图是不是「反应式」：是的话卡片墙按「裁剪式」显示（宽图铺满、左边对齐），
+           -- 结构式 / 照片仍然整张缩进框里。前端按 scheme_thumb 判断。
+           (EXISTS(SELECT 1 FROM scheme_cache c WHERE c.exp_id = e.id)
+            OR EXISTS(SELECT 1 FROM attachments a WHERE a.exp_id = e.id AND a.category = 'scheme')) AS scheme_thumb
     FROM experiments e
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY ${order}

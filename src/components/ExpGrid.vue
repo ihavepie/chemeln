@@ -281,7 +281,7 @@ function groupMenu(ev, g) {
                 @click="openCard(card)"
                 @contextmenu="experimentMenu($event, card.it, router, { groupSize: card.members.length })"
               >
-                <div class="grid-thumb">
+                <div class="grid-thumb" :class="{ 'is-scheme': card.it.scheme_thumb }">
                   <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
                   <Icon v-else name="flask" :size="20" class="i-empty" />
                   <span class="stack-badge is-corner" :title="card.members.map((m) => `${m.code} ${m.status}`).join(' / ')">
@@ -321,7 +321,7 @@ function groupMenu(ev, g) {
               @click="openCard(card)"
               @contextmenu="experimentMenu($event, card.it, router)"
             >
-              <div class="grid-thumb">
+              <div class="grid-thumb" :class="{ 'is-scheme': card.it.scheme_thumb }">
                 <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
                 <Icon v-else name="flask" :size="20" class="i-empty" />
                 <!-- 平行组标记钉在缩略图角上：塞进下面那行会把编号/日期挤出去 -->
