@@ -9,7 +9,12 @@ const props = defineProps({
   locked: Boolean,
   /** 由投料表算出来的字段（溶剂 / 浓度）：只显示，不给编辑 */
   fixed: { type: Object, default: () => ({}) },
+  /** 本次筛选把哪些字段当变量：`[{key,label}]`（温度 [T] / 时间 [t] / 气氛 [atm]） */
+  fieldVars: { type: Array, default: () => [] },
 });
+const emit = defineEmits(['toggle-var']);
+/** 这些字段才允许当变量（跟服务端白名单一致：apparatus / light 不是筛选变量） */
+const VAR_KEYS = new Set(['temperature', 'duration', 'atmosphere']);
 
 /** 和下面「结果」那张表同款：一行表头 + 一行值 */
 // 溶剂已经挪进投料表（作为「溶剂」行），浓度不常用就不摆了；
@@ -63,7 +68,20 @@ onBeforeUnmount(() => {
     </colgroup>
     <thead>
       <tr>
-        <th v-for="f in fields" :key="f.key">{{ f.label }}</th>
+        <th v-for="f in fields" :key="f.key">
+          {{ f.label }}
+          <!-- 这一栏当「筛选变量」用：标签旁边一颗小开关，开了就在箭头上写 [T] / [t] / [atm] -->
+          <button
+            v-if="VAR_KEYS.has(f.key) && !locked"
+            type="button"
+            class="cond-var-tog"
+            :class="{ on: fieldVars.some((v) => v.key === f.key) }"
+            :title="fieldVars.some((v) => v.key === f.key) ? '取消这个变量（条件组里对应的列会消失）' : '把这一栏当本次筛选的变量'"
+            @click.stop="emit('toggle-var', f)"
+          >
+            {{ fieldVars.some((v) => v.key === f.key) ? `[${(fieldVars.find((v) => v.key === f.key) || {}).label}]` : '变量' }}
+          </button>
+        </th>
       </tr>
     </thead>
     <tbody>
@@ -72,6 +90,7 @@ onBeforeUnmount(() => {
           <span v-if="f.key in fixed" class="cond-fixed" title="来自投料表">{{ fixed[f.key] || '—' }}</span>
           <template v-else>
             <input
+              :class="{ 'is-var': fieldVars.some((v) => v.key === f.key) }"
               :value="model[f.key]"
               :placeholder="f.ph"
               :disabled="locked"

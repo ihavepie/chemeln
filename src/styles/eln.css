@@ -7888,3 +7888,24 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 }
 .cond-varbtn:hover { color: var(--ink-2); border-color: var(--ink-4); }
 .cond-varbtn.on { color: var(--accent-ink); border-color: transparent; background: var(--accent-soft); }
+
+/* 「条件」那一行里每栏的变量开关（温度 / 时间 / 气氛）：
+   平时是一颗很淡的「变量」小字，开了变成强调色的 `[T]`；顺带把输入框标成变量色，一眼看出这栏在变。 */
+.cond-table th { position: relative; }
+.cond-var-tog {
+  margin-left: 5px;
+  font-family: var(--mono); font-size: 8.5px; line-height: 1;
+  padding: 2px 5px; border-radius: 999px;
+  border: 1px solid transparent; background: transparent;
+  color: #bdb8ae; cursor: pointer;
+  /* 平时就露出来一点（藏起来的话根本不知道这栏能当变量），hover 才变清楚 */
+  opacity: 0.5; transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+.cond-table th:hover .cond-var-tog,
+.cond-var-tog.on,
+.cond-var-tog:focus-visible { opacity: 1; }
+.cond-var-tog:hover { color: var(--ink-2); background: #f4f2ee; }
+.cond-var-tog.on { color: var(--accent-ink); background: var(--accent-soft); }
+/* 变量那一格填的是「标准条件」，但箭头／条件组里显示的是占位符 → 给个淡提示色 */
+.cond-cell input.is-var { color: var(--accent-ink); }
+.cond-cell input.is-var::placeholder { color: #d8c3b6; }

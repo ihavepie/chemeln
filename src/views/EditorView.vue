@@ -92,11 +92,6 @@ const conds = ref([]);
  * 条件组的列、反应式箭头上的占位符（`[L]` / `[T]`）都从这一个来源来。
  */
 const fieldVars = ref([]);   // [{key:'temperature', label:'T'}]
-const COND_FIELDS = [
-  { key: 'temperature', label: '温度', ph: '−40 °C' },
-  { key: 'duration', label: '时间', ph: '6 h' },
-  { key: 'atmosphere', label: '气氛', ph: 'N₂' },
-];
 const condVars = computed(() => {
   const out = [];
   for (const r of reagent.rows) {
@@ -107,7 +102,6 @@ const condVars = computed(() => {
   for (const f of fieldVars.value) out.push({ key: `f:${f.key}`, ph: f.label, label: f.label, src: f.key });
   return out;
 });
-const varLabel = computed(() => condVars.value.map((v) => `[${v.ph}]`).join(' '));
 function toggleFieldVar(f) {
   const i = fieldVars.value.findIndex((v) => v.key === f.key);
   if (i >= 0) fieldVars.value.splice(i, 1);
@@ -1488,7 +1482,14 @@ const openAttachment = (id) => {
 
           <ReagentTable v-if="sheetPrefs.reagents" :model="reagent" :notify="notify" :locked="exp.locked" @recipe="openRecipe">
             <template #cond>
-              <CondRow :model="fields" :notify="notify" :locked="exp.locked" :fixed="condFixed" />
+              <CondRow
+                :model="fields"
+                :notify="notify"
+                :locked="exp.locked"
+                :fixed="condFixed"
+                :field-vars="fieldVars"
+                @toggle-var="toggleFieldVar"
+              />
             </template>
           </ReagentTable>
 
@@ -1510,19 +1511,6 @@ const openAttachment = (id) => {
                 <span v-for="v in condVars" :key="v.key" class="cond-var" :title="v.src ? `来自：${v.src}` : ''">
                   [{{ v.ph }}]
                 </span>
-              </span>
-              <span v-if="!exp.locked" class="cond-varbtns">
-                <button
-                  v-for="f in COND_FIELDS"
-                  :key="f.key"
-                  type="button"
-                  class="cond-varbtn"
-                  :class="{ on: fieldVars.some((v) => v.key === f.key) }"
-                  :title="fieldVars.some((v) => v.key === f.key) ? `取消「${f.label}」变量` : `把「${f.label}」当本次筛选的变量`"
-                  @click="toggleFieldVar(f)"
-                >
-                  {{ fieldVars.some((v) => v.key === f.key) ? `− ${f.label}` : `＋ ${f.label}` }}
-                </button>
               </span>
               <span class="spacer" />
               <button v-if="!exp.locked" type="button" class="cond-add" @click="addCond">＋ 加条件</button>
