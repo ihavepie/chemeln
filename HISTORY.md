@@ -45,3 +45,4 @@
   `ResultBlock` 不再看 `kind` 字符串，改收 `yieldDefault` / `showSel` 两个 prop；`ReagentTable` 收 `showCheck`；`useSheetBlocks(kind)` 一次把块和功能两套都灌进去。
   **踩了个 TDZ 坑**：`sheetFx = reactive({...fxDefaultsFor('')})` 在模块初始化时就跑，而 `fxDefaultsFor` 里要读 `SHEET_KINDS`——那段被放在 `SHEET_KINDS` 之前，于是整站白屏（`Cannot access uninitialized variable`，用 `_probe-err.html` 抓到的）。顺序改成 `SHEET_KINDS` → `normKind` → `SHEET_FX/fxDefaultsFor/sheetFx`。
   验证：设置里选「原料」勾上「计产率」→ 打开 SJ-2-10，产率格变成可填的「自动」；再取消「计产率」「选择性测定」→ 表头回到「不计」、产率格禁用、`.res-sel` 那行消失，`sheetFx` 存成 `{"原料":{"yield":false,"sel":false,"check":true}}`。`ui_prefs` 白名单补了 `sheetFx` / `reagentPrec`。
+- **条件行去掉「长得像真值」的占位文字**：用户圈着投料表上面那条条件行说「不要这些灰色占位字符，有误导」——那几格原本有 `placeholder`：`−78 ℃` / `8:45 → 15:11` / `N₂，封管` / `封管 / Schlenk / 微波` / `365 nm / 蓝光 LED`，灰字放在那儿看着像已经填过。现在五格 `ph` 全清空（`CondRow` 的 `fields`），只剩上方的小标签 + 右边那个出候选的小箭头；空着就空着，点一下照样能选。验证：SJ-2-10 的条件行 `placeholder` 全是 `''`、页面上没有灰字。

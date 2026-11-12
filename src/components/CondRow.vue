@@ -23,12 +23,15 @@ const VAR_KEYS = new Set(['temperature', 'duration', 'atmosphere']);
 /** 和下面「结果」那张表同款：一行表头 + 一行值 */
 // 溶剂已经挪进投料表（作为「溶剂」行），浓度不常用就不摆了；
 // 两个字段还在（导出/打印读得到，投料表里有溶剂行时会自动算出来）
+// **不给占位文字**：以前这几格的 placeholder 长得跟真值一模一样（「−78 ℃」「8:45 → 15:11」
+// 「N₂，封管」…），灰字放在那儿很容易被当成已经填了 —— 用户说「有误导」。
+// 每格上面本来就有标签（反应温度 / 时间节点 / …），空着就空着，右边小箭头照样能点出候选。
 const fields = [
-  { key: 'temperature', label: '反应温度', ph: '−78 ℃', cls: 'ct-temp ct-temp-wide' },
-  { key: 'duration', label: '时间节点', ph: '8:45 → 15:11', cls: 'ct-time' },
-  { key: 'atmosphere', label: '气氛 / 容器', ph: 'N₂，封管', cls: 'ct-atm' },
-  { key: 'apparatus', label: '装置 / 器皿', ph: '封管 / Schlenk / 微波', cls: 'ct-app' },
-  { key: 'light', label: '光照 / 波长', ph: '365 nm / 蓝光 LED', cls: 'ct-light' },
+  { key: 'temperature', label: '反应温度', ph: '', cls: 'ct-temp ct-temp-wide' },
+  { key: 'duration', label: '时间节点', ph: '', cls: 'ct-time' },
+  { key: 'atmosphere', label: '气氛 / 容器', ph: '', cls: 'ct-atm' },
+  { key: 'apparatus', label: '装置 / 器皿', ph: '', cls: 'ct-app' },
+  { key: 'light', label: '光照 / 波长', ph: '', cls: 'ct-light' },
 ];
 
 const open = ref('');
