@@ -116,6 +116,21 @@ function pickKind(v) {
  * 条件组的列、反应式箭头上的占位符（`[L]` / `[T]`）都从这一个来源来。
  */
 const fieldVars = ref([]);   // [{key:'temperature', label:'T'}]
+/** 每个变量槽在条件组里有几个候选（投料表那行显示「N 个候选」用） */
+const varCounts = computed(() => {
+  const m = {};
+  for (const c of conds.value) {
+    for (const [k, v] of Object.entries(c.vars || {})) {
+      if (String(v || '').trim()) m[k] = (m[k] || 0) + 1;
+    }
+  }
+  return m;
+});
+const condsEl = ref(null);
+function scrollToConds() {
+  condsEl.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
 const condVars = computed(() => {
   const out = [];
   for (const r of reagent.rows) {
@@ -1576,8 +1591,10 @@ const openAttachment = (id) => {
             :model="reagent"
             :notify="notify"
             :locked="exp.locked"
+            :var-counts="varCounts"
             @recipe="openRecipe"
             @promote-var="promoteVarCandidate"
+            @focus-var="scrollToConds"
           >
             <template #cond>
               <CondRow
@@ -1600,7 +1617,7 @@ const openAttachment = (id) => {
           <!-- 条件组：一次筛选批次里的 N 个条件。一行一个条件，只写「改了什么」+ 结果；
                投料表 / 操作 / TLC 是整条记录共享的（一起做的、一起点的板）。
                没有条件时只露一行「＋ 加条件」，不占平常记录的版面。 -->
-          <section v-if="sheetPrefs.conds" class="sec sec-tight cond-group">
+          <section v-if="sheetPrefs.conds" ref="condsEl" class="sec sec-tight cond-group">
             <div class="sec-head">
               <h3>条件组</h3>
               <span v-if="conds.length" class="cond-count">{{ conds.length }} 个条件</span>

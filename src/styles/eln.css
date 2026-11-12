@@ -7980,3 +7980,22 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   gap: 1px;
 }
 .kind-opt-menu .rxn-opt { text-align: left; }
+
+/* 投料表变量行：「[Cat]」后面那颗「N 个候选」小签——点一下滚到条件组，
+   让「投料表留占位、候选在条件表」这件事一眼可见 */
+.var-count {
+  flex: 0 0 auto;
+  font-family: var(--mono); font-size: 9px; line-height: 15px;
+  padding: 0 6px; border-radius: 999px; border: 1px solid transparent;
+  background: transparent; color: var(--ink-4); cursor: pointer; white-space: nowrap;
+}
+.var-count:hover { background: #f4f2ee; color: var(--ink-2); }
+
+/* 变量小签上的候选数：`[Cat]×3`（点一下跳到条件组，双击取消变量） */
+.var-chip { border: 0; cursor: pointer; }
+.var-chip-n { margin-left: 3px; font-size: 9px; color: var(--ink-3); }
+
+/* 变量小签挂在「组分」格里、角色输入下面**另起一行**（试剂名那格只有 ~110px，
+   小签放那儿会把名字挤成「Pd((」）。这一行因此比其他行高一点，只有变量行会这样。 */
+.rtable .role-wrap + .var-chip { margin: 2px 0 0 0; }
+.rtable tr.is-var .role-cell { padding-top: 4px; padding-bottom: 4px; }

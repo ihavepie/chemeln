@@ -14,8 +14,10 @@ const props = defineProps({
   model: { type: Object, required: true },
   notify: { type: Function, required: true },
   locked: { type: Boolean, default: false },
+  /** 每个变量槽在条件组里有几个候选：`{Cat: 3}` —— 变量行后面显示「N 个候选」 */
+  varCounts: { type: Object, default: () => ({}) },
 });
-const emit = defineEmits(['recipe', 'promote-var']);
+const emit = defineEmits(['recipe', 'promote-var', 'focus-var']);
 
 const roleMenuFor = ref(-1);
 
@@ -1195,6 +1197,14 @@ function onDrop(ev) {
                     <Icon name="down" :size="11" />
                   </button>
                 </div>
+                <button
+                  v-if="r.variable"
+                  type="button"
+                  class="var-chip"
+                  :title="`这一组分是变量：反应式上写成 [${r.variable}]；条件组里有 ${varCounts[r.variable] || 0} 个候选（点一下跳过去，双击取消变量）`"
+                  @click.stop="emit('focus-var', r.variable)"
+                  @dblclick.stop="toggleVariable(r)"
+                >[{{ r.variable }}]<span v-if="varCounts[r.variable]" class="var-chip-n">×{{ varCounts[r.variable] }}</span></button>
                 <!-- 点菜单空白处也算「有反应」：直接关掉，别让那一下像是没点到 -->
                 <div v-if="roleMenuFor === rows.indexOf(r)" class="qmenu role-menu" :class="{ up: roleMenuUp }" @click.stop="closeRoleMenu">
                   <button
@@ -1222,12 +1232,6 @@ function onDrop(ev) {
 
               </td>
               <td class="name-cell" @click="pinPreview(r)">
-                <span
-                  v-if="r.variable"
-                  class="var-chip"
-                  :title="`这一组分是变量：反应式上写成 [${r.variable}]，条件组每行填它的取值`"
-                  @click.stop="toggleVariable(r)"
-                >[{{ r.variable }}]</span>
                 <input
                   data-f="name"
                   :value="r.name"
