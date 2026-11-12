@@ -1,3 +1,5 @@
+import { ref } from 'vue';
+
 /** 投料表用到的纯计算 —— 不碰 DOM，方便以后写测试。 */
 
 export const ROLES = ['底物', '试剂', '催化剂', '配体', '碱', '添加剂', '氧化剂', '还原剂', '溶剂', '其他'];
@@ -111,15 +113,33 @@ export const densityUsable = (r) =>
       ? saneDensity(r && r.density)
       : null;
 
+/**
+ * 用量的显示精度：`0` = 自适应（按量级 2 / 3 / 4 位，老行为）；`2` / `3` / `4` = 最多这么多位小数。
+ * 用户要过「这边需要小数点后四位」——称量时 4.9625 g 和 4.96 g 是两回事。
+ * 存在页面设置里（`uiprefs` 的 `reagentPrec`），投料表按钮上能现改。
+ */
+// 用 ref 而不是普通变量：投料表那个「小数位」按钮要跟着它重新渲染
+const amountDecRef = ref(0);
+const AMOUNT_DEC = () => amountDecRef.value;
+export const amountDecimals = () => amountDecRef.value;
+export const setAmountDecimals = (n) => {
+  const v = Number(n);
+  amountDecRef.value = [0, 2, 3, 4].includes(v) ? v : 0;
+  return amountDecRef.value;
+};
+/** 小数位固定时：`toFixed` 后去掉多余的 0（12.3400 → 12.34，4.9625 还是 4.9625） */
+const trimZeros = (s) => (s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s);
+const dec = (v, autoDec) => trimZeros(Number(v).toFixed(AMOUNT_DEC() || autoDec));
+
 export function amountText(r) {
   const mmol = num(r.mmol);
   const conc = num(r.conc);
-  if (conc && mmol) return `${round(mmol / conc, 2)} mL`;
+  if (conc && mmol) return `${dec(mmol / conc, 2)} mL`;
   // 记着体积的（溶剂行、或者你自己按 µL / mL 量的那几行）就按体积显示：
   // **够 1 mL 写 mL，不够的写 µL**（HFIP 41 µL 这种，写 0.041 mL 没法量）
   const ulStored = num(r.volume_ul);
   if (ulStored !== null && ulStored > 0 && num(r.mass_mg) === null) {
-    return ulStored >= 1000 ? `${round(ulStored / 1000, 2)} mL` : `${round(ulStored, ulStored >= 20 ? 0 : 1)} µL`;
+    return ulStored >= 1000 ? `${dec(ulStored / 1000, 2)} mL` : `${dec(ulStored, ulStored >= 20 ? 0 : 1)} µL`;
   }
   const mg = num(r.mass_mg);
   // 0 就是「没填」：老代码遇到空 mmol 会算成 0 mg，再按密度折成 0 µL 显示出来（演示站踩到）
@@ -129,19 +149,24 @@ export function amountText(r) {
     const d = densityUsable(r);
     if (d) {
       const ml = mg / d / 1000;
-      if (ml >= 1) return `${round(ml, 2)} mL`;
+      if (ml >= 1) return `${dec(ml, 2)} mL`;
       const ul = ml * 1000;
-      return ul >= 20 ? `${round(ul, 0)} µL` : `${round(ul, 1)} µL`;
+      return ul >= 20 ? `${dec(ul, 0)} µL` : `${dec(ul, 1)} µL`;
     }
     // 用量一律按**克**写（跟合计那行的 `固体 0.0977 g` 对得上）；只有不到 1 mg 才退回 mg
     const g = mg / 1000;
+    if (AMOUNT_DEC()) {
+      // 固定位数：小到 0 了才退回 mg
+      const t = trimZeros(g.toFixed(AMOUNT_DEC()));
+      return Number(t) > 0 ? `${t} g` : `${dec(mg, 2)} mg`;
+    }
     if (g >= 1) return `${round(g, 2)} g`;
     if (g >= 0.1) return `${round(g, 3)} g`;
     if (g >= 0.001) return `${round(g, 4)} g`;
     return `${round(mg, 2)} mg`;
   }
   const ul = num(r.volume_ul);
-  if (ul !== null) return `${round(ul / 1000, 2)} mL`;
+  if (ul !== null) return `${dec(ul / 1000, 2)} mL`;
   return '';
 }
 
@@ -149,7 +174,7 @@ export function amountText(r) {
 export const volText = (ul) => {
   const v = num(ul);
   if (v === null || v <= 0) return '';
-  return v >= 1000 ? `${round(v / 1000, 2)} mL` : `${round(v, v >= 20 ? 0 : 1)} µL`;
+  return v >= 1000 ? `${dec(v / 1000, 2)} mL` : `${dec(v, v >= 20 ? 0 : 1)} µL`;
 };
 
 /** 试剂库里「用法」小签上的字：溶剂写用量，其余写当量 */

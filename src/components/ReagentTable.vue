@@ -5,7 +5,8 @@ import AppModal from './AppModal.vue';
 import { toast, confirm as confirmDialog } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqLabel, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, variantText, vesselHint, volText } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountDecimals, amountText, derive, eqLabel, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, setAmountDecimals, totals, variantText, vesselHint, volText } from '../lib/reagent.js';
+import { uiSetIfChanged } from '../lib/uiprefs.js';
 import { compoundDict, reagentDict, store } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
@@ -251,6 +252,27 @@ const phaseRank = (r) => {
 const rowsOf = (i) => rows.value.filter((r) => r.step === i + 1);
 /** 画出来的行：变量行被「挪到」投料表下面的变量块里，这里就不再画（数据还在，取消变量就回来） */
 const shownRows = (i) => rowsOf(i).filter((r) => !(props.dropVarRows && r.variable));
+
+/**
+ * 「用量」显示几位小数：自适应(0) → 2 → 3 → 4 循环。
+ * 按量级自适应用来看，称量时 4.9625 g 和 4.96 g 是两回事（用户要过 4 位）。
+ * 存在页面设置里（`reagentPrec`），改完把每行重算一遍，页面上立刻变。
+ */
+const PREC_STEPS = [0, 2, 3, 4];
+const precLabel = computed(() => {
+  const n = amountDecimals();
+  return n ? `${n} 位小数` : '自适应';
+});
+function cyclePrec() {
+  const cur = amountDecimals();
+  const next = PREC_STEPS[(PREC_STEPS.indexOf(cur) + 1) % PREC_STEPS.length];
+  setAmountDecimals(next);
+  uiSetIfChanged('reagentPrec', next);
+  // 只重排「用量」的写法：每行都 syncAmount 一遍（recomputeAll 会跳过第一行，第一行的量就不跟着变）
+  for (const r of rows.value) syncAmount(r);
+  props.notify();
+  toast(next ? `用量显示 ${next} 位小数` : '用量按量级自适应（2 / 3 / 4 位）', 'ok', 1800);
+}
 
 /** 按相态整理：每一步内部「固体 → 液体 → 溶剂」，同相态之间保持现有顺序 */
 function sortByPhase() {
@@ -1505,6 +1527,13 @@ function onDrop(ev) {
               <button class="add-row" @click="openLib"><Icon name="flask" :size="12" /> 从试剂库选</button>
               <button class="add-row" title="按固体 → 液体 → 溶剂重排（会改存盘顺序）" @click="sortByPhase">
                 <Icon name="down" :size="12" /> 按相态整理
+              </button>
+              <button
+                class="add-row"
+                :title="`用量显示：${precLabel}（点一下切：自适应 → 2 → 3 → 4 位）`"
+                @click="cyclePrec"
+              >
+                <Icon name="hash" :size="12" /> {{ precLabel }}
               </button>
               <span class="spacer" />
               <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>

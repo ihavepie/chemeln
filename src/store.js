@@ -1,6 +1,7 @@
 import { reactive } from 'vue';
 import { api } from './api.js';
 import { onUiMerged, uiGet, uiMerge, uiSetIfChanged } from './lib/uiprefs.js';
+import { setAmountDecimals } from './lib/reagent.js';
 
 /** 当前课题存在 localStorage：刷新页面还留在同一个「空间」里。
  *  这一项**故意不进「页面设置」的同步**——那是「这台机器上我正想看哪个课题」，
@@ -69,8 +70,12 @@ export function setGroup(kind, mode) {
   uiSetIfChanged(GROUP_KEY, store.groups);
 }
 
+// 投料表「用量」显示几位小数（0 = 按量级自适应）：存 uiprefs，开机先按本地的套上
+setAmountDecimals(uiGet('reagentPrec', 0));
+
 // 开机合并后回灌（另一台机器改过视图/分组的话，这一页也跟着换）
 onUiMerged(() => {
+  setAmountDecimals(uiGet('reagentPrec', 0));
   const v = readViews();
   if (JSON.stringify(v) !== JSON.stringify(store.views)) store.views = v;
   const g = readGroups();
