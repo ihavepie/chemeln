@@ -1274,9 +1274,9 @@ function onDrop(ev) {
         <col class="c-grip" /><col class="c-role" /><col class="c-name" /><col class="c-mw" />
         <col class="c-eq" /><col class="c-mmol" /><col class="c-amt" /><col class="c-note" /><col class="c-del" />
       </colgroup>
-      <!-- 列头整张表只有一条：两步的列一模一样，每步再抄一遍那排小字只是噪音
-           （两张表靠「第 N 步」那条虚线和各自的投料行分开） -->
-      <thead>
+      <!-- 单步：一条表头带着整张表；一步以上：表头属于「这一步的投料行」，
+           所以每条表在自己的条件行下面各带一份（见下面 step-cols） -->
+      <thead v-if="singleStep">
         <tr>
           <th class="grip-cell" />
           <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
@@ -1339,12 +1339,20 @@ function onDrop(ev) {
             </td>
           </tr>
 
-          <!-- 一步以上：这一步的条件行紧贴着自己的投料行（用户：条件表和投料表一起，两步分别一个） -->
-          <tr v-if="!singleStep && $slots.cond" class="step-cond-row">
-            <td colspan="9">
-              <div class="cond-above"><slot name="cond" :step="si" /></div>
-            </td>
-          </tr>
+          <!-- 一步以上：这一步的条件行 + 这一步自己的表头，都只包裹这一步的投料行
+               （用户：表头不要连条件一起包进去，分步各来一个表头） -->
+          <template v-if="!singleStep">
+            <tr v-if="$slots.cond" class="step-cond-row">
+              <td colspan="9">
+                <div class="cond-above"><slot name="cond" :step="si" /></div>
+              </td>
+            </tr>
+            <tr class="step-cols">
+              <th class="grip-cell" />
+              <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
+              <th class="n">当量</th><th class="n">mmol</th><th class="n">用量</th><th>说明</th><th class="noprint" />
+            </tr>
+          </template>
 
           <template v-if="!collapsed.has(si)">
             <tr

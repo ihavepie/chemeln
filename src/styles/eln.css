@@ -9116,17 +9116,17 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .step-cond-row .cond-f-val input { font-size: 11.5px; padding: 2px 4px; }
 /* 每一步的条件行不再挂「变量」小开关：筛条件的变量是整条记录的事，多步里摆两遍只是噪音 */
 .step-cond-row .cond-var-tog { display: none; }
-/* 每一步自己的列头：不铺色带，只留一条细线和那排小字（两张表各一份，铺底色会连成三道横杠） */
+/* 每一步自己的表头：它就是「这一步的投料行」的表头（条件行在上面、不在它包的范围内），
+   所以跟顶部那条同一套字和底色，只把上下 padding 压小，两张表别各多出一条厚带 */
 .sheet .rtable tr.step-cols > th {
-  background: transparent;
-  border-top: 1px solid #eeede7;
-  border-bottom: none;
-  font-size: 8.5px;
-  font-weight: 400;
-  color: #9a978f;
+  background: #f0eee6;
+  border-top: 1px solid #e6e2d7;
+  border-bottom: 1px solid #ddd9cf;
   padding-top: 3px;
   padding-bottom: 3px;
 }
+/* 步骤头上面那条虚线：表头已经把它和投料行隔开了，这里只留一点缝 */
+.sheet .rtable tr.step-head[data-step] .step-cell { padding-bottom: 0 !important; }
 /* 两张表之间留一点空：上一张表最后一行 → 虚线 → 下一张的「第 N 步」 */
 .sheet .rtable tr.step-head[data-step]:not([data-step='1']) .step-line { margin-top: 9px; }
 /* 多步的「第 N 步」：一条虚线 + 一个小签，别再有右边那截格子（产物已经挪到结果表里） */
