@@ -18,6 +18,7 @@ import CatPick from '../components/CatPick.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
+import ProductBind from '../components/ProductBind.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
@@ -29,12 +30,13 @@ import { confirm, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, eqLabel, eqNum, mwText, num, round, saneDensity, volText } from '../lib/reagent.js';
 import { buildReportCard, reportCardCss } from '../lib/reportcard.js';
 import { downloadBlob } from '../lib/print.js';
-import { schemeParts } from '../lib/expScheme.js';
+import { schemeParts, productSmilesOf } from '../lib/expScheme.js';
 import { preloadSchemeLib } from '../lib/scheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
 import { composeSchemeSvg } from '../lib/scheme.js';
+import { analyzeSmiles, svgToFile } from '../lib/chem.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -1218,6 +1220,105 @@ async function applyRecipe() {
   notify();
 }
 
+/** 绑定产物：弹窗里三条路（反应式里读 / 库里挑 / 画一个），都落到「product_compound_id + 名称 + MW」 */
+const productBindOpen = ref(false);
+const productSketchOpen = ref(false);
+function openProductBind() {
+  moreMenu.value = false;
+  productBindOpen.value = true;
+}
+
+/** 绑定库里已有的那个：名称和分子量跟着库走（同名不同 MW 的老坑就在这儿） */
+function bindProduct(c) {
+  if (!c) return;
+  fields.product_compound_id = c.id;
+  if (c.name || c.code) fields.product_name = c.name || c.code;
+  if (num(c.mw) !== null) fields.product_mw = round(c.mw, 2);
+  productBindOpen.value = false;
+  notify();
+  toast(`已绑定 ${c.code || c.name}；名称和分子量按库里那份`);
+}
+
+/** 用一条结构（反应式里读出来的 / 画板画回来的）新建化合物并绑定 */
+async function createProductFromStructure({ smiles, svg, formula, mw, name, mol } = {}) {
+  if (!exp.value) return;
+  const s = String(smiles || '').trim();
+  let fm = formula || '';
+  let m = num(mw);
+  if (s && (!fm || m === null)) {
+    const a = await analyzeSmiles(s);
+    if (a) {
+      fm = fm || a.formula || '';
+      if (m === null) m = a.mw ?? null;
+      svg = svg || a.svg || '';
+    }
+  }
+  const c = await api.createCompound({
+    code: '',
+    name: String(name || '').trim() || `${exp.value.code} 产物`,
+    kind: '产物',
+    project: fields.project || '',
+    standard_exp_id: exp.value.id,
+    smiles: s,
+    mol: mol || '',
+    formula: fm,
+    mw: m,
+  });
+  if (svg) {
+    const fd = new FormData();
+    fd.append('file', svgToFile(svg), '结构式.svg');
+    fd.append('category', 'structure');
+    await api.uploadCompoundFile(c.id, fd);
+  }
+  await loadBoot();
+  fields.product_compound_id = c.id;
+  fields.product_name = c.name || '';
+  if (num(c.mw) !== null) fields.product_mw = round(c.mw, 2);
+  productBindOpen.value = false;
+  notify();
+  toast(`建好了 ${c.code || c.name}，已绑定到这条记录`);
+}
+
+function drawProduct() {
+  productBindOpen.value = false;
+  productSketchOpen.value = true;
+}
+
+async function onProductPicked({ smiles, mol, svg, info }) {
+  productSketchOpen.value = false;
+  try {
+    await createProductFromStructure({
+      smiles: smiles || info?.smiles || '',
+      mol: mol || '',
+      svg: svg || '',
+      formula: info?.formula || '',
+      mw: info?.mw ?? null,
+      name: fields.product_name || '',
+    });
+  } catch (e) {
+    toast(e.message || '没能建化合物', 'err');
+  }
+}
+
+/** 给一个化合物补上「产物结构」那张图（从反应式里的产物 SMILES 算；没有就跳过） */
+async function attachProductStructure(compoundId) {
+  const smiles = productSmilesOf(fields.scheme_smiles);
+  if (!smiles || !compoundId) return false;
+  const a = await analyzeSmiles(smiles);
+  if (!a || !a.svg) return false;
+  const fd = new FormData();
+  fd.append('file', svgToFile(a.svg), '结构式.svg');
+  fd.append('category', 'structure');
+  await api.uploadCompoundFile(compoundId, fd);
+  return true;
+}
+
+/** 老的「产物存库」：连表征 / TLC / 操作一起搬一份档案（弹窗底部那条小字） */
+function archiveProduct() {
+  productBindOpen.value = false;
+  void saveToCompound();
+}
+
 async function saveToCompound() {
   moreMenu.value = false;
   const ok = await confirm({
@@ -1229,6 +1330,8 @@ async function saveToCompound() {
   try {
     const c = await api.compoundFromExperiment(exp.value.id);
     fields.product_compound_id = c.id;
+    // 顺手补一张真·结构图：从反应式里的产物 SMILES 算（以前是把整张反应式搬过去当结构图，不对）
+    await attachProductStructure(c.id).catch(() => {});
     await loadBoot();
     toast(`已存入化合物库：${c.code || c.name || '新化合物'}`);
   } catch (e) {
@@ -1692,7 +1795,7 @@ const openAttachment = (id) => {
             <button @click="duplicate(); moreMenu = false"><Icon name="copy" :size="13" /> 复制</button>
             <button @click="undoSave()"><Icon name="undo" :size="13" /> 撤销上次保存</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验</button>
-            <button @click="saveToCompound()"><Icon name="molecule" :size="13" /> 产物存库</button>
+            <button @click="openProductBind()"><Icon name="molecule" :size="13" /> 绑定产物…</button>
             <div class="menu-sep" />
             <button class="menu-danger" @click="removeExperiment(); moreMenu = false">
               <Icon name="trash" :size="13" /> 移入回收站
@@ -2207,6 +2310,27 @@ const openAttachment = (id) => {
       :initial="schemePadSeed || fields.scheme_rxn || ''"
       @close="schemeSketcherOpen = false"
       @pick="applySketchScheme"
+    />
+
+    <!-- 画产物结构（绑定产物的第三条路）：单结构模式，跟反应式那个画板互不相干 -->
+    <SketcherModal
+      :open="productSketchOpen"
+      mode="molecule"
+      :initial="''"
+      @close="productSketchOpen = false"
+      @pick="onProductPicked"
+    />
+
+    <ProductBind
+      v-if="productBindOpen && exp"
+      :model="fields"
+      :exp-code="exp.code"
+      :locked="exp.locked"
+      @close="productBindOpen = false"
+      @bind="bindProduct"
+      @create="(info) => createProductFromStructure(info).catch((e) => toast(e.message || '没能建化合物', 'err'))"
+      @draw="drawProduct"
+      @archive="archiveProduct"
     />
 
     <PrintPanel

@@ -34,6 +34,19 @@ function label(r, c) {
  * 投料表 → `{ reactants, product, prodName, above, below }`。
  * 缺结构式的项留空字符串，由调用方决定提示什么（记录页要弹 toast，筛选表只是不画图）。
  */
+/**
+ * 反应式文本里 `>>` 后面那段＝产物 SMILES（取第一个片段；空就是没有）。
+ * 两条画法都往 `scheme_smiles` 写这个格式：「按投料表生成」写 `底物>>产物`，
+ * 画板画的反应式也写 `反应物>>产物`。「绑定产物」靠它把产物结构读出来。
+ */
+export function productSmilesOf(schemeSmiles) {
+  const s = String(schemeSmiles || '');
+  const i = s.lastIndexOf('>>');
+  if (i < 0) return '';
+  const tail = s.slice(i + 2).split('>')[0];
+  return (tail.split('.')[0] || '').trim();
+}
+
 export function schemeParts(model, compounds) {
   const lib = compounds || [];
   const byId = new Map(lib.map((c) => [Number(c.id), c]));

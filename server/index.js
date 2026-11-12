@@ -1557,10 +1557,12 @@ function compoundFromExperiment(expId, { copyFiles = true } = {}) {
   if (copyFiles) {
     const dir = path.join(COMPOUND_DIR, String(id));
     fs.mkdirSync(dir, { recursive: true });
-    const wanted = new Set(['scheme', 'h1', 'c13', 'nmr_other', 'nmr_raw', 'nmr_pdf', 'tlc']);
+    // 别再把「反应式」那张图当产物的结构图搬过去（整条反应 ≠ 一个结构）。
+    // 结构图由前端从产物 SMILES 算出来 / 画板画出来后单独上传。
+    const wanted = new Set(['h1', 'c13', 'nmr_other', 'nmr_raw', 'nmr_pdf', 'tlc']);
     for (const a of exp.attachments) {
       if (!wanted.has(a.category)) continue;
-      const category = a.category === 'scheme' ? 'structure' : a.category;
+      const category = a.category;
       const newRow = db
         .prepare(
           `INSERT INTO compound_files(compound_id, category, filename, original_name, size, mime, is_dir, note, created_at)

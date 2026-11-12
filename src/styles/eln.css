@@ -8659,3 +8659,64 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   background: #f7f0ea;
   border-color: rgba(168, 71, 31, 0.32);
 }
+
+/* ---------- 「绑定产物」弹窗 ----------
+   三条路各一小节；①里那张结构图直接用算出来的 SVG（不套外框），挑库那栏复用 .recipe-* */
+.pbind { display: flex; flex-direction: column; gap: 14px; }
+.pbind-now {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  padding-bottom: 10px;
+  border-bottom: 1px dotted var(--line-2);
+}
+.pbind-lbl {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.pbind-bound { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.pbind-muted { color: var(--ink-3); font-size: 11px; }
+.pbind-muted.mono { font-family: var(--mono); }
+.pbind-sec { display: flex; flex-direction: column; gap: 8px; }
+.pbind-head { display: flex; align-items: center; gap: 10px; }
+.pbind-head .pbind-muted { flex: 1 1 auto; min-width: 0; }
+.pbind-q {
+  margin-left: auto;
+  width: 190px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 11.5px;
+  background: var(--paper);
+}
+.pbind-q:focus { outline: none; border-color: var(--ink-3); }
+.pbind-struct {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.pbind-svg { flex: 0 0 auto; width: 132px; height: 84px; display: flex; align-items: center; justify-content: center; }
+.pbind-svg svg { width: 100%; height: 100%; }
+.pbind-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.pbind-list { max-height: 210px; overflow-y: auto; }
+.pbind-sec-draw .pbind-acts { padding-bottom: 2px; }
+.pbind-foot { border-top: 1px dotted var(--line-2); padding-top: 10px; }
+.pbind-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.pbind-link:hover { color: var(--accent); }
