@@ -8319,3 +8319,9 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   color: var(--ink-3);
   pointer-events: none;
 }
+
+/* 反应规模：整体往纸面中间收一点（不贴着表格右边缘），数字和 `mmol` 之间也拉开一点 */
+.cond-above .cond-f-scale .cond-f-val { padding-right: 7px; gap: 7px; }
+
+/* 再来一点：整格从表格右边缘往里收 10px，数字和 `mmol` 之间 9px */
+.cond-above .cond-f-scale .cond-f-val { padding-right: 10px; gap: 9px; }
