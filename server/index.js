@@ -1564,16 +1564,42 @@ function copyExpFilesToCompound(exp, compoundId, { ts, skipExisting = false } = 
   }
 }
 
+/** 补档案时管的那几格（名称 / MW / 性状 / NMR / TLC / 操作），label 用来在冲突提示里说人话 */
+const SYNC_FIELDS = [
+  ['name', '名称'],
+  ['mw', '分子量'],
+  ['appearance', '性状'],
+  ['nmr_h1', '¹H NMR'],
+  ['nmr_c13', '¹³C NMR'],
+  ['nmr_other', '其它表征'],
+  ['tlc_solvent', 'TLC'],
+  ['procedure', '操作步骤'],
+];
+
+/** 这条记录对应的化合物：先看绑着的，再看有没有哪份档案的 standard_exp_id 指着它（解绑过的） */
+function compoundOfExperiment(exp) {
+  if (exp.product_compound_id) {
+    const c = db.prepare('SELECT * FROM compounds WHERE id = ?').get(exp.product_compound_id);
+    if (c) return c;
+  }
+  return (
+    db
+      .prepare('SELECT * FROM compounds WHERE standard_exp_id = ? ORDER BY id LIMIT 1')
+      .get(exp.id) || null
+  );
+}
+
 /**
  * 从一条实验的产物「建 / 补」化合物档案。
  *
- * **幂等**：这条记录已经绑过化合物就**不再新建一份** —— 以前点两次「产物存库」，
- * 库里会多出一个 `SJ-2-1-2`，记录还被偷偷改绑到新的那份上。
- * 现在只把它**空着**的格子补上（名称 / MW / 性状 / NMR 三栏 / TLC / 操作），
- * 已经有内容的一律不动（跟「手填过就不动」同一个规矩）；谱图也只在缺那一类时补。
- * 返回 `{ compound, created }`，created=false 就是「只补了一次」。
+ * **幂等**：这条记录已经有档案（绑着的，或者 `standard_exp_id` 指着它的——解绑过也算）
+ * 就**不再新建一份**；只补**空着**的格子，可选的 `overwrite` 才会用记录里的值覆盖
+ * （冲突由前端先提示）。
+ * `dry: true` 只算不改：返回会补哪些格（`fills`）、哪些格子两边都有但不一样（`conflicts`）、
+ * 哪些谱图会搬 / 因为那边已有同类而跳过（`filesCopy` / `filesSkip`）。
+ * 返回 `{ compound, created, fills, conflicts, filesCopy, filesSkip }`。
  */
-function compoundFromExperiment(expId, { copyFiles = true } = {}) {
+function compoundFromExperiment(expId, { copyFiles = true, overwrite = false, dry = false } = {}) {
   const exp = getExperiment(expId);
   if (!exp) return null;
 
@@ -1585,7 +1611,6 @@ function compoundFromExperiment(expId, { copyFiles = true } = {}) {
   const rest = lines.filter((l) => !/^¹?H\s*NMR|^1H\s*NMR|^¹³?C\s*NMR|^13C\s*NMR/i.test(l)).join('\n');
 
   const ts = nowISO();
-  // 产物挂库时跟着那条记录的课题走
   const projectValue = str(exp.project);
   const patch = {
     name: str(exp.product_name) || `${exp.code} 产物`,
@@ -1598,34 +1623,82 @@ function compoundFromExperiment(expId, { copyFiles = true } = {}) {
     procedure: str(exp.procedure),
   };
 
-  const bound = exp.product_compound_id
-    ? db.prepare('SELECT * FROM compounds WHERE id = ?').get(exp.product_compound_id)
-    : null;
+  // 谱图：缺哪类搬哪类，那边已经有同类的不重复搬（也不覆盖 —— 那是他自己传的原件）
+  const wanted = new Set(['h1', 'c13', 'nmr_other', 'nmr_raw', 'nmr_pdf', 'tlc']);
+  const expCats = copyFiles ? [...new Set(exp.attachments.map((a) => a.category).filter((c) => wanted.has(c)))] : [];
+
+  const bound = compoundOfExperiment(exp);
   if (bound) {
+    const have = new Set(db.prepare('SELECT DISTINCT category FROM compound_files WHERE compound_id = ?').all(bound.id).map((r) => r.category));
+    const fills = [];
+    const conflicts = [];
     const sets = [];
     const args = [];
-    const filled = [];
-    for (const [col, value] of Object.entries(patch)) {
+    for (const [col, label] of SYNC_FIELDS) {
       const cur = bound[col];
-      const isEmpty = cur === null || cur === undefined || String(cur).trim() === '';
-      if (!isEmpty) continue;                       // 已经有内容：一个字都不动
-      if (value === null || value === undefined || String(value).trim() === '') continue;
-      sets.push(`${col} = ?`);
-      args.push(value);
-      filled.push(col);
+      const incoming = patch[col];
+      const curEmpty = cur === null || cur === undefined || String(cur).trim() === '';
+      const incEmpty = incoming === null || incoming === undefined || String(incoming).trim() === '';
+      if (incEmpty) continue;
+      if (curEmpty) {
+        fills.push({ field: col, label, value: incoming });
+        sets.push(`${col} = ?`);
+        args.push(incoming);
+        continue;
+      }
+      const same = col === 'mw'
+        ? Number(cur) === Number(incoming)
+        : String(cur).trim() === String(incoming).trim();
+      if (same) continue;
+      conflicts.push({ field: col, label, current: cur, incoming });
+      if (overwrite) {
+        sets.push(`${col} = ?`);
+        args.push(incoming);
+      }
     }
     if (!numOrNull(bound.standard_exp_id)) {
       sets.push('standard_exp_id = ?');
       args.push(exp.id);
     }
-    if (sets.length) {
-      sets.push('updated_at = ?');
-      args.push(ts);
-      db.prepare(`UPDATE compounds SET ${sets.join(', ')} WHERE id = ?`).run(...args, bound.id);
-      logEvent('compound', bound.id, 'sync', { detail: `从 ${exp.code} 补了空着的格子`, fields: filled });
+    // 解绑过（靠 standard_exp_id 找到的）：顺手把绑定关系接回去，别让它一直是散的
+    if (!exp.product_compound_id && !dry) {
+      db.prepare('UPDATE experiments SET product_compound_id = ?, updated_at = ? WHERE id = ?').run(bound.id, ts, expId);
     }
-    if (copyFiles) copyExpFilesToCompound(exp, bound.id, { ts, skipExisting: true });
-    return { compound: getCompound(bound.id), created: false };
+
+    const filesCopy = expCats.filter((c) => !have.has(c));
+    const filesSkip = expCats.filter((c) => have.has(c));
+
+    if (!dry) {
+      if (sets.length) {
+        const cols = sets.slice();
+        const vals = args.slice();
+        cols.push('updated_at = ?');
+        vals.push(ts);
+        db.prepare(`UPDATE compounds SET ${cols.join(', ')} WHERE id = ?`).run(...vals, bound.id);
+        const changed = [...fills.map((f) => f.field), ...(overwrite ? conflicts.map((f) => f.field) : [])];
+        if (changed.length) {
+          logEvent('compound', bound.id, 'sync', { detail: `从 ${exp.code} 补了 ${changed.length} 格`, fields: changed });
+        }
+      }
+      if (copyFiles && filesCopy.length) copyExpFilesToCompound(exp, bound.id, { ts, skipExisting: true });
+    }
+    return { compound: getCompound(bound.id), created: false, fills, conflicts, filesCopy, filesSkip, dry };
+  }
+
+  // 还没档案：dry 只报告会做什么
+  if (dry) {
+    return {
+      compound: null,
+      created: true,
+      fills: SYNC_FIELDS.filter(([col]) => {
+        const v = patch[col];
+        return !(v === null || v === undefined || String(v).trim() === '');
+      }).map(([col, label]) => ({ field: col, label, value: patch[col] })),
+      conflicts: [],
+      filesCopy: expCats,
+      filesSkip: [],
+      dry,
+    };
   }
 
   const row = db
@@ -1642,7 +1715,7 @@ function compoundFromExperiment(expId, { copyFiles = true } = {}) {
   const id = Number(row.lastInsertRowid);
   db.prepare('UPDATE experiments SET product_compound_id = ?, updated_at = ? WHERE id = ?').run(id, ts, expId);
   if (copyFiles) copyExpFilesToCompound(exp, id, { ts });
-  return { compound: getCompound(id), created: true };
+  return { compound: getCompound(id), created: true, fills: [], conflicts: [], filesCopy: expCats, filesSkip: [], dry };
 }
 
 /* -------------------------------------------------------------- routing */
@@ -2130,10 +2203,22 @@ route('POST', '/api/compounds/from-experiment', async (req, res) => {
   const body = await readJson(req);
   const expId = Number(body.exp_id);
   if (!expId) return fail(res, 400, '缺少 exp_id');
-  const out = compoundFromExperiment(expId, { copyFiles: body.copy_files !== false });
+  const out = compoundFromExperiment(expId, {
+    copyFiles: body.copy_files !== false,
+    overwrite: body.overwrite === true,
+    dry: body.dry === true,
+  });
   if (!out) return fail(res, 404, '实验不存在');
-  // created=false：这条记录早就绑过化合物，这次只是把它空着的格子补了一下，没有新建
-  ok(res, { compound: out.compound, created: out.created });
+  // created=false：这条记录早就有档案了，这次只是补 / 覆盖了格子，没有新建
+  ok(res, {
+    compound: out.compound,
+    created: out.created,
+    fills: out.fills,
+    conflicts: out.conflicts,
+    files_copy: out.filesCopy,
+    files_skip: out.filesSkip,
+    dry: out.dry === true,
+  });
 });
 
 route('GET', '/api/compounds/:id', async (req, res, params) => {

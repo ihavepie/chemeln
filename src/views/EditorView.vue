@@ -26,7 +26,7 @@ import { sheetPrefs, useSheetBlocks } from '../lib/sheetprefs.js';
 import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
-import { confirm, prompt, toast } from '../lib/feedback.js';
+import { confirm, confirmLines, prompt, toast } from '../lib/feedback.js';
 import { amountText, derive, eqLabel, eqNum, mwText, num, round, saneDensity, volText } from '../lib/reagent.js';
 import { buildReportCard, reportCardCss } from '../lib/reportcard.js';
 import { downloadBlob } from '../lib/print.js';
@@ -1319,32 +1319,90 @@ function archiveProduct() {
   void saveToCompound();
 }
 
+/** 冲突里的值太长就截一下（NMR / 操作步骤都是一大段） */
+const shortVal = (v) => {
+  const t = String(v ?? '').replace(/\s+/g, ' ').trim();
+  return t.length > 30 ? `${t.slice(0, 30)}…` : t;
+};
+
+/**
+ * 产物存库 = **建 / 补**（幂等）：先 `dry` 问一次会补什么、哪几格跟档案不一样，
+ * 有冲突就让人选「用记录里的覆盖」还是「只补空着的」；谱图只补缺的，那边已有同类的不动。
+ */
 async function saveToCompound() {
   moreMenu.value = false;
-  // 已经绑过化合物的记录：这次是「补空着的格子」，不会在库里再造一份
-  const already = Number(fields.product_compound_id) > 0;
-  const ok = await confirm({
-    title: already ? '产物已经在库里了，补一下空着的格子？' : '将本实验产物存入化合物库？',
-    body: already
-      ? '不会新建化合物：只把库里那份空着的格子和缺的谱图补上（已经有内容的一律不动）。'
-      : '将新建化合物档案，并带入名称、分子量、表征、TLC 与操作步骤；谱图一并复制。',
-    confirmText: already ? '补一下' : '存入',
-  });
-  if (!ok) return;
   try {
-    const { compound: c, created } = await api.compoundFromExperiment(exp.value.id);
-    fields.product_compound_id = c.id;
-    // 顺手补一张真·结构图：从反应式里的产物 SMILES 算（以前是把整张反应式搬过去当结构图，不对）
-    if (created) await attachProductStructure(c.id).catch(() => {});
-    await loadBoot();
-    toast(
-      created
-        ? `已存入化合物库：${c.code || c.name || '新化合物'}`
-        : `${c.code || c.name} 早就在库里了：只把空着的格子补上，没另建一份`
-    );
+    const pre = await api.compoundFromExperiment(exp.value.id, { dry: true });
+
+    if (pre.created) {
+      const ok = await confirm({
+        title: '将本实验产物存入化合物库？',
+        body: '库里还没有这条记录的产物档案：会新建一份，带入名称、分子量、性状、表征、TLC 与操作步骤，谱图一并复制。',
+        confirmText: '新建并绑定',
+      });
+      if (!ok) return;
+      await applyArchive(false);
+      return;
+    }
+
+    const c = pre.compound;
+    const name = c?.code || c?.name || '那份档案';
+
+    // 有冲突：先说清哪几格不一样，再让他选覆盖还是不覆盖
+    if (pre.conflicts.length) {
+      const overwrite = await confirmLines({
+        title: `「${name}」有 ${pre.conflicts.length} 处跟这条记录不一样`,
+        lines: pre.conflicts.map((x) => `${x.label}：档案「${shortVal(x.current)}」／记录「${shortVal(x.incoming)}」`),
+        hint: '要用记录里的值覆盖吗？不想覆盖的话，下面可以只补空着的格子。',
+        confirmText: '用记录里的覆盖',
+        cancelText: '不要覆盖',
+      });
+      if (overwrite) {
+        await applyArchive(true);
+        return;
+      }
+    }
+
+    if (!pre.fills.length && !pre.filesCopy.length) {
+      toast(
+        pre.conflicts.length
+          ? `那就保持「${name}」里的值，什么都没改`
+          : `${name} 已经跟这条记录一致，没什么可补的`
+      );
+      return;
+    }
+    const ok = await confirmLines({
+      title: pre.conflicts.length ? `那就保留「${name}」里的值，只补空着的？` : `补一下「${name}」空着的格子？`,
+      lines: pre.fills.map((x) => `${x.label}：空着 → 「${shortVal(x.value)}」`),
+      hint:
+        (pre.filesCopy.length ? `谱图会搬 ${pre.filesCopy.join(' / ')}。` : '') +
+        (pre.filesSkip.length ? `这边已有的 ${pre.filesSkip.join(' / ')} 不重复搬、也不覆盖。` : '') +
+        '已经有内容的一律不动。',
+      confirmText: '补一下',
+    });
+    if (!ok) return;
+    await applyArchive(false);
   } catch (e) {
     toast(e.message, 'err');
   }
+}
+
+/** 真正执行一次（`overwrite` 只影响「两边都有但不一样」的那几格） */
+async function applyArchive(overwrite) {
+  const r = await api.compoundFromExperiment(exp.value.id, { overwrite });
+  const c = r.compound;
+  if (!c) return;
+  fields.product_compound_id = c.id;
+  if (r.created) await attachProductStructure(c.id).catch(() => {});
+  await loadBoot();
+  const name = c.code || c.name || '档案';
+  const bits = [];
+  if (r.created) bits.push(`新建了「${name}」`);
+  else bits.push(`「${name}」${overwrite ? '按记录覆盖了冲突的格子' : '只补了空着的格子'}`);
+  if (r.fills?.length) bits.push(`补 ${r.fills.length} 格`);
+  if (r.filesCopy?.length) bits.push(`搬了 ${r.filesCopy.length} 份谱图`);
+  if (r.filesSkip?.length) bits.push(`${r.filesSkip.join('/')} 那边已有，没重复搬`);
+  toast(bits.join('；'));
 }
 
 function duplicate() {
