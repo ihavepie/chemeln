@@ -1,2 +1,2 @@
 
-- **刻度滑条也能用滚轮拨**（用户：「鼠标滚轮能滚动这个」）：`RulerPick` 根节点挂 `@wheel="onWheel"`，**攒够 60px 才算一格、每次最多走一格**（鼠标滚轮一格 100~120，触控板连发小 delta 会攒着走；只用正负号，不然一滚就飞到底），`preventDefault()` 挡住页面滚动；停手 200ms 清掉余量。**验证**：`0 ℃` 滚一格 → `rt`（已存盘）。**探针注意**：Vue 是异步渲染的，`dispatchEvent` 之后**同步**读 `.ruler-item.is-on` / `style` 拿到的是旧值，看起来像「没生效」——要等一拍（`setTimeout`）再读。
+- **选择器开着时把页面锁住，滚轮别带着整页跑**（用户：「页面可能会被滚轮滚动，页面需要固定一下」）：`CondRow` 里 `watch(open)` → 开的时候在 `document` 上挂 **capture 阶段的 `wheel` 监听** `onLockWheel`（`preventDefault()`，`passive:false`），关的时候摘掉；刻度滑条自己的 `@wheel` 照样继续拨格子（`preventDefault` 不影响冒泡）。另外 `.editor { overscroll-behavior: contain }`，滚到头不把橡皮筋传给外层。**验证**：弹窗开着时在 `.editor` 上发一个 wheel → `defaultPrevented: true`；关着 → `false`（页面照常滚）。

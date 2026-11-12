@@ -8540,3 +8540,8 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   cursor: pointer;
 }
 .ruler-add:hover { color: var(--accent); }
+
+/* 记录页的滚动容器：滚到头别把橡皮筋传给外层（页面本身不该跟着动） */
+.editor { overscroll-behavior: contain; }
+/* 选择器（刻度滑条 / 胶囊菜单）开着时：弹窗贴着手指，页面别跑 */
+body.is-picker-open .editor { overscroll-behavior: none; }

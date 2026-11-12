@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Icon from './Icon.vue';
 import RulerPick from './RulerPick.vue';
 import { QUICK } from '../lib/ui.js';
@@ -126,6 +126,23 @@ function pick(key, v) {
   props.notify();
 }
 
+/**
+ * 选择器开着的时候**把页面锁住**：滚轮只用来拨刻度（或者什么都不做），
+ * 不让整页跟着上下跑 —— 尤其弹窗贴在纸面中间，页面一动它就离开手指了。
+ */
+function onLockWheel(ev) {
+  if (!open.value) return;
+  ev.preventDefault();
+}
+function lockPage(on) {
+  if (on) document.addEventListener('wheel', onLockWheel, { passive: false, capture: true });
+  else document.removeEventListener('wheel', onLockWheel, { passive: false, capture: true });
+}
+watch(open, (v, old) => {
+  if (v && !old) lockPage(true);
+  if (!v && old) lockPage(false);
+});
+
 /* 点外面 / 按 Esc 就把下拉收起来（之前只能再点一次箭头，很卡手） */
 function onDocClick(ev) {
   if (!open.value) return;
@@ -149,6 +166,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', onDocClick);
   document.removeEventListener('keydown', onDocKey);
+  lockPage(false);
 });
 </script>
 
