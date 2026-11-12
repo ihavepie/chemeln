@@ -21,8 +21,8 @@ import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
-import { sheetPrefs, setSheetPref, showAllSheetBlocks, SHEET_BLOCKS } from '../lib/sheetprefs.js';
-import { KINDS, RXN_TYPES, KIND_BLOCKS } from '../lib/kind.js';
+import { sheetPrefs, useSheetBlocks } from '../lib/sheetprefs.js';
+import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -92,19 +92,14 @@ const reagent = reactive({ base: null, steps: [], rows: [] });
 const conds = ref([]);
 
 /**
- * 记录类型 = 版式：切类型就把「这张纸显示哪几块」换成那类该有的样子
- * （`lib/kind.js` 的 KIND_BLOCKS；用户可以再手动开关，切回来还是按类型来）。
- * 「通用」没有专门配置 → 全显示。
+ * 记录类型 = 版式：打开记录 / 切类型时，把「这张纸显示哪几块」换成**那一类自己记的那一套**
+ * （`lib/sheetprefs.js`：按类型分开存，设置页 06 里能逐类改；没改过的类用 `KIND_BLOCKS` 的默认）。
+ * 这里只「选」不「写」——以前每次打开都按类型重写，把用户在 06 里手勾的盖掉了。
  */
 const KIND_OPTIONS = [{ value: '', label: '通用' }, ...KINDS.map((k) => ({ value: k.key, label: k.key }))];
 const kindMenu = ref(false);
 function applyKindBlocks(kind) {
-  const keys = KIND_BLOCKS[kind];
-  if (!keys) {
-    showAllSheetBlocks();
-    return;
-  }
-  for (const k of Object.keys(SHEET_BLOCKS)) setSheetPref(k, keys.includes(k));
+  useSheetBlocks(kind);
 }
 function pickKind(v) {
   kindMenu.value = false;

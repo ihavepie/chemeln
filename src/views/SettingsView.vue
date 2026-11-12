@@ -4,7 +4,15 @@ import Icon from '../components/Icon.vue';
 import AppModal from '../components/AppModal.vue';
 import { api } from '../api.js';
 import { peekPrefs, setPeekPref, PEEK_LABELS } from '../lib/peek.js';
-import { sheetPrefs, setSheetPref, showAllSheetBlocks, SHEET_BLOCKS } from '../lib/sheetprefs.js';
+import {
+  sheetPrefs,
+  setSheetPref,
+  showAllSheetBlocks,
+  useSheetBlocks,
+  currentSheetKind,
+  SHEET_BLOCKS,
+  SHEET_KINDS,
+} from '../lib/sheetprefs.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickExtra } from '../store.js';
 import { QUICK } from '../lib/ui.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -300,6 +308,14 @@ async function removeCategory(g) {
 /* ---- 课题 ---- */
 
 const projects = computed(() => store.boot?.projects || []);
+
+/* ---- 记录页显示：按记录类型各一套（和 `lib/sheetprefs.js` 的键一致）---- */
+const editKind = ref(currentSheetKind());
+if (editKind.value !== currentSheetKind()) useSheetBlocks(editKind.value);
+function pickSheetKind(kind) {
+  editKind.value = String(kind || '');
+  useSheetBlocks(editKind.value);
+}
 
 /* ---- 常用选项（条件行那几个下拉里自己加的值）----
    存服务端 settings 的 `quick:<字段>`，跟着 data/ 一起备份；页面上「＋ 自定义」加的
@@ -675,8 +691,24 @@ async function removeProject(p) {
           <button class="btn btn-sm btn-ghost" @click="showAllSheetBlocks()">全部显示</button>
         </div>
         <p class="card-note">
-          实验记录那张 A4 上要出现哪几块。取消勾选的块，页面和打印 / 存 PDF 都不出现（内容不会丢，重新勾上就回来）。
+          实验记录那张 A4 上要出现哪几块 —— <b>每种记录类型各记一套</b>，打开记录时就按它的类型取那一套。取消勾选的块，页面和打印 / 存 PDF 都不出现（内容不会丢，重新勾上就回来）。
         </p>
+        <div class="sheet-kind-row">
+          <span class="sheet-kind-lbl">改哪一类</span>
+          <span class="sheet-kind-chips">
+            <button
+              v-for="k in SHEET_KINDS"
+              :key="k.key || 'all'"
+              type="button"
+              class="qchip"
+              :class="{ 'is-on': editKind === k.key }"
+              :title="k.key ? `「${k.label}」这类记录默认显示哪几块` : '没写类型的老记录（通用）'"
+              @click="pickSheetKind(k.key)"
+            >
+              {{ k.label }}
+            </button>
+          </span>
+        </div>
         <div class="sheet-blocks">
           <label v-for="(label, key) in SHEET_BLOCKS" :key="key">
             <input type="checkbox" :checked="sheetPrefs[key]" @change="setSheetPref(key, $event.target.checked)" />

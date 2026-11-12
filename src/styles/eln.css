@@ -8637,3 +8637,25 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 /* 产率表头上那个「不计」：原料类记录是**算出来的**默认值（不是开关），所以不给点，
    样子沿用 `.th-mini.on`，只是没有 hover。 */
 .th-mini.is-static { cursor: default; color: #8a5a3a; background: #f3e7dc; }
+
+/* 设置页 06：那排「改哪一类」的类型胶囊（记录页显示按类型分开存） */
+.sheet-kind-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 12px;
+}
+.sheet-kind-lbl {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.sheet-kind-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.sheet-kind-chips .qchip { color: var(--ink-3); }
+.sheet-kind-chips .qchip.is-on {
+  color: var(--accent-ink);
+  background: #f7f0ea;
+  border-color: rgba(168, 71, 31, 0.32);
+}
