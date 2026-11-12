@@ -20,8 +20,8 @@ import ProjPick from '../components/ProjPick.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
-import { sheetPrefs } from '../lib/sheetprefs.js';
-import { KINDS, RXN_TYPES } from '../lib/kind.js';
+import { sheetPrefs, setSheetPref, showAllSheetBlocks, SHEET_BLOCKS } from '../lib/sheetprefs.js';
+import { KINDS, RXN_TYPES, KIND_BLOCKS } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -87,6 +87,30 @@ const reagent = reactive({ base: null, steps: [], rows: [] });
  * 条件筛选页（`#/screenings`）会从这里拆行，不用为每个条件再建一条实验记录。
  */
 const conds = ref([]);
+
+/**
+ * 记录类型 = 版式：切类型就把「这张纸显示哪几块」换成那类该有的样子
+ * （`lib/kind.js` 的 KIND_BLOCKS；用户可以再手动开关，切回来还是按类型来）。
+ * 「通用」没有专门配置 → 全显示。
+ */
+const KIND_OPTIONS = [{ value: '', label: '通用' }, ...KINDS.map((k) => ({ value: k.key, label: k.key }))];
+const kindMenu = ref(false);
+function applyKindBlocks(kind) {
+  const keys = KIND_BLOCKS[kind];
+  if (!keys) {
+    showAllSheetBlocks();
+    return;
+  }
+  for (const k of Object.keys(SHEET_BLOCKS)) setSheetPref(k, keys.includes(k));
+}
+function pickKind(v) {
+  kindMenu.value = false;
+  if (fields.kind === v) return;
+  fields.kind = v;
+  applyKindBlocks(v);
+  notify();
+}
+
 /**
  * 本次筛选的「变量集合」= 投料表里标成变量的行（`reagents.variable`）+ 记录级字段变量（温度 / 时间…）。
  * 条件组的列、反应式箭头上的占位符（`[L]` / `[T]`）都从这一个来源来。
@@ -151,6 +175,7 @@ function fill(e) {
   fields.no_yield = Number(e.no_yield) === 1 ? 1 : 0;   // 0/1 开关，别让它变成 null
   fields.product_compound_id = e.product_compound_id ?? null;
 
+  applyKindBlocks(String(e.kind || ''));
   fieldVars.value = (Array.isArray(e.field_vars) ? e.field_vars : []).map((v) => ({ key: v.key, label: v.label || v.key }));
   conds.value = (Array.isArray(e.conds) ? e.conds : []).map((c) => ({
     label: c.label || '',
@@ -323,7 +348,7 @@ function arrowBusy(ev) {
   const t = ev.target;
   if (t && (t.closest?.('input, textarea, select, [contenteditable="true"]') || t.isContentEditable)) return true;
   // 弹层 / 菜单开着时方向键归它们（自绘菜单那几个类名 + Element Plus 的遮罩与 popper）
-  const overlays = document.querySelectorAll('.el-overlay, .el-popper, .cat-menu, .kind-menu, .proj-menu, .role-menu');
+  const overlays = document.querySelectorAll('.el-overlay, .el-popper, .cat-menu, .kind-menu, .kind-opt-menu, .proj-menu, .role-menu');
   for (const el of overlays) if (el.getClientRects().length) return true;
   return false;
 }
@@ -1433,10 +1458,31 @@ const openAttachment = (id) => {
                 <th>类型</th>
                 <td class="kind-cell">
                   <div class="kind-inline">
-                    <select class="kind-pick" v-model="fields.kind" :disabled="exp.locked" title="记录类型（原料/试反应/条件筛选/底物扩展，并行存在）">
-                      <option value="">通用</option>
-                      <option v-for="k in KINDS" :key="k.key" :value="k.key">{{ k.key }}</option>
-                    </select>
+                    <div class="kind-wrap">
+                      <input
+                        class="kind-pick"
+                        :value="fields.kind || '通用'"
+                        readonly
+                        :disabled="exp.locked"
+                        title="记录类型（通用 / 原料 / 试反应 / 条件筛选 / 底物扩展，并行存在）——换类型会换这套版式"
+                        @click.stop="kindMenu = !kindMenu"
+                        @focus="kindMenu = true"
+                        @keydown.esc="kindMenu = false"
+                      />
+                      <Icon name="down" :size="10" class="kind-caret" />
+                      <div v-if="kindMenu && !exp.locked" class="kind-opt-menu" @click.stop>
+                        <button
+                          v-for="k in KIND_OPTIONS"
+                          :key="k.value || 'plain'"
+                          type="button"
+                          class="rxn-opt"
+                          :class="{ 'is-on': (fields.kind || '') === k.value }"
+                          @click="pickKind(k.value)"
+                        >
+                          {{ k.label }}
+                        </button>
+                      </div>
+                    </div>
                     <div class="rxn-wrap">
                       <input
                         class="kind-rxn"
@@ -1534,7 +1580,7 @@ const openAttachment = (id) => {
           <!-- 条件组：一次筛选批次里的 N 个条件。一行一个条件，只写「改了什么」+ 结果；
                投料表 / 操作 / TLC 是整条记录共享的（一起做的、一起点的板）。
                没有条件时只露一行「＋ 加条件」，不占平常记录的版面。 -->
-          <section v-if="sheetPrefs.conds !== false" class="sec sec-tight cond-group">
+          <section v-if="sheetPrefs.conds" class="sec sec-tight cond-group">
             <div class="sec-head">
               <h3>条件组</h3>
               <span v-if="conds.length" class="cond-count">{{ conds.length }} 个条件</span>
