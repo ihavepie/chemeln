@@ -8362,3 +8362,21 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 
 /* 条件行回到 5 格（反应规模搬走了） */
 .cond-above { grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr; }
+
+/* 变量行里「用不上」的那几格：跟溶剂行同一个「—」，淡淡的居中，别留空洞 */
+.sheet .rtable tr.rt-var td .var-na,
+.sheet .rtable tr.rt-var td.n { color: var(--ink-4); }
+.sheet .rtable tr.rt-var td .var-na { opacity: 0.5; }
+
+/* 变量标志再明显一档：底色不变、字加粗到大一号，边框给一道极淡的强调色 */
+.var-chip,
+.var-slot {
+  font-size: 10px;
+  line-height: 17px;
+  padding: 0 7px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(168, 71, 31, 0.22);
+}
+.cond-var-tog.on { font-weight: 600; }

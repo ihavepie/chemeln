@@ -1861,7 +1861,12 @@ const openAttachment = (id) => {
                       @input="notify()"
                     />
                   </td>
-                  <td class="n var-mw">{{ row.isMol ? (row.info.mw != null ? round(row.info.mw, 2) : '—') : '' }}</td>
+                  <!-- 温度 / 时间 / 气氛这种变量没有分子量、当量、mmol、用量：跟溶剂行一样写「—」，
+                       别留四个空洞（用户说「这边的空太大」） -->
+                  <td class="n var-mw">
+                    <template v-if="row.isMol">{{ row.info.mw != null ? round(row.info.mw, 2) : '—' }}</template>
+                    <span v-else class="sol-blank">—</span>
+                  </td>
                   <td class="n var-eq">
                     <input
                       v-if="row.isMol"
@@ -1872,9 +1877,16 @@ const openAttachment = (id) => {
                       :title="`这个条件的当量（空 = 用投料表里的标准当量）`"
                       @input="setVarEq(row.c, row.ph, $event.target.value)"
                     />
+                    <span v-else class="sol-blank">—</span>
                   </td>
-                  <td class="n var-mmol">{{ row.isMol ? (row.info.mmol != null ? round(row.info.mmol, 3) : '—') : '' }}</td>
-                  <td class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">{{ row.isMol ? row.info.amount : '' }}</td>
+                  <td class="n var-mmol">
+                    <template v-if="row.isMol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</template>
+                    <span v-else class="sol-blank">—</span>
+                  </td>
+                  <td class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">
+                    <template v-if="row.isMol">{{ row.info.amount }}</template>
+                    <span v-else class="sol-blank">—</span>
+                  </td>
                   <td />
                   <td class="noprint">
                     <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个变量" @click="removeCond(row.i)">×</button>
