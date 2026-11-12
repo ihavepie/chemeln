@@ -230,23 +230,22 @@ const colors = computed(() => cmpList.value.filter((c) => String(c.name || c.cod
       <p v-if="!expRows.length" class="phone-hint" style="padding: 8px 2px">没有匹配的实验</p>
     </div>
 
-    <ul v-else class="phone-list">
-      <li v-for="c in colors" :key="c.id">
-        <a class="phone-item phone-item-cmp" :href="`#/c/${c.id}`">
-          <img v-if="c.structure_id" class="phone-cmp-fig" :src="`/api/compound-files/${c.structure_id}`" alt="" loading="lazy" />
-          <span v-else class="phone-cmp-fig is-empty" />
-          <span class="phone-item-body">
-            <span class="phone-item-top">
-              <b class="mono">{{ c.code || '—' }}</b>
-              <span v-if="c.kind" class="tag plain">{{ c.kind }}</span>
-            </span>
-            <span class="phone-item-title">{{ c.name || '（未命名）' }}</span>
-            <span class="phone-item-sub mono">{{ c.formula || '' }}<template v-if="c.mw"> · {{ round(c.mw, 2) }}</template></span>
+    <!-- 化合物也走同一套纸卡片（同一个页面里别一半卡片一半描边行） -->
+    <div v-else class="phone-cards">
+      <a v-for="c in colors" :key="c.id" class="exp-card is-cmp" :href="`#/c/${c.id}`">
+        <img v-if="c.structure_id" class="cmp-row-fig" :src="`/api/compound-files/${c.structure_id}`" alt="" loading="lazy" />
+        <span v-else class="cmp-row-fig is-empty" />
+        <span class="cmp-row-body">
+          <span class="top">
+            <span class="exp-code">{{ c.code || '—' }}</span>
+            <span v-if="c.kind" class="tag plain">{{ c.kind }}</span>
           </span>
-        </a>
-      </li>
-      <li v-if="!colors.length" class="phone-hint" style="padding: 16px 2px">没有匹配的化合物</li>
-    </ul>
+          <span class="exp-title"><span class="exp-name">{{ c.name || '（未命名）' }}</span></span>
+          <span class="exp-meta mono">{{ c.formula || '' }}<template v-if="c.mw"> · {{ round(c.mw, 2) }}</template></span>
+        </span>
+      </a>
+      <p v-if="!colors.length" class="phone-hint" style="padding: 8px 2px">没有匹配的化合物</p>
+    </div>
 
     <p class="phone-foot">瓶签二维码可直接打开化合物档案</p>
   </div>

@@ -7696,12 +7696,16 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 /* 手机端（`#/m`）的实验列表：把桌面中栏那套纸卡片搬过来。
    容器给一层 bone 底，卡片才是「白卡浮在上面」的亚克力感（纯白底上只剩影子、看不出卡片）。
    刻意不加：拖拽排序 / 右键菜单 / 分类分段——手机上手指拖卡片跟滚动打架，换分类回电脑。 */
+/* 通栏（不是「面板」）：以前这里是一块 `--bone` 圆角面板，而 --bone 是 #fbfbfa（几乎白），
+   于是变成「白页面 + 近白面板 + 白卡片」，看着像卡片里面又套了一张卡（用户报「双层卡片」）。
+   现在铺满屏宽、不圆角 —— 它就是这一段的底，跟桌面中栏是同一个角色。 */
 .phone-cards {
   background: var(--bone);
-  border-radius: 12px;
-  padding: 10px 10px 2px;
+  margin: 0 -16px;
+  padding: 12px 16px 4px;
+  border-radius: 0;
 }
-.phone-cards .exp-card { margin-bottom: 10px; }
+.phone-cards .exp-card { margin-bottom: 10px; border-radius: 10px; }
 /* 手机上卡片里的字比中栏稍大一点：它在整屏宽度里，9px 的小签太抠 */
 .phone-cards .exp-code { font-size: 11.5px; }
 .phone-cards .exp-name { font-size: 15px; }
@@ -7732,3 +7736,72 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .phone-cards a.exp-card .exp-name,
 .phone-cards a.exp-card .exp-desc-inline,
 .phone-cards a.exp-card .member-diff-item { text-decoration: none; }
+
+/* ---- 手机端 UI 打磨（`#/m`）----
+   1) 分段控件（实验 / 化合物）：改成「浅色轨道 + 选中项白底浮起」，比两个描边大按钮更像一套控件；
+   2) 搜索框：从「白底 + 1px 描边」改成浅底无边框，聚焦才浮出白底和描边（iOS 上更干净）；
+   3) 卡片堆的「展开 ▾」做成小胶囊，跟卡片上的其它小签同一族。 */
+.phone-seg {
+  gap: 2px;
+  padding: 3px;
+  margin: 12px 0 10px;
+  background: #f2f1ec;
+  border-radius: 11px;
+}
+.phone-seg button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink-3);
+  font-size: 13.5px;
+  transition: background 140ms var(--ease), color 140ms var(--ease), box-shadow 140ms var(--ease);
+}
+.phone-seg button.on {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: transparent;
+  box-shadow:
+    0 1px 2px rgba(20, 18, 14, 0.06),
+    0 6px 14px -10px rgba(20, 18, 14, 0.3);
+}
+.phone-search {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: #f4f3ef;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease);
+}
+.phone-search:focus {
+  outline: none;
+  background: var(--paper);
+  border-color: var(--line-2);
+}
+.phone-cards .stack-more {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f4f2ee;
+  color: var(--ink-2);
+}
+.phone-cards .exp-card.is-stack .stack-more:active { background: #ece9e2; }
+
+/* 手机端化合物卡片：左边结构缩略图、右边编号/名称/分子式——跟实验卡同一层白纸，不再用描边行 */
+.phone-cards a.exp-card.is-cmp {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.cmp-row-fig {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  object-fit: contain;
+  background: #fbfaf7;
+  border-radius: 8px;
+}
+.cmp-row-fig.is-empty { background: #fbfaf7; }
+.cmp-row-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cmp-row-body .top { display: flex; align-items: center; gap: 6px; }
+.cmp-row-body .exp-title { display: block; }
+.cmp-row-body .exp-meta { color: var(--ink-4); font-size: 10.5px; }

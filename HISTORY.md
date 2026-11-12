@@ -587,3 +587,15 @@
 
 - 修法：`.phone-cards a.exp-card { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent }`，再把卡里那几个小元素（`.tag` / `.exp-code` / `.exp-date` / `.exp-name` / `.exp-desc-inline` / `.member-diff-item`）显式写成 `text-decoration: none`（装饰线会往下继承，逐个按一遍更稳）。
 - 记一笔：**同一个外观，`<button>` 和 `<a>` 的默认样式不一样**——换成锚点时要连带补 `color` / `text-decoration` / tap-highlight。
+
+## 2026-11-12 · 手机端「双层卡片」+ 控件打磨
+
+用户指着手机构图说「这边是双层卡片了，然后就是按钮什么的其他 UI 稍微好看一点」。
+
+- **双层卡片**：上一轮我给列表套了一层 `background: var(--bone)` + `border-radius: 12px` 的**面板**，但 `--bone` 是 `#fbfbfa`（几乎就是白），于是变成「白页面 + 近白面板 + 白卡片」三层，看着像卡片里又套一张卡。
+  改成**通栏**：`.phone-cards { margin: 0 -16px; padding: 12px 16px 4px; border-radius: 0 }`（抵消 `.phone-cmp` 的左右内边距，铺满屏宽）——它就是这一段的底，跟桌面中栏 `.listpane` 是同一个角色，不再是一个「面板」。
+- **分段控件**（实验 / 化合物）：从「两个 1px 描边大按钮」改成「浅色轨道 `#f2f1ec` + 选中项白底浮起（微投影）」，圆角 11/9px，选中态不再靠描边。
+- **搜索框**：从「白底 + 描边」改成浅底 `#f4f3ef`、无边框，聚焦才浮出白底 + 淡描边（iOS 上更干净，也不再跟分段控件抢注意力）。
+- **卡片**：圆角 8 → 10；卡片堆的「展开 ▾」做成小胶囊（`border-radius: 999px` + `#f4f2ee` 底），跟卡片上其它小签同一族。
+- **化合物页签也一并换成卡片**（同一个页面里别一半卡片一半描边行）：左边 58px 结构缩略图、右边编号/类型/名称/分子式，`.exp-card.is-cmp` 横向排。
+- 记一笔：这页的「好看」全靠**底色分级**——白卡片要浮在比它深一点的底上；`--bone`（#fbfbfa）跟纯白差得太小，只适合当「几乎白的页底」，要衬托卡片得用 `--canvas`（#f5f4f1）那一档或更深的 `#f2f1ec`。
