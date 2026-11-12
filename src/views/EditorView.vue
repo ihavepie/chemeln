@@ -189,6 +189,7 @@ const varRows = computed(() => {
     i,
     ph: slot ? slot.ph : '',
     isMol,
+    fieldName: slot && slot.name ? slot.name : '',
     info: isMol ? varInfo(c) : { mw: null, mmol: null, amount: '—' },
   }));
 });
@@ -217,10 +218,12 @@ const condVars = computed(() => {
   const r = reagent.rows.find((x) => x.variable);
   if (r) return [{ key: `r:${r.variable}`, ph: r.variable, label: r.variable, src: r.name || r.role || '', role: r.role || '' }];
   const f = fieldVars.value[0];
-  if (f) return [{ key: `f:${f.key}`, ph: f.label, label: f.label, src: f.key, role: '' }];
+  if (f) return [{ key: `f:${f.key}`, ph: f.label, label: f.label, src: f.key, role: '', name: FIELD_VAR_NAME[f.key] || f.key }];
   return [];
 });
 const FIELD_VAR_LABEL = { temperature: 'T', duration: 't', atmosphere: 'atm', concentration: 'c' };
+/** 字段变量那一行合并成一格时要写的字（写「变的是哪样」） */
+const FIELD_VAR_NAME = { temperature: '反应温度', duration: '时间节点', atmosphere: '气氛 / 容器', concentration: '浓度' };
 
 /** 试剂行被标成变量（组分菜单里点的）：把字段变量和别的试剂行的变量收掉 */
 /**
@@ -1837,8 +1840,9 @@ const openAttachment = (id) => {
                 </tr>
                 <tr v-for="row in varRows" :key="`v${row.i}`" class="rt-var">
                   <td class="grip-cell" />
-                  <td class="var-idx-cell">{{ row.i + 1 }}</td>
-                  <td class="var-name-cell">
+                  <td class="var-idx-cell">Entry {{ row.i + 1 }}</td>
+                  <td class="var-name-cell" :colspan="row.isMol ? 1 : 7">
+                    <span v-if="!row.isMol" class="var-field-lbl">{{ row.fieldName }}</span>
                     <span v-if="condVars.length" class="var-vals">
                       <template v-for="(v, vi) in condVars" :key="v.key">
                         <span v-if="vi" class="var-val-sep">·</span>
@@ -1861,15 +1865,11 @@ const openAttachment = (id) => {
                       @input="notify()"
                     />
                   </td>
-                  <!-- 温度 / 时间 / 气氛这种变量没有分子量、当量、mmol、用量：跟溶剂行一样写「—」，
-                       别留四个空洞（用户说「这边的空太大」） -->
-                  <td class="n var-mw">
-                    <template v-if="row.isMol">{{ row.info.mw != null ? round(row.info.mw, 2) : '—' }}</template>
-                    <span v-else class="sol-blank">—</span>
-                  </td>
-                  <td class="n var-eq">
+                  <!-- 温度 / 时间 / 气氛这种变量：没有分子量 / 当量 / mmol / 用量，
+                       干脆把那五格并成一格，写清楚「变的是哪样」（一排「—」看着像挖了个洞） -->
+                  <td v-if="row.isMol" class="n var-mw">{{ row.info.mw != null ? round(row.info.mw, 2) : '—' }}</td>
+                  <td v-if="row.isMol" class="n var-eq">
                     <input
-                      v-if="row.isMol"
                       class="cond-eq"
                       :value="row.c.varEq?.[row.ph] ?? ''"
                       :disabled="exp.locked"
@@ -1877,16 +1877,9 @@ const openAttachment = (id) => {
                       :title="`这个条件的当量（空 = 用投料表里的标准当量）`"
                       @input="setVarEq(row.c, row.ph, $event.target.value)"
                     />
-                    <span v-else class="sol-blank">—</span>
                   </td>
-                  <td class="n var-mmol">
-                    <template v-if="row.isMol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</template>
-                    <span v-else class="sol-blank">—</span>
-                  </td>
-                  <td class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">
-                    <template v-if="row.isMol">{{ row.info.amount }}</template>
-                    <span v-else class="sol-blank">—</span>
-                  </td>
+                  <td v-if="row.isMol" class="n var-mmol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</td>
+                  <td v-if="row.isMol" class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">{{ row.info.amount }}</td>
                   <td />
                   <td class="noprint">
                     <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个变量" @click="removeCond(row.i)">×</button>

@@ -8380,3 +8380,41 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   border: 1px solid rgba(168, 71, 31, 0.22);
 }
 .cond-var-tog.on { font-weight: 600; }
+
+/* 变量胶囊再小一档（上一轮加得有点大）：字号回到 9.5px、行高 16px、字重 500，描边留着 */
+.var-chip,
+.var-slot {
+  font-size: 9.5px;
+  line-height: 16px;
+  padding: 0 6px;
+  font-weight: 500;
+}
+/* 字段变量的那一行：中间那格写「变的是哪样」（时间节点 / 反应温度），淡淡的靠左 */
+.sheet .rtable tr.rt-var td.var-what-cell {
+  font-size: 11px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+}
+/* 「Entry 1」：Entry 更淡一点、数字用 mono */
+.sheet .rtable tr.rt-var td.var-idx-cell {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 字段变量的那一行：`Entry 1 | 时间节点 [6 h]` —— 名字写在小字标签里、值跟在后面，
+   后面那几格并成一格，不再是一排「—」 */
+.sheet .rtable tr.rt-var .var-field-lbl {
+  font-size: 11px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.sheet .rtable tr.rt-var td.var-name-cell { white-space: nowrap; }
+
+/* `.var-vals` 原来是 `display: flex`：它会把 td 里的「时间节点」小标签挤到上一行。
+   换成 inline-flex —— 标签和值就能排在同一行（td 本身还是 table-cell，colspan 照旧生效）。 */
+.sheet .rtable tr.rt-var .var-vals { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; vertical-align: middle; }
