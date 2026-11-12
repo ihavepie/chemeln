@@ -14,7 +14,9 @@ export const KIND_TONE = Object.fromEntries(KINDS.map((k) => [k.key, k.tone]));
 
 /** 每种类型的默认块（用户仍可手动开关；这里只是切类型时给一套合理默认） */
 export const KIND_BLOCKS = {
-  原料: ['env', 'literature', 'reagents', 'result', 'tlc', 'procedure', 'workup', 'characterization', 'attachments'],
+  // 原料记录也是「A + 试剂 → B」：反应式照样要有（用户问过「这个没有化学式吗」，
+  // 之前这里少了 scheme，纸面直接从抬头表格跳到投料表，明明存了反应式图也不显示）
+  原料: ['env', 'literature', 'scheme', 'reagents', 'result', 'tlc', 'procedure', 'workup', 'characterization', 'attachments'],
   试反应: ['env', 'scheme', 'reagents', 'conds', 'result', 'tlc', 'procedure', 'attachments'],
   条件筛选: ['env', 'scheme', 'reagents', 'conds', 'result', 'tlc'],
   底物扩展: ['env', 'scheme', 'reagents', 'result', 'tlc', 'procedure'],
