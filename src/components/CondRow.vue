@@ -1,7 +1,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from './Icon.vue';
-import WheelPick from './WheelPick.vue';
+import RulerPick from './RulerPick.vue';
 import { QUICK } from '../lib/ui.js';
 import { api } from '../api.js';
 import { loadBoot, quickExtra } from '../store.js';
@@ -32,9 +32,9 @@ const fields = [
 ];
 
 const open = ref('');
-/** 温度和时间的候选是**有序刻度**，用轮盘（一档一档转）；其余字段还是一排胶囊 */
-const WHEEL_KEYS = new Set(['temperature', 'duration']);
-const isWheel = (key) => WHEEL_KEYS.has(key);
+/** 温度和时间的候选是**有序刻度**，用刻度滑条（按住左右拖 / 点某一格）；其余字段还是一排胶囊 */
+const RULER_KEYS = new Set(['temperature', 'duration']);
+const isRuler = (key) => RULER_KEYS.has(key);
 
 const builtin = (key) => QUICK[`f-${key}`] || [];
 /** 下拉里列什么：内置那几条 + 自己加的（去重，自己加的在后面） */
@@ -152,8 +152,8 @@ onBeforeUnmount(() => {
             <Icon name="down" :size="10" />
           </button>
 
-          <WheelPick
-            v-if="open === f.key && isWheel(f.key)"
+          <RulerPick
+            v-if="open === f.key && isRuler(f.key)"
             :items="optionsFor(f.key)"
             :model-value="String(model[f.key] || '')"
             :locked="locked"

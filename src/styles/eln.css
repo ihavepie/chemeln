@@ -8454,74 +8454,83 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .cond-menu .qchip.is-own:hover .qchip-x { opacity: 1; }
 .cond-menu .qchip .qchip-x:hover { color: var(--accent); }
 
-/* 温度 / 时间的「轮盘」选择（像相机倍率那种刻度轮）：原生 scroll-snap 做吸附，
-   离中间远的项自己缩小变淡 → 看着像在转。纸面上不放渐变，所以淡出靠 JS 逐项调 opacity。 */
-.wheel-pop {
+
+
+/* 温度 / 时间的「刻度滑条」：按住往左右拖（或点某一格），松手回弹吸附。
+   不是滚轮 —— 用户要的是「点击滑动」那种：相机倍率 / 曝光补偿的刻度条。 */
+.ruler-pop {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
   z-index: 75;
-  width: 132px;
+  width: 232px;
   background: var(--paper);
   border: 1px solid var(--line-2);
   border-radius: 8px;
   box-shadow: 0 14px 34px rgba(20, 18, 14, 0.12);
-  padding: 6px 6px 4px;
+  padding: 8px 0 4px;
   overflow: hidden;
 }
-.wheel-mask { position: relative; }
-.wheel-drum {
-  overflow-y: auto;
-  overflow-x: hidden;
-  scroll-snap-type: y mandatory;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  cursor: ns-resize;
+.ruler-track {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.wheel-drum::-webkit-scrollbar { width: 0; height: 0; display: none; }
-.wheel-pad { height: var(--pad); }
-.wheel-item {
-  display: block;
-  width: 100%;
-  height: 26px;
+.ruler-strip {
+  display: flex;
+  align-items: flex-start;
+  padding: 0 calc(50% - 28px);
+  will-change: transform;
+}
+.ruler-item {
+  flex: 0 0 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
   border: 0;
   background: none;
   padding: 0;
   font: inherit;
-  font-size: 12.5px;
-  color: var(--ink-1);
-  text-align: center;
-  scroll-snap-align: center;
-  transition: opacity 90ms linear, transform 90ms linear;
   cursor: pointer;
 }
-.wheel-item.is-on { color: var(--accent-ink); font-weight: 600; }
-/* 中间那一档的底带：压在轮子上，不吃点击 */
-.wheel-band {
+.ruler-tick {
+  width: 1px;
+  height: 8px;
+  background: var(--line-2);
+  transition: height 140ms, background 140ms;
+}
+.ruler-item.is-on .ruler-tick { height: 13px; background: var(--accent); }
+.ruler-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  transition: color 140ms;
+}
+.ruler-item.is-on .ruler-label { color: var(--accent-ink); font-weight: 600; }
+/* 中间那条指示线：刻度带从它底下滑过去 */
+.ruler-needle {
   position: absolute;
-  left: -2px;
-  right: -2px;
-  top: 50%;
-  height: 26px;
-  transform: translateY(-50%);
-  border-top: 1px solid var(--line-2);
-  border-bottom: 1px solid var(--line-2);
-  background: rgba(248, 247, 242, 0.7);
+  left: 50%;
+  top: 4px;
+  height: 13px;
+  width: 1px;
+  margin-left: -0.5px;
+  background: transparent;
   pointer-events: none;
-  border-radius: 3px;
 }
-.wheel-foot {
+.ruler-foot {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 5px 2px 1px;
+  justify-content: flex-start;
+  padding: 4px 10px 0;
+  margin-top: 2px;
   border-top: 1px dotted var(--line-2);
-  margin-top: 4px;
 }
-.wheel-hint { font-size: 9.5px; color: var(--ink-4); }
-.wheel-add {
+.ruler-add {
   border: 0;
   background: none;
   padding: 0;
@@ -8530,9 +8539,4 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   color: var(--ink-3);
   cursor: pointer;
 }
-.wheel-add:hover { color: var(--accent); }
-
-/* 轮盘弹层：132px 太窄，底部那行会折成两行 —— 放到 150px，foot 只留「＋自定义」 */
-.wheel-pop { width: 150px; }
-.wheel-foot { justify-content: flex-start; }
-.wheel-hint { display: none; }
+.ruler-add:hover { color: var(--accent); }
