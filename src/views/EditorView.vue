@@ -6,6 +6,7 @@ import ExperimentMobile from '../components/ExperimentMobile.vue';
 import ExpListPane from '../components/ExpListPane.vue';
 import AttachmentsBlock from '../components/AttachmentsBlock.vue';
 import FilePreview from '../components/FilePreview.vue';
+import CondCand from '../components/CondCand.vue';
 import CondRow from '../components/CondRow.vue';
 import ReagentTable from '../components/ReagentTable.vue';
 import ResultBlock from '../components/ResultBlock.vue';
@@ -148,7 +149,7 @@ const condVars = computed(() => {
   for (const r of reagent.rows) {
     if (!r.variable) continue;
     if (out.some((v) => v.ph === r.variable)) continue;
-    out.push({ key: `r:${r.variable}`, ph: r.variable, label: r.variable, src: r.name || r.role || '' });
+    out.push({ key: `r:${r.variable}`, ph: r.variable, label: r.variable, src: r.name || r.role || '', role: r.role || '' });
   }
   for (const f of fieldVars.value) out.push({ key: `f:${f.key}`, ph: f.label, label: f.label, src: f.key });
   return out;
@@ -553,6 +554,16 @@ function addCond() {
 }
 function removeCond(i) {
   conds.value.splice(i, 1);
+  notify();
+}
+/** 从候选菜单挑了一个名字：填进这一格，试剂库知道常用当量就顺手带过来（还能改） */
+function pickCondCand(c, ph, it) {
+  if (!c.vars) c.vars = {};
+  c.vars[ph] = it.name;
+  if (it.eq) {
+    if (!c.varEq) c.varEq = {};
+    c.varEq[ph] = it.eq;
+  }
   notify();
 }
 
@@ -1699,12 +1710,13 @@ const openAttachment = (id) => {
                   <template v-if="condVars.length">
                     <td v-for="v in condVars" :key="v.key">
                       <span class="cond-var-cell">
-                        <input
+                        <CondCand
                           v-model="c.vars[v.ph]"
-                          class="cond-in"
+                          :role="v.role || ''"
+                          :cands="varCandidates[v.ph] || []"
                           :disabled="exp.locked"
                           :placeholder="v.ph === 'T' ? '−40 °C' : v.ph === 't' ? '6 h' : v.ph === 'L' ? 'XPhos' : v.ph"
-                          @input="notify()"
+                          @pick="(it) => pickCondCand(c, v.ph, it)"
                         />
                         <!-- 当量也能作为变量（筛当量：10% / 20% / 1.0 eq…）；空着就用投料表的标准当量 -->
                         <input
