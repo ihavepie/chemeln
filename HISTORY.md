@@ -1,2 +1,2 @@
 
-- **条件行：单击出选择、双击改文字**（用户：「想点那个弹窗可能只是点击到编辑了，或者单击那个弹窗然后双击编辑」）：以前单击值就落进输入框、要开候选得去够右边小箭头。现在 `CondRow` 的值格上挂 `@click`（**延迟 220ms** 再开，不然双击时先弹一下再被关掉，闪）→ `el.blur()` 不进打字态、`open = f.key` 出选择；`@dblclick` → 清掉那个定时器、`open=''`、`focus + select()` 直接改字。右边小箭头照旧**立即**开（不用等）。`onDocClick` 里把 `.cond-f` / `.ruler-pop` 也算「点在自己身上」，否则刚开就被自己关掉。
+- **单击不许进光标：要在 `mousedown` 上拦，不能等 click 再 blur**（用户：「单击还是会光标进去」）：输入框是**按下那一刻**就拿焦点的，`click` 阶段再 `blur()` 已经晚了一拍，光标先闪进去了。现在 `CondRow` 的 `onFieldDown(f, ev)` 在 `mousedown` 里判：①这一格**已经在编辑**（`document.activeElement === el`）→ 什么都不做，正常点、正常选字；②离上一次按下 < 340ms（第二下 = 双击）→ 清定时器、`open=''`、`focus + select()`，**并且不 preventDefault**，让光标落进去；③否则（单击）→ `preventDefault()`（不给焦点、光标不闪）+ 180ms 后开选择。原来的 `@click` / `@dblclick` 两个手势都撤了。

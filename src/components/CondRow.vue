@@ -86,27 +86,38 @@ function onInput(ev, f) {
 }
 
 /**
- * **单击 = 出选择（轮盘 / 胶囊），双击 = 直接改文字。**
- * 以前单击就落进输入框，想点开候选得去够右边那个小箭头；现在整格都能点。
- * 单击要等 220ms 再开，不然双击时它会先弹一下再被双击关掉（闪一下）。
+ * **单击 = 出选择（刻度滑条 / 胶囊），双击 = 直接改文字。**
+ *
+ * 关键在 `mousedown` 上拦：输入框是**按下那一刻**就拿焦点的，等到 click 再 blur 已经晚了
+ * （光标先闪进去一下，用户看得很清楚）。所以单击直接 `preventDefault()` 不给焦点；
+ * 双击的**第二下**放行，光标才落进去。已经在编辑中的格子不拦（不然里面选不了字）。
  */
-let clickTimer = 0;
-function onFieldClick(f, ev) {
+let downTimer = 0;
+let lastDownAt = 0;
+
+function onFieldDown(f, ev) {
   if (props.locked) return;
   const el = ev.target;
-  clearTimeout(clickTimer);
-  clickTimer = setTimeout(() => {
-    el.blur?.();               // 别顺手进打字状态（光标闪在那儿会让人以为要输入）
-    if (open.value !== f.key) open.value = f.key;
-  }, 220);
-}
+  // 已经在编辑这一格：正常点、正常选字，别抢
+  if (document.activeElement === el) return;
 
-function onFieldDblClick(f, ev) {
-  clearTimeout(clickTimer);
-  open.value = '';
-  const el = ev.target;
-  el.focus?.();
-  el.select?.();
+  const now = Date.now();
+  const isDouble = now - lastDownAt < 340;
+  lastDownAt = now;
+
+  if (isDouble) {
+    clearTimeout(downTimer);
+    open.value = '';
+    el.focus?.();
+    el.select?.();
+    return; // 不 preventDefault —— 让光标正常落进去
+  }
+
+  ev.preventDefault(); // 单击：不给焦点，光标不会闪进来
+  clearTimeout(downTimer);
+  downTimer = setTimeout(() => {
+    if (open.value !== f.key) open.value = f.key;
+  }, 180);
 }
 
 function pick(key, v) {
@@ -168,8 +179,7 @@ onBeforeUnmount(() => {
             :title="model[f.key] || ''"
             :placeholder="f.ph"
             :disabled="locked"
-            @click="onFieldClick(f, $event)"
-            @dblclick="onFieldDblClick(f, $event)"
+            @mousedown="onFieldDown(f, $event)"
             spellcheck="false"
             @input="onInput($event, f)"
             @change="model[f.key] = $event.target.value; notify()"
