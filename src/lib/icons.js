@@ -104,6 +104,10 @@ export const ICONS = {
     "vb": "0 0 24 24",
     "inner": "<path d=\"M12 3.4l6.6 3.8v7.6L12 18.6l-6.6-3.8V7.2z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"12\" cy=\"3.4\" r=\"1.4\" fill=\"currentColor\"/><circle cx=\"18.6\" cy=\"15\" r=\"1.4\" fill=\"currentColor\"/><circle cx=\"5.4\" cy=\"15\" r=\"1.4\" fill=\"currentColor\"/>"
   },
+  "arrow-left": {
+    "vb": "0 0 24 24",
+    "inner": "<path d=\"M19.2 12H5.2M10.8 6.4L5.2 12l5.6 5.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+  },
   "qr": {
     "vb": "0 0 24 24",
     "inner": "<rect x=\"4\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/><rect x=\"14\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/><rect x=\"4\" y=\"14\" width=\"6\" height=\"6\" rx=\"1\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M14 14h2.5v2.5H14zM18 18h2v2h-2zM14 18h2v2h-2zM18 14h2v2h-2z\" fill=\"currentColor\"/>"

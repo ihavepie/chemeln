@@ -8963,3 +8963,105 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .sheet-fx-chips { display: inline-flex; gap: 4px; }
 .sheet-fx-chips .qchip { font-size: 10.5px; padding: 1px 8px; }
 .sheet-fx-chips .qchip.is-on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.32); background: #f7f0ea; }
+
+/* ── 「挑几条实验」弹窗（ExpPick：建筛选表、接上一步）─────────────────────────
+   以前这些行一个样式都没有（纯原生按钮）。照 `.recipe-opt` 的样子来：
+   整行可点、悬停淡底、选中的加一圈极淡描边，不搞成框框。 */
+.xpick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.xpick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.xpick-row:hover { background: var(--canvas); }
+.xpick-row.is-on { border-color: #dcdcd7; background: var(--bone); }
+.xpick-box {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 1px solid #cfcdc6;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+}
+.xpick-row.is-on .xpick-box { border-color: var(--accent-ink); }
+.xpick-code { font-size: 10px; color: var(--ink-3); letter-spacing: 0.04em; }
+.xpick-title {
+  font-size: 12.5px;
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xpick-cond { font-size: 10.5px; color: var(--ink-4); white-space: nowrap; }
+.xpick-y { font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+/* 猜出来的「更可能就是它」：暖色小胶囊 */
+.xpick-tag {
+  font-size: 9.5px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f7f0ea;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+/* ── 反应式标题行里的「两步反应」小条 ─────────────────────────────────────
+   第 N 步 / 上一步 / 连上一步画：都不描边，只有悬停才浮出一点底；具体步骤用 mono，
+   跟页面里别的编号一致。 */
+.chain-step {
+  border: none;
+  background: none;
+  padding: 1px 2px;
+  margin-left: 8px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chain-step:hover { color: var(--accent-ink); }
+.chain-join {
+  margin-left: 6px;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chain-join:hover { color: var(--ink-2); border-color: #e4e2dc; }
+.chain-join.is-on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.32); background: #f7f0ea; }
+
+/* 两步反应那条链：列表卡片上标「第 2 步」。做成中性的细胶囊，别跟反应类型那颗
+   （暖色 is-rxn）抢眼——它是位置，不是化学信息。 */
+.tag.is-step {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 1px 6px;
+  background: none;
+  border: 1px solid #e2e0da;
+  color: var(--ink-3);
+}

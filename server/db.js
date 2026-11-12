@@ -411,6 +411,12 @@ ensureColumn('compounds', 'mol', "mol TEXT NOT NULL DEFAULT ''");
 // 存一份结构指纹（化合物 id + updated_at），读缓存时比一下，对不上就丢掉重画。
 ensureColumn('scheme_cache', 'fp', "fp TEXT NOT NULL DEFAULT ''");
 
+// 两步反应：一条记录指向它的「上一步」（另一条记录），串成链。
+// 不在投料表里硬塞两个 step —— 用户说那样不好看，两步本来就是两次投料 / 两次后处理。
+ensureColumn('experiments', 'prev_exp_id', 'prev_exp_id INTEGER');
+// 反应式要不要连上一步一起画（0 = 只画这一段，1 = A→B→C 一张图）
+ensureColumn('experiments', 'chain_draw', 'chain_draw INTEGER NOT NULL DEFAULT 0');
+
 // 分类挂在课题下：'' = 共用（每个课题都看得到），否则只在该课题里出现。
 // 老数据全是 ''，等于先都当共用，新建的分类才跟当前课题走。
 ensureColumn('categories', 'project', "project TEXT NOT NULL DEFAULT ''");

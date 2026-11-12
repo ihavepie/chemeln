@@ -12,7 +12,10 @@ const props = defineProps({
   onSketch: Function,
   onFromTable: Function,   // 投料表 + 产物 → 反应式（存成附件，给导出用）
   liveSvg: String,         // 按投料表算出来的那张图（inline SVG，不落盘；有它就显示它）
+  // 两步反应那条链：`{ step, prev:{id,code}, next:[{id,code}], join }`，没接就是 null
+  chain: { type: Object, default: null },
 });
+const emit = defineEmits(['open-prev', 'open-next', 'toggle-join']);
 
 const scheme = computed(() => props.attachments.find((a) => a.category === 'scheme'));
 </script>
@@ -21,6 +24,35 @@ const scheme = computed(() => props.attachments.find((a) => a.category === 'sche
   <div class="scheme-block">
     <div class="scheme-head">
       <span class="lbl">反应式</span>
+      <!-- 两步反应：接在哪条后面 / 下一步是哪条，点一下跳过去 -->
+      <button
+        v-if="chain && chain.prev"
+        type="button"
+        class="chain-step"
+        title="打开上一步那条记录"
+        @click.stop="emit('open-prev', chain.prev.id)"
+      >
+        第 {{ chain.step }} 步 · 上一步 {{ chain.prev.code }} ←
+      </button>
+      <button
+        v-else-if="chain && chain.next && chain.next.length"
+        type="button"
+        class="chain-step"
+        title="打开下一步那条记录"
+        @click.stop="emit('open-next', chain.next[0].id)"
+      >
+        第 {{ chain.step }} 步 · 下一步 {{ chain.next[0].code }} →
+      </button>
+      <button
+        v-if="chain && chain.prev && !locked"
+        type="button"
+        class="chain-join noprint"
+        :class="{ 'is-on': chain.join }"
+        :title="chain.join ? '这张图现在是「上一步 → 这一步」连着画的；点一下只画这一段' : '把上一步一起画进这张反应式（中间体只画一次）'"
+        @click.stop="emit('toggle-join')"
+      >
+        连上一步画
+      </button>
       <span class="spacer" />
       <!-- 懒得起 ChemDraw 时，直接在画板里把反应物 → 产物连起来 -->
       <button

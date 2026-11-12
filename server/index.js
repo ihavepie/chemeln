@@ -140,11 +140,12 @@ const EXP_COLUMNS = [
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
   'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles', 'lit_note',
   'no_yield', 'apparatus', 'light', 'kind', 'conds_json', 'field_vars_json',
+  'prev_exp_id', 'chain_draw',
 ];
 
 const NUMERIC_COLUMNS = new Set([
   'yield_pct', 'base_mmol', 'product_mass', 'product_mw', 'product_compound_id', 'category_id', 'ee_pct',
-  'no_yield',
+  'no_yield', 'prev_exp_id', 'chain_draw',
 ]);
 
 /** 反应步骤：一条记录里可以有多个阶段，阶段之间夹着后处理就是「两步连开」。 */
@@ -289,6 +290,10 @@ function normalizeExperiment(input) {
     }
     if (key === 'no_yield') {
       out.no_yield = Number(input.no_yield) === 1 ? 1 : 0;   // 0/1 开关，NOT NULL
+      continue;
+    }
+    if (key === 'chain_draw') {
+      out.chain_draw = Number(input.chain_draw) === 1 ? 1 : 0;
       continue;
     }
     out[key] = NUMERIC_COLUMNS.has(key) ? numOrNull(input[key]) : str(input[key]);
@@ -615,7 +620,30 @@ function getExperiment(id) {
     .map(parseScreening);
   // 平行组（重复 / 控制变量）：同一条记录旁边那几个「书签」，顺带算出每条相对基准差在哪
   exp.siblings = exp.group_id ? groupMembers(exp.group_id) : [];
+  // 两步反应那条链：上一步（可能没有）、下一步（可能有好几条平行重复）、自己排第几步
+  exp.prev = exp.prev_exp_id
+    ? db.prepare('SELECT id, code, title, kind, product_name FROM experiments WHERE id = ?').get(exp.prev_exp_id) || null
+    : null;
+  if (!exp.prev) exp.prev_exp_id = null;   // 指的那条已经删了：当没接
+  exp.next = db.prepare('SELECT id, code, title, kind, yield_pct FROM experiments WHERE prev_exp_id = ? ORDER BY id').all(id);
+  exp.chain_step = chainStepOf(id);
   return exp;
+}
+
+/** 自己在两步链上排第几步（顺着 prev_exp_id 往上数，1 = 第一步） */
+function chainStepOf(id) {
+  let step = 1;
+  let cur = id;
+  const seen = new Set([id]);
+  for (let i = 0; i < 64; i++) {
+    const row = db.prepare('SELECT prev_exp_id FROM experiments WHERE id = ?').get(cur);
+    const prev = row && row.prev_exp_id ? Number(row.prev_exp_id) : 0;
+    if (!prev || seen.has(prev)) break;
+    seen.add(prev);
+    cur = prev;
+    step++;
+  }
+  return step;
 }
 
 function parseScreening(row) {
@@ -691,7 +719,7 @@ function listExperiments(query) {
   const sql = `
     SELECT e.id, e.code, e.title, e.objective, e.date, e.status, e.project, e.rxn_type,
            e.yield_pct, e.dr_ee, e.ee_pct, e.updated_at, e.locked, e.category_id,
-           e.product_name, e.product_mass, e.product_mw, e.base_mmol,
+           e.product_name, e.product_compound_id, e.product_mass, e.product_mw, e.base_mmol,
            e.solvent, e.concentration, e.temperature, e.duration, e.atmosphere,
            (SELECT name FROM categories c WHERE c.id = e.category_id) AS category_name,
            (SELECT COUNT(*) FROM attachments a WHERE a.exp_id = e.id) AS attach_count,
@@ -761,6 +789,43 @@ function listExperiments(query) {
       if (p.file_id && !firstFile.get(p.exp_id)) firstFile.set(p.exp_id, p.file_id);
     }
     for (const it of items) it.preview_cmp_file = firstFile.get(it.id) || null;
+  }
+
+  // 两步链：自己排第几步、这条链一共几步（1 步 = 没接，卡片上不标）。
+  // 上游可能在筛选结果之外（比如只筛第二步），所以 prev 关系单独查全表、在 JS 里走。
+  if (items.length) {
+    const prevMap = new Map();
+    for (const r of db.prepare('SELECT id, prev_exp_id FROM experiments').all()) {
+      prevMap.set(Number(r.id), r.prev_exp_id ? Number(r.prev_exp_id) : 0);
+    }
+    const link = new Map(); // id → { step, root }
+    const walk = (id) => {
+      if (link.has(id)) return link.get(id);
+      let step = 1;
+      let cur = id;
+      const seen = new Set([id]);
+      let prev = prevMap.get(id) || 0;
+      while (prev && !seen.has(prev)) {
+        seen.add(prev);
+        step++;
+        cur = prev;
+        prev = prevMap.get(cur) || 0;
+      }
+      const out = { step, root: cur };
+      link.set(id, out);
+      return out;
+    };
+    const count = new Map();
+    for (const id of prevMap.keys()) {
+      const { root } = walk(id);
+      count.set(root, (count.get(root) || 0) + 1);
+    }
+    for (const it of items) {
+      const { step, root } = walk(Number(it.id));
+      it.prev_exp_id = prevMap.get(Number(it.id)) || null;
+      it.chain_step = step;
+      it.chain_len = count.get(root) || 1;
+    }
   }
 
   // total 是「符合筛选条件的总数」，items 可能被 LIMIT 400 截断
@@ -2603,6 +2668,7 @@ route('POST', '/api/experiments', async (req, res) => {
     if (k === 'operator') return data.operator || settingsFor(projectName).owner_name || '';
     if (k === 'steps_json') return data.steps_json ?? '[]';
     if (k === 'no_yield') return Number(data.no_yield) === 1 ? 1 : 0;   // NOT NULL 的 0/1 开关
+    if (k === 'chain_draw') return Number(data.chain_draw) === 1 ? 1 : 0; // 同上：NOT NULL
     if (NUMERIC_COLUMNS.has(k)) return data[k] ?? null;
     return data[k] ?? '';
   });
@@ -2643,6 +2709,18 @@ function readSchemeCache(id) {
  * 投料表里的底物按 `reagents.compound_id` 取，产物按 `product_compound_id`。
  */
 function schemeFp(expId) {
+  const e = db.prepare('SELECT product_compound_id, prev_exp_id FROM experiments WHERE id = ?').get(expId);
+  if (!e) return '';
+  const parts = [compoundFp(expId)];
+  // 接上一步、而且画在一起时，这张图还用了上一步的底物 / 产物和条件文字：
+  // 那边改了也得重画，所以把它的结构指纹 + 文字签名一起算进来
+  const prevId = e.prev_exp_id ? Number(e.prev_exp_id) : 0;
+  if (prevId) parts.push(`prev:${prevId}:${schemeTextSig(prevId)}:${compoundFp(prevId)}`);
+  return parts.filter(Boolean).join('|');
+}
+
+/** 一条记录用到的化合物结构指纹：`id:updated_at`，按 id 数字排序（前端 `liveFp` 拼法一致） */
+function compoundFp(expId) {
   const e = db.prepare('SELECT product_compound_id FROM experiments WHERE id = ?').get(expId);
   if (!e) return '';
   const ids = db
@@ -2655,11 +2733,28 @@ function schemeFp(expId) {
   const rows = db
     .prepare(`SELECT id, updated_at FROM compounds WHERE id IN (${uniq.map(() => '?').join(',')})`)
     .all(...uniq);
-  // 顺序按 id 数字（不是字符串），前端 `liveFp` 拼的是同一个样子，两边要能一 string 比
   return rows
     .sort((a, b) => a.id - b.id)
     .map((r) => `${r.id}:${String(r.updated_at || '')}`)
     .join('|');
+}
+
+/** 会进这张反应式图的文字（条件行 + 投料表 + 产物名）：拿来当「上一步改了没有」的签名 */
+function schemeTextSig(expId) {
+  const e = db
+    .prepare('SELECT solvent, temperature, duration, product_name FROM experiments WHERE id = ?')
+    .get(expId);
+  if (!e) return '';
+  const rows = db
+    .prepare('SELECT role, name, eq, variable FROM reagents WHERE exp_id = ? ORDER BY position, id')
+    .all(expId);
+  return [
+    e.solvent || '',
+    e.temperature || '',
+    e.duration || '',
+    e.product_name || '',
+    ...rows.map((r) => `${r.role || ''}|${r.name || ''}|${r.eq ?? ''}|${r.variable || ''}`),
+  ].join('~');
 }
 
 /**
@@ -2735,6 +2830,25 @@ route('PUT', '/api/experiments/:id', async (req, res, params) => {
   const hasSolventRow =
     Array.isArray(body.reagents) &&
     body.reagents.some((r) => str(r.role).trim() === '溶剂' && str(r.name).trim());
+  // 「接上一步」：不能接自己，也不能接出一个环（A 接 B、B 又接 A）
+  if (data.prev_exp_id !== undefined && data.prev_exp_id !== null) {
+    const pid = Number(data.prev_exp_id);
+    if (pid === id) return fail(res, 400, '不能把记录接成自己的上一步');
+    if (!db.prepare('SELECT 1 AS x FROM experiments WHERE id = ?').get(pid)) {
+      return fail(res, 404, '上一步那条记录不在了');
+    }
+    let cur = pid;
+    const seen = new Set([pid]);
+    for (let i = 0; i < 64; i++) {
+      const row = db.prepare('SELECT prev_exp_id FROM experiments WHERE id = ?').get(cur);
+      const up = row && row.prev_exp_id ? Number(row.prev_exp_id) : 0;
+      if (!up) break;
+      if (up === id) return fail(res, 400, '这样会绕回来（那一步已经在这条前面了）');
+      if (seen.has(up)) break;   // 老数据里的环，别卡着
+      seen.add(up);
+      cur = up;
+    }
+  }
   const changed = changedFields(exp, data, EXP_FIELD_LABELS, { hasSolventRow });
   const sets = Object.keys(data).map((k) => `${k} = ?`);
   const values = Object.values(data);
@@ -2833,6 +2947,8 @@ function trashExperiment(id) {
   });
   db.prepare('UPDATE screenings SET exp_id = NULL WHERE exp_id = ?').run(id);
   db.prepare('UPDATE compounds SET standard_exp_id = NULL WHERE standard_exp_id = ?').run(id);
+  // 别人接在这条后面当「上一步」的，断开（不然链上留个洞、也点不进去）
+  db.prepare('UPDATE experiments SET prev_exp_id = NULL WHERE prev_exp_id = ?').run(id);
   db.prepare('DELETE FROM experiments WHERE id = ?').run(id); // 投料行 / 附件行跟外键级联删掉
   logEvent('experiment', id, 'trash', { detail: `移到回收站：${row.code}` });
   return row;
@@ -2950,7 +3066,9 @@ route('POST', '/api/experiments/:id/parallel', async (req, res, params) => {
         data.title,
         data.date,
         data.status,
-        ...EXP_COLUMNS.slice(4).map((k) => (k === 'group_id' ? groupId : data[k] ?? null)),
+        ...EXP_COLUMNS.slice(4).map((k) =>
+          k === 'group_id' ? groupId : k === 'chain_draw' ? (Number(data.chain_draw) === 1 ? 1 : 0) : data[k] ?? null
+        ),
         ts,
         ts
       );
@@ -3537,7 +3655,9 @@ route('POST', '/api/trash/:id/restore', async (req, res, params) => {
     // 老快照里可能没有后来加的列（新字段都走 ensureColumn）。缺的列不能写 NULL：
     // sel_method 这些是 NOT NULL DEFAULT ''，显式 NULL 会报错，这条就永远恢复不了。
     const cols = [...EXP_COLUMNS, 'locked'].filter((k) => k in e);
-    const values = cols.map((k) => (k === 'code' ? code : e[k] ?? null));
+    const values = cols.map((k) =>
+      k === 'code' ? code : k === 'chain_draw' ? (Number(e.chain_draw) === 1 ? 1 : 0) : e[k] ?? null
+    );
     db.exec('BEGIN');
     try {
       db.prepare(

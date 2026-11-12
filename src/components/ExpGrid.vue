@@ -32,6 +32,8 @@ const activeId = () => (route.name === 'editor' ? Number(route.params.id) : null
  * 附件是生成那一刻的快照，改了投料表它不会变，卡片和记录页就会显示两个不同的反应式（用户报过）。
  * 缓存里的图可能已经作废（化合物结构改过，服务端指纹对不上会回 404）→ 那张加载失败就退回附件。
  */
+/* 两步反应那条链：卡片上标「第 2 步」（没接的记录不标） */
+const chainTag = (it) => (Number(it && it.chain_len) > 1 ? `第 ${Number(it.chain_step) || 1} 步` : '');
 const badThumb = reactive(new Set());
 function onThumbErr(it) {
   if (!badThumb.has(it.id)) badThumb.add(it.id);
@@ -338,6 +340,7 @@ function groupMenu(ev, g) {
                 <div class="grid-body">
                   <div class="top">
                     <span class="exp-code">{{ card.it.code }}</span>
+                    <span v-if="chainTag(card.it)" class="tag is-step">{{ chainTag(card.it) }}</span>
                     <span class="tag" :class="STATUS_TONE[card.it.status]" style="font-size: 9px; padding: 1px 6px">{{ card.it.status }}</span>
                     <span class="exp-date">{{ card.it.date }}</span>
                   </div>
@@ -382,6 +385,7 @@ function groupMenu(ev, g) {
               <div class="grid-body">
                 <div class="top">
                   <span class="exp-code">{{ card.it.code }}</span>
+                  <span v-if="chainTag(card.it)" class="tag is-step">{{ chainTag(card.it) }}</span>
                   <span class="tag" :class="STATUS_TONE[card.it.status]" style="font-size: 9px; padding: 1px 6px">{{ card.it.status }}</span>
                   <span class="exp-date">{{ card.it.date }}</span>
                 </div>

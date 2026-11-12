@@ -14,7 +14,10 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   /** 已经在表里的 id，别再让勾 */
   exclude: { type: Array, default: () => [] },
+  /** 更可能是想要的那几条（比如「产物正好是本条底物」的记录）：排在最前面，带一颗小标 */
+  preferIds: { type: Array, default: () => [] },
   title: { type: String, default: '挑几条实验' },
+  confirmText: { type: String, default: '加入' },
 });
 const emit = defineEmits(['close', 'confirm']);
 
@@ -49,13 +52,16 @@ watch(
   }
 );
 
+const prefer = computed(() => new Set((props.preferIds || []).map(Number)));
 const list = computed(() => {
   const kw = q.value.trim().toLowerCase();
-  return all.value.filter((e) => {
+  const rows = all.value.filter((e) => {
     if (excl.value.has(Number(e.id))) return false;
     if (!kw) return true;
     return `${e.code} ${e.title} ${e.substrates || ''} ${e.product_name || ''}`.toLowerCase().includes(kw);
   });
+  // 猜的那几条排前面（只调顺序，不藏别的）
+  return rows.slice().sort((x, y) => Number(prefer.value.has(Number(y.id))) - Number(prefer.value.has(Number(x.id))));
 });
 
 const pickedCount = computed(() => Object.keys(picked.value).length);
@@ -77,7 +83,7 @@ function confirm() {
   <AppModal
     :model-value="modelValue"
     :title="title"
-    confirm-text="加入"
+    :confirm-text="confirmText"
     width="560px"
     :close-on-backdrop="false"
     @close="emit('close')"
@@ -97,6 +103,7 @@ function confirm() {
           <span class="xpick-code mono">{{ e.code }}</span>
           <span class="xpick-title">{{ e.title || '（未命名实验）' }}</span>
           <span class="xpick-cond">{{ cond(e) }}</span>
+          <span v-if="prefer.has(Number(e.id))" class="xpick-tag">产物是这条的底物</span>
           <span class="xpick-y mono">{{ e.yield_pct == null ? '' : `${e.yield_pct}%` }}</span>
         </button>
       </li>

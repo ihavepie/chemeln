@@ -18,6 +18,7 @@ import CatPick from '../components/CatPick.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
+import ExpPick from '../components/ExpPick.vue';
 import ProductBind from '../components/ProductBind.vue';
 import SyncConflicts from '../components/SyncConflicts.vue';
 import { api } from '../api.js';
@@ -36,7 +37,7 @@ import { preloadSchemeLib } from '../lib/scheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
-import { composeSchemeSvg } from '../lib/scheme.js';
+import { composeChainSvg } from '../lib/scheme.js';
 import { analyzeSmiles, svgToFile } from '../lib/chem.js';
 
 const route = useRoute();
@@ -83,6 +84,9 @@ const fields = reactive({
   scheme_smiles: '',
   lit_note: '',
   kind: '',
+  // 两步反应：接在上一步哪条记录后面 + 反应式要不要连上一步一起画
+  prev_exp_id: null,
+  chain_draw: 0,
 });
 
 const reagent = reactive({ base: null, steps: [], rows: [] });
@@ -337,6 +341,11 @@ function fill(e) {
   for (const k of FIELD_KEYS) if (k in e) fields[k] = e[k] ?? (typeof fields[k] === 'number' ? null : '');
   fields.no_yield = Number(e.no_yield) === 1 ? 1 : 0;   // 0/1 开关，别让它变成 null
   fields.product_compound_id = e.product_compound_id ?? null;
+  fields.prev_exp_id = e.prev_exp_id ?? null;
+  fields.chain_draw = Number(e.chain_draw) === 1 ? 1 : 0;
+  prevExp.value = e.prev || null;
+  nextExps.value = Array.isArray(e.next) ? e.next : [];
+  chainStep.value = Number(e.chain_step) || 1;
 
   applyKindBlocks(String(e.kind || ''));
 
@@ -1005,6 +1014,9 @@ const liveSig = computed(() =>
     d: fields.duration || '',
     pn: fields.product_name || '',
     pc: fields.product_compound_id ?? '',
+    // 两步反应：接的是哪条、要不要连起来画（都进 sig，不然切开关不重画）
+    pv: fields.prev_exp_id ?? '',
+    cd: Number(fields.chain_draw) === 1 ? 1 : 0,
   })
 );
 /* 这张图用到的化合物「结构改过没有」：`id:updated_at` 拼一串。
@@ -1025,6 +1037,85 @@ const liveFp = computed(() => {
   return out.join('|');
 });
 const liveFpShown = ref('');
+
+/* ---------- 两步反应：一条记录接在「上一步」后面 ---------- */
+const prevExp = ref(null);      // 上一步那条记录（id / code / title）
+const nextExps = ref([]);       // 下一步：可能有好几条（同一步重复做）
+const chainStep = ref(1);       // 自己排第几步
+/** 交给 SchemeBlock 的那条小字条；没接就不显示 */
+const chainInfo = computed(() => {
+  if (!exp.value) return null;
+  const prev = prevExp.value;
+  const next = nextExps.value || [];
+  if (!prev && !next.length) return null;
+  return {
+    step: chainStep.value || 1,
+    prev: prev ? { id: prev.id, code: prev.code } : null,
+    next: next.map((n) => ({ id: n.id, code: n.code })),
+    join: Number(fields.chain_draw) === 1,
+  };
+});
+async function refreshChain() {
+  const id = exp.value?.id;
+  if (!id) return;
+  const e = await api.experiment(id).catch(() => null);
+  if (!e || exp.value?.id !== id) return;
+  prevExp.value = e.prev || null;
+  nextExps.value = Array.isArray(e.next) ? e.next : [];
+  chainStep.value = Number(e.chain_step) || 1;
+}
+const prevPickOpen = ref(false);
+/** 「接上一步」弹窗里往前排的那几条：产物正好是本条底物的记录（链上通常就是这个） */
+const prevPrefers = computed(() => {
+  const mine = new Set(
+    (reagent.rows || []).filter((r) => r.role === '底物' && r.compound_id).map((r) => Number(r.compound_id))
+  );
+  if (!mine.size) return [];
+  return (store.items || [])
+    .filter((e) => Number(e.id) !== Number(exp.value?.id) && mine.has(Number(e.product_compound_id)))
+    .map((e) => e.id);
+});
+function openPrevPick() {
+  moreMenu.value = false;
+  prevPickOpen.value = true;
+}
+function openRecord(id) {
+  if (id) router.push(`/e/${id}`);
+}
+async function linkPrev(ids) {
+  prevPickOpen.value = false;
+  const id = Array.isArray(ids) ? Number(ids[0]) : Number(ids);
+  if (!id || id === Number(exp.value?.id)) return;
+  fields.prev_exp_id = id;
+  notify();
+  await flush();
+  await refreshChain();
+  scheduleLive(0);
+  const code = prevExp.value?.code || '';
+  if (code) toast(`接上了：${code} → ${exp.value.code}`, 'ok');
+}
+async function unlinkPrev() {
+  const ok = await confirm({ title: '断开上一步？', body: '只断这个链接，两条记录本身都不动。反应式会回到只画这一段。' });
+  if (!ok) return;
+  fields.prev_exp_id = null;
+  notify();
+  await flush();
+  await refreshChain();
+  scheduleLive(0);
+}
+/** 反应式连上一步一起画（A → B → C 一张图） */
+function toggleChainDraw() {
+  fields.chain_draw = Number(fields.chain_draw) === 1 ? 0 : 1;
+  notify();
+  scheduleLive(0);
+}
+/** 「上一步」那条记录的构件（画连着的那张图要用）：不缓存，画的次数不多，省得改完不同步 */
+async function prevParts(id) {
+  const e = await api.experiment(id).catch(() => null);
+  if (!e) return null;
+  if (!(store.compounds && store.compounds.length)) await loadCompounds();
+  return schemeParts({ ...e, field_vars: e.field_vars || [], reagents: e.reagents || [] }, store.compounds || []);
+}
 let liveTimer = null;
 function scheduleLive(ms = 700) {
   clearTimeout(liveTimer);
@@ -1072,16 +1163,25 @@ async function drawLive() {
       liveFpShown.value = '';
       return;
     }
-    const svg = await composeSchemeSvg({
-      reactants: parts.reactants,
-      reactantIds: parts.reactantIds,
-      reactantVers: parts.reactantVers,
-      product: parts.product,
-      productId: parts.productId,
-      productVer: parts.productVer,
-      productLabel: parts.product ? '' : parts.prodName,
-      above: parts.above,
-      below: parts.below,
+    const stage = (p) => ({
+      reactants: p.reactants,
+      reactantIds: p.reactantIds,
+      reactantVers: p.reactantVers,
+      product: p.product,
+      productId: p.productId,
+      productVer: p.productVer,
+      productLabel: p.product ? '' : p.prodName,   // 还不知道产物结构就把名字写在箭头右边
+      above: p.above,
+      below: p.below,
+    });
+    const stages = [stage(parts)];
+    // 「连上一步一起画」：把上一步那条也算进这张图（中间体只画一次，两段箭头各带各的条件）
+    if (Number(fields.chain_draw) === 1 && prevExp.value?.id) {
+      const pp = await prevParts(prevExp.value.id);
+      if (pp && pp.reactants.length) stages.unshift(stage(pp));
+    }
+    const svg = await composeChainSvg({
+      stages,
       background: false,     // 直接贴在纸面上，别垫一块白方块
     });
     if (exp.value?.id !== id) return;   // 等的时候切到别的记录了：这份丢掉
@@ -1167,17 +1267,23 @@ async function schemeFromTable() {
 
   let svg;
   try {
-    svg = await composeSchemeSvg({
-      reactants: parts.reactants,
-      reactantIds: parts.reactantIds,
-      reactantVers: parts.reactantVers,
-      product: parts.product,
-      productId: parts.productId,
-      productVer: parts.productVer,
-      productLabel: hasProduct ? '' : parts.prodName,
-      above: parts.above,
-      below: parts.below,
+    const stage2 = (p) => ({
+      reactants: p.reactants,
+      reactantIds: p.reactantIds,
+      reactantVers: p.reactantVers,
+      product: p.product,
+      productId: p.productId,
+      productVer: p.productVer,
+      productLabel: p.product ? '' : p.prodName,
+      above: p.above,
+      below: p.below,
     });
+    const stages2 = [stage2(parts)];
+    if (Number(fields.chain_draw) === 1 && prevExp.value?.id) {
+      const pp = await prevParts(prevExp.value.id);
+      if (pp && pp.reactants.length) stages2.unshift(stage2(pp));
+    }
+    svg = await composeChainSvg({ stages: stages2 });
   } catch (e) {
     return toast(e.message || '反应式没拼出来', 'err');
   }
@@ -1940,6 +2046,11 @@ const openAttachment = (id) => {
             <button @click="undoSave()"><Icon name="undo" :size="13" /> 撤销上次保存</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验</button>
             <button @click="openProductBind()"><Icon name="molecule" :size="13" /> 绑定产物…</button>
+            <button @click="openPrevPick()"><Icon name="arrow-left" :size="13" /> 接上一步…</button>
+            <button v-if="prevExp" @click="unlinkPrev(); moreMenu = false"><Icon name="x" :size="13" /> 断开上一步（{{ prevExp.code }}）</button>
+            <button v-if="prevExp" @click="toggleChainDraw(); moreMenu = false">
+              <Icon name="molecule" :size="13" /> {{ fields.chain_draw ? '只画这一段（不连起来）' : '反应式连上一步一起画' }}
+            </button>
             <div class="menu-sep" />
             <button class="menu-danger" @click="removeExperiment(); moreMenu = false">
               <Icon name="trash" :size="13" /> 移入回收站
@@ -2095,6 +2206,10 @@ const openAttachment = (id) => {
             :on-sketch="openSchemePad"
             :on-from-table="schemeFromTable"
             :live-svg="liveScheme"
+            :chain="chainInfo"
+            @open-prev="openRecord"
+            @open-next="openRecord"
+            @toggle-join="toggleChainDraw"
           />
 
           <ReagentTable
@@ -2490,6 +2605,17 @@ const openAttachment = (id) => {
       @create="(info) => createProductFromStructure(info).catch((e) => toast(e.message || '没能建化合物', 'err'))"
       @draw="drawProduct"
       @archive="archiveProduct"
+    />
+
+    <!-- 「接上一步」：从记录里挑一条当这条的前一步（产物正好是本条底物的排前面） -->
+    <ExpPick
+      :model-value="prevPickOpen"
+      title="这一步接在哪条记录后面？"
+      confirm-text="接上"
+      :exclude="exp ? [exp.id] : []"
+      :prefer-ids="prevPrefers"
+      @close="prevPickOpen = false"
+      @confirm="linkPrev"
     />
 
     <PrintPanel

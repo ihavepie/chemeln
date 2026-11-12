@@ -229,128 +229,121 @@ async function molSvg(smiles, id, molfile = '') {
 }
 
 /**
- * 拼一张完整的反应式 SVG。
- * @param {object} p
- * @param {string[]} p.reactants 反应物 SMILES（两个底物就是两条）
- * @param {string} p.product     产物 SMILES
- * @param {string[]} p.above     箭头上方的几行字（试剂 / 催化剂）
- * @param {string[]} p.below     箭头下方的几行字（溶剂 / 温度 / 时间、放不下的试剂）
- */
-/**
- * @param {object} o
+ * 拼一张完整的反应式 SVG。**支持多段**（两步反应：A →(条件1) B →(条件2) C）：
+ * 每段自己有反应物 / 产物 / 箭头上下那几行字；上一段的产物要是正好是这一段的底物
+ * （同一个化合物），只画一次、当中间那道桥。
+ * @param {object[]} o.stages 每段 `{reactants, reactantIds, reactantVers, product, productId, productVer, productLabel, above, below}`
  * @param {boolean} [o.background] 铺一层白底（存成附件 / 打印时要用）；
  *   直接贴在纸面上看（比如筛选表表头那张）就传 false，不然纸面会多出一块白方块。
  */
-export async function composeSchemeSvg({
-  reactants = [],
-  reactantIds = [],       // 与 reactants 平行：有化合物 id 就去库里问有没有「带缩写的那份画」
-  reactantVers = [],      // 与 reactants 平行：化合物 updated_at，结构改过就换一份画
-  product = '',
-  productId = null,
-  productVer = '',
-  productLabel = '',
-  above = [],
-  below = [],
-  background = true,
-} = {}) {
-  const rs = [];
-  for (let i = 0; i < reactants.length; i++) {
-    if (!String(reactants[i] || '').trim()) continue;
-    const mol = reactantIds[i] ? await abbrevMol(reactantIds[i], reactantVers[i] || '') : '';
-    rs.push(await molSvg(reactants[i], `r${i}`, mol));
-  }
-  const prod = product ? await molSvg(product, 'p', productId ? await abbrevMol(productId, productVer) : '') : null;
-  // 试反应常常还不知道产物结构：那就只画「反应物 →（箭头）」，
-  // 有产物名就把名字写在箭头右边（没有就干脆留空），不再因为缺产物拒绝出图。
-  const pLabel = String(productLabel || '').trim();
-  if (!rs.length) throw new Error('至少要一个反应物');
-
+export async function composeChainSvg({ stages = [], background = true } = {}) {
   const GAP = 12;          // 结构之间的一般间距
   const PLUS = 18;         // 加号的宽度
   const ARROW_MIN = 110;   // 箭头最短多长；实际长度按上下最长那行字来（够写条件就行，别拉太长）
   const MAX_ARROW = 320;   // 但别让一行长字把箭头拉到 500+：折行后还超长就截在这里
-  // 箭头上下的条件字号（跟结构式里的原子标签差不多大；以前 13px 偏小，用户说看不清）
-  const CAP_SIZE = 15;
-  // 箭头那块地方要放得下最长的那行字（按 CAP_SIZE 估宽：中文全角、西文约 0.53 倍），
-  // 否则字会压到反应物上
-  // 系数按实测校准过：15px 的 Helvetica 混排大约 0.47×字号 / 西文字符，中文按全角 1.0×
-  const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? CAP_SIZE : CAP_SIZE * 0.47), 0);
-  // 条件先折行（单行最多 ~250px，最多 2 行），再拿折完最宽的那行算箭头长度
-  const MAX_LINE_W = 250;
-  const capAbove = above
-    .filter((t) => lineText(t).trim())
-    .flatMap((l) => wrapPhrases(l, MAX_LINE_W, textW))
-    .filter((l) => lineText(l).trim());
-  const capBelow = below
-    .filter((t) => lineText(t).trim())
-    .flatMap((l) => wrapPhrases(l, MAX_LINE_W, textW))
-    .filter((l) => lineText(l).trim());
-  const capW = Math.max(0, ...[...capAbove, ...capBelow].map((t) => textW(lineText(t))));
-  // 画出来那根线比 arrowLen 短（两头留白 / 箭头尖用掉了约 37px），所以这里补回来：
-  // 目标 = 线比最长的条件行宽 16px 左右（+30 而不是以前的 +53，箭头别太肥）
-  const arrowLen = Math.min(MAX_ARROW, Math.max(ARROW_MIN, Math.round(capW) + 30));
-  const arrowW = arrowLen + 26;                                // 这块区域两头各留 13px，字不会贴到结构上
+  const CAP_SIZE = 15;     // 箭头上下的条件字号（跟结构式里的原子标签差不多大）
+  const MAX_LINE_W = 250;  // 条件先折行（单行最多 ~250px，最多 2 行），再拿折完最宽的那行算箭头长度
   const LINE_H = 20;
   const CAP_GAP = 12;      // 最近那行字离箭头多远
-  const capTopH = capAbove.length ? capAbove.length * LINE_H + CAP_GAP : 0;
-  const capBotH = capBelow.length ? capBelow.length * LINE_H + CAP_GAP : 0;
+  // 字号按实测校准过：15px 的 Helvetica 混排大约 0.47×字号 / 西文字符，中文按全角 1.0×
+  const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? CAP_SIZE : CAP_SIZE * 0.47), 0);
 
-  const maxMolH = Math.max(...rs.map((r) => r.h), prod ? prod.h : 0);
-  const cy = PAD + capTopH + maxMolH / 2; // 所有结构都按这条中轴对齐
-  const height = Math.round(cy + maxMolH / 2 + capBotH + PAD);
+  // ① 每个结构先出图（同一张图里同一个化合物只出一种，两步共用的中间体不会画两遍）
+  const drawn = new Map();
+  const draw = async (smiles, id, ver) => {
+    const key = id ? `i${id}:${ver || ''}` : `s${smiles}`;
+    if (!drawn.has(key)) {
+      const mol = id ? await abbrevMol(id, ver) : '';
+      drawn.set(key, await molSvg(smiles, key, mol));
+    }
+    return drawn.get(key);
+  };
+  const caps = (list) =>
+    (list || [])
+      .filter((t) => lineText(t).trim())
+      .flatMap((l) => wrapPhrases(l, MAX_LINE_W, textW))
+      .filter((l) => lineText(l).trim());
 
-  // 横向排：反应物（+ 加号）→ 箭头 → 产物
-  let x = PAD;
-  const placed = [];
-  rs.forEach((r, i) => {
-    if (i) x += PLUS + GAP * 2;
-    placed.push({ ...r, x, y: cy - r.h / 2 });
-    x += r.w;
-  });
-  x += GAP * 2;
-  const arrowZone = x;
-  // 箭头画在这块地方的正中，字也居中在箭头上
-  const arrowX1 = arrowZone + (arrowW - arrowLen) / 2;
-  const arrowX2 = arrowX1 + arrowLen;
-  x = arrowZone + arrowW + GAP * 2;
-  const PROD_SIZE = 15;
-  // 产物名（没有产物结构时写在箭头右边）用衬线斜体，跟 ChemDraw 里手写字标的样式接近；
-  // 结构式里的原子标签本身也是衬线字体，普通 sans 站在旁边会显得「另一套字体」
-  const PROD_FONT = "'Times New Roman', Times, 'Songti SC', serif";
-  const pLabelW = pLabel ? [...pLabel].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? PROD_SIZE : PROD_SIZE * 0.55), 0) : 0;
-  const prodPos = prod ? { ...prod, x, y: cy - prod.h / 2 } : null;
-  x += prod ? prod.w : pLabelW;
-  x += PAD;
-  const width = Math.round(x);
+  // ② 排成一串节点：结构 / 加号 / 箭头 / 产物名
+  const nodes = [];
+  let prevKey = ''; // 上一段的产物：下一段里跟它同一个的底物不再画一次
+  for (let si = 0; si < stages.length; si++) {
+    const st = stages[si] || {};
+    const above = caps(st.above);
+    const below = caps(st.below);
+    const capW = Math.max(0, ...[...above, ...below].map((t) => textW(lineText(t))));
+    // 画出来那根线比 arrowLen 短（两头留白 / 箭头尖用掉了约 37px），所以这里补回来
+    const arrowLen = Math.min(MAX_ARROW, Math.max(ARROW_MIN, Math.round(capW) + 30));
 
-  const molTag = (m) =>
-    `<svg x="${Math.round(m.x)}" y="${Math.round(m.y)}" width="${m.w}" height="${m.h}" viewBox="${esc(m.vb)}" preserveAspectRatio="xMidYMid meet">${m.body}</svg>`;
+    const rs = [];
+    const list = st.reactants || [];
+    for (let i = 0; i < list.length; i++) {
+      const smi = String(list[i] || '').trim();
+      if (!smi) continue;
+      const id = st.reactantIds && st.reactantIds[i] ? Number(st.reactantIds[i]) : null;
+      const key = id ? `i${id}` : `s${smi}`;
+      if (si > 0 && key === prevKey) continue; // 就是上一段的产物：已经画在上一根箭头右边了
+      rs.push(await draw(smi, id, (st.reactantVers && st.reactantVers[i]) || ''));
+    }
+    const pSmi = String(st.product || '').trim();
+    const pId = st.productId ? Number(st.productId) : null;
+    const prod = pSmi ? await draw(pSmi, pId, st.productVer || '') : null;
+    prevKey = pSmi ? (pId ? `i${pId}` : `s${pSmi}`) : '';
 
-  let pluses = '';
-  let px = placed[0].x + placed[0].w;
-  for (let i = 1; i < placed.length; i++) {
-    const mid = (px + placed[i].x) / 2;
-    pluses += `<text x="${Math.round(mid)}" y="${Math.round(cy + 7)}" text-anchor="middle" font-size="20" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">+</text>`;
-    px = placed[i].x + placed[i].w;
+    rs.forEach((r, i) => {
+      if (i) nodes.push({ kind: 'plus', w: PLUS });
+      nodes.push({ kind: 'mol', mol: r, w: r.w });
+    });
+    nodes.push({
+      kind: 'arrow',
+      w: arrowLen + 26, // 这块区域两头各留 13px，字不会贴到结构上
+      len: arrowLen,
+      above,
+      below,
+      capTopH: above.length ? above.length * LINE_H + CAP_GAP : 0,
+      capBotH: below.length ? below.length * LINE_H + CAP_GAP : 0,
+    });
+    const pLabel = String(st.productLabel || '').trim();
+    if (prod) nodes.push({ kind: 'mol', mol: prod, w: prod.w });
+    else if (pLabel) {
+      const PROD_SIZE = 15;
+      nodes.push({
+        kind: 'label',
+        text: pLabel,
+        w: [...pLabel].reduce((a, ch) => a + (ch.charCodeAt(0) > 255 ? PROD_SIZE : PROD_SIZE * 0.55), 0),
+      });
+    }
   }
+  const mols = nodes.filter((n) => n.kind === 'mol');
+  const arrows = nodes.filter((n) => n.kind === 'arrow');
+  if (!mols.length) throw new Error('至少要一个反应物');
 
-  const arrow =
-    `<line x1="${Math.round(arrowX1)}" y1="${Math.round(cy)}" x2="${Math.round(arrowX2 - 9)}" y2="${Math.round(cy)}" stroke="#1b1a17" stroke-width="1.8"/>` +
-    `<path d="M ${Math.round(arrowX2 - 10)} ${Math.round(cy - 5.5)} L ${Math.round(arrowX2)} ${Math.round(cy)} L ${Math.round(arrowX2 - 10)} ${Math.round(cy + 5.5)} Z" fill="#1b1a17"/>`;
+  // ③ 纵向：所有结构共一条中轴，箭头上下那几行字按各自的行数往上 / 往下长
+  const maxMolH = Math.max(...mols.map((m) => m.mol.h));
+  const capTopMax = arrows.length ? Math.max(...arrows.map((a) => a.capTopH)) : 0;
+  const capBotMax = arrows.length ? Math.max(...arrows.map((a) => a.capBotH)) : 0;
+  const cy = PAD + capTopMax + maxMolH / 2;
+  const height = Math.round(cy + maxMolH / 2 + capBotMax + PAD);
 
-  const capX = Math.round(arrowZone + arrowW / 2);
-  // 下标 / 上标靠 tspan 的 dy 挪基线，字号小一号；挪完要挪回来，不然后面全跟着跑
+  // ④ 横向：从左到右依次排（加号两边只留半个 GAP，免得「+」离结构太远）
+  let x = PAD;
+  nodes.forEach((n, i) => {
+    if (i) x += nodes[i - 1].kind === 'plus' || n.kind === 'plus' ? GAP * 0.5 : GAP;
+    n.x = x;
+    x += n.w;
+  });
+  const width = Math.round(x + PAD);
+
+  // 条件文字：每段字自己带着「相对上一段的基线偏移」走（正常 0、下标 +3、上标 -4）
   const SIZE = CAP_SIZE;
-  const textTag = (line, y) => {
-    // 每段字自己带着「相对上一段的基线偏移」走：正常 0、下标 +3、上标 -4。
-    // 以前是「先记 pending 再还回去」写反了——下标没往下挪，后面的字反而被抬起来，
-    // 整行看着上上下下地飘（用户截过图）。现在按「目标偏移 - 当前偏移」算 dy，不会攒错。
+  let cap = '';
+  const textTag = (line, capX, y) => {
     let cur = 0;
     const spans = [];
     const parts = lineParts(line);
     parts.forEach((part, pi) => {
       const fill = roleColor(part.role);
-      const text = pi ? `, ${part.text}` : part.text;   // 段与段之间用西文逗号（跟「Name (20 mol%)」的括号配套）
+      const text = pi ? `, ${part.text}` : part.text; // 段与段之间用西文逗号（跟「Name (20 mol%)」的括号配套）
       for (const r of splitScript(text)) {
         const want = r.kind === 'sub' ? 3 : r.kind === 'sup' ? -4 : 0;
         const dy = want - cur;
@@ -361,15 +354,36 @@ export async function composeSchemeSvg({
         spans.push(`<tspan${dyAttr}${size}${colorAttr}>${esc(r.t)}</tspan>`);
       }
     });
-    return `<text x="${capX}" y="${Math.round(y)}" text-anchor="middle" font-size="${SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${spans.join('')}</text>`;
+    return `<text x="${Math.round(capX)}" y="${Math.round(y)}" text-anchor="middle" font-size="${SIZE}" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">${spans.join('')}</text>`;
   };
-  let cap = '';
-  capAbove.forEach((line, i) => {
-    cap += textTag(line, cy - CAP_GAP - (capAbove.length - 1 - i) * LINE_H);
-  });
-  capBelow.forEach((line, i) => {
-    cap += textTag(line, cy + CAP_GAP + 9 + i * LINE_H);
-  });
+  // 产物名（没有产物结构时写在箭头右边）用衬线斜体，跟 ChemDraw 里手写字标的样式接近
+  const PROD_FONT = "'Times New Roman', Times, 'Songti SC', serif";
+
+  let body = '';
+  let pluses = '';
+  for (const n of nodes) {
+    if (n.kind === 'mol') {
+      const m = n.mol;
+      body += `<svg x="${Math.round(n.x)}" y="${Math.round(cy - m.h / 2)}" width="${m.w}" height="${m.h}" viewBox="${esc(m.vb)}" preserveAspectRatio="xMidYMid meet">${m.body}</svg>`;
+    } else if (n.kind === 'plus') {
+      pluses += `<text x="${Math.round(n.x + n.w / 2)}" y="${Math.round(cy + 7)}" text-anchor="middle" font-size="20" font-family="Helvetica, Arial, sans-serif" fill="#1b1a17">+</text>`;
+    } else if (n.kind === 'label') {
+      body += `<text x="${Math.round(n.x)}" y="${Math.round(cy + 5)}" font-size="15" font-family="${PROD_FONT}" font-style="italic" fill="#1b1a17">${esc(n.text)}</text>`;
+    } else if (n.kind === 'arrow') {
+      const x1 = n.x + (n.w - n.len) / 2;
+      const x2 = x1 + n.len;
+      const capX = n.x + n.w / 2;
+      body +=
+        `<line x1="${Math.round(x1)}" y1="${Math.round(cy)}" x2="${Math.round(x2 - 9)}" y2="${Math.round(cy)}" stroke="#1b1a17" stroke-width="1.8"/>` +
+        `<path d="M ${Math.round(x2 - 10)} ${Math.round(cy - 5.5)} L ${Math.round(x2)} ${Math.round(cy)} L ${Math.round(x2 - 10)} ${Math.round(cy + 5.5)} Z" fill="#1b1a17"/>`;
+      n.above.forEach((line, i) => {
+        cap += textTag(line, capX, cy - CAP_GAP - (n.above.length - 1 - i) * LINE_H);
+      });
+      n.below.forEach((line, i) => {
+        cap += textTag(line, capX, cy + CAP_GAP + 9 + i * LINE_H);
+      });
+    }
+  }
 
   return (
     // `xmlns:xlink` 别省：带缩写的分子是 Indigo 画的，它用 `xlink:href="#glyph…"` 引字形，
@@ -377,14 +391,14 @@ export async function composeSchemeSvg({
     // 就是致命的 XML 错误——整张图空白（踩过）
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     (background ? `<rect width="100%" height="100%" fill="#ffffff"/>` : '') +
-    placed.map(molTag).join('') +
+    body +
     pluses +
-    arrow +
-    (prodPos ? molTag(prodPos) : '') +
-    (pLabel
-      ? `<text x="${Math.round(arrowZone + arrowW + GAP * 2)}" y="${Math.round(cy + PROD_SIZE * 0.35)}" font-size="${PROD_SIZE}" font-family="${PROD_FONT}" font-style="italic" fill="#1b1a17">${esc(pLabel)}</text>`
-      : '') +
     cap +
     '</svg>'
   );
+}
+
+/** 单段的（绝大多数地方还是只画一根箭头）：包一层就行 */
+export async function composeSchemeSvg(opts = {}) {
+  return composeChainSvg({ stages: [opts], background: opts.background !== false });
 }

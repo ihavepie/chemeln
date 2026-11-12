@@ -274,6 +274,8 @@ async function dropRow(anchor, groupKey, gap) {
 
 /** 记录类型（试反应 / 条件筛选…）。反应类型单独做成一颗胶囊（`.tag.is-rxn`），不挤进那段文字里 */
 const rxnDesc = (m) => String(m.kind || '').trim();
+/* 两步反应那条链：`第 2 步`（单独一条记录、没接就不显示） */
+const chainTag = (it) => (Number(it && it.chain_len) > 1 ? `第 ${Number(it.chain_step) || 1} 步` : '');
 const rxnType = (m) => String(m.rxn_type || '').trim();
 
 /* 组员段展开 / 收起：高度 + 上边距一起过渡，下面那些卡片跟着被推下去，
@@ -401,6 +403,7 @@ function onStackFace(row) {
             <span class="exp-code">{{ row.one.code }}</span>
             <span v-if="row.one.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
             <span class="tag" :class="STATUS_TONE[row.one.status]" style="font-size: 9px; padding: 1px 6px">{{ row.one.status }}</span>
+            <span v-if="chainTag(row.one)" class="tag is-step">{{ chainTag(row.one) }}</span>
             <span v-if="rxnType(row.one)" class="tag is-rxn">{{ rxnType(row.one) }}</span>
             <span class="exp-date">{{ row.one.date }}</span>
           </div>
@@ -448,6 +451,7 @@ function onStackFace(row) {
                 <span class="exp-code">{{ row.face.code }}</span>
                 <span v-if="row.face.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
                 <span class="stack-badge">平行 ×{{ row.members.length }}</span>
+                <span v-if="chainTag(row.face)" class="tag is-step">{{ chainTag(row.face) }}</span>
                 <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
                 <span v-if="rxnType(row.face)" class="tag is-rxn">{{ rxnType(row.face) }}</span>
                 <span class="exp-date">{{ row.face.date }}</span>
