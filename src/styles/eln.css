@@ -8268,3 +8268,7 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .sheet .rtable tr.rt-var td.var-amt.is-liquid { font-weight: 400; color: var(--ink-2); }
 .sheet .rtable tr.rt-var .cond-in { font-size: 12px; }
 .sheet .rtable tr.rt-var .cond-cand { min-width: 120px; }
+
+/* 条件那一行左边原来有个「条件」小字，用户说不要（内容自己会说话）——
+   去掉左边距后，第一格（反应温度）跟下面投料表的「组分」列左边缘对齐。 */
+.cond-above { padding-left: 0; padding-right: 0; }
