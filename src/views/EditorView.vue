@@ -26,7 +26,9 @@ import { KINDS, RXN_TYPES, KIND_BLOCKS } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, prompt, toast } from '../lib/feedback.js';
-import { amountText, derive, eqNum, mwText, num, round, saneDensity, volText } from '../lib/reagent.js';
+import { amountText, derive, eqLabel, eqNum, mwText, num, round, saneDensity, volText } from '../lib/reagent.js';
+import { buildReportCard, reportCardCss } from '../lib/reportcard.js';
+import { downloadBlob } from '../lib/print.js';
 import { schemeParts } from '../lib/expScheme.js';
 import { preloadSchemeLib } from '../lib/scheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
@@ -1529,6 +1531,67 @@ async function snapshotHtml() {
   }
 }
 
+/**
+ * 「一页汇报卡」：给导师看的**一张纸** —— 反应式 / 条件 / 投料 / 产率·选择性 / TLC。
+ * 不带记录簿抬头、操作现象、后处理、表征、讨论（那些是自己看的）；谱图也不进纸面。
+ */
+async function exportReportCard() {
+  closeMore();
+  if (!exp.value) return;
+  if (dirty.value) await flush();
+  try {
+    await renderLive();                      // 反应式按当前投料表重画一遍（缓存命中很快）
+    const rows = reagent.rows
+      .filter((r) => String(r.name || '').trim() && !r.variable)
+      .map((r) => ({
+        role: r.role,
+        name: r.name,
+        mw: num(r.mw),
+        eqText: r.role === '溶剂' ? '' : eqLabel(r.eq),
+        mmol: num(r.mmol),
+        amount: String(r.amountText || '').trim() || amountText(derive({ ...r })),
+      }));
+    const subs = reagent.rows
+      .filter((r) => r.role === '底物' && String(r.name || '').trim() && !r.variable)
+      .map((r) => r.name);
+    const prod = String(fields.product_name || '').trim();
+    const conds = [
+      { k: '反应温度', v: fields.temperature },
+      { k: '时间', v: fields.duration },
+      { k: '气氛', v: fields.atmosphere },
+      { k: '装置', v: fields.apparatus },
+      { k: '光照', v: fields.light },
+      { k: '反应规模', v: reagent.base ? `${round(reagent.base, 3)} mmol` : '' },
+    ];
+    const yields = fields.no_yield
+      ? '不计产率'
+      : String(fields.yield_pct ?? '').trim()
+        ? `${round(Number(fields.yield_pct), 1)}%`
+        : '';
+    const sel = [String(fields.dr_ee || '').trim(), String(fields.ee_pct || '').trim() ? `ee ${fields.ee_pct}%` : '']
+      .filter(Boolean)
+      .join(' / ');
+    const html = buildReportCard({
+      code: exp.value.code,
+      date: fields.date,
+      title: String(fields.title || fields.objective || exp.value.code || '').trim(),
+      subtitle: subs.length || prod ? `${subs.join(' + ') || '?'} → ${prod || '产物（待定）'}` : '',
+      schemeSvg: liveScheme.value || '',
+      conds,
+      base: reagent.base,
+      rows,
+      result: { name: prod, appearance: fields.appearance, yieldText: yields, selText: sel, drText: '' },
+      tlc: { note: fields.tlc_note, plates: tlcShots.value.map((f) => `/api/files/${f.id}`) },
+    });
+    const name = `汇报卡-${exp.value.code || '记录'}.pdf`;
+    const blob = await api.printPdf({ pages: [html], css: reportCardCss(), filename: name });
+    downloadBlob(blob, name);
+    toast('汇报卡好了，一张 A4，直接发就行');
+  } catch (e) {
+    toast(e.message || '生成汇报卡失败', 'err');
+  }
+}
+
 /** 点 TLC 图 / 反应式看大图：走弹窗预览（要下载再在弹窗里下） */
 const preview = ref(null);
 const openAttachment = (id) => {
@@ -1623,6 +1686,7 @@ const openAttachment = (id) => {
                 <Icon name="download" :size="13" /> 导出 <span class="menu-caret">›</span>
               </button>
               <div v-if="exportSub" class="menu menu-sub">
+                <button @click="exportReportCard()"><Icon name="file" :size="13" /> 一页汇报卡（PDF）</button>
                 <button @click="exportOne(); closeMore()"><Icon name="file" :size="13" /> 本条记录</button>
                 <button @click="exportAll(); closeMore()"><Icon name="book" :size="13" /> 整本记录</button>
                 <button @click="snapshotPng(); closeMore()"><Icon name="image" :size="13" /> 长图 PNG</button>
