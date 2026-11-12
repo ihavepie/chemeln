@@ -57,6 +57,18 @@ function pathBox(d) {
 }
 
 /**
+ * 这一组字是不是「黑字」。缩写成字（Ts / Bn / OMe…）是黑的；带杂原子的原子标（OH / N / H3C）
+ * 是彩色的（O 红、N 蓝）。`<use>` 没被 `<g fill>` 包住时按黑算（默认色）。
+ */
+function isBlackFill(fill) {
+  const f = String(fill || '').replace(/\s+/g, '');
+  if (!f) return true;
+  if (/rgb\(0%,0%,0%\)/i.test(f)) return true;
+  if (/^#(000000|1a1a1a|000)$/i.test(f)) return true;
+  return false;
+}
+
+/**
  * @param {string} svg Indigo / Ketcher 出图（带 `matrix(...)` 的那套）
  * @param {string} mol 同一结构的 molfile（只取 `M  SMT` 的缩写文本，不用坐标）
  * @param {number} ratio 标签字高 / 键长
@@ -123,22 +135,9 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
   // ---- 3) 缩写文本（M  SMT）按**位置**匹配到各组
   // 以前按「字符数唯一匹配」：结构里只要还有 N / O 这种普通原子标，组数就跟 SMT 条数对不上，
   // 整张图直接退回 Indigo 的衬线字形（用户看到的「这块文字跟别处不一样」）。现在改成：
-  // 用 molfile 里 SAL 的附着原子坐标 + matrix 算出每个缩写该在哪，取最近的那一组。
-  const molText = String(mol || '');
-  const molLines = molText.split(/\r?\n/);
-  const natoms = parseInt(String(molLines[3] || '').slice(0, 3), 10) || 0;
-  const atomXY = (i) => {
-    const parts = String(molLines[3 + i] || '').trim().split(/\s+/);
-    return [parseFloat(parts[0]), parseFloat(parts[1])];
-  };
-  const salOf = new Map();     // SMT 编号 → 附着原子（1 起）
-  const smts = [];
-  for (const line of molLines) {
-    let m = line.match(/^M  SAL\s+(\d+)\s+(\d+)/);
-    if (m) salOf.set(+m[1], +m[2]);
-    m = line.match(/^M  SMT\s+(\d+)\s+(.+)$/);
-    if (m) smts.push({ n: +m[1], text: m[2].trim().replace(/\s+/g, '') });
-  }
+  // 用 molfile 里 S 组的附着原子坐标 + matrix 算出每个缩写该在哪，取最近的那一组。
+  const { natoms, atomXY, attachOf } = molGeom(mol);
+  const smts = smtList(mol);
   if (!smts.length) return src;
   const capGuess = Math.max(...[...glyphs.values()].map((x) => x.h), 1);
   const boxes = groups.map((g) => {
@@ -153,7 +152,7 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
   const pairs = [];
   const used = new Set();
   for (const s of smts) {
-    const ai = salOf.get(s.n);
+    const ai = attachOf(s.n);
     if (!ai || ai > natoms) return src;
     const [ax, ay] = atomXY(ai);
     if (!Number.isFinite(ax) || !Number.isFinite(ay)) return src;
@@ -179,9 +178,12 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
   }
 
   // ---- 4) 每组的锚：最近的键端点（纯几何）
+  // 缩放**不能写死 40**：Ketcher 出图的 matrix 是 `matrix(40,…)`，而 indigo-ketcher 直接渲的是
+  // `matrix(100,…)`（一根键 100 单位）。写死 40 时「重画结构式」那条路的图键端全算到 1/2.5 处，
+  // 锚点偏得离谱 → 判成「认不准」整张退回 Indigo 原图。一律按 matrix 自己的缩放算。
   const ends = [];
   for (const m of src.matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
-    ends.push([mTx + 40 * +m[1], mTy + mD * +m[2]], [mTx + 40 * +m[3], mTy + mD * +m[4]]);
+    ends.push([mTx + mA * +m[1], mTy + mD * +m[2]], [mTx + mA * +m[3], mTy + mD * +m[4]]);
   }
   if (!ends.length) return src;
 
@@ -296,10 +298,12 @@ function stripLabelWrappers(svg) {
 /** 重算画布：无衬线字比原来宽，标签会顶出去（不重算就被裁） */
 function fitCanvas(svg, mainSize, subSize) {
   const mat = svg.match(/transform="matrix\(([^)]+)\)"/);
-  const [, , , mD, mTx, mTy] = mat[1].split(',').map(Number);
+  // 缩放按 matrix 实际值来（Ketcher 是 40、indigo-ketcher 是 100）；写死 40 会把画布算小、
+  // 把右边整块结构裁在 viewBox 外面（用户报的「被截断」就是这么来的）
+  const [mA, , , mD, mTx, mTy] = mat[1].split(',').map(Number);
   const pts = [];
   for (const m of svg.matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
-    pts.push([mTx + 40 * +m[1], mTy + mD * +m[2]], [mTx + 40 * +m[3], mTy + mD * +m[4]]);
+    pts.push([mTx + mA * +m[1], mTy + mD * +m[2]], [mTx + mA * +m[3], mTy + mD * +m[4]]);
   }
   // 还没换掉的字形标签（原子标：N / O / H3C…）也得算进画布，不然重算 viewBox 会把它裁掉
   for (const m of svg.matchAll(/<use xlink:href="#[^"]+" x="(-?[\d.]+)" y="(-?[\d.]+)"\/>/g)) {
@@ -346,7 +350,8 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
   const mat = src.match(/transform="matrix\(([^)]+)\)"/);
   if (!mat) return src;
   const [mA, mB, , mD, mTx, mTy] = mat[1].split(',').map(Number);
-  const bond = Math.hypot(mA, mB) || BOND_PX;   // 键长 = matrix 的缩放量（Ketcher 出图是 40）
+  // 键长 = matrix 的缩放量（Ketcher 出图是 40、indigo-ketcher 直接渲的是 100，别写死）
+  const bond = Math.hypot(mA, mB) || BOND_PX;
 
   // 字形墨迹尺寸
   const glyphs = new Map();
@@ -364,7 +369,7 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
   // 键段（用户坐标），用来算留白
   const segs = [];
   for (const m of src.matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
-    segs.push([mTx + 40 * +m[1], mTy + mD * +m[2], mTx + 40 * +m[3], mTy + mD * +m[4]]);
+    segs.push([mTx + mA * +m[1], mTy + mD * +m[2], mTx + mA * +m[3], mTy + mD * +m[4]]);
   }
 
   // 分组：同基线 + 横向相邻
@@ -460,7 +465,7 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
   // 画布：键端 + 放大后的标签框都要装得下
   const pts = [];
   for (const m of out.matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
-    pts.push([mTx + 40 * +m[1], mTy + mD * +m[2]], [mTx + 40 * +m[3], mTy + mD * +m[4]]);
+    pts.push([mTx + mA * +m[1], mTy + mD * +m[2]], [mTx + mA * +m[3], mTy + mD * +m[4]]);
   }
   for (const m of out.matchAll(/<g transform="translate\((-?[\d.]+) (-?[\d.]+)\) scale\((-?[\d.]+)\) translate\((-?[\d.]+) (-?[\d.]+)\)">([\s\S]*?)<\/g>/g)) {
     const k = +m[3];
@@ -528,17 +533,62 @@ function bondEnds(svg) {
   return pts;
 }
 
+/** molfile 里的 `M  SMT` 缩写：`[{n, text}]`（n = S 组编号，text = 标签文字） */
+function smtList(mol) {
+  const out = [];
+  for (const line of String(mol || '').split(/\r?\n/)) {
+    const m = line.match(/^M  SMT\s+(\d+)\s+(.+)$/);
+    if (m) out.push({ n: +m[1], text: m[2].trim().replace(/\s+/g, '') });
+  }
+  return out;
+}
+
+/**
+ * molfile → 原子数 / 原子坐标 / 每个 S 组的**附着原子**（1 起）。
+ * 附着原子优先取 `M  SAP`（Indigo、Ketcher 都会写）；没有 SAP 才退回**第一条** `M  SAL` 的
+ * 第一个原子 —— 一个 S 组可能有好几条 SAL 行（比如 Ts：S+甲苯 一行、两个 O 另一行），
+ * 后面的行第一个原子是 O，拿它当锚会指到错的地方（踩过）。
+ */
+function molGeom(mol) {
+  const lines = String(mol || '').split(/\r?\n/);
+  const natoms = parseInt(String(lines[3] || '').slice(0, 3), 10) || 0;
+  const atomXY = (i) => {
+    const parts = String(lines[3 + i] || '').trim().split(/\s+/);
+    return [parseFloat(parts[0]), parseFloat(parts[1])];
+  };
+  const salOf = new Map();
+  const sapOf = new Map();
+  for (const line of lines) {
+    let m = line.match(/^M  SAL\s+(\d+)\s+(\d+)/);
+    if (m && !salOf.has(+m[1])) salOf.set(+m[1], +m[2]);
+    m = line.match(/^M  SAP\s+(\d+)\s+\d+\s+(\d+)/);
+    if (m) sapOf.set(+m[1], +m[2]);
+  }
+  const attachOf = (n) => sapOf.get(n) ?? salOf.get(n) ?? 0;
+  return { natoms, atomXY, attachOf };
+}
+
 /** 把一张图里的字形 <use> 按「同一基线 + 横向相邻」聚成标签，返回 {items, box} */
 function glyphGroups(svg) {
+  const src = String(svg);
   const glyphs = new Map();
-  for (const g of String(svg).matchAll(/<g id="(glyph-[^"]+)">\s*<path d="([^"]+)"/g)) {
+  for (const g of src.matchAll(/<g id="(glyph-[^"]+)">\s*<path d="([^"]+)"/g)) {
     const box = pathBox(g[2]);
     glyphs.set(g[1], { w: Math.max(box.x1, 0.4), h: -box.y0, d: g[2].trim() });
   }
   const cap = Math.max(...[...glyphs.values()].map((x) => x.h), 1);
+  // 每个 <use> 外面那层 `<g fill="…">` 的颜色：**缩写（S 组）是黑字，带杂原子的原子标（OH/N）是彩色**，
+  // 靠这个分辨「字数一样」的两组（Bn 撞 OH 就是这么分的，比拿 molfile 坐标投影稳）
+  const fillAt = new Map();
+  for (const g of src.matchAll(/<g fill="([^"]+)"[^>]*>([\s\S]*?)<\/g>/g)) {
+    const start = g.index + g[0].indexOf(g[2]);
+    for (const u of g[2].matchAll(/<use xlink:href="#[^"]+" x="[^"]*" y="[^"]*"\/>/g)) {
+      fillAt.set(start + u.index, g[1]);
+    }
+  }
   const uses = [];
-  for (const u of String(svg).matchAll(/<use xlink:href="#([^"]+)" x="(-?[\d.]+)" y="(-?[\d.]+)"\/>/g)) {
-    uses.push({ raw: u[0], id: u[1], x: +u[2], y: +u[3] });
+  for (const u of src.matchAll(/<use xlink:href="#([^"]+)" x="(-?[\d.]+)" y="(-?[\d.]+)"\/>/g)) {
+    uses.push({ raw: u[0], id: u[1], x: +u[2], y: +u[3], fill: fillAt.get(u.index) || '' });
   }
   const lines = [];
   for (const u of uses) {
@@ -578,12 +628,7 @@ function glyphGroups(svg) {
  * 只在「结构里有缩写（M  SMT）」时才有意义。
  */
 export async function chemdrawLabelsExact(mol, indigoSvg, ratio = LABEL_RATIO) {
-  const lines = String(mol || '').split(/\r?\n/);
-  const smts = [];
-  for (const line of lines) {
-    const m = line.match(/^M  SMT\s+(\d+)\s+(.+)$/);
-    if (m) smts.push({ n: +m[1], text: m[2].trim().replace(/\s+/g, '') });
-  }
+  const smts = smtList(mol);
   if (!smts.length) return '';
 
   // ① 一条一条单独渲，拿到每个缩写在图里的位置
@@ -593,14 +638,23 @@ export async function chemdrawLabelsExact(mol, indigoSvg, ratio = LABEL_RATIO) {
     try {
       one = await indigoSvg(molWithOnlyText(mol, s.n));
     } catch (e) {
-      return '';
+      continue;   // 这条渲不出来就跳过它，别的照换
     }
-    // 只留一条缩写后，长度等于它字数的那一组就是它；万一还撞上同样长的原子标（H3C 之类），
-    // 宁可这一个不换，也别换错
+    // 只留一条缩写后，长度等于它字数的那一组就是它。**撞车不放弃**：结构里常见的
+    // OH / CH3 这类原子标跟缩写字数一样（比如 Bn 撞 OH），先用颜色筛——缩写字是黑的、
+    // 带杂原子的原子标是彩色的（实测 OH 那个 O 是 rgb(100%, 5.1%, 5.1%)）；
+    // 筛完还不唯一就只跳过这一条，别的照换（别为了一个标签把整张图退回衬线字形）。
     const all = glyphGroups(one);
-    const cands = all.filter((g) => g.items.length === s.text.length);
-    if (cands.length !== 1) return '';
-    const box = cands[0].box;
+    const sized = all.filter((g) => g.items.length === s.text.length);
+    if (!sized.length) continue;
+    let cands = sized;
+    if (cands.length > 1) {
+      const black = sized.filter((g) => g.items.every((it) => isBlackFill(it.fill)));
+      if (black.length) cands = black;
+    }
+    if (cands.length !== 1) continue;
+    const pick = cands[0];
+    const box = pick.box;
     // 锚点 = 离标签最近的键端点：键端点坐标就是 molfile 坐标，**每张渲染里都一样**，
     // 而标签自身的坐标会随整图归一化平移（这张图别的标签被换成了 X，宽度变了，整图就挪了）
     let anchor = null;
@@ -612,9 +666,10 @@ export async function chemdrawLabelsExact(mol, indigoSvg, ratio = LABEL_RATIO) {
         anchor = e;
       }
     }
-    if (!anchor) return '';
-    spots.push({ text: s.text, box, anchor, offset: [(box.x0 + box.x1) / 2 - anchor[0], box.baseY - anchor[1]], paths: cands[0].paths });
+    if (!anchor) continue;
+    spots.push({ text: s.text, box, anchor, offset: [(box.x0 + box.x1) / 2 - anchor[0], box.baseY - anchor[1]], paths: pick.paths });
   }
+  if (!spots.length) return '';
 
   // ② 整图再来一张，把位置对得上的那几组字形换成文字
   let base = '';
@@ -656,12 +711,13 @@ export async function chemdrawLabelsExact(mol, indigoSvg, ratio = LABEL_RATIO) {
         best = i;
       }
     });
-    if (best < 0 || bestD > sp.box.cap * 1.5) return '';
+    if (best < 0 || bestD > sp.box.cap * 1.5) continue;   // 这条认不准就跳过，别拖累整张图
     used.add(best);
     pairs.push({ g: groups[best], text: sp.text });
   }
 
   // ③ 换字：字号按 Indigo 的字形高度换算成同一视觉高度，下标只认数字
+  if (!pairs.length) return '';   // 一条都没认出来 → 交给调用方退回（别拿原图冒充结果）
   const capOld = Math.max(...groups.map((g) => g.box.cap), 1);
   const mainSize = Math.round((capOld / CAP_RATIO) * 10) / 10;
   const subSize = Math.round(mainSize * 0.75 * 10) / 10;
