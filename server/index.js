@@ -1526,7 +1526,53 @@ function compoundLabelUrl(id, baseOverride, project = '') {
   return `${labelBase(baseOverride, project)}/#/c/${id}`;
 }
 
-/** 从一条实验的产物创建化合物（可按分类把谱图/结构图一起搬过来） */
+/**
+ * 把实验里的谱图 / TLC 文件搬进化合物目录。
+ * `skipExisting` 时同一类（h1 / c13 / tlc…）已经有了就不重复搬 —— 补档案那条路要用。
+ */
+function copyExpFilesToCompound(exp, compoundId, { ts, skipExisting = false } = {}) {
+  // 别再把「反应式」那张图当产物的结构图搬过去（整条反应 ≠ 一个结构）。
+  // 结构图由前端从产物 SMILES 算出来 / 画板画出来后单独上传。
+  const wanted = new Set(['h1', 'c13', 'nmr_other', 'nmr_raw', 'nmr_pdf', 'tlc']);
+  const have = new Set(
+    skipExisting
+      ? db.prepare('SELECT DISTINCT category FROM compound_files WHERE compound_id = ?').all(compoundId).map((r) => r.category)
+      : []
+  );
+  const dir = path.join(COMPOUND_DIR, String(compoundId));
+  fs.mkdirSync(dir, { recursive: true });
+  for (const a of exp.attachments) {
+    if (!wanted.has(a.category)) continue;
+    if (have.has(a.category)) continue;
+    const category = a.category;
+    const newRow = db
+      .prepare(
+        `INSERT INTO compound_files(compound_id, category, filename, original_name, size, mime, is_dir, note, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`
+      )
+      .run(compoundId, category, a.filename, a.original_name, a.size, a.mime, a.is_dir, a.note, ts);
+    const fileId = Number(newRow.lastInsertRowid);
+    const target = uniquePath(dir, `${fileId}__${a.original_name || a.filename}`);
+    const srcPath = attachmentPath(a);
+    try {
+      if (a.is_dir) fs.cpSync(srcPath, target, { recursive: true });
+      else fs.copyFileSync(srcPath, target);
+      db.prepare('UPDATE compound_files SET filename = ? WHERE id = ?').run(path.basename(target), fileId);
+    } catch {
+      db.prepare('DELETE FROM compound_files WHERE id = ?').run(fileId);
+    }
+  }
+}
+
+/**
+ * 从一条实验的产物「建 / 补」化合物档案。
+ *
+ * **幂等**：这条记录已经绑过化合物就**不再新建一份** —— 以前点两次「产物存库」，
+ * 库里会多出一个 `SJ-2-1-2`，记录还被偷偷改绑到新的那份上。
+ * 现在只把它**空着**的格子补上（名称 / MW / 性状 / NMR 三栏 / TLC / 操作），
+ * 已经有内容的一律不动（跟「手填过就不动」同一个规矩）；谱图也只在缺那一类时补。
+ * 返回 `{ compound, created }`，created=false 就是「只补了一次」。
+ */
 function compoundFromExperiment(expId, { copyFiles = true } = {}) {
   const exp = getExperiment(expId);
   if (!exp) return null;
@@ -1541,6 +1587,47 @@ function compoundFromExperiment(expId, { copyFiles = true } = {}) {
   const ts = nowISO();
   // 产物挂库时跟着那条记录的课题走
   const projectValue = str(exp.project);
+  const patch = {
+    name: str(exp.product_name) || `${exp.code} 产物`,
+    mw: numOrNull(exp.product_mw),
+    appearance: str(exp.appearance),
+    nmr_h1: h1,
+    nmr_c13: c13,
+    nmr_other: rest,
+    tlc_solvent: str(exp.tlc_note),
+    procedure: str(exp.procedure),
+  };
+
+  const bound = exp.product_compound_id
+    ? db.prepare('SELECT * FROM compounds WHERE id = ?').get(exp.product_compound_id)
+    : null;
+  if (bound) {
+    const sets = [];
+    const args = [];
+    const filled = [];
+    for (const [col, value] of Object.entries(patch)) {
+      const cur = bound[col];
+      const isEmpty = cur === null || cur === undefined || String(cur).trim() === '';
+      if (!isEmpty) continue;                       // 已经有内容：一个字都不动
+      if (value === null || value === undefined || String(value).trim() === '') continue;
+      sets.push(`${col} = ?`);
+      args.push(value);
+      filled.push(col);
+    }
+    if (!numOrNull(bound.standard_exp_id)) {
+      sets.push('standard_exp_id = ?');
+      args.push(exp.id);
+    }
+    if (sets.length) {
+      sets.push('updated_at = ?');
+      args.push(ts);
+      db.prepare(`UPDATE compounds SET ${sets.join(', ')} WHERE id = ?`).run(...args, bound.id);
+      logEvent('compound', bound.id, 'sync', { detail: `从 ${exp.code} 补了空着的格子`, fields: filled });
+    }
+    if (copyFiles) copyExpFilesToCompound(exp, bound.id, { ts, skipExisting: true });
+    return { compound: getCompound(bound.id), created: false };
+  }
+
   const row = db
     .prepare(
       `INSERT INTO compounds(code, name, kind, formula, mw, appearance, mp, smiles,
@@ -1548,40 +1635,14 @@ function compoundFromExperiment(expId, { copyFiles = true } = {}) {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     )
     .run(
-      uniqueCompoundCode(exp.code), str(exp.product_name) || `${exp.code} 产物`, '产物', '', numOrNull(exp.product_mw),
-      str(exp.appearance), '', '', h1, c13, rest, str(exp.tlc_note), '', str(exp.procedure), '', exp.id, projectValue, ts, ts
+      uniqueCompoundCode(exp.code), patch.name, '产物', '', patch.mw,
+      patch.appearance, '', '', patch.nmr_h1, patch.nmr_c13, patch.nmr_other, patch.tlc_solvent, '', patch.procedure,
+      '', exp.id, projectValue, ts, ts
     );
   const id = Number(row.lastInsertRowid);
   db.prepare('UPDATE experiments SET product_compound_id = ?, updated_at = ? WHERE id = ?').run(id, ts, expId);
-
-  if (copyFiles) {
-    const dir = path.join(COMPOUND_DIR, String(id));
-    fs.mkdirSync(dir, { recursive: true });
-    // 别再把「反应式」那张图当产物的结构图搬过去（整条反应 ≠ 一个结构）。
-    // 结构图由前端从产物 SMILES 算出来 / 画板画出来后单独上传。
-    const wanted = new Set(['h1', 'c13', 'nmr_other', 'nmr_raw', 'nmr_pdf', 'tlc']);
-    for (const a of exp.attachments) {
-      if (!wanted.has(a.category)) continue;
-      const category = a.category;
-      const newRow = db
-        .prepare(
-          `INSERT INTO compound_files(compound_id, category, filename, original_name, size, mime, is_dir, note, created_at)
-           VALUES (?,?,?,?,?,?,?,?,?)`
-        )
-        .run(id, category, a.filename, a.original_name, a.size, a.mime, a.is_dir, a.note, ts);
-      const fileId = Number(newRow.lastInsertRowid);
-      const target = uniquePath(dir, `${fileId}__${a.original_name || a.filename}`);
-      const srcPath = attachmentPath(a);
-      try {
-        if (a.is_dir) fs.cpSync(srcPath, target, { recursive: true });
-        else fs.copyFileSync(srcPath, target);
-        db.prepare('UPDATE compound_files SET filename = ? WHERE id = ?').run(path.basename(target), fileId);
-      } catch {
-        db.prepare('DELETE FROM compound_files WHERE id = ?').run(fileId);
-      }
-    }
-  }
-  return getCompound(id);
+  if (copyFiles) copyExpFilesToCompound(exp, id, { ts });
+  return { compound: getCompound(id), created: true };
 }
 
 /* -------------------------------------------------------------- routing */
@@ -2069,9 +2130,10 @@ route('POST', '/api/compounds/from-experiment', async (req, res) => {
   const body = await readJson(req);
   const expId = Number(body.exp_id);
   if (!expId) return fail(res, 400, '缺少 exp_id');
-  const compound = compoundFromExperiment(expId, { copyFiles: body.copy_files !== false });
-  if (!compound) return fail(res, 404, '实验不存在');
-  ok(res, { compound });
+  const out = compoundFromExperiment(expId, { copyFiles: body.copy_files !== false });
+  if (!out) return fail(res, 404, '实验不存在');
+  // created=false：这条记录早就绑过化合物，这次只是把它空着的格子补了一下，没有新建
+  ok(res, { compound: out.compound, created: out.created });
 });
 
 route('GET', '/api/compounds/:id', async (req, res, params) => {

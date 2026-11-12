@@ -1321,19 +1321,27 @@ function archiveProduct() {
 
 async function saveToCompound() {
   moreMenu.value = false;
+  // 已经绑过化合物的记录：这次是「补空着的格子」，不会在库里再造一份
+  const already = Number(fields.product_compound_id) > 0;
   const ok = await confirm({
-    title: '将本实验产物存入化合物库？',
-    body: '将新建化合物档案，并带入名称、分子量、表征、TLC 与操作步骤；谱图与结构图一并复制。',
-    confirmText: '存入',
+    title: already ? '产物已经在库里了，补一下空着的格子？' : '将本实验产物存入化合物库？',
+    body: already
+      ? '不会新建化合物：只把库里那份空着的格子和缺的谱图补上（已经有内容的一律不动）。'
+      : '将新建化合物档案，并带入名称、分子量、表征、TLC 与操作步骤；谱图一并复制。',
+    confirmText: already ? '补一下' : '存入',
   });
   if (!ok) return;
   try {
-    const c = await api.compoundFromExperiment(exp.value.id);
+    const { compound: c, created } = await api.compoundFromExperiment(exp.value.id);
     fields.product_compound_id = c.id;
     // 顺手补一张真·结构图：从反应式里的产物 SMILES 算（以前是把整张反应式搬过去当结构图，不对）
-    await attachProductStructure(c.id).catch(() => {});
+    if (created) await attachProductStructure(c.id).catch(() => {});
     await loadBoot();
-    toast(`已存入化合物库：${c.code || c.name || '新化合物'}`);
+    toast(
+      created
+        ? `已存入化合物库：${c.code || c.name || '新化合物'}`
+        : `${c.code || c.name} 早就在库里了：只把空着的格子补上，没另建一份`
+    );
   } catch (e) {
     toast(e.message, 'err');
   }

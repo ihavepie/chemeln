@@ -140,8 +140,12 @@ export const api = {
   saveCompound: (id, body) => request(`/api/compounds/${id}`, { method: 'PUT', body }).then((d) => d.compound),
   deleteCompound: (id) => request(`/api/compounds/${id}`, { method: 'DELETE' }),
   moveCompound: (id, body) => request(`/api/compounds/${id}/move`, { method: 'POST', body }).then((d) => d.compound),
+  // 已经是「建 / 补」二合一：`created:false` 表示这条记录早绑过化合物，只补了空着的格子
   compoundFromExperiment: (expId) =>
-    request('/api/compounds/from-experiment', { method: 'POST', body: { exp_id: expId, copy_files: true } }).then((d) => d.compound),
+    request('/api/compounds/from-experiment', { method: 'POST', body: { exp_id: expId, copy_files: true } }).then((d) => ({
+      compound: d.compound,
+      created: d.created !== false,
+    })),
   uploadCompoundFile: (id, formData) => request(`/api/compounds/${id}/files`, { method: 'POST', body: formData }),
   uploadCompoundPath: (id, body) => request(`/api/compounds/${id}/files/path`, { method: 'POST', body }),
   updateCompoundFile: (id, body) => request(`/api/compound-files/${id}`, { method: 'PUT', body }),

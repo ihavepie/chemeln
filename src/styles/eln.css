@@ -8720,3 +8720,12 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   cursor: pointer;
 }
 .pbind-link:hover { color: var(--accent); }
+
+/* 「绑定产物」里「已经绑好了」那颗对勾：不占按钮位，只是把状态说清楚 */
+.pbind-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--accent-ink);
+}

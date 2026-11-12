@@ -49,6 +49,11 @@ const same = computed(() => {
   return list.value.find((c) => norm(c.smiles) === s) || null;
 });
 
+/** 已经绑的就是反应式里这个结构：没什么可做的了 */
+const alreadySame = computed(
+  () => !!bound.value && !!same.value && Number(bound.value.id) === Number(same.value.id)
+);
+
 const shown = computed(() => {
   const key = q.value.trim().toLowerCase();
   if (!key) return list.value.slice(0, 40);
@@ -124,13 +129,20 @@ function createNew() {
         <div v-if="info" class="pbind-struct">
           <div class="pbind-svg" v-html="info.svg" />
           <div class="pbind-acts">
-            <button v-if="same" type="button" class="btn btn-sm" @click="emit('bind', same)">
+            <span v-if="alreadySame" class="pbind-ok">
+              <Icon name="check" :size="12" /> 已经绑好了
+            </span>
+            <button v-else-if="same" type="button" class="btn btn-sm" @click="emit('bind', same)">
               绑定 {{ same.code || same.name }}
             </button>
             <button v-else type="button" class="btn btn-sm" :disabled="loading" @click="createNew">
               新建化合物并绑定
             </button>
-            <span v-if="same" class="pbind-muted">库里已经有同样结构，直接绑它</span>
+            <span v-if="alreadySame" class="pbind-muted">反应式里的产物就是「{{ bound.code || bound.name }}」，不用再建</span>
+            <span v-else-if="same" class="pbind-muted">库里已经有同样结构，直接绑它</span>
+            <span v-else-if="bound" class="pbind-muted">
+              库里没有这个结构；会另建一份，现在绑的「{{ bound.code || bound.name }}」留在库里不动
+            </span>
             <span v-else class="pbind-muted">库里没有这个结构，会新建一份档案（带结构图 / 分子式 / MW）</span>
           </div>
         </div>
