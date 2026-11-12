@@ -19,6 +19,7 @@ import HistoryModal from '../components/HistoryModal.vue';
 import PrintPanel from '../components/PrintPanel.vue';
 import ProjPick from '../components/ProjPick.vue';
 import ProductBind from '../components/ProductBind.vue';
+import SyncConflicts from '../components/SyncConflicts.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
@@ -1319,6 +1320,11 @@ function archiveProduct() {
   void saveToCompound();
 }
 
+/** 冲突列表（补档案时两边都有但不一样的格子） */
+const syncOpen = ref(false);
+const syncData = ref(null);
+const syncBusy = ref(false);
+
 /** 冲突里的值太长就截一下（NMR / 操作步骤都是一大段） */
 const shortVal = (v) => {
   const t = String(v ?? '').replace(/\s+/g, ' ').trim();
@@ -1348,19 +1354,17 @@ async function saveToCompound() {
     const c = pre.compound;
     const name = c?.code || c?.name || '那份档案';
 
-    // 有冲突：先说清哪几格不一样，再让他选覆盖还是不覆盖
+    // 有冲突：开「冲突列表」，一格一格选要哪边（像代码合并那样）
     if (pre.conflicts.length) {
-      const overwrite = await confirmLines({
-        title: `「${name}」有 ${pre.conflicts.length} 处跟这条记录不一样`,
-        lines: pre.conflicts.map((x) => `${x.label}：档案「${shortVal(x.current)}」／记录「${shortVal(x.incoming)}」`),
-        hint: '要用记录里的值覆盖吗？不想覆盖的话，下面可以只补空着的格子。',
-        confirmText: '用记录里的覆盖',
-        cancelText: '不要覆盖',
-      });
-      if (overwrite) {
-        await applyArchive(true);
-        return;
-      }
+      syncData.value = {
+        compound: pre.compound,
+        conflicts: pre.conflicts,
+        fills: pre.fills,
+        filesCopy: pre.filesCopy,
+        filesSkip: pre.filesSkip,
+      };
+      syncOpen.value = true;
+      return;
     }
 
     if (!pre.fills.length && !pre.filesCopy.length) {
@@ -1387,9 +1391,23 @@ async function saveToCompound() {
   }
 }
 
-/** 真正执行一次（`overwrite` 只影响「两边都有但不一样」的那几格） */
-async function applyArchive(overwrite) {
-  const r = await api.compoundFromExperiment(exp.value.id, { overwrite });
+/** 按冲突列表里选的来：`fields` = 要「用记录里的」那几格（空数组＝只补空着的） */
+async function applySync({ fields = [] } = {}) {
+  syncBusy.value = true;
+  try {
+    await applyArchive(false, fields);
+    syncOpen.value = false;
+  } finally {
+    syncBusy.value = false;
+  }
+}
+
+/** 真正执行一次（`fields` 里的那几格用记录里的值覆盖，其余只补空着的） */
+async function applyArchive(overwrite, fields = []) {
+  const r = await api.compoundFromExperiment(exp.value.id, {
+    overwrite,
+    overwriteFields: fields,
+  });
   const c = r.compound;
   if (!c) return;
   fields.product_compound_id = c.id;
@@ -1398,7 +1416,9 @@ async function applyArchive(overwrite) {
   const name = c.code || c.name || '档案';
   const bits = [];
   if (r.created) bits.push(`新建了「${name}」`);
-  else bits.push(`「${name}」${overwrite ? '按记录覆盖了冲突的格子' : '只补了空着的格子'}`);
+  else if (overwrite) bits.push(`「${name}」按记录覆盖了冲突的格子`);
+  else if (fields.length) bits.push(`「${name}」按记录覆盖了 ${fields.length} 格`);
+  else bits.push(`「${name}」只补了空着的格子`);
   if (r.fills?.length) bits.push(`补 ${r.fills.length} 格`);
   if (r.filesCopy?.length) bits.push(`搬了 ${r.filesCopy.length} 份谱图`);
   if (r.filesSkip?.length) bits.push(`${r.filesSkip.join('/')} 那边已有，没重复搬`);
@@ -2385,6 +2405,18 @@ const openAttachment = (id) => {
       :initial="''"
       @close="productSketchOpen = false"
       @pick="onProductPicked"
+    />
+
+    <SyncConflicts
+      v-if="syncOpen && syncData"
+      :compound="syncData.compound"
+      :conflicts="syncData.conflicts"
+      :fills="syncData.fills"
+      :files-copy="syncData.filesCopy"
+      :files-skip="syncData.filesSkip"
+      :busy="syncBusy"
+      @close="syncOpen = false"
+      @apply="applySync"
     />
 
     <ProductBind

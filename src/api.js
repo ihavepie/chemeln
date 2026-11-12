@@ -142,10 +142,10 @@ export const api = {
   moveCompound: (id, body) => request(`/api/compounds/${id}/move`, { method: 'POST', body }).then((d) => d.compound),
   // 已经是「建 / 补」二合一：`created:false` = 这条记录早有档案，只补了空着的格子。
   // 先带 `dry:true` 问一次会补什么、有什么冲突（不改数据），再决定要不要 `overwrite`。
-  compoundFromExperiment: (expId, { overwrite = false, dry = false } = {}) =>
+  compoundFromExperiment: (expId, { overwrite = false, overwriteFields = [], dry = false } = {}) =>
     request('/api/compounds/from-experiment', {
       method: 'POST',
-      body: { exp_id: expId, copy_files: true, overwrite, dry },
+      body: { exp_id: expId, copy_files: true, overwrite, overwrite_fields: overwriteFields, dry },
     }).then((d) => ({
       compound: d.compound,
       created: d.created !== false,

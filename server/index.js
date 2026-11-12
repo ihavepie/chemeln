@@ -1599,7 +1599,9 @@ function compoundOfExperiment(exp) {
  * 哪些谱图会搬 / 因为那边已有同类而跳过（`filesCopy` / `filesSkip`）。
  * 返回 `{ compound, created, fills, conflicts, filesCopy, filesSkip }`。
  */
-function compoundFromExperiment(expId, { copyFiles = true, overwrite = false, dry = false } = {}) {
+function compoundFromExperiment(expId, { copyFiles = true, overwrite = false, overwriteFields = [], dry = false } = {}) {
+  // 逐个字段覆盖（冲突列表里一格一格选的）：只认白名单里的列
+  const take = new Set((Array.isArray(overwriteFields) ? overwriteFields : []).filter((f) => SYNC_FIELDS.some(([c]) => c === f)));
   const exp = getExperiment(expId);
   if (!exp) return null;
 
@@ -1651,7 +1653,7 @@ function compoundFromExperiment(expId, { copyFiles = true, overwrite = false, dr
         : String(cur).trim() === String(incoming).trim();
       if (same) continue;
       conflicts.push({ field: col, label, current: cur, incoming });
-      if (overwrite) {
+      if (overwrite || take.has(col)) {
         sets.push(`${col} = ?`);
         args.push(incoming);
       }
@@ -1675,7 +1677,10 @@ function compoundFromExperiment(expId, { copyFiles = true, overwrite = false, dr
         cols.push('updated_at = ?');
         vals.push(ts);
         db.prepare(`UPDATE compounds SET ${cols.join(', ')} WHERE id = ?`).run(...vals, bound.id);
-        const changed = [...fills.map((f) => f.field), ...(overwrite ? conflicts.map((f) => f.field) : [])];
+        const changed = [
+          ...fills.map((f) => f.field),
+          ...conflicts.filter((f) => overwrite || take.has(f.field)).map((f) => f.field),
+        ];
         if (changed.length) {
           logEvent('compound', bound.id, 'sync', { detail: `从 ${exp.code} 补了 ${changed.length} 格`, fields: changed });
         }
@@ -2206,6 +2211,7 @@ route('POST', '/api/compounds/from-experiment', async (req, res) => {
   const out = compoundFromExperiment(expId, {
     copyFiles: body.copy_files !== false,
     overwrite: body.overwrite === true,
+    overwriteFields: Array.isArray(body.overwrite_fields) ? body.overwrite_fields : [],
     dry: body.dry === true,
   });
   if (!out) return fail(res, 404, '实验不存在');
