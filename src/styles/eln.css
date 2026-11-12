@@ -7619,18 +7619,16 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   white-space: nowrap;
 }
 
-/* 卡片墙：反应式缩略图走「裁剪式」——宽图铺满整个框、**左边对齐**，只显示反应物那一段。
-   为什么：反应式动辄 3–5:1（例如 970×262），按 contain 缩进 176px 的卡里只剩 ~47px 高、
-   字不到 3px，墙上完全认不出；cover + 左对齐后结构大 4 倍，产物和条件进记录页看。
-   结构式（`.grid-thumb.is-structure`）和照片仍走 contain，别一股脑裁掉。 */
+/* 卡片墙：反应式缩略图**整张显示、不裁**（用户明确否掉了裁剪式：「有种截断的感觉」）。
+   图的画布已经收到 2.3–2.7:1（见 scheme.js 的折行 / 箭头封顶），按卡宽铺开约 70–75px 高；
+   想再大只能靠加宽卡片或点开看，别用 cover 切——切掉的是产物和条件。 */
 .grid-thumb.is-scheme { padding: 0; }
 .grid-thumb.is-scheme img {
   width: 100%;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  object-fit: cover;
-  object-position: left center;   /* 留左边：底物 / 反应物 + 箭头起始，比居中裁一半有用 */
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
   border-radius: var(--r) var(--r) 0 0;
 }
 /* 反应式卡片上那枚「平行 ×N」压在图上：底衬一块纸白，别让线条透过去 */
