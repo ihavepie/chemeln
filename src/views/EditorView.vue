@@ -1619,9 +1619,14 @@ const openAttachment = (id) => {
           </div>
 
           <table class="sheet-meta">
+            <!-- 8 列固定宽 + 最后一列吃剩下的：纸面内宽只有 ~595px，
+                 以前前 7 列加起来 594，最后那列只剩 1px —— 湿度（第 1 行）和状态（第 2 行）
+                 都溢出到那一格里，叠在一起、被推到表格右边缘（用户报「抬头表格排得不对」）。 -->
             <colgroup>
-              <col style="width: 62px" /><col style="width: 92px" /><col style="width: 52px" /><col style="width: 136px" />
-              <col style="width: 52px" /><col style="width: 150px" /><col style="width: 50px" /><col />
+              <!-- 用百分比而不是 px：纸面内宽会跟着内容区宽变（572 / 595 / 更宽），
+                   定长加起来一超，最后一列（湿度 / 状态）就被挤成 1px、两边叠在一起。 -->
+              <col style="width: 8%" /><col style="width: 13%" /><col style="width: 7%" /><col style="width: 18%" />
+              <col style="width: 7%" /><col style="width: 25%" /><col style="width: 7%" /><col style="width: 15%" />
             </colgroup>
             <tbody>
               <tr>

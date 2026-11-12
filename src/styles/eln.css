@@ -8194,3 +8194,21 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 /* 合计行右下角那句算式（「苄基氨基环丁酮：0.2 mmol × 433.57 = 0.0867 g」）不再常显——
    用户圈出来说「不应该在中间，删掉也行」。现在由模板 `v-if="focus"` 控制：
    只有正聚焦某个格子时才出现（`.foot-line` 的 space-between 仍在，它贴着右边、不会跳行）。 */
+
+/* 抬头表格「类型」格：里面同时放记录类型（kind）和反应类型（rxn_type），
+   纸面内宽只有 ~595px，这两样必须挤在 146px 里 —— 间距收窄、kind 上限压到 72px，
+   剩下的都给右边的反应类型（`筛配体` 三个字够用）。 */
+.sheet-meta .kind-inline { gap: 4px; }
+.sheet-meta .kind-inline .kind-pick { max-width: 72px; }
+
+/* 「类型」格里两个值（记录类型 / 反应类型）之间来一道极细的虚线：
+   不然 `条件筛选 筛配体` 贴在一起像一串字。 */
+.sheet-meta .kind-inline .rxn-wrap { position: relative; padding-left: 7px; }
+.sheet-meta .kind-inline .rxn-wrap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  border-left: 1px dotted var(--line-2);
+}
