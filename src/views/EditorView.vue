@@ -395,9 +395,12 @@ function fill(e) {
   if (cache && cache.sig === liveSig.value) {
     liveScheme.value = cache.svg;
     liveSigShown.value = cache.sig;
+    // 服务端已经核过结构指纹了；这里记下来，化合物库读进来后对得上就不再重画
+    liveFpShown.value = cache.fp || '';
   } else {
     liveScheme.value = '';
     liveSigShown.value = '';
+    liveFpShown.value = '';
     scheduleLive(0);
   }
 }
@@ -1004,34 +1007,78 @@ const liveSig = computed(() =>
     pc: fields.product_compound_id ?? '',
   })
 );
+/* 这张图用到的化合物「结构改过没有」：`id:updated_at` 拼一串。
+   **不能塞进 liveSig**：化合物库是页面打开后才读完的，sig 里一带这个，首帧永远对不上缓存、
+   每次打开都要重画一次（用户报过「闪一下」）。所以单独记一份，跟缓存里存的那份比。 */
+const liveFp = computed(() => {
+  const ids = new Set();
+  for (const r of reagent.rows || []) if (r.compound_id) ids.add(Number(r.compound_id));
+  if (fields.product_compound_id) ids.add(Number(fields.product_compound_id));
+  if (!ids.size) return '';
+  const lib = new Map((store.compounds || []).map((c) => [Number(c.id), c]));
+  const out = [];
+  for (const id of [...ids].sort((a, b) => a - b)) {
+    const c = lib.get(id);
+    if (!c) return null;      // 化合物库还没读进来：指纹未知，别当成「结构变过」白重画
+    out.push(`${id}:${String(c.updated_at || '')}`);
+  }
+  return out.join('|');
+});
+const liveFpShown = ref('');
 let liveTimer = null;
 function scheduleLive(ms = 700) {
   clearTimeout(liveTimer);
   liveTimer = setTimeout(() => void renderLive(), ms);
 }
-async function renderLive() {
+/* 好几个 watcher（sig / 结构指纹 / 化合物库读完）可能同时把它叫起来，同一个 tick 里连画两张：
+   前面那张白画了，还容易闪。同一时间只画一张，画的过程中又被叫就等画完补最后一次。 */
+let liveBusy = false;
+let livePending = false;
+function renderLive() {
+  if (liveBusy) {
+    livePending = true;
+    return Promise.resolve();
+  }
+  liveBusy = true;
+  return drawLive().finally(() => {
+    liveBusy = false;
+    if (livePending) {
+      livePending = false;
+      scheduleLive(0);
+    }
+  });
+}
+async function drawLive() {
   const id = exp.value?.id;
   if (!id || exp.value.locked) {
     liveScheme.value = '';
     liveSigShown.value = '';
+    liveFpShown.value = '';
     return;
   }
   const sig = liveSig.value;
-  if (liveScheme.value && liveSigShown.value === sig) return;   // 已经是这张了，别白画一遍
+  const fp = liveFp.value;
+  // 已经是这张了、而且用到的结构也没改过，就别白画一遍（指纹还不知道就先认这张）
+  if (liveScheme.value && liveSigShown.value === sig && (fp === null || liveFpShown.value === fp)) return;
   try {
     // 化合物库还没读进来时（刚打开页面）先读一次，否则底物挂不上结构、反应式是空的
     if (!(store.compounds && store.compounds.length)) await loadCompounds();
+    // 画这张图实际用到的结构状态（可能是刚读进来的，跟进去时那个 fp 不一样）
+    const fpUsed = liveFp.value;
     const parts = schemeParts({ ...fields, field_vars: fieldVars.value, reagents: reagent.rows }, store.compounds || []);
     if (!parts.reactants.length) {
       liveScheme.value = '';
       liveSigShown.value = '';
+      liveFpShown.value = '';
       return;
     }
     const svg = await composeSchemeSvg({
       reactants: parts.reactants,
       reactantIds: parts.reactantIds,
+      reactantVers: parts.reactantVers,
       product: parts.product,
       productId: parts.productId,
+      productVer: parts.productVer,
       productLabel: parts.product ? '' : parts.prodName,
       above: parts.above,
       below: parts.below,
@@ -1040,11 +1087,13 @@ async function renderLive() {
     if (exp.value?.id !== id) return;   // 等的时候切到别的记录了：这份丢掉
     liveScheme.value = svg;
     liveSigShown.value = sig;
+    liveFpShown.value = fpUsed ?? '';
     api.saveSchemeCache(id, { sig, svg }).catch(() => {});   // 存不下也不影响显示
   } catch {
     if (exp.value?.id === id) {
       liveScheme.value = '';
       liveSigShown.value = '';
+      liveFpShown.value = '';
     }
   }
 }
@@ -1094,6 +1143,8 @@ watch(
 );
 
 watch(liveSig, () => scheduleLive());
+// 结构在画板里改过（加了 / 去了缩写标签）→ 重画这张反应式；化合物库读完那一下也会走这里
+watch(liveFp, () => scheduleLive(200));
 watch(() => (store.compounds || []).length, () => scheduleLive(50));
 
 async function schemeFromTable() {
@@ -1119,8 +1170,10 @@ async function schemeFromTable() {
     svg = await composeSchemeSvg({
       reactants: parts.reactants,
       reactantIds: parts.reactantIds,
+      reactantVers: parts.reactantVers,
       product: parts.product,
       productId: parts.productId,
+      productVer: parts.productVer,
       productLabel: hasProduct ? '' : parts.prodName,
       above: parts.above,
       below: parts.below,

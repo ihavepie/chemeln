@@ -406,6 +406,11 @@ ensureColumn('compounds', 'rotation', "rotation TEXT NOT NULL DEFAULT ''");
 // 只存 SMILES 的话 Ketcher / Indigo 会按自己的算法重新摆一次，用户画的样子就没了。
 ensureColumn('compounds', 'mol', "mol TEXT NOT NULL DEFAULT ''");
 
+// 反应式缓存要跟着「结构改过没有」失效：sig 只由投料表字段拼出来，用户回画板改了产物结构
+// （尤其是加了 / 去了缩写标签）以后 sig 不变，缓存里那张图还会被贴出来，看着就是「莫名其妙变了」。
+// 存一份结构指纹（化合物 id + updated_at），读缓存时比一下，对不上就丢掉重画。
+ensureColumn('scheme_cache', 'fp', "fp TEXT NOT NULL DEFAULT ''");
+
 // 分类挂在课题下：'' = 共用（每个课题都看得到），否则只在该课题里出现。
 // 老数据全是 ''，等于先都当共用，新建的分类才跟当前课题走。
 ensureColumn('categories', 'project', "project TEXT NOT NULL DEFAULT ''");

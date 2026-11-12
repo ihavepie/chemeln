@@ -142,19 +142,22 @@ const esc = (s) =>
 
 /** 一个分子 → 一张小 SVG（内容紧凑裁边、键长≈BOND_PX） */
 /* 化合物库里存的那份 molfile（只带缩写的才拉）：按它出图，Ts / Bn / Ph 这些手画上去的标签就留着了 */
-const abbrevMolCache = new Map();   // compound_id → molfile（'' 表示这个化合物没有缩写）
-async function abbrevMol(compoundId) {
-  const key = Number(compoundId);
-  if (!key) return '';
+// 键带上 `ver`（化合物的 updated_at）：在画板里改过结构以后要重新拉，不然这张图一直是旧的。
+// **空结果不缓存**：第一次问的时候结构还没画好，缓存住空串就再也补不回来了。
+const abbrevMolCache = new Map();   // `id|ver` → molfile
+async function abbrevMol(compoundId, ver = '') {
+  const id = Number(compoundId);
+  if (!id) return '';
+  const key = `${id}|${ver}`;
   if (abbrevMolCache.has(key)) return abbrevMolCache.get(key);
   let mol = '';
   try {
-    const res = await fetch(`/api/compounds/${key}/abbrev-mol`);
+    const res = await fetch(`/api/compounds/${id}/abbrev-mol`);
     if (res.ok) mol = String((await res.json()).mol || '');
   } catch {
     mol = '';
   }
-  abbrevMolCache.set(key, mol);
+  if (mol) abbrevMolCache.set(key, mol);
   return mol;
 }
 
@@ -241,8 +244,10 @@ async function molSvg(smiles, id, molfile = '') {
 export async function composeSchemeSvg({
   reactants = [],
   reactantIds = [],       // 与 reactants 平行：有化合物 id 就去库里问有没有「带缩写的那份画」
+  reactantVers = [],      // 与 reactants 平行：化合物 updated_at，结构改过就换一份画
   product = '',
   productId = null,
+  productVer = '',
   productLabel = '',
   above = [],
   below = [],
@@ -251,10 +256,10 @@ export async function composeSchemeSvg({
   const rs = [];
   for (let i = 0; i < reactants.length; i++) {
     if (!String(reactants[i] || '').trim()) continue;
-    const mol = reactantIds[i] ? await abbrevMol(reactantIds[i]) : '';
+    const mol = reactantIds[i] ? await abbrevMol(reactantIds[i], reactantVers[i] || '') : '';
     rs.push(await molSvg(reactants[i], `r${i}`, mol));
   }
-  const prod = product ? await molSvg(product, 'p', productId ? await abbrevMol(productId) : '') : null;
+  const prod = product ? await molSvg(product, 'p', productId ? await abbrevMol(productId, productVer) : '') : null;
   // 试反应常常还不知道产物结构：那就只画「反应物 →（箭头）」，
   // 有产物名就把名字写在箭头右边（没有就干脆留空），不再因为缺产物拒绝出图。
   const pLabel = String(productLabel || '').trim();

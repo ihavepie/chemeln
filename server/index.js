@@ -2384,8 +2384,10 @@ route('POST', '/api/compounds/:id/files/path', async (req, res, params) => {
  * 没缓存（这条还没在记录页打开过）→ 404，前端退回附件。
  */
 route('GET', '/api/experiments/:id/scheme.svg', async (req, res, params) => {
-  const row = db.prepare('SELECT sig, svg FROM scheme_cache WHERE exp_id = ?').get(Number(params.id));
-  if (!row || !row.svg) return fail(res, 404, '还没有画好的反应式');
+  const id = Number(params.id);
+  const row = db.prepare('SELECT sig, svg, fp FROM scheme_cache WHERE exp_id = ?').get(id);
+  // 结构改过的旧缓存不算数（指纹对不上）→ 当没缓存，卡片退回附件那张
+  if (!row || !row.svg || String(row.fp || '') !== schemeFp(id)) return fail(res, 404, '还没有画好的反应式');
   // no-store：内容跟着投料表变，且 URL 不带版本号，不能让浏览器长期缓存
   res.writeHead(200, { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'no-store' });
   res.end(row.svg);
@@ -2626,10 +2628,38 @@ route('GET', '/api/experiments/:id', async (req, res, params) => {
   ok(res, { experiment: exp });
 });
 
-/** 反应式缓存：`{ sig, svg }`，没有就 null */
+/** 反应式缓存：`{ sig, svg }`，没有就 null（结构改过 / 对不上指纹的旧缓存当没有） */
 function readSchemeCache(id) {
-  const row = db.prepare('SELECT sig, svg FROM scheme_cache WHERE exp_id = ?').get(id);
-  return row ? { sig: row.sig, svg: row.svg } : null;
+  const row = db.prepare('SELECT sig, svg, fp FROM scheme_cache WHERE exp_id = ?').get(id);
+  if (!row) return null;
+  const fp = schemeFp(id);
+  if (String(row.fp || '') !== fp) return null;
+  return { sig: row.sig, svg: row.svg, fp };
+}
+
+/**
+ * 这条记录画的图用到了哪些化合物结构：`id:updated_at` 拼一串当指纹。
+ * 结构在画板里改过（缩写标签、坐标）updated_at 就变 → 缓存不算数，重画一次。
+ * 投料表里的底物按 `reagents.compound_id` 取，产物按 `product_compound_id`。
+ */
+function schemeFp(expId) {
+  const e = db.prepare('SELECT product_compound_id FROM experiments WHERE id = ?').get(expId);
+  if (!e) return '';
+  const ids = db
+    .prepare('SELECT DISTINCT compound_id FROM reagents WHERE exp_id = ? AND compound_id IS NOT NULL')
+    .all(expId)
+    .map((r) => Number(r.compound_id));
+  if (e.product_compound_id) ids.push(Number(e.product_compound_id));
+  const uniq = [...new Set(ids.filter((n) => Number.isFinite(n) && n > 0))].sort((a, b) => a - b);
+  if (!uniq.length) return '';
+  const rows = db
+    .prepare(`SELECT id, updated_at FROM compounds WHERE id IN (${uniq.map(() => '?').join(',')})`)
+    .all(...uniq);
+  // 顺序按 id 数字（不是字符串），前端 `liveFp` 拼的是同一个样子，两边要能一 string 比
+  return rows
+    .sort((a, b) => a.id - b.id)
+    .map((r) => `${r.id}:${String(r.updated_at || '')}`)
+    .join('|');
 }
 
 /**
@@ -2645,9 +2675,9 @@ route('PUT', '/api/experiments/:id/scheme-cache', async (req, res, params) => {
   const svg = String(body.svg || '').slice(0, 400000);
   if (!sig || !svg) return fail(res, 400, '缺少 sig / svg');
   db.prepare(
-    `INSERT INTO scheme_cache (exp_id, sig, svg, at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(exp_id) DO UPDATE SET sig = excluded.sig, svg = excluded.svg, at = excluded.at`
-  ).run(id, sig, svg, nowISO());
+    `INSERT INTO scheme_cache (exp_id, sig, svg, fp, at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(exp_id) DO UPDATE SET sig = excluded.sig, svg = excluded.svg, fp = excluded.fp, at = excluded.at`
+  ).run(id, sig, svg, schemeFp(id), nowISO());
   ok(res, { ok: true });
 });
 

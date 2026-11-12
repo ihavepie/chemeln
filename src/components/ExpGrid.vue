@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import { api } from '../api.js';
@@ -30,9 +30,14 @@ const activeId = () => (route.name === 'editor' ? Number(route.params.id) : null
 /**
  * 缩略图：**优先记录页那张**（按投料表拼好、缓存过的），退其次反应式附件，最后产物/底物的结构式。
  * 附件是生成那一刻的快照，改了投料表它不会变，卡片和记录页就会显示两个不同的反应式（用户报过）。
+ * 缓存里的图可能已经作废（化合物结构改过，服务端指纹对不上会回 404）→ 那张加载失败就退回附件。
  */
+const badThumb = reactive(new Set());
+function onThumbErr(it) {
+  if (!badThumb.has(it.id)) badThumb.add(it.id);
+}
 const thumbOf = (it) =>
-  it.has_scheme
+  it.has_scheme && !badThumb.has(it.id)
     ? `/api/experiments/${it.id}/scheme.svg`
     : it.preview_id
       ? `/api/files/${it.preview_id}`
@@ -324,7 +329,7 @@ function groupMenu(ev, g) {
                   @mouseenter="peekEnter($event)"
                   @mouseleave="peekLeave()"
                 >
-                  <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
+                  <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" @error="onThumbErr(card.it)" />
                   <Icon v-else name="flask" :size="20" class="i-empty" />
                   <span class="stack-badge is-corner" :title="card.members.map((m) => `${m.code} ${m.status}`).join(' / ')">
                     平行 ×{{ card.members.length }}
@@ -369,7 +374,7 @@ function groupMenu(ev, g) {
                   @mouseenter="peekEnter($event)"
                   @mouseleave="peekLeave()"
                 >
-                <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
+                <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" @error="onThumbErr(card.it)" />
                 <Icon v-else name="flask" :size="20" class="i-empty" />
                 <!-- 平行组标记钉在缩略图角上：塞进下面那行会把编号/日期挤出去 -->
                 <span v-if="card.it.group_size > 1" class="stack-badge is-corner" :class="{ 'is-below': card.it.kind }" :title="`属于一个平行组（共 ${card.it.group_size} 条，筛出来的只有这一条）`">平行 ×{{ card.it.group_size }}</span>

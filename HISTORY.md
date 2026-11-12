@@ -51,3 +51,12 @@
   换上的 `compoundSourceLabel(c)`（`lib/ui.js`）：看化合物**从哪条记录来的**——`standard_exp_id` 那条记录的 `kind`（原料 → 原料产物、试反应 → 小反应产物、条件筛选 → 筛选产物、底物扩展 → 扩展产物）；`standard_exp_id` 空的话反查 `experiments.product_compound_id`（老数据只有记录那一侧指着化合物）；老类型是「试剂」的显示「试剂」。列表 SQL 多返回 `source_kind`，`getCompound` 的 `standardExp` 也用同一个「正手 / 反查」拿。
   **坑**：`compounds.standard_exp_id` 是 TEXT 列、空值是 `''` 而不是 NULL，`COALESCE(c.standard_exp_id, …)` 会取到 `''` → 反查永远不生效（`NULLIF(c.standard_exp_id, '')` 才对）。
   验证：`/api/compounds` 里 B-Cr→原料、1→试反应、C/D→原料；卡片上显示「试剂」/「原料产物」，化合物页那格显示「来源=原料产物」；卡片墙工具行只剩 表格视图 / 批量标签 / 新建分类 / 新建化合物。
+- **反应式「莫名其妙变了」：产物结构被画成展开式**（用户圈着 SJ-2-9 的产物问「这边为什么莫名其妙变了」——反应物是缩写标签 `OMe`/`Bn`/`CO2Me`，产物却是把苯环、`O–CH3` 全摊开的放大图，还把箭头挤歪）。
+  诊断过程：①`/api/compounds/72/abbrev-mol` 返回 2255 字符的 S-group molfile（`M  STY` / `SAL Bn` / `SMT OMe`），Indigo 直接渲是**对的缩写式**；②用真数据重算（`schemeParts` + `composeSchemeSvg`，productId=72）也是**对的缩写式** —— 说明画法没问题；③但 `scheme_cache` 里那条（14:41 写的）**就是展开式**，而页面比 `sig` 相等就直接贴缓存、不再重画。根因：`sig` 只由投料表字段拼出来，用户在画板里给产物画上缩写标签 / 改坐标以后 `sig` 不变，**旧图就永远贴在那**；另外前端 `abbrevMolCache` 按 `compound_id` 缓存、连空串都缓存，同一页面里改过结构也不会重拉。
+  改法：
+  ① **服务端**：`scheme_cache` 加一列 `fp`（`ensureColumn`），值是「这条图用到的化合物 `id:updated_at`」按 id 排序拼起来（`schemeFp(expId)`：投料表里所有 `reagents.compound_id` + `product_compound_id`）。写缓存时存、读缓存时（`getExperiment` 的 `scheme_cache` 和 `GET /api/experiments/:id/scheme.svg` 两处）比一下，对不上就当没有 → 前端重画。
+  ② **前端**：`scheme.js` 的 `abbrevMol(id, ver)` 缓存键改成 `id|ver`、**空结果不缓存**；`composeSchemeSvg` 收 `reactantVers` / `productVer`（`expScheme.schemeParts` 一起返回），`EditorView` 两处调用都传。
+  ③ **`liveFp`**（编辑器内）：同样的指纹，`watch` 到变化就重画；`scheduleLive` 改成**单飞**（`liveBusy`/`livePending`）—— 以前 sig / 指纹 / 化合物库三个 watcher 同一 tick 里能连画两张，白画还闪。`abbrevMol` 的 ver 也从这里来，所以「回画板改了结构再回记录页」会在 200ms 内重画。
+  **坑**：`fp` 千万别塞进 `liveSig`。`liveSig` 是缓存的 key，而化合物库是**页面打开之后**才读完的 —— 带进去首帧永远对不上缓存，每次打开都要重画（就是以前那种「闪一下」）。所以单独一个 `liveFp`：指纹**还不知道（返回 null）时不比**，画完再把「画这张时用的 fp」记下来（`fpUsed`，在 `await loadCompounds()` 之后取，不能在函数入口取）。
+  **顺带**：卡片墙缩略图 `img` 加了 `@error` → 缓存被作废（404）时退回反应式附件 / 结构图，不再显示一个裂图标。
+  验证：真记录 SJ-2-9（280）—— 修之前产物是展开式，修之后产物跟反应物一样是缩写式（`OMe`/`Bn`/`OH`）；连开 4 次，`scheme_cache.at` 不再变（缓存命中、不再重画），产物依旧正确；临时记录 + 临时化合物实测「改一下结构 → 缓存读出来是 null（作废）→ 重开记录重画一次 → 再开又是 0 次重画」；`npm run build` 后 4780 上同样是缩写式。测试数据全清（`exp 11 / cmp 10 / trash 0`，`fp` 列已迁移）。
