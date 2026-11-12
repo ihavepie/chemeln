@@ -8325,3 +8325,40 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 
 /* 再来一点：整格从表格右边缘往里收 10px，数字和 `mmol` 之间 9px */
 .cond-above .cond-f-scale .cond-f-val { padding-right: 10px; gap: 9px; }
+
+/* 反应规模回到「投料表」那一行的右端（跟表连在一起，但不跟组分/试剂那排表头挤）：
+   标签跟 `.block-head .lbl` 一个字号，数字等宽右对齐、不画框，`mmol` 小一号、间距 6px。 */
+.sheet .block-head .scale-inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: none;
+}
+.sheet .block-head .scale-inline > span:first-child {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+}
+.sheet .block-head .scale-inline input {
+  width: 52px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  padding: 0 2px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.sheet .block-head .scale-inline input:hover { border-bottom-color: var(--line-2); }
+.sheet .block-head .scale-inline input:focus { outline: none; border-bottom-color: var(--ink-3); }
+.sheet .block-head .scale-inline .unit {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+}
+
+/* 条件行回到 5 格（反应规模搬走了） */
+.cond-above { grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr; }
