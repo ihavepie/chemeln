@@ -7692,3 +7692,27 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   color: var(--ink-3);
   background: #f5f3ee;
 }
+
+/* 手机端（`#/m`）的实验列表：把桌面中栏那套纸卡片搬过来。
+   容器给一层 bone 底，卡片才是「白卡浮在上面」的亚克力感（纯白底上只剩影子、看不出卡片）。
+   刻意不加：拖拽排序 / 右键菜单 / 分类分段——手机上手指拖卡片跟滚动打架，换分类回电脑。 */
+.phone-cards {
+  background: var(--bone);
+  border-radius: 12px;
+  padding: 10px 10px 2px;
+}
+.phone-cards .exp-card { margin-bottom: 10px; }
+/* 手机上卡片里的字比中栏稍大一点：它在整屏宽度里，9px 的小签太抠 */
+.phone-cards .exp-code { font-size: 11.5px; }
+.phone-cards .exp-name { font-size: 15px; }
+.phone-cards .exp-desc-inline { font-size: 11.5px; }
+.phone-cards .exp-date,
+.phone-cards .exp-meta { font-size: 10.5px; }
+.phone-cards .stack-badge,
+.phone-cards .stack-chip,
+.phone-cards .stack-more { font-size: 10px; }
+.phone-cards .stack-more { padding: 2px 6px; }
+.phone-cards .member-diff-item { font-size: 10.5px; line-height: 18px; }
+.phone-cards .stack-members { margin-top: 2px; }
+/* 展开状态下卡片堆那两张垫纸别露在组员行下面（跟桌面一个规矩） */
+.phone-cards .exp-card.is-stack.is-open { margin-bottom: 0; }

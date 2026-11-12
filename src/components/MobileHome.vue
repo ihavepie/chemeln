@@ -1,14 +1,21 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
+import Icon from './Icon.vue';
 import { api } from '../api.js';
 import { STATUS_TONE } from '../lib/ui.js';
 import { round } from '../lib/reagent.js';
 import { listDiff } from '../lib/expDiff.js';
+import { store } from '../store.js';
 
 /**
  * 手机端的门：`#/m`。
  * 站在通风橱前手机能做的其实就两件事 —— 找到某条实验（看/拍照）、扫瓶签看化合物。
  * 所以这里只列最近实验，点进去就是那条的移动页（里面有拍照上传）。
+ *
+ * 实验这边的列表**照着桌面中栏的样子做**（纸卡片 + 投影浮在 bone 底上）：平行组收成一张「卡片堆」，
+ * 点「展开 ▾」在下面列出组员行，每行挂「相对基准改了什么」的胶囊（文案来自 `lib/expDiff.js`，
+ * 跟桌面同一套）。**没做拖拽排序 / 右键菜单**——手机上手指拖卡片跟滚动会打架，
+ * 换分类请回电脑（或者以后长按再说）。
  */
 const tab = ref('exp');           // exp | cmp
 const list = ref([]);             // 实验
@@ -48,50 +55,68 @@ watch(q, (v) => {
   }, 220);
 });
 
-const rows = computed(() => {
+const filtered = computed(() => {
   const k = String(q.value || '').trim().toLowerCase();
-  if (!k || tab.value === 'cmp') return list.value;
+  if (!k) return list.value;
   return list.value.filter((e) => `${e.code || ''} ${e.title || ''}`.toLowerCase().includes(k));
 });
 
-/** 平行组：同 `group_id` 才算。基准 = 组里最早那条（跟桌面中栏一个规则） */
-const groupOf = computed(() => {
-  const byGid = new Map();
-  for (const e of list.value) {
+/**
+ * 行：同一 `group_id` 且组里 ≥2 条 → 收成一张卡片堆（面子 = 组里最早那条），其余一条一行。
+ * 组员的「改了什么」用 `listDiff(基准, 它)` 算，跟桌面中栏同一套文案。
+ * 一摞的位置按「基准那条」在列表里的下标排（跟桌面同一条规则，不然排序会跳）。
+ */
+const expRows = computed(() => {
+  const items = filtered.value;
+  const out = [];
+  const seen = new Set();
+  for (const e of items) {
     const gid = e.group_id || '';
-    if (!gid) continue;
-    if (!byGid.has(gid)) byGid.set(gid, []);
-    byGid.get(gid).push(e);
-  }
-  const out = new Map();          // 实验 id → { base, size, complete }
-  for (const arr of byGid.values()) {
-    const ordered = [...arr].sort((a, b) => a.id - b.id);
+    const members = gid ? items.filter((x) => (x.group_id || '') === gid) : [];
+    // 搜索只命中组里一条时，别装成卡片堆
+    if (!gid || members.length < 2) {
+      out.push({ key: `e${e.id}`, one: e, anchor: e.id });
+      continue;
+    }
+    if (seen.has(gid)) continue;
+    seen.add(gid);
+    const ordered = [...members].sort((a, b) => a.id - b.id);
     const base = ordered[0];
-    const size = Number(base.group_size) || arr.length;
-    for (const e of arr) out.set(e.id, { base, size, complete: arr.length >= size });
+    const withVariant = ordered.map((m) => {
+      const diffs = m.id === base.id ? [] : listDiff(base, m);
+      // 规模不同不算改条件（重复实验放大 / 缩小很正常），单独记一句
+      const scaleNote =
+        String(base.base_mmol ?? '') !== String(m.base_mmol ?? '') && m.base_mmol != null
+          ? base.base_mmol == null
+            ? `${m.base_mmol} mmol`
+            : `${base.base_mmol} → ${m.base_mmol} mmol`
+          : '';
+      const variant = m.id === base.id ? '基准' : diffs.length ? `改：${diffs.join('、')}` : scaleNote ? '改：规模' : '重复';
+      return { ...m, diffs, variant, scaleNote };
+    });
+    const allRepeat = withVariant.every((m) => m.variant === '基准' || m.variant === '重复');
+    const kinds = new Set(withVariant.filter((m) => m.variant !== '基准' && m.variant !== '重复').map((m) => m.variant));
+    const yields = withVariant.map((m) => m.yield_pct).filter((y) => y != null && y >= 0 && y <= 100);
+    out.push({
+      key: `g${gid}`,
+      gid,
+      anchor: base.id,
+      members: withVariant,
+      face: withVariant[0],
+      kindLabel: allRepeat ? `重复 ×${withVariant.length}` : `${kinds.size + 1} 种条件`,
+      mean: yields.length ? Math.round((yields.reduce((a, b) => a + Number(b), 0) / yields.length) * 10) / 10 : null,
+    });
   }
-  return out;
+  const slot = new Map(items.map((x, i) => [x.id, i]));
+  return out.sort((a, b) => (slot.get(a.anchor) ?? 1e9) - (slot.get(b.anchor) ?? 1e9));
 });
 
-/** 一条记录该挂哪些胶囊：基准 / 重复 / 相对基准改了什么（跟桌面组员行同一套文案） */
-function chipsFor(e, g) {
-  if (!g || g.size < 2) return [];
-  // 手机只取最近 40 条，组没取全时基准可能不在这批里 → 宁可不显示，也别拿错基准比
-  if (!g.complete) return [];
-  if (e.id === g.base.id) return [{ text: '基准', kind: 'base' }];
-  const diffs = listDiff(g.base, e);
-  if (diffs.length) return diffs.map((d) => ({ text: d }));
-  const scaled = String(g.base.base_mmol ?? '') !== String(e.base_mmol ?? '') && e.base_mmol != null;
-  return [{ text: scaled ? '改：规模' : '重复', kind: scaled ? '' : 'repeat' }];
+/* 展开着哪些组跟桌面共用 `store.openStacks`（点进记录回来还在），不一堆一套自己的状态 */
+const isOpen = (gid) => !!store.openStacks[gid];
+function toggleGroup(gid) {
+  if (store.openStacks[gid]) delete store.openStacks[gid];
+  else store.openStacks[gid] = true;
 }
-
-/** 实验列表带上「组大小 + 胶囊」，模板里别反复算 */
-const expRows = computed(() =>
-  rows.value.map((e) => {
-    const g = groupOf.value.get(e.id);
-    return { ...e, groupSize: g && g.size > 1 ? g.size : 0, chips: chipsFor(e, g) };
-  })
-);
 
 const colors = computed(() => cmpList.value.filter((c) => String(c.name || c.code || '').trim()));
 </script>
@@ -114,29 +139,97 @@ const colors = computed(() => cmpList.value.filter((c) => String(c.name || c.cod
     <div v-if="error" class="phone-note">{{ error }}</div>
     <div v-else-if="loading" class="phone-note">读取中…</div>
 
-    <ul v-else-if="tab === 'exp'" class="phone-list">
-      <li v-for="e in expRows" :key="e.id">
-        <a class="phone-item" :href="`#/e/${e.id}`">
-          <span class="phone-item-top">
-            <b class="mono">{{ e.code }}</b>
-            <span class="tag" :class="STATUS_TONE[e.status]">{{ e.status }}</span>
-            <span v-if="e.groupSize" class="tag plain">
-              平行 ×{{ e.groupSize }}
-            </span>
-          </span>
-          <span class="phone-item-title">{{ e.title || '（未命名实验）' }}</span>
-          <span class="phone-item-sub mono">{{ e.date || '' }}<template v-if="e.reagent_count"> · {{ e.reagent_count }} 行投料</template></span>
-          <span v-if="e.chips.length" class="phone-chips">
-            <span
-              v-for="(c, i) in e.chips"
-              :key="i"
-              class="member-diff-item"
-              :class="c.kind ? `is-${c.kind}` : ''"
-            >{{ c.text }}</span>
-          </span>
-        </a>
-      </li>
-    </ul>
+    <!-- 实验：纸卡片列表，平行组收成卡片堆 / 可展开（跟桌面中栏同构，只是不带拖拽） -->
+    <div v-else-if="tab === 'exp'" class="phone-cards">
+      <div v-for="row in expRows" :key="row.key" class="phone-stack">
+        <template v-if="row.one">
+          <a class="exp-card" :href="`#/e/${row.one.id}`">
+            <div class="top">
+              <span class="exp-code">{{ row.one.code }}</span>
+              <span v-if="row.one.locked" class="exp-lock" title="已锁定，只能查看"><Icon name="lock" :size="11" /></span>
+              <span class="tag" :class="STATUS_TONE[row.one.status]" style="font-size: 9px; padding: 1px 6px">{{ row.one.status }}</span>
+              <span v-if="row.one.rxn_type" class="tag is-rxn">{{ row.one.rxn_type }}</span>
+              <span class="exp-date">{{ row.one.date }}</span>
+            </div>
+            <div class="exp-title">
+              <span class="exp-name">{{ row.one.title || row.one.objective || '（未命名实验）' }}</span>
+              <template v-if="row.one.objective && row.one.objective !== row.one.title">
+                <span class="exp-rule" aria-hidden="true" />
+                <span class="exp-desc-inline">{{ row.one.objective }}</span>
+              </template>
+            </div>
+            <div class="exp-meta">
+              <template v-if="row.one.project"><span>{{ row.one.project }}</span><span class="sep">·</span></template>
+              <span v-if="row.one.reagent_count">{{ row.one.reagent_count }} 行投料</span>
+              <template v-if="row.one.yield_pct != null"><span class="sep">·</span><span>{{ row.one.yield_pct }}%</span></template>
+            </div>
+          </a>
+        </template>
+
+        <template v-else>
+          <div class="stack-top">
+            <div
+              class="exp-card is-stack"
+              :class="{ 'is-open': isOpen(row.gid) }"
+              role="button"
+              tabindex="0"
+              @click="toggleGroup(row.gid)"
+              @keydown.enter="toggleGroup(row.gid)"
+            >
+              <div class="top">
+                <span class="exp-code">{{ row.face.code }}</span>
+                <span class="stack-badge">平行 ×{{ row.members.length }}</span>
+                <span class="tag" :class="STATUS_TONE[row.face.status]" style="font-size: 9px; padding: 1px 6px">{{ row.face.status }}</span>
+                <span v-if="row.face.rxn_type" class="tag is-rxn">{{ row.face.rxn_type }}</span>
+                <span class="exp-date">{{ row.face.date }}</span>
+                <button
+                  type="button"
+                  class="stack-more"
+                  :aria-expanded="isOpen(row.gid) ? 'true' : 'false'"
+                  :title="isOpen(row.gid) ? '收起组员' : '展开组员'"
+                  @click.stop="toggleGroup(row.gid)"
+                >
+                  {{ isOpen(row.gid) ? '收起 ▴' : '展开 ▾' }}
+                </button>
+              </div>
+              <div class="exp-title">
+                <span class="exp-name">{{ row.face.title || row.face.objective || '（未命名实验）' }}</span>
+                <template v-if="row.face.objective && row.face.objective !== row.face.title">
+                  <span class="exp-rule" aria-hidden="true" />
+                  <span class="exp-desc-inline">{{ row.face.objective }}</span>
+                </template>
+              </div>
+              <div class="exp-meta">
+                <template v-if="row.face.project"><span>{{ row.face.project }}</span><span class="sep">·</span></template>
+                <span class="stack-kind">{{ row.kindLabel }}</span>
+                <template v-if="row.mean != null"><span class="sep">·</span><span style="color: var(--ok)">均值 {{ row.mean }}%</span></template>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="isOpen(row.gid)" class="stack-members">
+            <a v-for="m in row.members" :key="m.id" class="exp-card is-member" :href="`#/e/${m.id}`">
+              <div class="top">
+                <span class="exp-code">{{ m.code }}</span>
+                <span class="tag" :class="STATUS_TONE[m.status]" style="font-size: 9px; padding: 1px 6px">{{ m.status }}</span>
+                <span v-if="(!m.diffs || !m.diffs.length) && m.variant !== '改：规模'" class="stack-variant">{{ m.variant }}</span>
+                <span v-if="m.scaleNote" class="stack-scale" :title="`规模 ${m.scaleNote}（不算改条件）`">{{ m.scaleNote }}</span>
+                <span class="exp-date">{{ m.date }}</span>
+                <span v-if="m.yield_pct != null" class="member-yield">{{ m.yield_pct }}%</span>
+              </div>
+              <div class="exp-title">
+                <span class="exp-name">{{ m.title || m.objective || '（未命名实验）' }}</span>
+              </div>
+              <div v-if="m.diffs && m.diffs.length" class="member-diff">
+                <span v-for="d in m.diffs" :key="d" class="member-diff-item">{{ d }}</span>
+              </div>
+            </a>
+          </div>
+        </template>
+      </div>
+      <p v-if="!expRows.length" class="phone-hint" style="padding: 8px 2px">没有匹配的实验</p>
+    </div>
+
     <ul v-else class="phone-list">
       <li v-for="c in colors" :key="c.id">
         <a class="phone-item phone-item-cmp" :href="`#/c/${c.id}`">
