@@ -19,7 +19,7 @@ const props = defineProps({
   /** 每个变量槽的候选名单（按条件组顺序）：`{Cat: ['Pd(OPiv)2','dppe']}` —— 变量行那格显示摘要 */
   varCandidates: { type: Object, default: () => ({}) },
 });
-const emit = defineEmits(['recipe', 'promote-var', 'focus-var']);
+const emit = defineEmits(['recipe', 'promote-var', 'focus-var', 'var-toggled']);
 
 const roleMenuFor = ref(-1);
 
@@ -763,6 +763,8 @@ async function toggleVariable(r) {
     r.variable = '';
   } else {
     r.variable = VAR_GUESS[r.role] || 'X';
+    // 一次只筛一样：交给 EditorView 把别的变量（试剂行 / 温度这类字段）收掉
+    emit('var-toggled', r.variable);
   }
   props.notify?.();
 }

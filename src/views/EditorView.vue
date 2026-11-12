@@ -148,8 +148,10 @@ function scrollToConds() {
 function varPlaceholder(v) {
   if (v.ph === 'T') return '−40 °C';
   if (v.ph === 't') return '6 h';
-  if (v.ph === 'L') return 'XPhos';
   if (v.ph === 'atm') return 'N2 / 空气';
+  // 试剂类槽：拿投料表里那个标准试剂当提示（以前这里回落到占位符本身，
+  // 空着的时候格子里就只剩一个「Cat」，看着像填了什么）
+  if (v.role) return v.src || '试剂名';
   return v.ph;
 }
 
@@ -159,8 +161,9 @@ function varPlaceholder(v) {
  */
 function varInfo(c) {
   const empty = { mw: null, mmol: null, amount: '—' };
-  const slot = condVars.value.length === 1 ? condVars.value[0] : null;
-  if (!slot) return empty;
+  const slot = condVars.value[0] || null;
+  // 温度 / 时间 / 气氛这类字段变量没有分子量、当量、用量可言（用户点名要分开）
+  if (!slot || !slot.role) return empty;
   const name = String(c.vars?.[slot.ph] || '').trim().toLowerCase();
   if (!name) return empty;
   let mw = null;
@@ -177,8 +180,18 @@ function varInfo(c) {
   if (mw != null && mmol != null) amount = amountText(derive({ role: '试剂', mw, mmol, density: null, conc: null })) || '—';
   return { mw, mmol, amount };
 }
-/** 变量行（连下标 / 算好的数一起给模板） */
-const varRows = computed(() => conds.value.map((c, i) => ({ c, i, info: varInfo(c) })));
+/** 变量行（连下标 / 算好的数一起给模板）；`isMol` = 这一槽是「试剂类」，才显示 MW / 当量 / mmol / 用量 */
+const varRows = computed(() => {
+  const slot = condVars.value[0] || null;
+  const isMol = !!slot && !!slot.role;
+  return conds.value.map((c, i) => ({
+    c,
+    i,
+    ph: slot ? slot.ph : '',
+    isMol,
+    info: isMol ? varInfo(c) : { mw: null, mmol: null, amount: '—' },
+  }));
+});
 /** 结果块里那一行「这个条件改了什么」 */
 function condWhat(c) {
   const parts = [];
@@ -195,20 +208,53 @@ function setVarEq(c, ph, v) {
   notify();
 }
 
+/**
+ * 一次筛选只筛**一样**（用户定的：不会出现「配体 × 温度」这种交叉变量，最多换试剂种类 + 它的当量）。
+ * 所以这里只取第一个变量槽——试剂行优先，其次是字段（温度 / 时间 / 气氛）。
+ * 真正保证「互斥」的是 toggleVariable / toggleFieldVar 里的收尾，这里只是渲染口径。
+ */
 const condVars = computed(() => {
-  const out = [];
-  for (const r of reagent.rows) {
-    if (!r.variable) continue;
-    if (out.some((v) => v.ph === r.variable)) continue;
-    out.push({ key: `r:${r.variable}`, ph: r.variable, label: r.variable, src: r.name || r.role || '', role: r.role || '' });
-  }
-  for (const f of fieldVars.value) out.push({ key: `f:${f.key}`, ph: f.label, label: f.label, src: f.key });
-  return out;
+  const r = reagent.rows.find((x) => x.variable);
+  if (r) return [{ key: `r:${r.variable}`, ph: r.variable, label: r.variable, src: r.name || r.role || '', role: r.role || '' }];
+  const f = fieldVars.value[0];
+  if (f) return [{ key: `f:${f.key}`, ph: f.label, label: f.label, src: f.key, role: '' }];
+  return [];
 });
+const FIELD_VAR_LABEL = { temperature: 'T', duration: 't', atmosphere: 'atm', concentration: 'c' };
+
+/** 试剂行被标成变量（组分菜单里点的）：把字段变量和别的试剂行的变量收掉 */
+function onReagentVarToggled(slot) {
+  if (!slot) return;
+  const dropped = [];
+  if (fieldVars.value.length) dropped.push(...fieldVars.value.map((v) => v.label));
+  fieldVars.value = [];
+  for (const r of reagent.rows) {
+    if (r.variable && r.variable !== slot) {
+      dropped.push(r.variable);
+      r.variable = '';
+    }
+  }
+  if (dropped.length) toast(`一次只筛一样：变量换成 [${slot}]，已经收掉 ${dropped.map((x) => `[${x}]`).join(' ')}`, 'info', 2800);
+  notify();
+}
+
 function toggleFieldVar(f) {
   const i = fieldVars.value.findIndex((v) => v.key === f.key);
-  if (i >= 0) fieldVars.value.splice(i, 1);
-  else fieldVars.value.push({ key: f.key, label: { temperature: 'T', duration: 't', atmosphere: 'atm' }[f.key] || f.key });
+  if (i >= 0) {
+    fieldVars.value.splice(i, 1);
+    return notify();
+  }
+  // 反过来：字段变量开起来，投料表那边的变量（以及别的字段变量）一起收掉
+  const dropped = fieldVars.value.map((v) => v.label);
+  for (const r of reagent.rows) {
+    if (r.variable) {
+      dropped.push(r.variable);
+      r.variable = '';
+    }
+  }
+  const label = FIELD_VAR_LABEL[f.key] || f.key;
+  fieldVars.value = [{ key: f.key, label }];
+  if (dropped.length) toast(`一次只筛一样：变量换成 [${label}]，已经收掉 ${dropped.map((x) => `[${x}]`).join(' ')}`, 'info', 2800);
   notify();
 }
 
@@ -547,6 +593,7 @@ function payload() {
   body.steps = reagent.steps.map((s) => ({ ...s }));
   body.reagents = reagent.rows.map(({ mwText, amountText, ...r }) => r);
   body.field_vars = fieldVars.value.map((v) => ({ key: v.key, label: v.label }));
+  const activeSlots = new Set(condVars.value.map((v) => v.ph));
   body.conds = conds.value
     .filter(
       (c) =>
@@ -561,8 +608,13 @@ function payload() {
       yield_pct: c.yield_pct ?? null,
       sel: c.sel || '',
       note: c.note || '',
-      vars: Object.fromEntries(Object.entries(c.vars || {}).filter(([, v]) => String(v || '').trim())),
-      varEq: Object.fromEntries(Object.entries(c.varEq || {}).filter(([, v]) => String(v || '').trim())),
+      // 只留当前那个变量槽的取值：换了变量以后，旧槽的值不该还藏在行里（筛选表会把它抖出来）
+      vars: Object.fromEntries(
+        Object.entries(c.vars || {}).filter(([k, v]) => String(v || '').trim() && (!activeSlots.size || activeSlots.has(k)))
+      ),
+      varEq: Object.fromEntries(
+        Object.entries(c.varEq || {}).filter(([k, v]) => String(v || '').trim() && (!activeSlots.size || activeSlots.has(k)))
+      ),
     }));
   return body;
 }
@@ -1706,6 +1758,7 @@ const openAttachment = (id) => {
             @recipe="openRecipe"
             @promote-var="promoteVarCandidate"
             @focus-var="scrollToConds"
+            @var-toggled="onReagentVarToggled"
           >
             <template #cond>
               <CondRow
@@ -1762,21 +1815,20 @@ const openAttachment = (id) => {
                       @input="notify()"
                     />
                   </td>
-                  <td class="n var-mw">{{ row.info.mw != null ? round(row.info.mw, 2) : '—' }}</td>
+                  <td class="n var-mw">{{ row.isMol ? (row.info.mw != null ? round(row.info.mw, 2) : '—') : '' }}</td>
                   <td class="n var-eq">
                     <input
-                      v-if="condVars.length === 1"
+                      v-if="row.isMol"
                       class="cond-eq"
-                      :value="row.c.varEq?.[condVars[0].ph] ?? ''"
+                      :value="row.c.varEq?.[row.ph] ?? ''"
                       :disabled="exp.locked"
                       placeholder="—"
                       :title="`这个条件的当量（空 = 用投料表里的标准当量）`"
-                      @input="setVarEq(row.c, condVars[0].ph, $event.target.value)"
+                      @input="setVarEq(row.c, row.ph, $event.target.value)"
                     />
-                    <span v-else>—</span>
                   </td>
-                  <td class="n var-mmol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</td>
-                  <td class="n var-amt">{{ row.info.amount }}</td>
+                  <td class="n var-mmol">{{ row.isMol ? (row.info.mmol != null ? round(row.info.mmol, 3) : '—') : '' }}</td>
+                  <td class="n var-amt">{{ row.isMol ? row.info.amount : '' }}</td>
                   <td />
                   <td class="noprint">
                     <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个变量" @click="removeCond(row.i)">×</button>
