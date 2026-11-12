@@ -117,7 +117,7 @@
 ## 6. 当前进度
 
 > 更早轮次（同一写法逐字搬走）在 **`HISTORY.md`**；本文件有 **64 KB 注入上限**，最近几轮留下面，再早的往下搬。加新内容前先看体积。
-- **最近几轮**：明细在 HISTORY；筛选表**别改回无衬线 / 满页宽**；变量槽**只留一行占位**（`collapseVarRows`）；条件组的候选名走自绘下拉 `CondCand.vue`（**类名 `condc-*`，别叫 `.cond-menu`——跟 `CondRow` 撞**）。
+- **最近几轮**：明细在 HISTORY；筛选表**别改回无衬线 / 满页宽**；变量槽**只留一行占位**（`collapseVarRows`）；条件组的候选名走自绘下拉 `CondCand.vue`（**类名 `condc-*`**）；`onName()` **同名化合物不按名字重认**。
 - **分支**：`try/record-kind`（回退 = `git checkout main`）上有「记录类型 + `exp_groups` 分组」那批，见 HISTORY。
 - **已完成**：v2 全功能已构建进 `public/`（4780 跑的就是 v2）；逐项清单在 `HISTORY.md`。
 - **半成品 / 待确认**：「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。

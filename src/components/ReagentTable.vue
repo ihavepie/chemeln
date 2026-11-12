@@ -168,10 +168,14 @@ function applyCompound(r, c) {
   r.name = c.name || c.code || '';
   const role = KIND_TO_ROLE[c.kind];
   if (role && !isBaseRow(r)) r.role = role;
-  if (!String(r.mwText || '').trim() && c.mw) {
+  // 明确选了哪个化合物，分子量就按它的来（同名化合物分子量可能不一样；
+  // 手填过 MW 的不动）。以前这里只在 mwText 为空时才填，换同名化合物 MW 不变。
+  if (!r._mwManual && c.mw) {
     r.mwText = Number(c.mw).toFixed(2);
     onMw(r);
   }
+  r._looked = '';       // 换了化合物，下次「按名字查」重新查
+  r._miss = false;
   mergeCompounds([c]);
   pickerClose();
   props.notify();
@@ -497,7 +501,7 @@ function maybePromote(r) {
 function onNameBlur(r) {
   if (maybePromote(r)) return;
   clearTimeout(nameTimer);
-  onName(r);
+  onName(r, true);
   verifyName(r);
 }
 
@@ -656,14 +660,45 @@ async function recheck(r) {
 }
 
 /** 试剂名填的是化合物库里的编号 / 名称 → 带出 MW 并记下关联 */
-function onName(r) {
+const sameKey = (a, b) => {
+  const x = String(a || '').trim().toLowerCase();
+  return !!x && x === String(b || '').trim().toLowerCase();
+};
+/** 这个化合物自己的名字 / 编号是不是就是这段字 */
+const isOwnName = (c, key) => !!c && (sameKey(c.code, key) || sameKey(c.name, key));
+
+/** 名字改了，原来挂的化合物就不再代表这一行：摘掉关联，
+ *  分子量是它带进来的也一起作废（手填的不动），别留一张对不上的结构卡。 */
+function dropStaleLink(r, c) {
+  delete r.compound_id;
+  if (!r._mwManual && c && c.mw != null && sameKey(r.mwText, Number(c.mw).toFixed(2))) {
+    r.mwText = '';
+    r.mw = null;
+    r.conc = null;
+    r.mass_mg = null;
+    r.volume_ul = null;
+    r.amountText = '';
+  }
+  unpinPreview();
+}
+
+function onName(r, commit = false) {
   const key = String(r.name || '').trim().toLowerCase();
   // 名字都被删空了 → 就把引用的化合物一起解绑，别留一张点得开的结构卡
   if (!key) {
     if (r.compound_id) return unlinkCompound(r);
     return props.notify();
   }
-  const hit = compoundDict().find((c) => (c.code || '').toLowerCase() === key || (c.name || '').toLowerCase() === key);
+  // **已经明确挂了库的行，名字还是它自己的名字时，不要再按名字重新认一遍**：
+  // 两个化合物可以同名（比如「丙炔基氨基环丁酮」有 sub/G 和 1 两个），
+  // 按名字 find 只会命中排在前面的那个，用户刚选的底物就被换回另一个（用户报过：
+  // 「改底物会默认变回这个」）。只在确实换了名字时才重新认。
+  const linked = r.compound_id ? cmpById(r.compound_id) : null;
+  if (linked && isOwnName(linked, key)) return props.notify();
+  const hits = compoundDict().filter((c) => isOwnName(c, key));
+  // 编号是唯一的，优先按编号认；只有同名时别瞎认一个，交给「从化合物库选一个」
+  const hit = hits.find((c) => sameKey(c.code, key)) || (hits.length === 1 ? hits[0] : null);
+  if (linked && commit && !hit) dropStaleLink(r, linked);
   if (hit) {
     r.compound_id = hit.id;
     if (!r._mwManual && hit.mw) {
@@ -1245,13 +1280,13 @@ function onDrop(ev) {
                   v-else
                   data-f="name"
                   :value="r.name"
-                  :title="r.name || ''"
+                  :title="r.compound_id && cmpById(r.compound_id) ? `${r.name}（库里 ${cmpById(r.compound_id).code || '无编号'}）` : r.name || ''"
                   :placeholder="isBaseRow(r) ? '起始原料' : '试剂名称'"
                   :disabled="locked"
                   @input="onNameInput($event, r)"
                   @compositionstart="onComposeStart"
                   @compositionend="onComposeEnd($event, r)"
-                  @change="onName(r)"
+                  @change="onName(r, true)"
                   @keydown="onKeydown($event, r, 'name')"
                   @blur="onNameBlur(r)"
                   @dblclick.prevent="openBrowse(r)"
