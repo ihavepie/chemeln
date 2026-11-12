@@ -1837,10 +1837,7 @@ const openAttachment = (id) => {
                 </tr>
                 <tr v-for="row in varRows" :key="`v${row.i}`" class="rt-var">
                   <td class="grip-cell" />
-                  <td class="var-slot-cell">
-                    <span v-if="!condVars.length" class="var-slot">变量</span>
-                    <span v-for="v in condVars" :key="v.key" class="var-slot">[{{ v.ph }}]</span>
-                  </td>
+                  <td class="var-idx-cell">{{ row.i + 1 }}</td>
                   <td class="var-name-cell">
                     <span v-if="condVars.length" class="var-vals">
                       <template v-for="(v, vi) in condVars" :key="v.key">
@@ -1877,7 +1874,7 @@ const openAttachment = (id) => {
                     />
                   </td>
                   <td class="n var-mmol">{{ row.isMol ? (row.info.mmol != null ? round(row.info.mmol, 3) : '—') : '' }}</td>
-                  <td class="n var-amt">{{ row.isMol ? row.info.amount : '' }}</td>
+                  <td class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">{{ row.isMol ? row.info.amount : '' }}</td>
                   <td />
                   <td class="noprint">
                     <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个变量" @click="removeCond(row.i)">×</button>

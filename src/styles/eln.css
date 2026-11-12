@@ -8247,3 +8247,24 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .cond-f-scale .cond-f-val input::-webkit-outer-spin-button,
 .cond-f-scale .cond-f-val input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .cond-f-scale .cond-f-val input { -moz-appearance: textfield; }
+
+/* 「变量」那几行跟上面投料表同一个长相（用户：“格式最好和上面差不多”），
+   第一列原来是 `[Cat]` 小签，现在换成 Entry 序号（1 / 2 / 3，跟下面「各条件结果」对得上）。 */
+.sheet .rtable tr.rt-var td.var-idx-cell {
+  text-align: right;
+  padding-right: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+.sheet .rtable tr.rt-var td.n {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  text-align: right;
+}
+.sheet .rtable tr.rt-var td.var-amt { color: var(--ink); font-weight: 600; }
+.sheet .rtable tr.rt-var td.var-amt.is-liquid { font-weight: 400; color: var(--ink-2); }
+.sheet .rtable tr.rt-var .cond-in { font-size: 12px; }
+.sheet .rtable tr.rt-var .cond-cand { min-width: 120px; }
