@@ -4591,34 +4591,32 @@ kbd {
 
 /* ---------- 不让拖选 ----------
    整页默认不可选：在表格上拖一下就把标签、数字选成一片高亮，很难看。
-   需要能选的地方（输入框、文本域、下拉）单独放开。 */
-.app,
-.app * {
+   **只管拖选文字，不拦 mousedown / click**，所以按钮、胶囊、卡片、表头照样点。
+   挂在 body 上而不是 `.app` 上：Element Plus 的弹窗、胶囊菜单、toast 都是 teleport 到 body 的，
+   写在 .app 里管不到它们（点开一个菜单再拖两下，那一片字就选中了）。 */
+body {
   -webkit-user-select: none;
   user-select: none;
 }
 
-.app input,
-.app textarea,
-.app select,
-.app [contenteditable='true'],
-.el-overlay input,
-.el-overlay textarea {
-  -webkit-user-select: text;
-  user-select: text;
-}
-
-/* 这几种是「本来就该能复制」的：编号、分子式/MW、合计、换算算式、路径 */
+/* 该能选 / 能复制的：输入框、文本域、可编辑区、标了 .selectable 的块，以及纸面本身
+   （纸上的编号、分子式、合计、换算算式、备注是要能复制走的）。 */
+input,
+textarea,
+select,
+[contenteditable],
+[contenteditable] *,
+.selectable,
+.selectable *,
+.mono.selectable,
+.sheet,
+.sheet *,
 .sheet-runner,
 .hint .mono,
 .field .input.mono,
 .input.mono,
-.mono.selectable,
-.sheet .totals,
-.sheet .calc-hint,
-.sheet .res-note,
-.sheet .cond-fixed,
-.sheet .linked {
+.el-overlay input,
+.el-overlay textarea {
   -webkit-user-select: text;
   user-select: text;
 }
