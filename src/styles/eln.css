@@ -8298,3 +8298,24 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   gap: 3px 14px;
 }
 .cond-above .cond-inline { display: contents; }
+
+/* 反应规模那格：数字用等宽字体（跟投料表里的 MW / mmol 一样），`mmol` 不再绝对定位、
+   而是紧跟在数字右边（同一个基线、留 3px）——以前数字右对齐 + 单位飘在右边，看着像两截。 */
+.cond-above .cond-f-scale .cond-f-val { display: flex; align-items: center; gap: 3px; }
+.cond-f-scale .cond-f-val input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cond-f-scale .cond-f-unit {
+  position: static;
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  pointer-events: none;
+}

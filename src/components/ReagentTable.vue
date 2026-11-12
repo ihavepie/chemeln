@@ -1159,8 +1159,8 @@ function onDrop(ev) {
         <span class="cond-f-label">反应规模</span>
         <span class="cond-f-val">
           <input
-            type="number"
-            step="any"
+            type="text"
+            inputmode="decimal"
             :value="model.base ?? ''"
             placeholder="0.00"
             :disabled="locked"
