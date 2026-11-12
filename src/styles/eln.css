@@ -8559,3 +8559,8 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 /* 编辑态用 class 切（`:focus` 在 WebKit 里对 pointer-events 算不准）：双击进来之后
    才放开鼠标、才给 I 形光标，编辑时能点、能拖选文字。 */
 .cond-above .cond-f-val input.is-editing { pointer-events: auto; cursor: text; }
+
+/* 条件行的落点是**整格**（标签 + 值 + 中间那点空隙，事件挂在 `.cond-f` 上），
+   hover 给个手型，明确「这一格能点」；编辑态还是上面的 I 形光标。
+   （值那一行只有 20 来 px 高，只挂值那一行的时候稍微点偏就毫无反应，用户报过「不太灵敏」。） */
+.cond-f.is-openable { cursor: pointer; }

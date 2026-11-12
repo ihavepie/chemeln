@@ -90,9 +90,13 @@ function onInput(ev, f) {
  *
  * 输入框平时是 `pointer-events: none`（CSS）：鼠标根本点不到它，也就不会拿焦点、
  * 不会出现打字的 I 形光标、不会闪一下光标再消失 —— `mousedown` 里 `preventDefault()`
- * 在 Safari 上拦不干净（试过，还是会进光标）。所以事件挂在**外层 `.cond-f-val`** 上：
+ * 在 Safari 上拦不干净（试过，还是会进光标）。所以事件挂在**整格 `.cond-f`** 上：
  * 单击 → 开选择；双击 → 手动 `focus()`（程序化聚焦不受 pointer-events 影响），
  * 聚焦后 CSS 里再把 pointer-events 放开，编辑时还能点、能选字。
+ *
+ * 挂整格而不是只挂值那一行：值那一行只有 20 来 px 高、右边还留着小箭头，
+ * 稍微点偏一点（点在标签上、字上面一点）就毫无反应，用户报「不太灵敏」。
+ * 现在标签 + 值 + 中间那点空隙都算落点，四周没有死区。
  */
 let downTimer = 0;
 let lastDownAt = 0;
@@ -101,7 +105,9 @@ const editing = ref('');
 
 function onFieldDown(f, ev) {
   if (props.locked) return;
-  if (ev.target.closest?.('.cond-caret')) return; // 小箭头有自己的点击
+  // 小箭头 / 「变量」小开关 / 已经弹出来的选择器：各有自己的点击，别抢
+  // （菜单里的 mousedown 也会冒到这里，抢了会在 mouseup 前把菜单关掉 → 那一下选不中）
+  if (ev.target.closest?.('.cond-caret, .cond-var-tog, .cond-menu, .ruler-pop')) return;
   const box = ev.currentTarget;
   const el = box?.querySelector?.('input');
   if (!el) return;
@@ -123,9 +129,10 @@ function onFieldDown(f, ev) {
 
   ev.preventDefault();
   clearTimeout(downTimer);
+  // 130ms 就开（以前 180ms，感觉「点了没反应」）；再点同一格 = 收起来
   downTimer = setTimeout(() => {
-    if (open.value !== f.key) open.value = f.key;
-  }, 180);
+    open.value = open.value === f.key ? '' : f.key;
+  }, 130);
 }
 
 function pick(key, v) {
@@ -181,7 +188,13 @@ onBeforeUnmount(() => {
 <template>
   <!-- 这一块现在长在投料表的最后一行里（`条件` 那一行）：五个字段横着排，格子内联小标签 -->
   <div class="cond-inline">
-    <div v-for="f in fields" :key="f.key" class="cond-f">
+    <div
+      v-for="f in fields"
+      :key="f.key"
+      class="cond-f"
+      :class="{ 'is-openable': !(f.key in fixed) && !locked }"
+      @mousedown="onFieldDown(f, $event)"
+    >
       <span class="cond-f-label">
         {{ f.label }}
         <!-- 这一栏当「筛选变量」用：标签旁边一颗小开关，开了就在箭头上写 [T] / [t] / [atm] -->
@@ -196,7 +209,7 @@ onBeforeUnmount(() => {
           {{ fieldVars.some((v) => v.key === f.key) ? `[${(fieldVars.find((v) => v.key === f.key) || {}).label}]` : '变量' }}
         </button>
       </span>
-      <span class="cond-f-val" @mousedown="onFieldDown(f, $event)">
+      <span class="cond-f-val">
         <span v-if="f.key in fixed" class="cond-fixed" title="来自投料表">{{ fixed[f.key] || '—' }}</span>
         <template v-else>
           <input
