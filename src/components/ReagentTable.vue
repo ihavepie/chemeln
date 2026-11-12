@@ -1265,7 +1265,7 @@ function onDrop(ev) {
                   :title="`这一组分是变量：反应式上写成 [${r.variable}]；条件组里有 ${varCounts[r.variable] || 0} 个候选（点一下跳过去，双击取消变量）`"
                   @click.stop="emit('focus-var', r.variable)"
                   @dblclick.stop="toggleVariable(r)"
-                >[{{ r.variable }}]<span v-if="varCounts[r.variable]" class="var-chip-n">×{{ varCounts[r.variable] }}</span></button>
+                >[{{ r.variable }}]<span v-if="varCounts[r.variable] > 1" class="var-chip-n">×{{ varCounts[r.variable] }}</span></button>
                 <!-- 点菜单空白处也算「有反应」：直接关掉，别让那一下像是没点到 -->
                 <div v-if="roleMenuFor === rows.indexOf(r)" class="qmenu role-menu" :class="{ up: roleMenuUp }" @click.stop="closeRoleMenu">
                   <button
@@ -1293,9 +1293,15 @@ function onDrop(ev) {
 
               </td>
               <td class="name-cell" @click="pinPreview(r)">
-                <!-- 变量行：这格写「标准条件」用的那个试剂（跟同一行的 MW / 当量 对得上）；
-                     要换的几个候选在投料表下面那条虚线以下，一格一个 -->
+                <!-- 变量行：这一格里**不写具体试剂**，只放一个占位符——具体候选在投料表下面
+                     那条虚线以下（用户：「就是试剂去变量的话，就一个占位符就行了」） -->
+                <span
+                  v-if="r.variable"
+                  class="sol-blank"
+                  :title="`这一行是变量 [${r.variable}]：换的那几个试剂写在下面的「变量」里`"
+                >—</span>
                 <input
+                  v-else
                   data-f="name"
                   :value="r.name"
                   :title="r.compound_id && cmpById(r.compound_id) ? `${r.name}（库里 ${cmpById(r.compound_id).code || '无编号'}）` : r.name || ''"
@@ -1374,20 +1380,21 @@ function onDrop(ev) {
               </td>
               <td>
                 <!-- 溶剂只记「用了多少量」：分子量 / 当量 / mmol 三格都不填，也就不会算出 17 µL 那种数 -->
-                <span v-if="isSolvent(r)" class="sol-blank">—</span>
+                <span v-if="isSolvent(r) || r.variable" class="sol-blank">—</span>
                 <input v-else class="n mw-cell" data-f="mwcell" :value="mwDisplay(r)" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="r._mwEditing = true; focusHint(r, 'mwcell'); $event.target.select()" @blur="r._mwEditing = false; onMw(r); blurHint()" @keydown="onKeydown($event, r, 'mwcell')" />
               </td>
               <td>
-                <span v-if="isSolvent(r)" class="sol-blank">—</span>
+                <span v-if="isSolvent(r) || r.variable" class="sol-blank">—</span>
                 <input v-else class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq'); $event.target.select()" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
               </td>
               <td>
-                <span v-if="isSolvent(r)" class="sol-blank">—</span>
+                <span v-if="isSolvent(r) || r.variable" class="sol-blank">—</span>
                 <input v-else class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol'); $event.target.select()" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
               </td>
               <td class="amount-td" :data-kind="rowKind(r)">
                 <!-- 值就是 r.amountText 本身：边打字只解析不回写（回写会把光标顶走、字被吃成「3mL23」），失焦才规整成「3 mL」 -->
-                <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount'); $event.target.select()" @blur="onAmount(r); blurHint()" @keydown="onKeydown($event, r, 'amount')" />
+                <span v-if="r.variable" class="sol-blank">—</span>
+                <input v-else class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount'); $event.target.select()" @blur="onAmount(r); blurHint()" @keydown="onKeydown($event, r, 'amount')" />
               </td>
               <td class="note-td">
                 <input class="note-cell" data-f="note" :value="r.note" :placeholder="firstRow === r ? '说明' : ''" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
