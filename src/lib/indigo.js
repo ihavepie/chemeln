@@ -142,17 +142,26 @@ function namespaceIds(body) {
  * `padPx` 是四周额外留的空（px），换算成 viewBox 单位再塞进 viewBox，缩放比不变。
  */
 export async function indigoSvgSized(data, bondPx = 26, padPx = 6) {
-  const svg = await indigoSvg(data);
-  const body = namespaceIds(svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, ''));
-  const nums = ((svg.match(/viewBox="([^"]+)"/) || [])[1] || '').split(/[\s,]+/).map(Number);
+  return splitSvgSized(await indigoSvg(data), bondPx, padPx);
+}
+
+/**
+ * 手上已经有一份 Indigo 风格的 SVG（比如标签已经换成 `<text>` 的那份）时，直接拆成
+ * { svg, vb, body, w, h }。跟 `indigoSvgSized` 的尾巴是同一套算法 —— 换过字以后字更宽更高，
+ * 画布必须**重新量**；拿换字前那份 viewBox 用会把新字顶出画布裁掉。
+ */
+export function splitSvgSized(svg, bondPx = 26, padPx = 6) {
+  const src = String(svg || '');
+  const body = namespaceIds(src.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, ''));
+  const nums = ((src.match(/viewBox="([^"]+)"/) || [])[1] || '').split(/[\s,]+/).map(Number);
   if (nums.length !== 4 || !nums.every((n) => Number.isFinite(n)) || nums[2] <= 0 || nums[3] <= 0) {
-    return { svg, body, vb: '', w: 0, h: 0 };
+    return { svg: src, body, vb: '', w: 0, h: 0 };
   }
   const [vx, vy, vw, vh] = nums;
   const k = bondPx / INDIGO_BOND_UNITS; // 1 个 viewBox 单位 = k 像素
   const pad = padPx / k;
   return {
-    svg,
+    svg: src,
     body,
     vb: `${vx - pad} ${vy - pad} ${vw + pad * 2} ${vh + pad * 2}`,
     w: Math.round((vw + pad * 2) * k),

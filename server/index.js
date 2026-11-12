@@ -611,7 +611,10 @@ function listExperiments(query) {
                     OR lower(a.original_name) LIKE '%.jpeg' OR lower(a.original_name) LIKE '%.webp'
                     OR lower(a.original_name) LIKE '%.gif' OR lower(a.original_name) LIKE '%.svg')
              ORDER BY (a.category = 'scheme') DESC, a.id
-             LIMIT 1) AS preview_id
+             LIMIT 1) AS preview_id,
+           -- 记录页里「按投料表拼好的那张」有没有缓存：有就让卡片直接显示它。
+           -- 附件是生成那一刻的快照，改过投料表以后卡片和记录页就对不上了（用户报过）。
+           EXISTS(SELECT 1 FROM scheme_cache c WHERE c.exp_id = e.id) AS has_scheme
     FROM experiments e
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY ${order}
@@ -2006,6 +2009,19 @@ route('POST', '/api/compounds/:id/files', async (req, res, params) => {
 route('POST', '/api/compounds/:id/files/path', async (req, res, params) => {
   const body = await readJson(req);
   await compoundFromPath(res, Number(params.id), body);
+});
+
+/**
+ * 记录页里「按投料表拼好的那张反应式」的原图（`scheme_cache` 里存着的）。
+ * 卡片墙拿它当缩略图，这样卡片和记录页永远同一张（附件那张是旧快照）。
+ * 没缓存（这条还没在记录页打开过）→ 404，前端退回附件。
+ */
+route('GET', '/api/experiments/:id/scheme.svg', async (req, res, params) => {
+  const row = db.prepare('SELECT sig, svg FROM scheme_cache WHERE exp_id = ?').get(Number(params.id));
+  if (!row || !row.svg) return fail(res, 404, '还没有画好的反应式');
+  // no-store：内容跟着投料表变，且 URL 不带版本号，不能让浏览器长期缓存
+  res.writeHead(200, { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(row.svg);
 });
 
 route('GET', '/api/experiments/:id/qr.svg', async (req, res, params, url) => {

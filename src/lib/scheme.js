@@ -12,7 +12,8 @@
  */
 
 import { relayoutMolecule, orientLandscape, canonicalOrientation } from './relayout.js';
-import { indigoSvgSized } from './indigo.js';
+import { indigoSvg, indigoSvgSized, splitSvgSized } from './indigo.js';
+import { chemdrawLabels, chemdrawLabelsExact } from './chemdraw.js';
 import { roleTone } from './reagent.js';
 
 /** 组分 → 文字颜色，跟投料表「组分」那一列的配色一致（Sub 棕、Cat 紫、Base 蓝、Lig 绿…） */
@@ -131,7 +132,27 @@ async function molSvg(smiles, id, molfile = '') {
   if (molfile) {
     try {
       const p = await indigoSvgSized(molfile, BOND_PX, 6);
-      if (p && p.w > 0 && p.h > 0) return { w: p.w, h: p.h, body: p.body, vb: p.vb };
+      if (p && p.w > 0 && p.h > 0) {
+        // 缩写标签换成真正的无衬线字，跟化合物卡片（`chemdraw.js` 那套）一个字体 ——
+        // 不然同一个 Ts 在卡片是 Helvetica、在反应式里是 Indigo 的衬线小字。
+        // 换字会改字宽 → 画布必须重新量，所以再拆一次。
+        // **判成功要看「字形变少了」而不是「一个都不剩」**：O / N 这类元素符号本来就该留着
+        // 是 Indigo 字形（它们有颜色），拿「没有 glyph」当条件会把整条转换白扔掉（踩过）。
+        try {
+          const glyphs = (s) => (String(s).match(/href="#[^"]*glyph/g) || []).length;
+          // exact 版（每条缩写单独渲一张、按字形轮廓认位置）才靠谱；老版按 molfile 坐标投影
+          // 配位置，两套坐标系不同，基本配不上、会原样返回（所以这边先 exact、再退回老版）。
+          let conv = await chemdrawLabelsExact(molfile, indigoSvg).catch(() => '');
+          if (!conv || !conv.includes('<svg')) conv = chemdrawLabels(p.svg, molfile);
+          if (conv && conv.includes('<svg') && glyphs(conv) < glyphs(p.svg)) {
+            const q = splitSvgSized(conv, BOND_PX, 6);
+            if (q.w > 0 && q.h > 0) return { w: q.w, h: q.h, body: q.body, vb: q.vb };
+          }
+        } catch {
+          /* 换字失败就用 Indigo 原图 */
+        }
+        return { w: p.w, h: p.h, body: p.body, vb: p.vb };
+      }
     } catch {
       /* Indigo 出不来就退回下面按 SMILES 画 */
     }

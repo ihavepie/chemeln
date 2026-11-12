@@ -27,9 +27,18 @@ async function create(categoryId = undefined) {
 
 const activeId = () => (route.name === 'editor' ? Number(route.params.id) : null);
 
-/** 缩略图：先看反应式附件，没有再退回到记录里产物/底物的结构式 */
+/**
+ * 缩略图：**优先记录页那张**（按投料表拼好、缓存过的），退其次反应式附件，最后产物/底物的结构式。
+ * 附件是生成那一刻的快照，改了投料表它不会变，卡片和记录页就会显示两个不同的反应式（用户报过）。
+ */
 const thumbOf = (it) =>
-  it.preview_id ? `/api/files/${it.preview_id}` : it.preview_cmp_file ? `/api/compound-files/${it.preview_cmp_file}` : '';
+  it.has_scheme
+    ? `/api/experiments/${it.id}/scheme.svg`
+    : it.preview_id
+      ? `/api/files/${it.preview_id}`
+      : it.preview_cmp_file
+        ? `/api/compound-files/${it.preview_cmp_file}`
+        : '';
 
 const cats = computed(() => recordCategories('experiment'));
 
