@@ -1032,7 +1032,7 @@ const liveScheme = ref('');
 const liveSigShown = ref('');
 /* sig 只看「会进这张图的字段」，别把密度 / 用量那些也塞进来——它们一变就白重画一次，
    页面一打开就能对得上缓存（化合物库还没读进来也不影响）。版本号用来让旧缓存失效。 */
-const SCHEME_SIG_VERSION = 'v11';  // 改了出图规则就加一，让旧缓存失效（v10：条件行折行 + 箭头封顶 + 结构放大）
+const SCHEME_SIG_VERSION = 'v12';  // 改了出图规则就加一，让旧缓存失效（v12：箭头上只排一行；v10：条件行折行 + 箭头封顶 + 结构放大）
 const liveSig = computed(() =>
   SCHEME_SIG_VERSION +
   JSON.stringify({

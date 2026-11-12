@@ -240,7 +240,7 @@ export async function composeChainSvg({ stages = [], background = true } = {}) {
   const GAP = 12;          // 结构之间的一般间距
   const PLUS = 18;         // 加号的宽度
   const ARROW_MIN = 110;   // 箭头最短多长；实际长度按上下最长那行字来（够写条件就行，别拉太长）
-  const MAX_ARROW = 320;   // 但别让一行长字把箭头拉到 500+：折行后还超长就截在这里
+  const MAX_ARROW = 360;   // 但别让一行长字把箭头拉到 500+；上方的字只排一行，所以这里放宽到 360
   const CAP_SIZE = 15;     // 箭头上下的条件字号（跟结构式里的原子标签差不多大）
   const MAX_LINE_W = 250;  // 条件先折行（单行最多 ~250px，最多 2 行），再拿折完最宽的那行算箭头长度
   const LINE_H = 20;
@@ -258,10 +258,12 @@ export async function composeChainSvg({ stages = [], background = true } = {}) {
     }
     return drawn.get(key);
   };
-  const caps = (list) =>
+  // 箭头上**只排一行**（用户：「箭头上最好不要两行」）：一行放不下就让它长一点（箭头跟着变长），
+  // 不再折成两行；箭头下面（溶剂 / 温度 / 试剂）还是最多两行
+  const caps = (list, maxLines = 2) =>
     (list || [])
       .filter((t) => lineText(t).trim())
-      .flatMap((l) => wrapPhrases(l, MAX_LINE_W, textW))
+      .flatMap((l) => wrapPhrases(l, MAX_LINE_W, textW, maxLines))
       .filter((l) => lineText(l).trim());
 
   // ② 排成一串节点：结构 / 加号 / 箭头 / 产物名
@@ -269,8 +271,8 @@ export async function composeChainSvg({ stages = [], background = true } = {}) {
   let prevKey = ''; // 上一段的产物：下一段里跟它同一个的底物不再画一次
   for (let si = 0; si < stages.length; si++) {
     const st = stages[si] || {};
-    const above = caps(st.above);
-    const below = caps(st.below);
+    const above = caps(st.above, 1);
+    const below = caps(st.below, 2);
     const capW = Math.max(0, ...[...above, ...below].map((t) => textW(lineText(t))));
     // 画出来那根线比 arrowLen 短（两头留白 / 箭头尖用掉了约 37px），所以这里补回来
     const arrowLen = Math.min(MAX_ARROW, Math.max(ARROW_MIN, Math.round(capW) + 30));
