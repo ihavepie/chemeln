@@ -1272,7 +1272,6 @@ function onDrop(ev) {
       </div>
       <div v-for="(s, si) in singleStep ? [] : steps" :key="`cb${si}`" class="step-cond-block" :data-step="si + 1">
         <div class="step-line step-line-head">
-          <button type="button" class="step-caret noprint" @click="toggleCollapse(si)"><Icon name="chevron" :size="11" /></button>
           <span class="step-no">第 {{ si + 1 }} 步</span>
           <input class="step-label" :value="s.label" placeholder="本步内容" :disabled="locked" @change="onStepField(si, 'label', $event.target.value)" />
           <span class="step-rule" />

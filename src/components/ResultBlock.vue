@@ -220,6 +220,15 @@ function onYieldInput(ev, r) {
           <td v-if="multi" class="res-step-cell">{{ r.label }}</td>
           <td>
             <div class="pick-wrap">
+              <!-- 名字在前、化合物标签在后：表头写的是「产物名称」，名字要跟表头左对齐
+                   （标签放前面会把名字顶到右边，整列看着跟表头错开一截） -->
+              <input
+                :value="r.rm.product_name"
+                :placeholder="multi ? (r.last ? '终产物' : '中间体') : 'C'"
+                :disabled="locked"
+                @input="r.rm.product_name = $event.target.value; notify()"
+                @change="notify()"
+              />
               <span v-if="linkedOf(r.rm)" class="prod-link">
                 <span
                   class="cmp-tag"
@@ -229,15 +238,8 @@ function onYieldInput(ev, r) {
                 >
                 <button v-if="!locked" class="cmp-unlink noprint" title="解除关联" @click.stop="unlink(r)"><Icon name="x" :size="9" /></button>
               </span>
-              <input
-                :value="r.rm.product_name"
-                :placeholder="multi ? (r.last ? '终产物' : '中间体') : 'C'"
-                :disabled="locked"
-                @input="r.rm.product_name = $event.target.value; notify()"
-                @change="notify()"
-              />
               <button
-                v-if="!locked && !linkedOf(r.rm)"
+                v-else-if="!locked"
                 type="button"
                 class="pick-btn noprint"
                 title="从化合物库选"
