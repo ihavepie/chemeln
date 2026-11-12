@@ -161,6 +161,12 @@ function normalizeSteps(list) {
     stir: str(s && s.stir).slice(0, 60),           // 这一步怎么搅的（500 rpm…）
     // 这一步的产物（中间体）：一条记录里串两步时，反应式要靠它画中间那道桥
     product_name: str(s && s.product_name).slice(0, 120),
+    // 每一步自己的条件行（温度 / 时间 / 气氛 / 装置 / 光照）：多步记录按步各一条
+    temperature: str(s && s.temperature).slice(0, 60),
+    duration: str(s && s.duration).slice(0, 60),
+    atmosphere: str(s && s.atmosphere).slice(0, 60),
+    apparatus: str(s && s.apparatus).slice(0, 60),
+    light: str(s && s.light).slice(0, 60),
   }));
 }
 

@@ -15,6 +15,8 @@ const props = defineProps({
   fixed: { type: Object, default: () => ({}) },
   /** 本次筛选把哪些字段当变量：`[{key,label}]`（温度 [T] / 时间 [t] / 气氛 [atm]） */
   fieldVars: { type: Array, default: () => [] },
+  /** 不显示格子上面那排小标签（多步记录的第 2 步起：上面那条已经标过了） */
+  hideLabels: Boolean,
 });
 const emit = defineEmits(['toggle-var']);
 /** 这些字段才允许当变量（跟服务端白名单一致：apparatus / light 不是筛选变量） */
@@ -195,7 +197,7 @@ onBeforeUnmount(() => {
       v-for="f in fields"
       :key="f.key"
       class="cond-f"
-      :class="{ 'is-openable': !(f.key in fixed) && !locked }"
+      :class="{ 'is-openable': !(f.key in fixed) && !locked, 'no-label': hideLabels }"
       @mousedown="onFieldDown(f, $event)"
     >
       <span class="cond-f-label">

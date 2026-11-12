@@ -105,7 +105,7 @@ export function schemeParts(model, compounds) {
    * @param {string} prodName 没挂库时的产物名
    * @param {string} condText 这一步的条件文字（多步时来自「第 N 步」那行的条件格）
    */
-  const stageOf = (rows, prod, prodName, condText) => {
+  const stageOf = (rows, prod, prodName, condText, step = {}) => {
     const seenPlaceholder = new Set();   // 同一个变量槽（两行都标成 [Cat]）箭头上只写一次
     const reactants = [];
     const reactantIds = []; // 与 reactants 平行：反应式要按库里那份「带缩写的画」出图时用
@@ -149,14 +149,15 @@ export function schemeParts(model, compounds) {
     // 两个都画出来的时候不写这行（左边已经是「结构1 + 结构2」，再写一遍是重复）
     const subBelow = loose.length && subNames.length > 1 ? subNames.join(' + ') : '';
     const { fit, over } = packAbove(others);
-    // 条件：单步还是老规矩（记录里的溶剂 / 温度 / 时间）；多步时按「这一步的溶剂行 + 这一步的条件文字」
+    // 条件：单步还是老规矩（记录里的溶剂 / 温度 / 时间）；多步时用「这一步的溶剂行 + 这一步的条件行」
     let cond;
     if (maxStep > 1) {
       const sol = solvents.join(' + ');
       const text = str(condText);
       // 这一步的条件文字里往往已经写了溶剂（「THF, rt」），别再重复一遍
       const needSol = sol && !text.toLowerCase().includes(sol.toLowerCase());
-      cond = [needSol ? sol : '', text].filter(Boolean).join('，');
+      const own = [str(step.temperature), str(step.duration), str(step.atmosphere)].filter(Boolean).join('，');
+      cond = [needSol ? sol : '', text, own].filter(Boolean).join('，');
     } else {
       // 单步：还是记录里那格「溶剂」（投料表的溶剂行是它的镜像，名字对不齐时以这格为准）
       cond = [str(model.solvent) || solvents.join(' + '), fieldText('temperature', model.temperature), fieldText('duration', model.duration)]
@@ -196,7 +197,7 @@ export function schemeParts(model, compounds) {
     const isLast = step === maxStep;
     const meta = stepMeta[step - 1] || {};
     const prod = isLast ? finalProd : findProduct(null, meta.product_name);
-    stages.push(stageOf(rows, prod, isLast ? model.product_name : meta.product_name, meta.condition));
+    stages.push(stageOf(rows, prod, isLast ? model.product_name : meta.product_name, meta.condition, meta));
   }
 
   // 单步的：把 stages[0] 摊平返回（老调用方照旧用这些字段）

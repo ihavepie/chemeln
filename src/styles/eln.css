@@ -9100,3 +9100,20 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   font-size: 11px;
 }
 .step-head .step-label { flex: 0 1 auto; width: 150px; }
+
+/* 多步记录：一步一条条件行（第 N 步 + 温度 / 时间 / 气氛…），行与行之间留一点缝 */
+.cond-step { display: flex; align-items: flex-start; gap: 8px; }
+.cond-step + .cond-step { margin-top: 6px; padding-top: 6px; border-top: 1px dotted #eeede8; }
+.cond-step-lbl {
+  flex: 0 0 auto;
+  padding-top: 4px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.cond-step .cond-row { flex: 1 1 auto; min-width: 0; }
+
+/* 多步记录的第 2 步起：条件行不再重复那排小标签（上面那条已经标过了），值跟上一行对齐 */
+.cond-f.no-label .cond-f-label { visibility: hidden; height: 0; overflow: hidden; }

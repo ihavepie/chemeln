@@ -369,10 +369,19 @@ function fill(e) {
     addition: s.addition || '',
     stir: s.stir || '',
     product_name: s.product_name || '',   // 这一步的产物（中间体）
+    // 这一步自己的条件行（多步记录里一步一条）
+    temperature: s.temperature || '',
+    duration: s.duration || '',
+    atmosphere: s.atmosphere || '',
+    apparatus: s.apparatus || '',
+    light: s.light || '',
   }));
   const need = (e.reagents || []).reduce((m, r) => Math.max(m, Number(r.step) || 1), 1);
   while (list.length < Math.max(1, need)) {
-    list.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '', product_name: '' });
+    list.push({
+      label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '', product_name: '',
+      temperature: '', duration: '', atmosphere: '', apparatus: '', light: '',
+    });
   }
   const rows = (e.reagents || []).map(toRow);
   // 一条试剂都还没有时，第一步给一行空行当起点；其余步骤不再自动补空行
@@ -2284,7 +2293,23 @@ const openAttachment = (id) => {
             @var-toggled="onReagentVarToggled"
           >
             <template #cond>
+              <!-- 多步记录：一步一条条件行（温度 / 时间 / 气氛…各自归各自那一步），
+                   两步不一样的条件才记得下；单步记录还是原来那一行 -->
+              <template v-if="multiStep">
+                <div v-for="(s, si) in reagent.steps" :key="`c${si}`" class="cond-step">
+                  <span class="cond-step-lbl">{{ si + 1 }} 步</span>
+                  <CondRow
+                    :model="s"
+                    :notify="notify"
+                    :locked="exp.locked"
+                    :fixed="condFixed"
+                    :field-vars="[]"
+                    :hide-labels="si > 0"
+                  />
+                </div>
+              </template>
               <CondRow
+                v-else
                 :model="fields"
                 :notify="notify"
                 :locked="exp.locked"

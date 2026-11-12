@@ -1290,8 +1290,6 @@ function onDrop(ev) {
                 <!-- 一步以上：跟「变量」那条虚线一个路子——一条虚线隔开，右边挂这一步的两个关键格子 -->
                 <template v-if="steps.length > 1">
                   <span class="step-rule" />
-                  <span class="step-tag">条件</span>
-                  <input class="step-cond" :value="s.condition" :disabled="locked" @change="onStepField(si, 'condition', $event.target.value)" />
                   <template v-if="si < steps.length - 1">
                     <span class="step-tag">产物</span>
                     <input
