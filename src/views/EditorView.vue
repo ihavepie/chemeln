@@ -494,10 +494,25 @@ watch(
   }
 );
 
+/**
+ * 「纸放得下就别让它滚」：`.editor` 底部那 120px 是给长内容留的呼吸位，
+ * 纸本身没超出一屏的时候它会让页面白滚一段（用户报过「现在会上下动」）。
+ * 所以量一下「内容 + 顶距」够不够放，够就把这个容器的 overflow 关掉。
+ */
+const editorFits = ref(false);
+function updateEditorFit() {
+  const el = editorEl.value;
+  if (!el) return;
+  const pad = parseFloat(getComputedStyle(el).paddingBottom) || 0;
+  editorFits.value = el.scrollHeight - pad <= el.clientHeight + 1;
+}
+let fitRO = null;
+
 /** 窄屏（手机）走只读精简页，桌面版式完全不渲染 */
 const isPhone = ref(typeof window !== 'undefined' && window.innerWidth <= 820);
 function onResize() {
   isPhone.value = window.innerWidth <= 820;
+  updateEditorFit();
 }
 
 onMounted(async () => {
@@ -513,6 +528,20 @@ onMounted(async () => {
   document.addEventListener('keydown', onParallelKey);
   // 等这一帧渲染完再量纸面位置
   requestAnimationFrame(updateRail);
+  requestAnimationFrame(updateEditorFit);
+  // 纸的高度随内容变（画反应式、加附件、翻页、切块）→ 用 ResizeObserver 跟着重量，
+  // 别在每处都手动调一次
+  if (typeof ResizeObserver !== 'undefined') {
+    fitRO = new ResizeObserver(() => updateEditorFit());
+    const watchInner = () => {
+      const inner = editorEl.value && editorEl.value.querySelector('.editor-inner');
+      fitRO.disconnect();
+      if (inner) fitRO.observe(inner);
+      updateEditorFit();
+    };
+    watchInner();
+    watch([() => !!exp.value, page, () => liveScheme.value], () => nextTick(watchInner), { flush: 'post' });
+  }
 });
 /** 现在能翻的几页（文献 / 附件两页在设置里关掉后就不参与左右翻页） */
 const pageTabs = computed(() => {
@@ -566,6 +595,7 @@ function onParallelKey(ev) {
 }
 
 onBeforeUnmount(() => {
+  if (fitRO) fitRO.disconnect();
   window.removeEventListener('resize', onResize);
   window.removeEventListener('resize', updateRail);
   document.removeEventListener('paste', onPaste);
@@ -1958,7 +1988,7 @@ const openAttachment = (id) => {
     <!-- 左：实验列表。读取中就一直挂着——从列表/卡片墙点进来时，这栏以前会跟着
          整棵 v-if 分支一起卸载重建，看着就是闪一下 -->
     <ExpListPane />
-    <div class="editor" ref="editorEl" @scroll="updateRail">
+    <div class="editor" :class="{ 'is-fit': editorFits }" ref="editorEl" @scroll="updateRail">
       <!-- 读取中：左边列表原地不动，只把右边这张纸换成空白骨架，
            不然点开记录是一整片白闪一下再长出内容 -->
       <template v-if="!exp">

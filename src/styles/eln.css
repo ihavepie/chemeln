@@ -6833,8 +6833,8 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   justify-content: center;
 }
 .scheme-live > div { width: 100%; display: flex; align-items: center; justify-content: center; }
-.scheme-live svg { display: block; max-width: 100%; max-height: 240px; width: auto; height: auto; }
-@media print { .scheme-live svg { max-height: 210px; } }
+.scheme-live svg { display: block; max-width: 100%; max-height: 190px; width: auto; height: auto; }
+@media print { .scheme-live svg { max-height: 190px; } }
 
 /* 反应式格子右上角的「画反应式」按钮：字号跟着这一带走，别把标签挤歪 */
 .scheme-head { align-items: center; }
@@ -9065,3 +9065,7 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   border: 1px solid #e2e0da;
   color: var(--ink-3);
 }
+
+/* 纸放得下（`scrollHeight` 减掉底部呼吸位还够）时由 `EditorView` 挂上 `is-fit`：
+   这时候不该能滚——以前底部那 120px 会让页面白滚一段，用户报过「会上下动」。 */
+.editor.is-fit { overflow-y: hidden; }
