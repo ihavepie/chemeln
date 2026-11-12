@@ -8435,3 +8435,21 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 
 /* 变量行跟普通投料行一样高：td 的上下 padding 归零（26px 一行，跟上面一致） */
 .sheet .rtable tr.rt-var > td { padding-top: 0; padding-bottom: 0; }
+
+/* 条件行的小下拉里最后那条「＋ 自定义」，以及自己加的那几条（悬停露出 × 可删） */
+.cond-menu .qchip.is-add { color: var(--ink-3); border-style: dashed; }
+.cond-menu .qchip.is-add:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.35); }
+.cond-menu .qchip.is-own { position: relative; padding-right: 16px; }
+.cond-menu .qchip .qchip-x {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ink-4);
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+}
+.cond-menu .qchip.is-own:hover .qchip-x { opacity: 1; }
+.cond-menu .qchip .qchip-x:hover { color: var(--accent); }

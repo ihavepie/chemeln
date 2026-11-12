@@ -193,6 +193,21 @@ export async function addCategory(name, scope, project = undefined) {
 
 export const settings = () => store.boot?.settings || {};
 export const compoundDict = () => store.boot?.compoundDict || [];
+/**
+ * 「常用选项」里自己加的那几条（条件行的小下拉）。
+ * 存服务端 settings 的 `quick:<field>`（JSON 数组）——跟着 data/ 一起备份，
+ * 不像 localStorage 那样换台机器 / 清缓存就没了。
+ */
+export const quickExtra = (field) => {
+  try {
+    const raw = store.boot?.settings?.[`quick:${field}`];
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.map(String).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+};
+
 /** 自己记录本里用过的试剂（名字 / MW / 浓度），服务端从历史行汇总好的 */
 export const reagentDict = () => store.boot?.reagentDict || [];
 

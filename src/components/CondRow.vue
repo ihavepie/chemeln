@@ -2,6 +2,9 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from './Icon.vue';
 import { QUICK } from '../lib/ui.js';
+import { api } from '../api.js';
+import { loadBoot, quickExtra } from '../store.js';
+import { prompt, toast } from '../lib/feedback.js';
 
 const props = defineProps({
   model: { type: Object, required: true },
@@ -28,7 +31,49 @@ const fields = [
 ];
 
 const open = ref('');
-const optionsFor = (key) => QUICK[`f-${key}`] || [];
+const builtin = (key) => QUICK[`f-${key}`] || [];
+/** 下拉里列什么：内置那几条 + 自己加的（去重，自己加的在后面） */
+const optionsFor = (key) => {
+  const own = quickExtra(key);
+  const out = [...builtin(key)];
+  for (const v of own) if (!out.includes(v)) out.push(v);
+  return out;
+};
+const isOwn = (key, v) => !builtin(key).includes(v) && quickExtra(key).includes(v);
+
+/** 把这个格子当前填的值加进「常用选项」；空着就先问他填什么 */
+async function addOption(f) {
+  const cur = String(props.model[f.key] || '').trim();
+  const v = await prompt({
+    title: `加一条「${f.label}」常用选项`,
+    placeholder: '比如 Ar 手套箱 / 45 ℃ / 光照 24 h',
+    value: cur,
+  });
+  if (!v) return;
+  try {
+    const items = [...quickExtra(f.key), v];
+    await api.saveQuick(f.key, items);
+    await loadBoot();
+    props.model[f.key] = v;
+    notify();
+    open.value = '';
+    toast(`「${v}」加好了，以后在这个下拉里能直接点`);
+  } catch (e) {
+    toast(e.message || '没存上', 'err');
+  }
+}
+
+/** 从「常用选项」里删掉一条（只删自己加的，内置那几条删不掉） */
+async function delOption(f, v) {
+  if (!isOwn(f.key, v)) return;
+  try {
+    await api.saveQuick(f.key, quickExtra(f.key).filter((x) => x !== v));
+    await loadBoot();
+    toast(`已经从常用选项里去掉「${v}」`);
+  } catch (e) {
+    toast(e.message || '没删掉', 'err');
+  }
+}
 
 /** 这几栏都是自由输入（−78 ℃、16 h、N₂） */
 function onInput(ev, f) {
@@ -108,10 +153,22 @@ onBeforeUnmount(() => {
               :key="v"
               type="button"
               class="qchip"
+              :class="{ 'is-own': isOwn(f.key, v) }"
               :aria-selected="String(model[f.key] || '') === v"
               @click="pick(f.key, v)"
             >
               {{ v }}
+              <!-- 自己加的那几条：鼠标移上来露出 ×，点它就删掉（内置的没有） -->
+              <span
+                v-if="isOwn(f.key, v)"
+                class="qchip-x"
+                role="button"
+                title="从常用选项里去掉"
+                @click.stop.prevent="delOption(f, v)"
+              >×</span>
+            </button>
+            <button type="button" class="qchip is-add" title="把自己常用的值加进来（跟着记录本一起备份）" @click.stop="addOption(f)">
+              ＋ 自定义
             </button>
           </div>
         </template>

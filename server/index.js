@@ -1768,6 +1768,23 @@ route('PUT', '/api/settings', async (req, res) => {
 });
 
 
+/* --- 「常用选项」：条件行那几个小下拉里，用户可以自己加（存 settings，跟着数据一起备份） --- */
+const QUICK_FIELDS = new Set(['temperature', 'duration', 'atmosphere', 'apparatus', 'light', 'solvent', 'concentration']);
+
+route('PUT', '/api/quick', async (req, res) => {
+  const body = await readJson(req);
+  const field = str(body.field).trim();
+  if (!QUICK_FIELDS.has(field)) return fail(res, 400, '不认识的字段');
+  const items = (Array.isArray(body.items) ? body.items : [])
+    .map((x) => str(x).trim().slice(0, 40))
+    .filter(Boolean)
+    .slice(0, 60);
+  const uniq = [...new Set(items)];
+  if (uniq.length) setSetting(`quick:${field}`, JSON.stringify(uniq));
+  else db.prepare('DELETE FROM settings WHERE key = ?').run(`quick:${field}`);
+  ok(res, { field, items: uniq });
+});
+
 /* --- 分类（自己建的文件夹；实验、化合物各一套，互不相干） --- */
 const CATEGORY_SCOPES = new Set(['experiment', 'compound']);
 
