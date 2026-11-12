@@ -8280,3 +8280,21 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   padding-left: 6px;
   padding-right: 0;
 }
+
+/* 投料表这块的抬头：下面紧跟着「条件」那一行 + 表格，所以别再拉一条满宽的线、也别留大空隙，
+   让「投料表」当这一整块的小标题（只作用于这一块，`结果` 那些 block-head 不动）。 */
+.sheet .block-head.block-head-flat {
+  border-bottom: 0;
+  margin-bottom: 1px;
+  padding-bottom: 0;
+}
+
+/* 「条件」那一行改成外头一层 6 列网格（反应温度 / 时间节点 / 气氛 / 装置 / 光照 / 反应规模），
+   CondRow 自己那个 5 列网格用 `display: contents` 摊平——这样六格间距均匀，
+   反应规模不会孤零零飘在最右边、跟「光照」之间空一大截。 */
+.cond-above {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr 0.9fr;
+  gap: 3px 14px;
+}
+.cond-above .cond-inline { display: contents; }

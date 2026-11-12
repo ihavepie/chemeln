@@ -1145,7 +1145,7 @@ function onDrop(ev) {
 
 <template>
   <section class="sec sec-tight">
-    <div class="block-head">
+    <div class="block-head block-head-flat">
       <span class="lbl">投料表</span>
       <span class="spacer" />
     </div>
