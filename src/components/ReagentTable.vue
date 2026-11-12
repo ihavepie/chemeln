@@ -329,6 +329,9 @@ const stepHasExtras = (s) =>
     String(s.stir || '').trim()
   );
 const showStepHead = (s) => !singleStep.value || stepHasExtras(s);
+/** 第二行（之后 / 加料 / 搅拌 / 起止）只在真填过东西时露出来——新记录不摆一堆空格子 */
+const stepHasMore = (s) =>
+  !!(String(s.workup || '').trim() || String(s.addition || '').trim() || String(s.stir || '').trim() || String(s.start || '').trim() || String(s.end || '').trim());
 
 /** 溶剂行：只有「量」有意义，分子量 / 当量 / mmol 都不算，也不许按当量自动折体积 */
 const isSolvent = (r) => r && r.role === '溶剂';
@@ -1284,55 +1287,55 @@ function onDrop(ev) {
                 <button type="button" class="step-caret noprint" @click="toggleCollapse(si)"><Icon name="chevron" :size="11" /></button>
                 <span class="step-no">第 {{ si + 1 }} 步</span>
                 <input class="step-label" :value="s.label" placeholder="本步内容" :disabled="locked" @change="onStepField(si, 'label', $event.target.value)" />
-                <template v-if="steps.length > 1 || s.condition">
+                <!-- 一步以上：跟「变量」那条虚线一个路子——一条虚线隔开，右边挂这一步的两个关键格子 -->
+                <template v-if="steps.length > 1">
+                  <span class="step-rule" />
                   <span class="step-tag">条件</span>
                   <input class="step-cond" :value="s.condition" :disabled="locked" @change="onStepField(si, 'condition', $event.target.value)" />
+                  <template v-if="si < steps.length - 1">
+                    <span class="step-tag">产物</span>
+                    <input
+                      class="step-prod"
+                      :value="s.product_name"
+                      placeholder="中间体"
+                      :disabled="locked"
+                      @change="onStepField(si, 'product_name', $event.target.value)"
+                    />
+                  </template>
                 </template>
-                <template v-if="steps.length > 1 || s.workup">
-                  <span class="step-tag">之后</span>
-                  <input class="step-after" :value="s.workup" :disabled="locked" @change="onStepField(si, 'workup', $event.target.value)" />
-                </template>
-                <!-- 这一步的产物（中间体）：一条记录串两步时，反应式靠它画中间那道桥 -->
-                <template v-if="steps.length > 1 && si < steps.length - 1">
-                  <span class="step-tag">产物</span>
-                  <input
-                    class="step-prod"
-                    :value="s.product_name"
-                    placeholder="中间体（写上名字就能画出结构）"
-                    :disabled="locked"
-                    @change="onStepField(si, 'product_name', $event.target.value)"
-                  />
+                <template v-else>
+                  <template v-if="s.condition">
+                    <span class="step-tag">条件</span>
+                    <input class="step-cond" :value="s.condition" :disabled="locked" @change="onStepField(si, 'condition', $event.target.value)" />
+                  </template>
+                  <template v-if="s.workup">
+                    <span class="step-tag">之后</span>
+                    <input class="step-after" :value="s.workup" :disabled="locked" @change="onStepField(si, 'workup', $event.target.value)" />
+                  </template>
                 </template>
                 <span class="step-spacer" />
                 <button type="button" class="step-add noprint" title="在这一步加一行投料" @click="addRow(si + 1)"><Icon name="plus" :size="11" /></button>
                 <button type="button" class="step-del noprint" title="删除这一步" @click="removeStep(si)"><Icon name="x" :size="11" /></button>
               </div>
-              <div class="step-line step-line-sub noprint-wrap">
-                <template v-if="steps.length > 1 || s.addition">
-                  <span class="step-tag">加料</span>
-                  <input class="step-addmode" :value="s.addition" placeholder="滴加 / 分批" :disabled="locked" @change="onStepField(si, 'addition', $event.target.value)" />
+              <!-- 老记录里填过「之后 / 加料 / 搅拌 / 起止」的，这一行还留着（平时不出现） -->
+              <div v-if="stepHasMore(s)" class="step-line step-line-sub noprint-wrap">
+                <template v-if="s.workup">
+                  <span class="step-tag">之后</span>
+                  <input class="step-after" :value="s.workup" :disabled="locked" @change="onStepField(si, 'workup', $event.target.value)" />
                 </template>
-                <template v-if="steps.length > 1 || s.stir">
+                <template v-if="s.addition">
+                  <span class="step-tag">加料</span>
+                  <input class="step-addmode" :value="s.addition" :disabled="locked" @change="onStepField(si, 'addition', $event.target.value)" />
+                </template>
+                <template v-if="s.stir">
                   <span class="step-tag">搅拌</span>
-                  <input class="step-stir" :value="s.stir" placeholder="500 rpm" :disabled="locked" @change="onStepField(si, 'stir', $event.target.value)" />
+                  <input class="step-stir" :value="s.stir" :disabled="locked" @change="onStepField(si, 'stir', $event.target.value)" />
                 </template>
                 <span class="step-spacer" />
-                <span class="step-time">
-                  <input
-                    class="step-time-in"
-                    :value="s.start"
-                    placeholder="起"
-                    :disabled="locked"
-                    @input="onStepTime($event, si, 'start')"
-                  />
+                <span v-if="s.start || s.end" class="step-time">
+                  <input class="step-time-in" :value="s.start" placeholder="起" :disabled="locked" @input="onStepTime($event, si, 'start')" />
                   <span class="step-time-sep">→</span>
-                  <input
-                    class="step-time-in"
-                    :value="s.end"
-                    placeholder="止"
-                    :disabled="locked"
-                    @input="onStepTime($event, si, 'end')"
-                  />
+                  <input class="step-time-in" :value="s.end" placeholder="止" :disabled="locked" @input="onStepTime($event, si, 'end')" />
                 </span>
               </div>
             </td>

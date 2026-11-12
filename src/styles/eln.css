@@ -9075,3 +9075,28 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 
 /* 「第 N 步」那行里的「产物（中间体）」格：宽一点，名字往往比试剂名长 */
 .step-line .step-prod { width: 168px; }
+
+/* 「第 N 步」那条分隔：跟「变量」那条虚线一个路子（左边小标签、一条虚线、右边小格子），
+   不要把整个步骤头做成一整块浅色横条（用户：「不用太复杂，分隔一下就行了」） */
+.sheet .rtable tr.step-head td {
+  background: transparent;
+  border-top: 1px dashed var(--line-2);
+  border-bottom: none;
+  padding: 6px 0 2px;
+}
+.sheet .rtable tr.step-head:first-child td { border-top: none; padding-top: 2px; }
+.step-rule {
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 1px dashed var(--line-2);
+  margin: 0 4px;
+}
+.step-head .step-tag { color: var(--ink-4); }
+.step-head .step-cond,
+.step-head .step-prod {
+  flex: 0 1 auto;
+  width: 132px;
+  min-width: 70px;
+  font-size: 11px;
+}
+.step-head .step-label { flex: 0 1 auto; width: 150px; }
