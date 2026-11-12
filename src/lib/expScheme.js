@@ -196,7 +196,8 @@ export function schemeParts(model, compounds) {
     const rows = rowsAll.filter((r) => (Number(r.step) || 1) === step);
     const isLast = step === maxStep;
     const meta = stepMeta[step - 1] || {};
-    const prod = isLast ? finalProd : findProduct(null, meta.product_name);
+    // 中间体：先按这一步「结果」那行挂的化合物找，没挂再按名字找
+    const prod = isLast ? finalProd : findProduct(meta.product_compound_id, meta.product_name);
     stages.push(stageOf(rows, prod, isLast ? model.product_name : meta.product_name, meta.condition, meta));
   }
 

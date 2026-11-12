@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import Icon from './Icon.vue';
 import AppModal from './AppModal.vue';
 import { compoundDict } from '../store.js';
@@ -18,15 +18,40 @@ const props = defineProps({
   yieldDefault: { type: Boolean, default: true },
   /** 「选择性测定」那行要不要出现（同一套设置里的开关） */
   showSel: { type: Boolean, default: true },
+  /**
+   * 多步记录：每一步自己的结果（产物 / MW / 质量 / 产率 / 选择性）。
+   * **最后一步就是这条记录本身**——列表、筛选表、导出读的都是记录那几格，
+   * 所以最后一行直接读写 `model`，前面几步写 `steps[i]`。
+   */
+  steps: { type: Array, default: () => [] },
 });
 const emit = defineEmits(['open-compound']);
 
 const picking = ref(false);
 const list = ref([]);
 const picked = ref(null);
-/** 产率格用户手填过没有：手填过就不再自动覆盖（和「手填过就不动」的约定一致） */
-const yieldTyped = ref(num(props.model.yield_pct) !== null);
-/** 粗产物 / 中间体：只记质量，不算也不显示产率（存到 experiments.no_yield） */
+/** 正在挑「产物是库里的哪个化合物」的那一行（多步时每行各挑各的） */
+const pickTarget = ref(null);
+
+const multi = computed(() => Array.isArray(props.steps) && props.steps.length > 1);
+/** 一行结果：`{i, label, rm, last}`；单步记录就一行、直接绑记录本身 */
+const rows = computed(() => {
+  const list = props.steps || [];
+  if (!multi.value) return [{ i: 0, label: '', rm: props.model, last: true }];
+  return list.map((s, i) => {
+    const last = i === list.length - 1;
+    return { i, label: `第 ${i + 1} 步`, rm: last ? props.model : s, last };
+  });
+});
+/** 「产率手填过」按行记：手填过就不再自动覆盖（和「手填过就不动」的约定一致） */
+const typed = reactive({});
+const rowKey = (r) => (r.last ? 'final' : `s${r.i}`);
+const isTyped = (r) => {
+  const k = rowKey(r);
+  if (!(k in typed)) typed[k] = num(r.rm.yield_pct) !== null;
+  return typed[k];
+};
+
 /**
  * 计不计产率：**按记录类型在设置页里配**（`sheetFx.yield`，见 `lib/sheetprefs.js`），
  * 以前的写死规则（kind === '原料' 就不计）已经搬进默认值。
@@ -36,6 +61,8 @@ const kindNoYield = computed(() => !props.yieldDefault);
 const noYield = computed(
   () => Number(props.model.no_yield) === 1 || (kindNoYield.value && num(props.model.yield_pct) === null)
 );
+/** 多步记录不给那种「整条不计产率」的开关：哪一步没算产率就把那格空着 */
+const showNoYieldBtn = computed(() => !multi.value && !kindNoYield.value);
 
 function toggleNoYield() {
   if (props.locked) return;
@@ -43,126 +70,136 @@ function toggleNoYield() {
   props.model.no_yield = next;
   if (next) {
     props.model.yield_pct = '';
-    yieldTyped.value = false;
+    typed.final = false;
   }
   props.notify();
 }
 
 /** 清空这一行结果（连化合物关联一起解掉），方便换产物或重填 */
-function clearResult() {
+function clearResult(r) {
   if (props.locked) return;
-  const m = props.model;
+  const m = r.rm;
   m.product_name = '';
   m.appearance = '';
   m.product_mw = '';
   m.product_mass = '';
   m.yield_pct = '';
   m.dr_ee = '';
-  m.ee_pct = '';
-  m.sel_method = '';
-  m.sel_condition = '';
-  m.sel_rt = '';
   m.product_compound_id = null;
-  m.no_yield = 0;
-  yieldTyped.value = false;
+  typed[rowKey(r)] = false;
+  // 最后一行就是整条记录的结果：选择性那几格也一起清
+  if (r.last) {
+    props.model.ee_pct = '';
+    props.model.sel_method = '';
+    props.model.sel_condition = '';
+    props.model.sel_rt = '';
+    props.model.no_yield = 0;
+  }
   props.notify();
 }
-const baseMmol = computed(() => props.base ?? props.model.base);
-const info = computed(() => yieldInfo({
-  base_mmol: baseMmol.value,
-  product_mw: props.model.product_mw,
-  product_mass: props.model.product_mass,
-  yield_pct: props.model.yield_pct,
-}));
 
-/**
- * 质量变了就刷新产率格（自动填的那种才刷新）。
- * 以前这里卡的是 `!num(yield_pct)`：质量的第一个字符就先把产率写进去了，
- * 后面补全质量时条件已经不成立，产率就永远停在半截值上。
- */
-function syncYield() {
-  if (yieldTyped.value || noYield.value) return;
-  const i = info.value;
+const baseMmol = computed(() => props.base ?? props.model.base);
+const infoOf = (rm) =>
+  yieldInfo({
+    base_mmol: baseMmol.value,
+    product_mw: rm.product_mw,
+    product_mass: rm.product_mass,
+    yield_pct: rm.yield_pct,
+  });
+/** 底部那行「理论产量 / 实测产率」：多步时只看最后一步（中间产物的数在各自的格子里） */
+const info = computed(() => infoOf(props.model));
+
+function syncYield(r) {
+  if (isTyped(r)) return;
+  if (r.last && noYield.value) return;
+  const i = infoOf(r.rm);
   if (i.calc === null || i.over) return;
-  props.model.yield_pct = round(i.calc, 1);
+  r.rm.yield_pct = round(i.calc, 1);
 }
 
-const linked = computed(() => compoundDict().find((c) => Number(c.id) === Number(props.model.product_compound_id)));
+const linkedOf = (rm) => compoundDict().find((c) => Number(c.id) === Number(rm.product_compound_id));
 
 /** 外面（比如「按投料表生成」发现产物没挂库）可以直接把这个选择器弹出来 */
-defineExpose({ openPicker });
+defineExpose({ openPicker: () => openPicker(rows.value[rows.value.length - 1]) });
 
-async function openPicker() {
+async function openPicker(r) {
+  pickTarget.value = r ? r.rm : props.model;
   list.value = await api.compounds();
-  picked.value = props.model.product_compound_id || list.value[0]?.id || null;
+  picked.value = pickTarget.value.product_compound_id || list.value[0]?.id || null;
   picking.value = true;
 }
 
 async function applyPick() {
   const hit = list.value.find((c) => c.id === picked.value);
   picking.value = false;
-  if (!hit) return;
+  if (!hit || !pickTarget.value) return;
   const full = await api.compound(hit.id);
-  props.model.product_name = full.name || full.code || '';
-  if (full.mw) props.model.product_mw = round(full.mw, 2);
-  props.model.product_compound_id = full.id;
+  const m = pickTarget.value;
+  m.product_name = full.name || full.code || '';
+  if (full.mw) m.product_mw = round(full.mw, 2);
+  m.product_compound_id = full.id;
   props.notify();
 }
 
-function unlink() {
-  props.model.product_compound_id = null;
+function unlink(r) {
+  r.rm.product_compound_id = null;
   props.notify();
 }
 
 /** 边打字边算：数字格先清洗，再写回模型（不用等失焦） */
-function onNumInput(ev, field) {
+function onNumInput(ev, rm, field) {
   applyNumeric(ev.target, '');
-  props.model[field] = ev.target.value;
+  rm[field] = ev.target.value;
   props.notify();
 }
 
-function onMassInput(ev) {
+function onMassInput(ev, r) {
   applyNumeric(ev.target, '');
-  props.model.product_mass = ev.target.value;
-  syncYield();
+  r.rm.product_mass = ev.target.value;
+  syncYield(r);
   props.notify();
 }
 
 /** 自动补产率（手填过就不动） */
-function afterMass() {
-  syncYield();
+function afterMass(r) {
+  syncYield(r);
   props.notify();
 }
 
 /** 手填产率：从此停止自动算；把它清空就退回自动 */
-function onYieldInput(ev) {
+function onYieldInput(ev, r) {
   applyNumeric(ev.target, '');
-  props.model.yield_pct = ev.target.value;
-  yieldTyped.value = num(props.model.yield_pct) !== null;
+  r.rm.yield_pct = ev.target.value;
+  typed[rowKey(r)] = num(r.rm.yield_pct) !== null;
   props.notify();
 }
 </script>
 
 <template>
   <section class="sec sec-tight">
-    <div class="block-head"><span class="lbl">结果</span></div>
-    <table class="rtable res-table">
+    <div class="block-head">
+      <span class="lbl">结果</span>
+      <span v-if="multi" class="lbl-note">一步一行</span>
+    </div>
+    <table class="rtable res-table" :class="{ 'is-multi': multi }">
       <colgroup>
-        <col class="r-name" /><col class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col class="r-dr" /><col class="r-del" />
+        <col v-if="multi" class="r-step" />
+        <col class="r-name" /><col v-if="!multi" class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col v-if="!multi" class="r-dr" /><col class="r-del" />
       </colgroup>
       <thead>
         <tr>
-          <th>产物名称</th><th>性状</th><th class="n">产物 MW</th>
+          <th v-if="multi" />
+          <th>产物名称</th><th v-if="!multi">性状</th><th class="n">产物 MW</th>
           <th class="n">质量 / g</th>
           <th class="n">
             <span class="th-with-btn"
               >产率 / %<!-- 「原料」类记录是算出来的「不计」，不给点（要产率就换类型）；其余照旧一颗 ∅ 小开关 --><span
-                v-if="kindNoYield && noYield"
+                v-if="!multi && kindNoYield && noYield"
                 class="th-mini is-static"
                 title="原料类记录默认不计产率；要产率就把记录类型换成「试反应」"
                 >不计</span
               ><button
-                v-else-if="!kindNoYield"
+                v-else-if="showNoYieldBtn"
                 type="button"
                 class="th-mini noprint"
                 :class="{ on: noYield }"
@@ -174,47 +211,79 @@ function onYieldInput(ev) {
               </button></span
             >
           </th>
-          <th class="n">dr / ee</th>
+          <th v-if="!multi" class="n">dr / ee</th>
           <th />
         </tr>
       </thead>
       <tbody>
-        <tr>
+        <tr v-for="r in rows" :key="rowKey(r)">
+          <td v-if="multi" class="res-step-cell">{{ r.label }}</td>
           <td>
             <div class="pick-wrap">
-              <span v-if="linked" class="prod-link">
-                <span class="cmp-tag" :title="linked.name" @click="emit('open-compound', linked.id)">{{ linked.code || linked.name }}</span>
-                <button v-if="!locked" class="cmp-unlink noprint" title="解除关联" @click.stop="unlink"><Icon name="x" :size="9" /></button>
+              <span v-if="linkedOf(r.rm)" class="prod-link">
+                <span
+                  class="cmp-tag"
+                  :title="linkedOf(r.rm).name"
+                  @click="emit('open-compound', linkedOf(r.rm).id)"
+                  >{{ linkedOf(r.rm).code || linkedOf(r.rm).name }}</span
+                >
+                <button v-if="!locked" class="cmp-unlink noprint" title="解除关联" @click.stop="unlink(r)"><Icon name="x" :size="9" /></button>
               </span>
-              <input :value="model.product_name" placeholder="C" :disabled="locked" @input="model.product_name = $event.target.value; notify()" @change="notify()" />
-              <button v-if="!locked && !linked" type="button" class="pick-btn noprint" title="从化合物库选" @click="openPicker"><Icon name="molecule" :size="12" /></button>
+              <input
+                :value="r.rm.product_name"
+                :placeholder="multi ? (r.last ? '终产物' : '中间体') : 'C'"
+                :disabled="locked"
+                @input="r.rm.product_name = $event.target.value; notify()"
+                @change="notify()"
+              />
+              <button
+                v-if="!locked && !linkedOf(r.rm)"
+                type="button"
+                class="pick-btn noprint"
+                title="从化合物库选"
+                @click="openPicker(r)"
+              >
+                <Icon name="molecule" :size="12" />
+              </button>
             </div>
           </td>
-          <td><input :value="model.appearance" placeholder="白色固体" :disabled="locked" @input="model.appearance = $event.target.value; notify()" @change="notify()" /></td>
-          <td><input class="n" inputmode="decimal" :value="model.product_mw ?? ''" placeholder="自动" :disabled="locked" @input="onNumInput($event, 'product_mw')" /></td>
-          <td><input class="n" inputmode="decimal" :value="model.product_mass ?? ''" placeholder="2.3975" :disabled="locked" @input="onMassInput($event)" @change="afterMass()" /></td>
+          <td v-if="!multi"><input :value="r.rm.appearance" placeholder="白色固体" :disabled="locked" @input="r.rm.appearance = $event.target.value; notify()" @change="notify()" /></td>
+          <td><input class="n" inputmode="decimal" :value="r.rm.product_mw ?? ''" placeholder="自动" :disabled="locked" @input="onNumInput($event, r.rm, 'product_mw')" /></td>
+          <td><input class="n" inputmode="decimal" :value="r.rm.product_mass ?? ''" :placeholder="multi ? '' : '2.3975'" :disabled="locked" @input="onMassInput($event, r)" @change="afterMass(r)" /></td>
           <td>
             <input
               class="n"
               inputmode="decimal"
-              :value="noYield ? '' : (model.yield_pct ?? '')"
-              :placeholder="noYield ? '—' : '自动'"
-              :disabled="locked || noYield"
-              @input="onYieldInput($event)"
+              :value="r.last && noYield ? '' : (r.rm.yield_pct ?? '')"
+              :placeholder="r.last && noYield ? '—' : multi ? '' : '自动'"
+              :disabled="locked || (r.last && noYield)"
+              @input="onYieldInput($event, r)"
             />
           </td>
-          <td><input class="n" :value="model.dr_ee" placeholder="> 20:1" :disabled="locked" @input="model.dr_ee = $event.target.value; notify()" @change="notify()" /></td>
+          <td v-if="!multi"><input class="n" :value="r.rm.dr_ee" placeholder="> 20:1" :disabled="locked" @input="r.rm.dr_ee = $event.target.value; notify()" @change="notify()" /></td>
           <td class="del-cell">
-            <button v-if="!locked" type="button" class="row-del noprint" title="清空这行结果" @click.stop="clearResult"><Icon name="x" :size="10" /></button>
+            <button v-if="!locked" type="button" class="row-del noprint" title="清空这行结果" @click.stop="clearResult(r)"><Icon name="x" :size="10" /></button>
           </td>
         </tr>
       </tbody>
     </table>
+    <!-- 多步记录：性状 / 选择性是**最终产物**的属性，挪到表下面一行，别跟每一步的数字挤在一张表里 -->
+    <div v-if="multi" class="res-sel res-final">
+      <span class="sel-cap">最终产物</span>
+      <label class="sel-f">
+        <span>性状</span>
+        <input :value="model.appearance" placeholder="黄色油状液体" :disabled="locked" @input="model.appearance = $event.target.value; notify()" @change="notify()" />
+      </label>
+      <label class="sel-f">
+        <span>dr / ee</span>
+        <input class="n" :value="model.dr_ee" placeholder="> 20:1" :disabled="locked" @input="model.dr_ee = $event.target.value; notify()" @change="notify()" />
+      </label>
+    </div>
     <div v-if="showSel" class="res-sel">
       <span class="sel-cap">选择性测定</span>
       <label class="sel-f">
         <span>ee / %</span>
-        <input class="n" inputmode="decimal" :value="model.ee_pct ?? ''" placeholder="92" :disabled="locked" @input="onNumInput($event, 'ee_pct')" />
+        <input class="n" inputmode="decimal" :value="model.ee_pct ?? ''" placeholder="92" :disabled="locked" @input="onNumInput($event, model, 'ee_pct')" />
       </label>
       <label class="sel-f">
         <span>方式</span>

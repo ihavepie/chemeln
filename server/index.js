@@ -161,6 +161,13 @@ function normalizeSteps(list) {
     stir: str(s && s.stir).slice(0, 60),           // 这一步怎么搅的（500 rpm…）
     // 这一步的产物（中间体）：一条记录里串两步时，反应式要靠它画中间那道桥
     product_name: str(s && s.product_name).slice(0, 120),
+    // 这一步的结果（「结果」那张表一步一行：产物挂库 / 分子量 / 质量 / 产率 / 性状 / 选择性）
+    product_compound_id: numOrNull(s && s.product_compound_id),
+    product_mw: numOrNull(s && s.product_mw),
+    product_mass: numOrNull(s && s.product_mass),
+    yield_pct: numOrNull(s && s.yield_pct),
+    appearance: str(s && s.appearance).slice(0, 80),
+    dr_ee: str(s && s.dr_ee).slice(0, 60),
     // 每一步自己的条件行（温度 / 时间 / 气氛 / 装置 / 光照）：多步记录按步各一条
     temperature: str(s && s.temperature).slice(0, 60),
     duration: str(s && s.duration).slice(0, 60),
@@ -378,7 +385,16 @@ function stepsText(raw) {
   if (!Array.isArray(list) || !list.length) return '';
   return list
     .map((s, i) => {
-      const bits = [str(s.label), str(s.condition), str(s.workup)].map((x) => x.trim()).filter(Boolean);
+      const bits = [
+        str(s.label),
+        str(s.condition),
+        str(s.temperature),
+        str(s.duration),
+        str(s.atmosphere),
+        str(s.workup),
+        str(s.product_name) && `→ ${str(s.product_name)}`,
+        numOrNull(s.yield_pct) !== null && `${s.yield_pct}%`,
+      ].map((x) => String(x || '').trim()).filter(Boolean);
       return `${i + 1}. ${bits.join(' · ') || '（空）'}`;
     })
     .join('；');
@@ -2733,13 +2749,17 @@ function schemeFp(expId) {
 
 /** 一条记录用到的化合物结构指纹：`id:updated_at`，按 id 数字排序（前端 `liveFp` 拼法一致） */
 function compoundFp(expId) {
-  const e = db.prepare('SELECT product_compound_id FROM experiments WHERE id = ?').get(expId);
+  const e = db.prepare('SELECT product_compound_id, steps_json FROM experiments WHERE id = ?').get(expId);
   if (!e) return '';
   const ids = db
     .prepare('SELECT DISTINCT compound_id FROM reagents WHERE exp_id = ? AND compound_id IS NOT NULL')
     .all(expId)
     .map((r) => Number(r.compound_id));
   if (e.product_compound_id) ids.push(Number(e.product_compound_id));
+  // 多步记录：每步「结果」那行挂的中间体也算「这张图用到的结构」，结构改过就得重画
+  for (const st of parseSteps(e.steps_json)) {
+    if (st.product_compound_id) ids.push(Number(st.product_compound_id));
+  }
   const uniq = [...new Set(ids.filter((n) => Number.isFinite(n) && n > 0))].sort((a, b) => a - b);
   if (!uniq.length) return '';
   const rows = db
@@ -2754,18 +2774,23 @@ function compoundFp(expId) {
 /** 会进这张反应式图的文字（条件行 + 投料表 + 产物名）：拿来当「上一步改了没有」的签名 */
 function schemeTextSig(expId) {
   const e = db
-    .prepare('SELECT solvent, temperature, duration, product_name FROM experiments WHERE id = ?')
+    .prepare('SELECT solvent, temperature, duration, product_name, steps_json FROM experiments WHERE id = ?')
     .get(expId);
   if (!e) return '';
   const rows = db
-    .prepare('SELECT role, name, eq, variable FROM reagents WHERE exp_id = ? ORDER BY position, id')
+    .prepare('SELECT role, name, eq, variable, step FROM reagents WHERE exp_id = ? ORDER BY position, id')
     .all(expId);
+  // 多步记录里每一步的条件 / 中间体都会画到箭头上：改了它们，那张两段箭头也得重画
+  const steps = parseSteps(e.steps_json)
+    .map((s) => [s.temperature, s.duration, s.atmosphere, s.apparatus, s.light, s.product_name].join('/'))
+    .join(';');
   return [
     e.solvent || '',
     e.temperature || '',
     e.duration || '',
     e.product_name || '',
-    ...rows.map((r) => `${r.role || ''}|${r.name || ''}|${r.eq ?? ''}|${r.variable || ''}`),
+    steps,
+    ...rows.map((r) => `${r.step || 1}|${r.role || ''}|${r.name || ''}|${r.eq ?? ''}|${r.variable || ''}`),
   ].join('~');
 }
 

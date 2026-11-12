@@ -99,7 +99,8 @@ function reagentTable(reagents, steps = []) {
     // 单步也要把「这一步怎么加的 / 怎么搅的」写出来，否则记了就丢了
     const st = steps[0] || {};
     const notes = [];
-    if (st.condition) notes.push(`> 条件：${st.condition}`);
+    const oneCond = [st.temperature, st.duration, st.atmosphere, st.condition].filter((x) => x && String(x).trim()).join('，');
+    if (oneCond) notes.push(`> 条件：${oneCond}`);
     if (st.addition) notes.push(`> 加料：${st.addition}`);
     if (st.stir) notes.push(`> 搅拌：${st.stir}`);
     if (st.workup) notes.push(`> 之后：${st.workup}`);
@@ -117,7 +118,8 @@ function reagentTable(reagents, steps = []) {
   for (let s = 1; s <= total; s++) {
     const st = steps[s - 1] || {};
     out.push(`**第 ${s} 步${st.label ? ` · ${st.label}` : ''}**`);
-    if (st.condition) out.push(`> 条件：${st.condition}`);
+    const cond = [st.temperature, st.duration, st.atmosphere, st.condition].filter((x) => x && String(x).trim()).join('，');
+    if (cond) out.push(`> 条件：${cond}`);
     if (st.addition) out.push(`> 加料：${st.addition}`);
     if (st.stir) out.push(`> 搅拌：${st.stir}`);
     out.push('');
@@ -219,6 +221,22 @@ function experimentToMarkdown(exp, { reagents = [], attachments = [], settings =
   if (sel) res.push(`- 选择性测定：${sel}`);
   L.push(res.length ? res.join('\n') : '- —');
   L.push('');
+  // 多步记录：中间那几步各自的产物 / 质量 / 产率也写上（终产物已经在上面的几条里）
+  const perStep = [];
+  (exp.steps || []).slice(0, -1).forEach((st, i) => {
+    const bits = [
+      st.product_name && `产物：${st.product_name}`,
+      st.product_mass !== null && st.product_mass !== undefined && `${num(st.product_mass, 4)} g`,
+      st.yield_pct !== null && st.yield_pct !== undefined && `产率 ${num(st.yield_pct, 1)}%`,
+    ].filter(Boolean);
+    if (bits.length) perStep.push(`- 第 ${i + 1} 步：${bits.join('，')}`);
+  });
+  if (perStep.length) {
+    L.push('各步结果：');
+    L.push('');
+    L.push(perStep.join('\n'));
+    L.push('');
+  }
 
   if (exp.tlc_note) {
     L.push('## TLC');

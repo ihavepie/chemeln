@@ -9101,24 +9101,54 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 }
 .step-head .step-label { flex: 0 1 auto; width: 150px; }
 
-/* 多步记录：一步一条条件行（第 N 步 + 温度 / 时间 / 气氛…），行与行之间留一点缝 */
-.cond-step { display: flex; align-items: flex-start; gap: 8px; }
-/* 条件那一块本身是个 6 列 grid（给单步那行对齐用）：多步的每一条要自己占满一整行，
-   否则第 2 步会被塞进第 2 列、跟第 1 步挤在同一排 */
-.cond-above .cond-step { grid-column: 1 / -1; }
-.cond-step + .cond-step { margin-top: 6px; padding-top: 6px; border-top: 1px dotted #eeede8; }
-.cond-step-lbl {
-  flex: 0 0 auto;
+/* ---------- 多步记录：每个步骤自成一张投料表 ----------
+   「第 N 步」→ 这一步的条件行 → 这一步的列头 → 这一步的投料行，
+   两步就是两张表（列宽还是同一套 colgroup，所以两张表的列是对齐的）。 */
+.rtable tr.step-cond-row > td { padding: 0 !important; }
+/* 单步那条条件行是六列 grid（多出来的一列给反应规模让位），多步这里五格铺满 */
+.step-cond-row .cond-above {
+  grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr;
+  padding: 2px 2px 6px;
+}
+/* 每一步自己的列头：跟主表头同一套字，底色淡一点，别跟上面的「第 N 步」抢 */
+.sheet .rtable tr.step-cols > th {
+  background: #f7f5ee;
+  border-bottom: 1px solid #e5e2d9;
+  font-weight: 500;
   padding-top: 4px;
+  padding-bottom: 4px;
+}
+/* 两张表之间留一段空：上一张表最后一行 → 虚线 → 下一张的「第 N 步」 */
+.sheet .rtable tr.step-head[data-step]:not([data-step='1']) .step-line { margin-top: 14px; }
+
+/* 结果那张表：一步一行，左边挂一个「第 N 步」的小签 */
+.res-table .r-step { width: 48px; }
+/* 多步那张结果表多了一列小签，产物名那一格得宽一点（不然「苄基甲氧基环丁烷」被切） */
+/* 格子多、每格内容又短：auto 布局会把「产物名称」压到 166px（名字就被切了），
+   多步这张表改成按 colgroup 的宽度来 */
+.res-table.is-multi { table-layout: fixed; }
+.res-table.is-multi .r-name { width: 36%; }
+.res-table.is-multi .r-mw { width: 68px; }
+.res-table.is-multi .r-mass { width: 84px; }
+.res-table.is-multi .r-yield { width: 64px; }
+/* 多步：最后一行「最终产物」的性状 / dr,ee（跟「选择性测定」那行同一个样子） */
+.res-final { margin-top: 5px; }
+.res-final .sel-cap { color: var(--ink-4); }
+/* 「结果」右边那句「一步一行」：跟别处的小注一个样子 */
+.block-head .lbl-note {
+  margin-left: 7px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.res-step-cell {
+  font-family: var(--mono);
+  font-size: 9px;
   letter-spacing: 0.04em;
   color: var(--ink-4);
   white-space: nowrap;
+  padding-right: 4px !important;
 }
-.cond-step .cond-row { flex: 1 1 auto; min-width: 0; }
-
-/* 多步记录的第 2 步起：条件行不再重复那排小标签（上面那条已经标过了），值跟上一行对齐 */
-/* 标签藏起来但**留着高度**：第 2 步起不用再写一遍「反应温度」这些字，
-   但值要跟上一行对齐，读起来才像一张表（高度塌掉的话数字会往上跳一截） */
-.cond-f.no-label .cond-f-label { visibility: hidden; }
+/* 多步的结果表一行里格子多，别让「性状」那格把产物名挤没 */
+.res-table td input { min-width: 0; }

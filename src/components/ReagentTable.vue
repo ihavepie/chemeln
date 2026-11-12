@@ -989,7 +989,13 @@ function removeRow(r) {
 
 /** 再开一步：投料表按步分段，反应式会自动画成两段箭头（第一步的产物写在「第 1 步」那行的产物格） */
 function addStep() {
-  props.model.steps.push({ label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '', product_name: '' });
+  // 新的一步：条件 / 中间体 / 这一步的结果格子都先摆空（结果表是一步一行，字段得先有）
+  props.model.steps.push({
+    label: '', condition: '', workup: '', start: '', end: '', addition: '', stir: '',
+    product_name: '',
+    temperature: '', duration: '', atmosphere: '', apparatus: '', light: '',
+    product_compound_id: null, product_mw: '', product_mass: '', yield_pct: '', appearance: '', dr_ee: '',
+  });
   props.notify();
 }
 
@@ -1257,9 +1263,10 @@ function onDrop(ev) {
       </label>
     </div>
 
-    <!-- 「条件」在投料表**上面**：纸质记录里也是先写反应条件、再列投料，少一截来回找 -->
-    <div v-if="$slots.cond" class="cond-above">
-      <slot name="cond" />
+    <!-- 「条件」在投料表**上面**：纸质记录里也是先写反应条件、再列投料，少一截来回找。
+         多步记录时这一步的条件行跟着各自的表走（见下面每个步骤那块），这里只管单步 -->
+    <div v-if="$slots.cond && singleStep" class="cond-above">
+      <slot name="cond" :step="0" />
     </div>
 
     <table class="rtable" id="rtable">
@@ -1267,7 +1274,8 @@ function onDrop(ev) {
         <col class="c-grip" /><col class="c-role" /><col class="c-name" /><col class="c-mw" />
         <col class="c-eq" /><col class="c-mmol" /><col class="c-amt" /><col class="c-note" /><col class="c-del" />
       </colgroup>
-      <thead>
+      <!-- 单步记录用这条表头；一步以上时每个步骤各带一份（读起来就是两张表，列也还是对齐的） -->
+      <thead v-if="singleStep">
         <tr>
           <th class="grip-cell" />
           <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
@@ -1338,6 +1346,21 @@ function onDrop(ev) {
               </div>
             </td>
           </tr>
+
+          <!-- 一步以上：这一步的条件行 + 这一步自己的列表头，就贴在它的「第 N 步」下面
+               （用户：条件表和投料表一起，两步分别一张） -->
+          <template v-if="!singleStep">
+            <tr v-if="$slots.cond" class="step-cond-row">
+              <td colspan="9">
+                <div class="cond-above"><slot name="cond" :step="si" /></div>
+              </td>
+            </tr>
+            <tr class="step-cols">
+              <th class="grip-cell" />
+              <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
+              <th class="n">当量</th><th class="n">mmol</th><th class="n">用量</th><th>说明</th><th class="noprint" />
+            </tr>
+          </template>
 
           <template v-if="!collapsed.has(si)">
             <tr
