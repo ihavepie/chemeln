@@ -8432,3 +8432,6 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   border-radius: 999px;
   opacity: 1;
 }
+
+/* 变量行跟普通投料行一样高：td 的上下 padding 归零（26px 一行，跟上面一致） */
+.sheet .rtable tr.rt-var > td { padding-top: 0; padding-bottom: 0; }

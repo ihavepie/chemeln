@@ -1846,7 +1846,9 @@ const openAttachment = (id) => {
                   <td class="grip-cell" />
                   <td class="var-idx-cell">Entry {{ row.i + 1 }}</td>
                   <td class="var-name-cell" :colspan="row.isMol ? 1 : 6">
-                    <span v-if="!row.isMol" class="var-field-lbl">{{ row.fieldName }}</span>
+                    <!-- 只有字段变量才写这行小字；自由写法（`−40 °C / LDA…`）没有名字可写，
+                         留一个空 span 会在块级输入框上面多顶出一行，整行高到 48px -->
+                    <span v-if="row.fieldName" class="var-field-lbl">{{ row.fieldName }}</span>
                     <span v-if="condVars.length" class="var-vals">
                       <template v-for="(v, vi) in condVars" :key="v.key">
                         <span v-if="vi" class="var-val-sep">·</span>
