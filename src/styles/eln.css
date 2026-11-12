@@ -8545,3 +8545,8 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .editor { overscroll-behavior: contain; }
 /* 选择器（刻度滑条 / 胶囊菜单）开着时：弹窗贴着手指，页面别跑 */
 body.is-picker-open .editor { overscroll-behavior: none; }
+
+/* 条件行那几格：**单击是「出选择」，不是「打字」**，所以别显示输入用的 I 形光标（看着像能打字）。
+   注：`:focus { cursor: text }` 写了也没用 —— WebKit 在文本输入框获得焦点时自己画 I 形光标，
+   `getComputedStyle().cursor` 也照样报 `default`（实测），所以别在那儿绕。 */
+.cond-above .cond-f-val input { cursor: default; }

@@ -1,2 +1,2 @@
 
-- **选择器开着时把页面锁住，滚轮别带着整页跑**（用户：「页面可能会被滚轮滚动，页面需要固定一下」）：`CondRow` 里 `watch(open)` → 开的时候在 `document` 上挂 **capture 阶段的 `wheel` 监听** `onLockWheel`（`preventDefault()`，`passive:false`），关的时候摘掉；刻度滑条自己的 `@wheel` 照样继续拨格子（`preventDefault` 不影响冒泡）。另外 `.editor { overscroll-behavior: contain }`，滚到头不把橡皮筋传给外层。**验证**：弹窗开着时在 `.editor` 上发一个 wheel → `defaultPrevented: true`；关着 → `false`（页面照常滚）。
+- **条件行别显示「打字光标」**（用户：「单击的时候不要是打字那个光标」）：那几格现在是「单击出选择、双击编辑」，鼠标移上去却还是输入框的 I 形光标，看着像要打字。`.cond-above .cond-f-val input { cursor: default }` 改掉。**注意**：`:focus { cursor: text }` 写了也没用 —— WebKit 在文本输入框获得焦点时自己画 I 形光标，`getComputedStyle().cursor` 也照样报 `default`（实测），别在那儿绕。
