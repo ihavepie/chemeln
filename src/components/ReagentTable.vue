@@ -1376,27 +1376,9 @@ function onDrop(ev) {
         </template>
             </tbody>
       <tfoot>
-        <tr class="rtable-total">
-          <td class="grip-cell" />
-          <td colspan="8">
-            <div class="foot-line">
-              <div class="totals">
-                <span class="tot-lbl">合计</span>
-                <span v-if="model.base" class="tot">规模 {{ round(model.base, 3) }} mmol</span>
-                <template v-if="sum.solidMg"><span class="tot-sep">·</span><span class="tot">固体 {{ round(sum.solidMg / 1000, 4) }} g</span></template>
-                <template v-if="sum.liquidUl"><span class="tot-sep">·</span><span class="tot">液体 / 溶液 {{ round(sum.liquidUl / 1000, 2) }} mL</span></template>
-                <template v-if="sum.solventUl"><span class="tot-sep">·</span><span class="tot">溶剂 {{ round(sum.solventUl / 1000, 2) }} mL</span></template>
-                <template v-if="vessel">
-                  <span class="tot-sep">·</span>
-                  <span class="tot tot-vessel" :title="`体系约 ${vessel.ml} mL；按「装量不超过瓶子六成」选瓶，磁子按瓶内径的 0.6–0.7 估`">
-                    {{ vessel.tight ? '超过 3 L，分釜做' : `${vessel.flask} mL 瓶 · ${vessel.bar} 磁子` }}
-                  </span>
-                </template>
-              </div>
-              <div class="calc-hint">{{ footInfo }}</div>
-            </div>
-          </td>
-        </tr>
+        <!-- 原来这里有一行「合计」（规模 / 固体 / 溶剂 / 瓶与磁子 + 右下角算式）。
+             用户说没什么用处、圈出来让删，就整行撤了：规模在右上角「反应规模」里本来就有，
+             溶剂、用量每行都写着。-> 变量块直接接在最后一条试剂下面。 -->
         <!-- 变量（一次筛选里换的那几样）：接在合计线下面，跟投料表同一套格子 -->
         <slot name="vars" />
         <tr v-if="!locked" class="rtable-add noprint">
