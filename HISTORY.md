@@ -547,3 +547,14 @@
 - 改回 `contain`：`.grid-thumb.is-scheme img { width:100%; height:auto; object-fit:contain }`（仍然零内边距、铺满卡宽），整张反应式可见。
 - 因为**图本身已经收紧了**（同一天的折行 / 箭头封顶 / 结构放大），现在整张显示约 **66–75px 高**，比最早那版（47px、图还是 3.7:1）大 40–60%，不是退回原点。
 - 结论记一笔：**176px 的卡片上，反应式的「整张」和「看清」只能二选一**。想再大只有三条路——卡片加宽（176→220/260，一列少放一张）、悬停浮出大图、点缩略图开大图（复用 `FilePreview`）。
+
+## 2026-11-12 · 卡片墙上悬停浮出反应式大图
+
+反应式缩略图回到「整张显示」以后只有 ~70px 高，条件字还是看不清。用户说「悬停感觉可以」，于是加了悬停预览：
+
+- 交互：`.grid-thumb` 上 `mouseenter` → **400ms** 后才弹（别跟手乱闪）；`mouseleave` 立刻收。拖动卡片时（`body.is-pointer-dragging`）不弹。
+- 浮层：`Teleport to="body"` + `position: fixed`（**`.editor` 是滚动容器，留在里面会被裁**），宽 `min(560, 视口 46%)`；右边放不下就翻到卡片左边，上下夹进视口；`pointer-events: none`，不会把鼠标从卡片上抢走。
+- 内容：跟缩略图同一个 src（有实时缓存就是记录页那张），底下带一行 `编号 + 题目`。
+- 实现位置：`ExpGrid.vue`（`peek` / `peekEnter` / `peekLeave` / `peekItemOf` + 模板末尾的 Teleport 块），样式 `.scheme-peek` 追加在 `eln.css` 末尾。
+- 坑：Vue 里 `@mouseenter="peekEnter($event)"` 的**原生事件过了那一拍 `currentTarget` 就变 null**，必须在入口同步存下元素引用，否则 400ms 后算位置时崩。
+- 验证：用 `jssnap` + 合成 `mouseenter` 截图核对了两处（普通卡片 `SJ-2-1`、平行堆 `SJ-2-2`）——浮层都在、图完整、条件可读。

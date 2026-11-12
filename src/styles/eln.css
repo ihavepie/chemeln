@@ -7633,3 +7633,39 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 }
 /* 反应式卡片上那枚「平行 ×N」压在图上：底衬一块纸白，别让线条透过去 */
 .grid-thumb.is-scheme .stack-badge.is-corner { background: rgba(255, 255, 255, 0.92); }
+
+/* 卡片墙：悬停 400ms 浮出的「大图」（反应式看清用）。
+   浮层是 Teleport 到 body 的 fixed 层（`.editor` 的 overflow 会裁掉它），
+   `pointer-events: none` 保证它不会把鼠标从卡片上抢走、闪个不停。 */
+.scheme-peek {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+  padding: 10px 12px 8px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(60, 45, 30, 0.16), 0 2px 6px rgba(60, 45, 30, 0.08);
+  animation: scheme-peek-in 0.14s ease-out;
+}
+.scheme-peek img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: contain;
+}
+.scheme-peek-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  min-width: 0;
+}
+.scheme-peek-code { font-family: var(--mono, ui-monospace); color: var(--ink-2); flex: 0 0 auto; }
+.scheme-peek-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes scheme-peek-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}

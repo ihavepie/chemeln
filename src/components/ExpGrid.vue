@@ -40,6 +40,43 @@ const thumbOf = (it) =>
         ? `/api/compound-files/${it.preview_cmp_file}`
         : '';
 
+/* 悬停浮出大图：176px 的卡片上反应式只能缩到 ~70px 高，想看清就悬停（400ms 再弹，别跟手乱闪）。
+   浮层 Teleport 到 body + position:fixed —— `.editor` 是滚动容器，overflow 会把浮层裁掉。
+   鼠标一离开卡片就收，浮层本身 `pointer-events: none`，不会抢 hover。 */
+const peek = ref(null);   // { src, code, title, x, y, w, h }
+let peekTimer = null;
+function peekEnter(e) {
+  if (document.body.classList.contains('is-pointer-dragging')) return;   // 正拖着卡片，别弹
+  const el = e.currentTarget;              // 原生事件过了这一拍 currentTarget 就没了，先存下来
+  const it = peekItemOf(el);
+  const src = it && thumbOf(it);
+  if (!src) return;
+  clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => {
+    if (document.body.classList.contains('is-pointer-dragging')) return;
+    const r = el.getBoundingClientRect();
+    const W = Math.min(560, Math.round(window.innerWidth * 0.46));
+    const H = Math.round(W / 2.3);        // 反应式大约 2.3:1，先按这个估高度（图加载完会自己撑）
+    const right = r.right + 14;
+    const x = right + W <= window.innerWidth - 12 ? right : Math.max(12, r.left - 14 - W);
+    const y = Math.max(12, Math.min(r.top - 20, window.innerHeight - H - 12));
+    peek.value = { src, code: it.code, title: it.title || it.objective || '', x, y, w: W };
+  }, 400);
+}
+function peekLeave() {
+  clearTimeout(peekTimer);
+  peek.value = null;
+}
+/** 从缩略图元素找回它属于哪条记录（卡片上挂了 data-drag-card = id） */
+function peekItemOf(el) {
+  const card = el.closest('[data-drag-card]');
+  const id = card ? Number(card.dataset.dragCard) : 0;
+  const all = store.items || [];
+  return all.find((x) => Number(x.id) === id) || null;
+}
+const peekStyle = computed(() =>
+  peek.value ? { left: `${peek.value.x}px`, top: `${peek.value.y}px`, width: `${peek.value.w}px` } : {});
+
 const cats = computed(() => recordCategories('experiment'));
 
 /** 同一 group_id 的实验在墙上收成一摞：面子是正在看的那条（没有就看最早那条），
@@ -281,7 +318,12 @@ function groupMenu(ev, g) {
                 @click="openCard(card)"
                 @contextmenu="experimentMenu($event, card.it, router, { groupSize: card.members.length })"
               >
-                <div class="grid-thumb" :class="{ 'is-scheme': card.it.scheme_thumb }">
+                <div
+                  class="grid-thumb"
+                  :class="{ 'is-scheme': card.it.scheme_thumb }"
+                  @mouseenter="peekEnter($event)"
+                  @mouseleave="peekLeave()"
+                >
                   <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
                   <Icon v-else name="flask" :size="20" class="i-empty" />
                   <span class="stack-badge is-corner" :title="card.members.map((m) => `${m.code} ${m.status}`).join(' / ')">
@@ -321,7 +363,12 @@ function groupMenu(ev, g) {
               @click="openCard(card)"
               @contextmenu="experimentMenu($event, card.it, router)"
             >
-              <div class="grid-thumb" :class="{ 'is-scheme': card.it.scheme_thumb }">
+              <div
+                  class="grid-thumb"
+                  :class="{ 'is-scheme': card.it.scheme_thumb }"
+                  @mouseenter="peekEnter($event)"
+                  @mouseleave="peekLeave()"
+                >
                 <img v-if="thumbOf(card.it)" :src="thumbOf(card.it)" alt="" loading="lazy" draggable="false" />
                 <Icon v-else name="flask" :size="20" class="i-empty" />
                 <!-- 平行组标记钉在缩略图角上：塞进下面那行会把编号/日期挤出去 -->
@@ -360,4 +407,15 @@ function groupMenu(ev, g) {
       {{ store.filters.q || store.filters.status || store.filters.category ? '无匹配记录。' : '暂无实验记录。点上方卡片新建一条。' }}
     </div>
   </div>
+
+  <!-- 悬停浮出的大图：不进 `.editor` 的滚动容器，否则会被裁 -->
+  <Teleport to="body">
+    <div v-if="peek" class="scheme-peek" :style="peekStyle">
+      <img :src="peek.src" alt="" draggable="false" />
+      <div class="scheme-peek-foot">
+        <span class="scheme-peek-code">{{ peek.code }}</span>
+        <span class="scheme-peek-title">{{ peek.title }}</span>
+      </div>
+    </div>
+  </Teleport>
 </template>
