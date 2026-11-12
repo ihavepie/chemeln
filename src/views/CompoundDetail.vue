@@ -19,6 +19,8 @@ import KindPick from '../components/KindPick.vue';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { analyzeSmiles, analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
+import { indigoSvg } from '../lib/indigo.js';
+import { chemdrawLabels, chemdrawLabelsExact, scaleGlyphLabels } from '../lib/chemdraw.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { round } from '../lib/reagent.js';
 
@@ -332,6 +334,50 @@ const lookupProps = computed(() => {
   if (pr.solubility) bits.push(`溶解度 ${pr.solubility}`);
   return bits.join(' · ');
 });
+
+/**
+ * 用库里存的 molfile 重画结构式。
+ * 干什么：走一遍「Indigo 出图 → 把缩写标签换成真正的无衬线文字（同画板那条路）」再传上去。
+ * 什么时候用：老图是在 `chemdrawLabels` 还认不准缩写的时候存的，标签是 Indigo 自带的衬线字形
+ * （一眼能看出跟别的卡片不一样）。化学、坐标都不动，只重画图。
+ */
+async function redrawFromMol() {
+  moreMenu.value = false;
+  if (!c.value) return;
+  // **不要 trim**：molfile 的首行就是空行（名字），trim 掉整段会错位、Indigo 读不出来（踩过）
+  const mol = String(form.mol || c.value.mol || '');
+  if (!mol.trim()) return tidyStructure();
+  try {
+    // 把缩写换成真正的无衬线文字（跟画板那条路一致）。两条路都不成时**保持原样不覆盖**：
+    // 换上去反而是「字体跟别处不一样」的那版，还不如留着
+    let svg = '';
+    const exact = await chemdrawLabelsExact(mol, indigoSvg);
+    if (exact && exact.includes('<svg')) svg = exact;
+    else {
+      const raw = await indigoSvg(mol);
+      let viaOld = chemdrawLabels(raw, mol);
+      if (viaOld.includes('xlink:href="#glyph')) viaOld = scaleGlyphLabels(viaOld);
+      if (!viaOld.includes('xlink:href="#glyph')) svg = viaOld;
+    }
+    if (!svg || !svg.includes('<svg')) return toast('这张的缩写没认准，先保持原样', 'warn');
+    const fd = new FormData();
+    fd.append('file', svgToFile(svg), '结构式.svg');
+    fd.append('category', 'structure');
+    await api.uploadCompoundFile(c.value.id, fd);
+    const old = struct.value;
+    if (old) {
+      try {
+        await api.deleteCompoundFile(old.id);
+      } catch {
+        /* 旧的删不掉就留着 */
+      }
+    }
+    await reload();
+    toast('结构式重画好了');
+  } catch (e) {
+    toast(e.message || '画不出来这个结构', 'err');
+  }
+}
 
 /**
  * 已经画歪 / 挤在一起的结构式：按存着的 SMILES 让 openchemlib 重新排一遍坐标，
@@ -797,6 +843,9 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
           <button @click="label(); moreMenu = false"><Icon name="qr" :size="13" /> 打印标签</button>
           <button @click="historyOpen = true; moreMenu = false"><Icon name="file" :size="13" /> 历史</button>
           <button @click="lookupNow(); moreMenu = false"><Icon name="molecule" :size="13" /> 查结构（PubChem）</button>
+          <button @click="redrawFromMol" title="按库里存的 molfile 重画一张（标签换成无衬线文字）">
+            <Icon name="image" :size="13" /> 重画结构式
+          </button>
           <div class="menu-sep" />
           <button class="menu-danger" @click="removeCompound(); moreMenu = false">
             <Icon name="trash" :size="13" /> 移入回收站

@@ -67,7 +67,7 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
   if (!src.includes('<svg') || !src.includes('<use')) return src;
   const mat = src.match(/transform="matrix\(([^)]+)\)"/);
   if (!mat) return src; // openchemlib 画的图不是这套结构
-  const [, , , mD, mTx, mTy] = mat[1].split(',').map(Number);
+  const [mA, , , mD, mTx, mTy] = mat[1].split(',').map(Number);
 
   // ---- 1) 字形包围盒（量字宽、判下标）
   const glyphs = new Map();
@@ -94,34 +94,88 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
     return svgText.slice(0, i0) + wrapGroup(body, ax, ay, k) + svgText.slice(i1 + lastRaw.length);
   };
   if (!uses.length) return src;
+  /* 分组不能靠「文件里的先后顺序」：Indigo 写 `<use>` 的顺序不一定是从左到右
+     （实测「H3C」是 H、3、C 之外还夹着别的标签），顺序法会把一个标签拆成几个单字，
+     后面按位置匹配就对不上、整张图退回衬线字形。改成：先按基线聚类成「行」，
+     行内按 x 排序，再把间距够近的连成一个标签。 */
+  const capEst = Math.max(...[...glyphs.values()].map((x) => x.h), 1);
+  const lines = [];
+  for (const u of uses) {
+    const line = lines.find((L) => Math.abs(u.y - L.y) < capEst * 0.5);
+    if (line) line.items.push(u);
+    else lines.push({ y: u.y, items: [u] });
+  }
   const groups = [];
-  for (const it of uses) {
-    const g = groups[groups.length - 1];
-    if (g && Math.abs(it.y - g.ys[0]) < 4 && it.x > g.maxX - 6 && it.x - g.maxX < 16) {
-      g.items.push(it);
-      g.maxX = Math.max(g.maxX, it.x);
-      g.ys.push(it.y);
-    } else {
-      groups.push({ items: [it], maxX: it.x, ys: [it.y] });
+  for (const L of lines) {
+    L.items.sort((a, b) => a.x - b.x);
+    for (const it of L.items) {
+      const g = groups[groups.length - 1];
+      if (g && g.line === L && it.x - g.maxX < capEst * 1.3 && it.x - g.maxX > -capEst * 0.8) {
+        g.items.push(it);
+        g.maxX = Math.max(g.maxX, it.x);
+        g.ys.push(it.y);
+      } else {
+        groups.push({ items: [it], maxX: it.x, ys: [it.y], line: L });
+      }
     }
   }
 
-  // ---- 3) 缩写文本（M  SMT）按**字符数**唯一匹配到各组
-  const texts = [];
-  for (const line of String(mol || '').split(/\r?\n/)) {
-    const m = line.match(/^M  SMT\s+(\d+)\s+(.+)$/);
-    if (m) texts.push(m[2].trim().replace(/\s+/g, ''));
+  // ---- 3) 缩写文本（M  SMT）按**位置**匹配到各组
+  // 以前按「字符数唯一匹配」：结构里只要还有 N / O 这种普通原子标，组数就跟 SMT 条数对不上，
+  // 整张图直接退回 Indigo 的衬线字形（用户看到的「这块文字跟别处不一样」）。现在改成：
+  // 用 molfile 里 SAL 的附着原子坐标 + matrix 算出每个缩写该在哪，取最近的那一组。
+  const molText = String(mol || '');
+  const molLines = molText.split(/\r?\n/);
+  const natoms = parseInt(String(molLines[3] || '').slice(0, 3), 10) || 0;
+  const atomXY = (i) => {
+    const parts = String(molLines[3 + i] || '').trim().split(/\s+/);
+    return [parseFloat(parts[0]), parseFloat(parts[1])];
+  };
+  const salOf = new Map();     // SMT 编号 → 附着原子（1 起）
+  const smts = [];
+  for (const line of molLines) {
+    let m = line.match(/^M  SAL\s+(\d+)\s+(\d+)/);
+    if (m) salOf.set(+m[1], +m[2]);
+    m = line.match(/^M  SMT\s+(\d+)\s+(.+)$/);
+    if (m) smts.push({ n: +m[1], text: m[2].trim().replace(/\s+/g, '') });
   }
-  if (!texts.length || groups.length !== texts.length) return src;
+  if (!smts.length) return src;
+  const capGuess = Math.max(...[...glyphs.values()].map((x) => x.h), 1);
+  const boxes = groups.map((g) => {
+    const first = g.items[0];
+    const lastW = (glyphs.get(g.items[g.items.length - 1].id) || { w: capGuess * 0.6 }).w;
+    const bx0 = Math.min(...g.items.map((i) => i.x));
+    const bx1 = Math.max(...g.items.map((i) => i.x)) + lastW;
+    const by0 = Math.min(...g.ys) - capGuess;
+    const by1 = Math.max(...g.ys);
+    return [bx0, by0, bx1, by1];
+  });
   const pairs = [];
-  const taken = new Set();
-  for (const g of groups) {
-    const cands = [];
-    for (let i = 0; i < texts.length; i++) if (!taken.has(i) && texts[i].length === g.items.length) cands.push(i);
-    const distinct = [...new Set(cands.map((i) => texts[i]))];
-    if (distinct.length !== 1) return src; // 长度撞车又不是同一个名 → 认不准，别动
-    taken.add(cands[0]);
-    pairs.push({ g, text: distinct[0] });
+  const used = new Set();
+  for (const s of smts) {
+    const ai = salOf.get(s.n);
+    if (!ai || ai > natoms) return src;
+    const [ax, ay] = atomXY(ai);
+    if (!Number.isFinite(ax) || !Number.isFinite(ay)) return src;
+    const px = mA * ax + mTx;
+    const py = mD * ay + mTy;
+    let best = -1;
+    let bestD = Infinity;
+    groups.forEach((g, i) => {
+      if (used.has(i)) return;
+      const [x0, y0, x1, y1] = boxes[i];
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const d = Math.hypot(cx - px, cy - py);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    // 离得太远就不是这个缩写（坐标对不上时宁可不换）
+    if (best < 0 || bestD > Math.max(80, 2.2 * capGuess)) return src;
+    used.add(best);
+    pairs.push({ g: groups[best], text: s.text });
   }
 
   // ---- 4) 每组的锚：最近的键端点（纯几何）
@@ -168,10 +222,14 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
     // 下标：比本组基线低的就是下标。按「连续同基线」切段，每段一个 tspan，
     // dy 用「相对上一段」的增量（下标 +drop、回到正常 -drop），段与段各自闭合
     const baseY = g.ys[0];
+    // 一行里「基线低一点」的字当数字下标（字母永不当下标：「Bn」的 n 曾被压下去）
+    const ordered = g.items
+      .map((it, i) => ({ x: it.x, y: g.ys[i] ?? it.y }))
+      .sort((p, q) => p.x - q.x);
     const chars = text.split('');
     const segs = [];
     for (let i = 0; i < chars.length; i++) {
-      const isSub = g.ys[i] > baseY + 0.6;
+      const isSub = /[0-9]/.test(chars[i]) && (ordered[i]?.y ?? baseY) > baseY + 0.6;
       const last = segs[segs.length - 1];
       if (last && last.isSub === isSub) last.text += chars[i];
       else segs.push({ isSub, text: chars[i] });
@@ -242,6 +300,12 @@ function fitCanvas(svg, mainSize, subSize) {
   const pts = [];
   for (const m of svg.matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
     pts.push([mTx + 40 * +m[1], mTy + mD * +m[2]], [mTx + 40 * +m[3], mTy + mD * +m[4]]);
+  }
+  // 还没换掉的字形标签（原子标：N / O / H3C…）也得算进画布，不然重算 viewBox 会把它裁掉
+  for (const m of svg.matchAll(/<use xlink:href="#[^"]+" x="(-?[\d.]+)" y="(-?[\d.]+)"\/>/g)) {
+    const x = +m[1];
+    const y = +m[2];
+    pts.push([x, y - mainSize * 0.78], [x + mainSize * 0.62, y + subSize * 0.3]);
   }
   for (const m of svg.matchAll(/<text x="(-?[\d.]+)" y="(-?[\d.]+)"[^>]*text-anchor="(\w+)">([\s\S]*?)<\/text>/g)) {
     const x = +m[1];
@@ -428,4 +492,217 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${Math.round(w)}" height="${Math.round(h)}" viewBox="${num(x0)} ${num(y0)} ${num(w)} ${num(h)}">`,
   );
   return normalizeScale(rebuilt, bond);
+}
+
+/* ================================================================
+   缩写标签的「精确换字」（给 `chemdrawLabels` 认不准时用）
+   ----------------------------------------------------------------
+   为什么需要它：`chemdrawLabels` 靠「字形组 + molfile 坐标」去配对，Indigo 渲染时会把
+   整个图归一化（平移 / 翻 y / 缩放），我们反算不出稳定的映射；结构里再混进 N / O 这种
+   普通原子标，配对就更容易失败，于是整张图退回 Indigo 自带的衬线字形——
+   用户一眼就看出「这张的缩写文字跟别的不一样」。
+   这里的办法不需要算映射：**一条缩写单独渲一张**，那张里只有它这一个多字标签，
+   位置就是它在整图里的位置（坐标没变），拿这个位置回整图里把同一组的字形换成文字。
+   ================================================================ */
+
+/** 把**别的**缩写换成单字占位符 `X`、目标那条保持原样：这样图里只有它一个「多字标签」，
+ *  按字符数就能认出来（同一个化合物里常有两个 OMe，全换成同一个 X 会留下两个三字标签，
+ *  那就分不清了——所以只换别的，不换自己）。 */
+function molWithOnlyText(mol, keep) {
+  return String(mol)
+    .split(/\r?\n/)
+    .map((line) => {
+      const m = line.match(/^M  SMT\s+(\d+)\s+(.+)$/);
+      if (!m) return line;
+      return Number(m[1]) === keep ? line : `M  SMT   ${m[1]} X`;
+    })
+    .join('\n');
+}
+
+/** 图里的键端点坐标（就是 molfile 的坐标，不随整图平移变） */
+function bondEnds(svg) {
+  const pts = [];
+  for (const m of String(svg).matchAll(/d="M (-?[\d.]+) (-?[\d.]+) L (-?[\d.]+) (-?[\d.]+) "/g)) {
+    pts.push([+m[1], +m[2]], [+m[3], +m[4]]);
+  }
+  return pts;
+}
+
+/** 把一张图里的字形 <use> 按「同一基线 + 横向相邻」聚成标签，返回 {items, box} */
+function glyphGroups(svg) {
+  const glyphs = new Map();
+  for (const g of String(svg).matchAll(/<g id="(glyph-[^"]+)">\s*<path d="([^"]+)"/g)) {
+    const box = pathBox(g[2]);
+    glyphs.set(g[1], { w: Math.max(box.x1, 0.4), h: -box.y0, d: g[2].trim() });
+  }
+  const cap = Math.max(...[...glyphs.values()].map((x) => x.h), 1);
+  const uses = [];
+  for (const u of String(svg).matchAll(/<use xlink:href="#([^"]+)" x="(-?[\d.]+)" y="(-?[\d.]+)"\/>/g)) {
+    uses.push({ raw: u[0], id: u[1], x: +u[2], y: +u[3] });
+  }
+  const lines = [];
+  for (const u of uses) {
+    const line = lines.find((L) => Math.abs(u.y - L.y) < cap * 0.5);
+    if (line) line.items.push(u);
+    else lines.push({ y: u.y, items: [u] });
+  }
+  const groups = [];
+  for (const L of lines) {
+    L.items.sort((a, b) => a.x - b.x);
+    for (const it of L.items) {
+      const g = groups[groups.length - 1];
+      if (g && g.line === L && it.x - g.maxX < cap * 1.3 && it.x - g.maxX > -cap * 0.8) {
+        g.items.push(it);
+        g.maxX = Math.max(g.maxX, it.x);
+        g.ys.push(it.y);
+      } else {
+        groups.push({ items: [it], maxX: it.x, ys: [it.y], line: L });
+      }
+    }
+  }
+  for (const g of groups) {
+    const lastW = (glyphs.get(g.items[g.items.length - 1].id) || { w: cap * 0.6 }).w;
+    const xs = g.items.map((i) => i.x);
+    const bx0 = Math.min(...xs);
+    const bx1 = Math.max(...xs) + lastW;
+    const baseY = Math.max(...g.ys);
+    g.box = { x0: bx0, x1: bx1, baseY, cap, w: bx1 - bx0 };
+    // 每个字的轮廓数据：跟别的渲染里同名字符完全一样，可以用来认字
+    g.paths = g.items.map((i) => glyphs.get(i.id)?.d || '');
+  }
+  return groups;
+}
+
+/**
+ * molfile → 已经把缩写换成无衬线 `<text>` 的 SVG；认不准时返回 ''（调用方自己退回）。
+ * 只在「结构里有缩写（M  SMT）」时才有意义。
+ */
+export async function chemdrawLabelsExact(mol, indigoSvg, ratio = LABEL_RATIO) {
+  const lines = String(mol || '').split(/\r?\n/);
+  const smts = [];
+  for (const line of lines) {
+    const m = line.match(/^M  SMT\s+(\d+)\s+(.+)$/);
+    if (m) smts.push({ n: +m[1], text: m[2].trim().replace(/\s+/g, '') });
+  }
+  if (!smts.length) return '';
+
+  // ① 一条一条单独渲，拿到每个缩写在图里的位置
+  const spots = [];
+  for (const s of smts) {
+    let one = '';
+    try {
+      one = await indigoSvg(molWithOnlyText(mol, s.n));
+    } catch (e) {
+      return '';
+    }
+    // 只留一条缩写后，长度等于它字数的那一组就是它；万一还撞上同样长的原子标（H3C 之类），
+    // 宁可这一个不换，也别换错
+    const all = glyphGroups(one);
+    const cands = all.filter((g) => g.items.length === s.text.length);
+    if (cands.length !== 1) return '';
+    const box = cands[0].box;
+    // 锚点 = 离标签最近的键端点：键端点坐标就是 molfile 坐标，**每张渲染里都一样**，
+    // 而标签自身的坐标会随整图归一化平移（这张图别的标签被换成了 X，宽度变了，整图就挪了）
+    let anchor = null;
+    let ad = Infinity;
+    for (const e of bondEnds(one)) {
+      const d = Math.hypot(e[0] - (box.x0 + box.x1) / 2, e[1] - box.baseY);
+      if (d < ad) {
+        ad = d;
+        anchor = e;
+      }
+    }
+    if (!anchor) return '';
+    spots.push({ text: s.text, box, anchor, offset: [(box.x0 + box.x1) / 2 - anchor[0], box.baseY - anchor[1]], paths: cands[0].paths });
+  }
+
+  // ② 整图再来一张，把位置对得上的那几组字形换成文字
+  let base = '';
+  try {
+    base = await indigoSvg(mol);
+  } catch (e) {
+    return '';
+  }
+  const groups = glyphGroups(base);
+  const pairs = [];
+  const used = new Set();
+  for (const sp of spots) {
+    let best = -1;
+    let bestD = Infinity;
+    // ① 先按字形轮廓认：同一个字符在不同渲染里的 path 逐字相同，跟整图怎么平移无关
+    const byPath = groups.findIndex((g, i) => {
+      if (used.has(i)) return false;
+      const a = g.paths || [];
+      const b = sp.paths || [];
+      if (a.length !== b.length || !a.length || a.join('|') !== b.join('|')) return false;
+      return true;
+    });
+    if (byPath >= 0) {
+      used.add(byPath);
+      pairs.push({ g: groups[byPath], text: sp.text });
+      continue;
+    }
+    groups.forEach((g, i) => {
+      if (used.has(i)) return;
+      // 单条渲染时别的缩写换成了长占位符，标签整体宽度会变、中心会平移；
+      // 但**基线 y 一定不变**，所以先按 y 卡，再按 x 最近（宽松一点）
+      if (g.items.length !== sp.text.length) return;   // 字符数得对上（过滤掉 H3C 这类原子标）
+      // 预期位置 = 锚点（两张渲染里一致）+ 单条渲染里量到的相对偏移
+      const wantX = sp.anchor[0] + sp.offset[0];
+      const wantY = sp.anchor[1] + sp.offset[1];
+      const d = Math.hypot((g.box.x0 + g.box.x1) / 2 - wantX, g.box.baseY - wantY);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    if (best < 0 || bestD > sp.box.cap * 1.5) return '';
+    used.add(best);
+    pairs.push({ g: groups[best], text: sp.text });
+  }
+
+  // ③ 换字：字号按 Indigo 的字形高度换算成同一视觉高度，下标只认数字
+  const capOld = Math.max(...groups.map((g) => g.box.cap), 1);
+  const mainSize = Math.round((capOld / CAP_RATIO) * 10) / 10;
+  const subSize = Math.round(mainSize * 0.75 * 10) / 10;
+  const subDrop = Math.max(1.4, mainSize * 0.2);
+  let out = base;
+  for (const { g, text } of pairs) {
+    for (const it of g.items) out = out.replace(it.raw, '');
+    const ordered = g.items.map((it, i) => ({ x: it.x, y: g.ys[i] ?? it.y })).sort((p, q) => p.x - q.x);
+    const baseY = ordered[0]?.y ?? g.box.baseY;
+    const chars = text.split('');
+    const segs = [];
+    for (let i = 0; i < chars.length; i++) {
+      const isSub = /[0-9]/.test(chars[i]) && (ordered[i]?.y ?? baseY) > baseY + capOld * 0.12;
+      const last = segs[segs.length - 1];
+      if (last && last.isSub === isSub) last.text += chars[i];
+      else segs.push({ isSub, text: chars[i] });
+    }
+    let body = '';
+    segs.forEach((seg, i) => {
+      const t = escapeXml(seg.text);
+      if (i === 0) {
+        body += seg.isSub ? `<tspan dy="${num(subDrop)}" font-size="${subSize}">${t}</tspan>` : t;
+        return;
+      }
+      const dy = seg.isSub ? subDrop : -subDrop;
+      body += `<tspan dy="${num(dy)}" font-size="${seg.isSub ? subSize : mainSize}">${t}</tspan>`;
+    });
+    const textEl =
+      `<text x="${num(g.box.x0)}" y="${num(baseY)}" font-family="${FONT}" font-size="${mainSize}" ` +
+      `fill="#1a1a1a" text-anchor="start">${body}</text>`;
+    out = out.replace('</svg>', `${textEl}\n</svg>`);
+  }
+
+  // ④ 画布重新量一遍（无衬线字比原来的宽/高），然后再归到统一尺度
+  const mat = out.match(/transform="matrix\(([^)]+)\)"/);
+  if (!mat) return '';
+  const [mA] = mat[1].split(',').map(Number);
+  return normalizeScale(fitCanvas(scaleTo(out, mA), mainSize, subSize), Math.abs(mA));
+}
+
+/** 把 matrix 的 x 缩放当「一根键多少单位」，统一成 24px/键的显示尺度（跟 normalizeScale 配套） */
+function scaleTo(svg, mA) {
+  return svg; // normalizeScale 已经按 viewBox 处理；这里留一层，避免 mA 为 0 时崩
 }

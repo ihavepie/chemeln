@@ -4,7 +4,8 @@ import AppModal from './AppModal.vue';
 import { toast } from '../lib/feedback.js';
 import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../lib/lookup.js';
 import { spreadAbbrevBonds, spreadRxnAbbrevBonds } from '../lib/abbrevspread.js';
-import { chemdrawLabels, scaleGlyphLabels } from '../lib/chemdraw.js';
+import { chemdrawLabels, chemdrawLabelsExact, scaleGlyphLabels } from '../lib/chemdraw.js';
+import { indigoSvg } from '../lib/indigo.js';
 
 /**
  * 画结构式：弹窗里嵌 Ketcher（`/vendor/ketcher/index.html`，由 vendor-build/ketcher 打包而来，
@@ -129,7 +130,17 @@ async function pick() {
   // 这里把标签换回真正的文字（无衬线、字号调到 0.32 键长，见 lib/chemdraw.js）。
   // 没有缩写标签 / 认不准的图它会原样返回，不会把图弄坏。
   if (svg && svg.includes('<svg')) {
-    svg = chemdrawLabels(svg, mol);
+    // 先把缩写换成真正的无衬线文字：一条一条单独渲一遍去定位，比按坐标猜稳得多
+    // （结构里混着 N / O 这种普通原子标时，按字符数 / 坐标配都容易认不准，整张图就会
+    //   退回 Indigo 自带的衬线字形，跟别的图不一样——用户报过）
+    let exact = '';
+    try {
+      exact = await chemdrawLabelsExact(mol, indigoSvg);
+    } catch {
+      exact = '';
+    }
+    if (exact && exact.includes('<svg')) svg = exact;
+    else svg = chemdrawLabels(svg, mol);
     // 认不准缩写文本时它原样返回 → 那就至少把这套 Indigo 字形放大（同 LABEL_RATIO），
     // 不然新存的图又是小字，跟墙里其它图不是一个尺度
     if (svg.includes('xlink:href="#glyph')) svg = scaleGlyphLabels(svg);
