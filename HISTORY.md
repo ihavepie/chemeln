@@ -580,3 +580,10 @@
 - 面子卡整张是「展开/收起」的热区（手机目标大好点），要进面子那条记录就在展开后的第一行点。
 - 顺手：`🔒` 换成项目里的 `<Icon name="lock">`（跟桌面一致，别在纸面上出现 emoji）。
 - 验证：390 宽（手机视口）截图核对列表形态、展开后的三张组员卡 + 胶囊都对；桌面中栏没动过。
+
+## 2026-11-12 · 手机端卡片的下划线（`<a>` 默认样式）
+
+用户指着手机截图问「为什么有下划线」。原因：桌面中栏那张卡是 `<button>`，手机端为了「点进记录」写成了 `<a href>`，**锚点默认带 `text-decoration: underline` + 链接蓝**，整张卡的文字（标题、日期、说明、胶囊）全挂着下划线。
+
+- 修法：`.phone-cards a.exp-card { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent }`，再把卡里那几个小元素（`.tag` / `.exp-code` / `.exp-date` / `.exp-name` / `.exp-desc-inline` / `.member-diff-item`）显式写成 `text-decoration: none`（装饰线会往下继承，逐个按一遍更稳）。
+- 记一笔：**同一个外观，`<button>` 和 `<a>` 的默认样式不一样**——换成锚点时要连带补 `color` / `text-decoration` / tap-highlight。

@@ -7716,3 +7716,19 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .phone-cards .stack-members { margin-top: 2px; }
 /* 展开状态下卡片堆那两张垫纸别露在组员行下面（跟桌面一个规矩） */
 .phone-cards .exp-card.is-stack.is-open { margin-bottom: 0; }
+
+/* 手机端卡片是 `<a href>`（桌面中栏那边是 `<button>`）：锚点默认带下划线和链接蓝，
+   这里按纸卡片来——否则整张卡的字都挂着一条下划线（用户截图问过）。 */
+.phone-cards a.exp-card,
+.phone-cards a.exp-card:visited {
+  text-decoration: none;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 卡片里那些小签本来就不该继承下划线 */
+.phone-cards a.exp-card .tag,
+.phone-cards a.exp-card .exp-code,
+.phone-cards a.exp-card .exp-date,
+.phone-cards a.exp-card .exp-name,
+.phone-cards a.exp-card .exp-desc-inline,
+.phone-cards a.exp-card .member-diff-item { text-decoration: none; }
