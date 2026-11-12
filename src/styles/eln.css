@@ -7701,8 +7701,11 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
    现在铺满屏宽、不圆角 —— 它就是这一段的底，跟桌面中栏是同一个角色。 */
 .phone-cards {
   background: var(--bone);
-  margin: 0 -16px;
-  padding: 12px 16px 4px;
+  /* 真正贴到屏幕两边：`.phone-cmp` 有 max-width: 560，光用 `margin: 0 -16px` 只撑出 32px，
+     在平板 / 宽一点的窗口里就露出一块居中的矩形，又变成「面板套卡片」。 */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: 12px calc(50vw - 50% + 16px) 6px;
   border-radius: 0;
 }
 .phone-cards .exp-card { margin-bottom: 10px; border-radius: 10px; }
