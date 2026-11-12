@@ -383,8 +383,9 @@ function normalizeReagents(list) {
       mass_mg: numOrNull(r.mass_mg),
       volume_ul: numOrNull(r.volume_ul),
       note: str(r.note),
+      variable: str(r.variable).slice(0, 12),   // 非空 = 这一行是「变量」，箭头上写成 [L]
     }))
-    .filter((r) => r.name || r.role || r.mw !== null || r.eq !== null);
+    .filter((r) => r.name || r.role || r.variable || r.mw !== null || r.eq !== null);
 }
 
 /** 把这一版投料行登记到试剂库：名字进 reagent_lib（只补最新值），
@@ -425,13 +426,13 @@ function touchReagentLib(expId, reagents, ts = nowISO()) {
 function insertReagents(expId, reagents) {
   touchReagentLib(expId, reagents);
   const stmt = db.prepare(
-    `INSERT INTO reagents(exp_id, position, step, compound_id, role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    `INSERT INTO reagents(exp_id, position, step, compound_id, role, name, mw, conc, density, eq, mmol, mass_mg, volume_ul, note, variable)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
   );
   for (const r of reagents) {
     stmt.run(
       expId, r.position, r.step, r.compound_id, r.role, r.name, r.mw, r.conc, r.density,
-      r.eq, r.mmol, r.mass_mg, r.volume_ul, r.note
+      r.eq, r.mmol, r.mass_mg, r.volume_ul, r.note, r.variable || ''
     );
   }
 }

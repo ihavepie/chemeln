@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import Icon from './Icon.vue';
 import AppModal from './AppModal.vue';
-import { toast } from '../lib/feedback.js';
+import { toast, confirm as confirmDialog } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { ROLES, ROLE_ALIAS, ROLE_EN, amountText, derive, eqLabel, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, totals, variantText, vesselHint, volText } from '../lib/reagent.js';
@@ -658,6 +658,28 @@ function onName(r) {
   props.notify();
 }
 
+/**
+ * 把这一行标成「变量」/取消，或改占位符。
+ * 默认占位符按组分猜（配体 L / 碱 B / 添加剂 A / 催化剂 Cat / 溶剂 S）；
+ * 已经设过的话点一下问是否改字，取消就再点一次菜单里的「变量 [x]」。
+ */
+const VAR_GUESS = { 配体: 'L', 碱: 'B', 添加剂: 'A', 催化剂: 'Cat', 氧化剂: 'Ox', 溶剂: 'S', 还原剂: 'Red' };
+async function toggleVariable(r) {
+  closeRoleMenu();
+  if (r.variable) {
+    const keep = await confirmDialog({
+      title: `取消「[${r.variable}]」这个变量？`,
+      body: '取消后这一行回到固定组分，反应式上就直接写它的名字。',
+      confirmText: '取消变量',
+    });
+    if (!keep) return;
+    r.variable = '';
+  } else {
+    r.variable = VAR_GUESS[r.role] || 'X';
+  }
+  props.notify?.();
+}
+
 function setRole(r, role) {
   r.role = role;
   roleMenuFor.value = -1;
@@ -1099,6 +1121,7 @@ function onDrop(ev) {
               :class="{
                 base: isBaseRow(r),
                 'has-cmp': r.compound_id,
+                'is-var': !!r.variable,
                 'step-multi': rowsOf(si).length > 1,
                 'menu-open': roleMenuFor === rows.indexOf(r),
               }"
@@ -1137,9 +1160,26 @@ function onDrop(ev) {
                   >
                     {{ role }}<span class="role-en">{{ ROLE_EN[role] }}</span>
                   </button>
+                  <!-- 这一组分是「变量」（筛配体时配体拎出来）：反应式上写成 [L]，条件组每行填它的取值 -->
+                  <button
+                    type="button"
+                    class="qchip is-var"
+                    :aria-selected="!!r.variable"
+                    :title="r.variable ? '取消变量，回到固定组分' : '把这一行标成变量：反应式写 [占位符]'"
+                    @click.stop="toggleVariable(r)"
+                  >
+                    {{ r.variable ? `变量 [${r.variable}]` : '设为变量' }}<span class="role-en">var</span>
+                  </button>
                 </div>
+
               </td>
               <td class="name-cell" @click="pinPreview(r)">
+                <span
+                  v-if="r.variable"
+                  class="var-chip"
+                  :title="`这一组分是变量：反应式上写成 [${r.variable}]，条件组每行填它的取值`"
+                  @click.stop="toggleVariable(r)"
+                >[{{ r.variable }}]</span>
                 <input
                   data-f="name"
                   :value="r.name"

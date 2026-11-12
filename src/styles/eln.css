@@ -7850,3 +7850,26 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 
 /* 筛选表：同一条记录拆出来的第几个条件（记录页「条件组」的第 N 行）——跟在编号后面，淡一点 */
 .sct-cond { font-family: var(--mono); font-size: 10px; color: var(--accent-ink); margin-left: 2px; }
+
+/* 投料表里「变量」那一行的小签（`[L]`）：标在组分格右边，点一下可以取消 */
+.reagent-var, .var-chip {
+  display: inline-flex; align-items: center;
+  font-family: var(--mono); font-size: 9.5px; line-height: 16px;
+  padding: 0 6px; border-radius: 999px;
+  color: var(--accent-ink); background: var(--accent-soft);
+  cursor: pointer; white-space: nowrap;
+}
+.var-chip { margin-left: 4px; }
+/* 菜单里那条「设为变量」单独一行的样式 */
+.role-menu .qchip.is-var { flex: 1 1 auto; }
+.role-menu .qchip.is-var[aria-selected='true'] { color: var(--accent-ink); background: var(--accent-soft); }
+
+/* 「变量」那一行：`[L]` 小签放在试剂名左边（组分格太窄，放那儿会把 Lig 挤成 L） */
+.rtable tr.is-var .name-cell { display: flex; align-items: center; gap: 5px; }
+.rtable tr.is-var .name-cell input { flex: 1 1 auto; min-width: 0; }
+.rtable tr.is-var .var-chip { margin-left: 0; flex: 0 0 auto; }
+
+/* 条件组里的数字格：隐藏 number input 的上下箭头（一行条件表，箭头太吵） */
+.cond-in[type='number'] { -moz-appearance: textfield; }
+.cond-in[type='number']::-webkit-outer-spin-button,
+.cond-in[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

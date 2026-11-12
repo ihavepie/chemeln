@@ -87,6 +87,8 @@ const reagent = reactive({ base: null, steps: [], rows: [] });
  * 条件筛选页（`#/screenings`）会从这里拆行，不用为每个条件再建一条实验记录。
  */
 const conds = ref([]);
+/* 记录里标成「变量」的那一行（筛配体时配体拎出来）：条件组第一列的表头 / 占位提示跟着它变 */
+const varLabel = computed(() => String((reagent.rows.find((r) => r.variable) || {}).variable || ''));
 
 const FIELD_KEYS = Object.keys(fields);
 
@@ -104,6 +106,7 @@ function toRow(r) {
     mass_mg: r.mass_mg ?? null,
     volume_ul: r.volume_ul ?? null,
     note: r.note || '',
+    variable: r.variable || '',
     compound_id: r.compound_id ?? null,
     mwText: mwText(r),
     amountText: amountText(r),
@@ -1465,7 +1468,7 @@ const openAttachment = (id) => {
               <thead>
                 <tr>
                   <th class="cond-idx">#</th>
-                  <th>改了什么</th>
+                  <th>{{ varLabel ? `变量 [${varLabel}]` : '改了什么' }}</th>
                   <th class="cond-num">产率 %</th>
                   <th class="cond-num">选择性</th>
                   <th>备注</th>
@@ -1476,7 +1479,13 @@ const openAttachment = (id) => {
                 <tr v-for="(c, i) in conds" :key="i">
                   <td class="cond-idx">{{ i + 1 }}</td>
                   <td>
-                    <input v-model="c.label" class="cond-in" :disabled="exp.locked" placeholder="−40 °C / LDA 1.2 eq / DCM 代替 THF" @input="notify()" />
+                    <input
+                      v-model="c.label"
+                      class="cond-in"
+                      :disabled="exp.locked"
+                      :placeholder="varLabel ? `这个条件用的 ${varLabel}（如 XPhos）` : '−40 °C / LDA 1.2 eq / DCM 代替 THF'"
+                      @input="notify()"
+                    />
                   </td>
                   <td class="cond-num">
                     <input v-model="c.yield_pct" class="cond-in is-num" type="number" min="0" max="100" step="1" :disabled="exp.locked" placeholder="—" @input="notify()" />

@@ -7,7 +7,7 @@ export const ROLE_EN = {
   底物: 'Sub',
   试剂: 'Rgt',
   催化剂: 'Cat',
-  配体: 'L',
+  配体: 'Lig',   // 别用 'L'：变量占位符就是 [L]，组分列也叫 L 会看混
   碱: 'Base',
   添加剂: 'Add',
   氧化剂: 'Ox',

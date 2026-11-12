@@ -41,7 +41,7 @@ const isEmpty = (v) => v === null || v === undefined || v === '';
 /** 投料那一格：把试剂名和当量拼一行 */
 export const reagentText = (exp) =>
   (exp?.reagents || [])
-    .filter((r) => r.name)
+    .filter((r) => r.name && !r.variable)   // 变量行不是固定条件，别混进「Reagents」格
     .map((r) => `${r.name}${isEmpty(r.eq) || r.eq === '' ? '' : ` ${eqLabel(r.eq)}`}`)
     .join(' · ');
 

@@ -22,6 +22,8 @@ const widthOf = (t) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 1 
 const eqText = eqLabel;
 
 function label(r, c) {
+  // 「变量」行（配体 / 碱 / 添加剂…）：箭头上只写占位符 [L]，具体是什么由每个条件填
+  if (str(r.variable)) return `[${str(r.variable)}]`;
   const name = str(r.name) || (c ? str(c.name || c.code) : '');
   if (!name) return '';
   const t = eqText(r.eq);

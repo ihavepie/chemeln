@@ -247,6 +247,9 @@ function ensureColumn(table, name, ddl) {
 }
 /* 条件组：一次筛选批次里的 N 个条件（一条记录 = 一次筛选，共享投料表 / 一张 TLC 板）。
    `[{label, yield_pct, sel, note}]` —— 筛选表从这里拆行，不用为每个条件再建一条记录。 */
+/* 投料表里的「变量」行：这一组分不是固定条件，而是本次筛选在变的东西（配体 / 碱 / 添加剂…）。
+   值就是反应式上的占位符（`L` / `B` / `A`），箭头上写成 `[L]`。 */
+ensureColumn('reagents', 'variable', "variable TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'conds_json', "conds_json TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('experiments', 'operator', "operator TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'ambient_temp', "ambient_temp TEXT NOT NULL DEFAULT ''");
