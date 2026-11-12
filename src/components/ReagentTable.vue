@@ -18,6 +18,8 @@ const props = defineProps({
   varCounts: { type: Object, default: () => ({}) },
   /** 每个变量槽的候选名单（按条件组顺序）：`{Cat: ['Pd(OPiv)2','dppe']}` —— 变量行那格显示摘要 */
   varCandidates: { type: Object, default: () => ({}) },
+  // 变量行「挪下去」：开了变量块的时候，标成变量的那几行不在投料表里显示（值在下面的变量行里）
+  dropVarRows: { type: Boolean, default: false },
 });
 const emit = defineEmits(['recipe', 'promote-var', 'focus-var', 'var-toggled']);
 
@@ -246,6 +248,8 @@ const phaseRank = (r) => {
   return isLiquidRow(r) ? 2 : 1;
 };
 const rowsOf = (i) => rows.value.filter((r) => r.step === i + 1);
+/** 画出来的行：变量行被「挪到」投料表下面的变量块里，这里就不再画（数据还在，取消变量就回来） */
+const shownRows = (i) => rowsOf(i).filter((r) => !(props.dropVarRows && r.variable));
 
 /** 按相态整理：每一步内部「固体 → 液体 → 溶剂」，同相态之间保持现有顺序 */
 function sortByPhase() {
@@ -761,6 +765,7 @@ async function toggleVariable(r) {
     });
     if (!keep) return;
     r.variable = '';
+    emit('var-toggled', '');   // 取消变量：让上面把「只是候选、没填结果」的条件行收掉
   } else {
     r.variable = VAR_GUESS[r.role] || 'X';
     // 一次只筛一样：交给 EditorView 把别的变量（试剂行 / 温度这类字段）收掉
@@ -1226,7 +1231,7 @@ function onDrop(ev) {
 
           <template v-if="!collapsed.has(si)">
             <tr
-              v-for="r in rowsOf(si)"
+              v-for="r in shownRows(si)"
               :key="rows.indexOf(r)"
               class="reag-row"
               :class="{
@@ -1284,21 +1289,8 @@ function onDrop(ev) {
                 </div>
 
               </td>
-              <td class="name-cell" :colspan="r.variable ? 6 : 1" @click="pinPreview(r)">
-                <!-- 变量行：这一行不再写具体试剂，也不留一排空格子——整行只写一句
-                     「[Cat] 变量 · 下面有几个候选」，点一下跳到下面的变量里，双击取消变量 -->
-                <span
-                  v-if="r.variable"
-                  class="var-note"
-                  :title="`这一行是变量 [${r.variable}]：换的那几个写在投料表下面的「变量」里（点一下跳过去，双击取消变量）`"
-                  @click.stop="emit('focus-var', r.variable)"
-                  @dblclick.stop="toggleVariable(r)"
-                >
-                  <span class="var-chip is-inline">[{{ r.variable }}]</span>
-                  <span class="var-note-txt">变量<template v-if="varCounts[r.variable]"> · 下面有 {{ varCounts[r.variable] }} 个候选</template><template v-else> · 下面一行一个</template></span>
-                </span>
+              <td class="name-cell" @click="pinPreview(r)">
                 <input
-                  v-if="!r.variable"
                   data-f="name"
                   :value="r.name"
                   :title="r.compound_id && cmpById(r.compound_id) ? `${r.name}（库里 ${cmpById(r.compound_id).code || '无编号'}）` : r.name || ''"
@@ -1375,24 +1367,24 @@ function onDrop(ev) {
                   <div v-if="!picker.items.length" class="cmp-pick-empty">化合物库和「用过的试剂」里都没有「{{ picker.q }}」</div>
                 </div>
               </td>
-              <td v-if="!r.variable">
+              <td>
                 <!-- 溶剂只记「用了多少量」：分子量 / 当量 / mmol 三格都不填，也就不会算出 17 µL 那种数 -->
                 <span v-if="isSolvent(r)" class="sol-blank">—</span>
                 <input v-else class="n mw-cell" data-f="mwcell" :value="mwDisplay(r)" :disabled="locked" @input="onMwInput($event, r)" @change="onMw(r)" @focus="r._mwEditing = true; focusHint(r, 'mwcell'); $event.target.select()" @blur="r._mwEditing = false; onMw(r); blurHint()" @keydown="onKeydown($event, r, 'mwcell')" />
               </td>
-              <td v-if="!r.variable">
+              <td>
                 <span v-if="isSolvent(r)" class="sol-blank">—</span>
                 <input v-else class="n" data-f="eq" inputmode="decimal" :value="eqDisplay(r)" :disabled="locked" @input="onEqInput($event, r)" @change="onEq(r)" @focus="r._eqEditing = true; focusHint(r, 'eq'); $event.target.select()" @blur="r._eqEditing = false; onEq(r); blurHint()" @keydown="onKeydown($event, r, 'eq')" />
               </td>
-              <td v-if="!r.variable">
+              <td>
                 <span v-if="isSolvent(r)" class="sol-blank">—</span>
                 <input v-else class="n calc" data-f="mmol" inputmode="decimal" :value="r.mmol ?? ''" :disabled="locked" @input="onMmolInput($event, r)" @change="onMmol(r)" @focus="focusHint(r, 'mmol'); $event.target.select()" @blur="blurHint" @keydown="onKeydown($event, r, 'mmol')" />
               </td>
-              <td v-if="!r.variable" class="amount-td" :data-kind="rowKind(r)">
+              <td class="amount-td" :data-kind="rowKind(r)">
                 <!-- 值就是 r.amountText 本身：边打字只解析不回写（回写会把光标顶走、字被吃成「3mL23」），失焦才规整成「3 mL」 -->
                 <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount'); $event.target.select()" @blur="onAmount(r); blurHint()" @keydown="onKeydown($event, r, 'amount')" />
               </td>
-              <td v-if="!r.variable" class="note-td">
+              <td class="note-td">
                 <input class="note-cell" data-f="note" :value="r.note" :placeholder="firstRow === r ? '说明' : ''" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
               </td>
               <td class="rowend">

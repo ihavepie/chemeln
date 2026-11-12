@@ -223,8 +223,21 @@ const condVars = computed(() => {
 const FIELD_VAR_LABEL = { temperature: 'T', duration: 't', atmosphere: 'atm', concentration: 'c' };
 
 /** 试剂行被标成变量（组分菜单里点的）：把字段变量和别的试剂行的变量收掉 */
+/**
+ * 变量取消了：条件里那几行如果**只是候选**（没填产率 / 选择性 / 备注）就跟着收掉；
+ * 填过结果的留着（它们会退回「自由写法」那几行），别把数据吃掉。
+ */
+function pruneOrphanConds() {
+  if (condVars.value.length) return;
+  const before = conds.value.length;
+  conds.value = conds.value.filter(
+    (c) => c.yield_pct != null || String(c.sel || '').trim() || String(c.note || '').trim()
+  );
+  if (before !== conds.value.length) toast('变量取消了，下面没填结果的候选一起收掉了', 'info', 2600);
+}
+
 function onReagentVarToggled(slot) {
-  if (!slot) return;
+  if (!slot) return pruneOrphanConds();
   const dropped = [];
   if (fieldVars.value.length) dropped.push(...fieldVars.value.map((v) => v.label));
   fieldVars.value = [];
@@ -234,7 +247,28 @@ function onReagentVarToggled(slot) {
       r.variable = '';
     }
   }
+  // 「这一行挪下去」：投料表里原来那行就是标准条件，先在下面变量里补上它自己
+  const row = reagent.rows.find((x) => x.variable === slot);
+  const name = String(row?.name || '').trim();
+  if (name && !conds.value.some((c) => String(c.vars?.[slot] || '').trim() === name)) {
+    const eq = String(row?.eq ?? '').trim();
+    conds.value.unshift({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name }, varEq: eq ? { [slot]: eq } : {} });
+  }
   if (dropped.length) toast(`一次只筛一样：变量换成 [${slot}]，已经收掉 ${dropped.map((x) => `[${x}]`).join(' ')}`, 'info', 2800);
+  notify();
+}
+
+/** 取消当前这个变量：投料表里那一行「回来」，下面只是候选的条件行一起收掉 */
+function dropVariable() {
+  const slot = condVars.value[0];
+  if (!slot) return;
+  if (slot.role) {
+    const r = reagent.rows.find((x) => x.variable === slot.ph);
+    if (r) r.variable = '';
+  }
+  fieldVars.value = fieldVars.value.filter((v) => v.label !== slot.ph);
+  pruneOrphanConds();
+  for (const r of reagent.rows) if (r.variable === slot.ph) r.variable = '';
   notify();
 }
 
@@ -242,6 +276,7 @@ function toggleFieldVar(f) {
   const i = fieldVars.value.findIndex((v) => v.key === f.key);
   if (i >= 0) {
     fieldVars.value.splice(i, 1);
+    pruneOrphanConds();
     return notify();
   }
   // 反过来：字段变量开起来，投料表那边的变量（以及别的字段变量）一起收掉
@@ -1760,6 +1795,7 @@ const openAttachment = (id) => {
             :locked="exp.locked"
             :var-counts="varCounts"
             :var-candidates="varCandidates"
+            :drop-var-rows="sheetPrefs.conds"
             @recipe="openRecipe"
             @promote-var="promoteVarCandidate"
             @focus-var="scrollToConds"
@@ -1785,8 +1821,16 @@ const openAttachment = (id) => {
                   <td colspan="8">
                     <div class="vars-head">
                       <span class="vars-lbl">变量</span>
+                      <span v-for="v in condVars" :key="v.key" class="var-slot">[{{ v.ph }}]</span>
                       <span class="vars-rule" />
                       <span v-if="!conds.length" class="vars-hint">要筛条件就一行一个</span>
+                      <button
+                        v-if="condVars.length && !exp.locked"
+                        type="button"
+                        class="vars-add vars-drop"
+                        title="取消这个变量：投料表里那一行回来，下面只是候选的行一起收掉"
+                        @click="dropVariable"
+                      >取消变量</button>
                       <button v-if="!exp.locked" type="button" class="vars-add" @click="addCond">＋ 加变量</button>
                     </div>
                   </td>

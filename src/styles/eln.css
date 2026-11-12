@@ -8225,3 +8225,9 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .sheet .rtable .var-chip.is-inline { margin-left: 0; }
 .sheet .rtable .var-note-txt { font-size: 11.5px; color: var(--ink-3); }
 .sheet .rtable .var-note:hover .var-note-txt { color: var(--accent-ink); }
+
+/* 变量块的头：「变量 [Cat] ┈┈ 取消变量 ＋加变量」——变量行挪到下面以后，
+   取消变量只能在这里点（投料表里那一行已经不显示了）。 */
+.vars-head .var-slot { flex: 0 0 auto; }
+.vars-add.vars-drop { color: var(--ink-4); }
+.vars-add.vars-drop:hover { color: var(--accent); }
