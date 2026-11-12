@@ -1264,26 +1264,32 @@ function onDrop(ev) {
     </div>
 
     <!-- 「条件」在投料表**上面**：纸质记录里也是先写反应条件、再列投料，少一截来回找。
-         多步记录时这一步的条件行跟着各自的表走（见下面每个步骤那块），这里只管单步 -->
-    <div v-if="$slots.cond && singleStep" class="cond-above">
-      <slot name="cond" :step="0" />
-    </div>
+         一步以上时条件照样在上面，只是**一步一块**（第 N 步 + 本步内容 + 这一步的条件行）；
+         投料表本身还是一张，两步之间只用虚线分开。 -->
+    <template v-if="$slots.cond">
+      <div v-if="singleStep" class="cond-above">
+        <slot name="cond" :step="0" />
+      </div>
+      <div v-for="(s, si) in singleStep ? [] : steps" :key="`cb${si}`" class="step-cond-block" :data-step="si + 1">
+        <div class="step-line step-line-head">
+          <button type="button" class="step-caret noprint" @click="toggleCollapse(si)"><Icon name="chevron" :size="11" /></button>
+          <span class="step-no">第 {{ si + 1 }} 步</span>
+          <input class="step-label" :value="s.label" placeholder="本步内容" :disabled="locked" @change="onStepField(si, 'label', $event.target.value)" />
+          <span class="step-rule" />
+          <button type="button" class="step-add noprint" title="在这一步加一行投料" @click="addRow(si + 1)"><Icon name="plus" :size="11" /></button>
+          <button type="button" class="step-del noprint" title="删除这一步" @click="removeStep(si)"><Icon name="x" :size="11" /></button>
+        </div>
+        <div class="cond-above"><slot name="cond" :step="si" /></div>
+      </div>
+    </template>
 
-    <!-- 一步一张表：每步自带外框和表头，两步各是一个框（用户：别用一个外框把两步包在一起） -->
-    <table
-      v-for="(s, si) in steps"
-      :key="`tb${si}`"
-      class="rtable"
-      :class="{ 'is-step-table': !singleStep }"
-      :id="si === 0 ? 'rtable' : undefined"
-    >
+    <!-- 一张表：两步的行都在里面，中间只用虚线分开（用户：改回一张表，投料表内部就是虚线分隔） -->
+    <table class="rtable" id="rtable">
       <colgroup>
         <col class="c-grip" /><col class="c-role" /><col class="c-name" /><col class="c-mw" />
         <col class="c-eq" /><col class="c-mmol" /><col class="c-amt" /><col class="c-note" /><col class="c-del" />
       </colgroup>
-      <!-- 单步：一条表头带着整张表；一步以上：表头属于「这一步的投料行」，
-           所以每条表在自己的条件行下面各带一份（见下面 step-cols） -->
-      <thead v-if="singleStep">
+      <thead>
         <tr>
           <th class="grip-cell" />
           <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
@@ -1291,8 +1297,11 @@ function onDrop(ev) {
         </tr>
       </thead>
       <tbody @drop="onDrop" @dragover.prevent>
+        <template v-for="(s, si) in steps" :key="si">
+          <!-- 单步的步骤头（只有写过 条件 / 之后 / 加料 / 搅拌 才露）；
+               一步以上的「第 N 步」在上面条件那块里，表里只留一条虚线 -->
           <tr
-            v-if="showStepHead(s)"
+            v-if="singleStep && showStepHead(s)"
             class="step-head"
             :class="{ 'step-bare': singleStep }"
             :data-step="si + 1"
@@ -1345,20 +1354,15 @@ function onDrop(ev) {
             </td>
           </tr>
 
-          <!-- 一步以上：这一步的条件行 + 这一步自己的表头，都只包裹这一步的投料行
-               （用户：表头不要连条件一起包进去，分步各来一个表头） -->
-          <template v-if="!singleStep">
-            <tr v-if="$slots.cond" class="step-cond-row">
-              <td colspan="9">
-                <div class="cond-above"><slot name="cond" :step="si" /></div>
-              </td>
-            </tr>
-            <tr class="step-cols">
-              <th class="grip-cell" />
-              <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
-              <th class="n">当量</th><th class="n">mmol</th><th class="n">用量</th><th>说明</th><th class="noprint" />
-            </tr>
-          </template>
+          <!-- 一步以上：两步之间就一条虚线（不重复步骤头、也不重复表头） -->
+          <tr v-if="!singleStep && si" class="step-divider" :data-step="si + 1">
+            <td colspan="9">
+              <div class="step-divider-in">
+                <span class="step-divider-lbl">第 {{ si + 1 }} 步</span>
+                <span class="step-divider-rule" />
+              </div>
+            </td>
+          </tr>
 
           <template v-if="!collapsed.has(si)">
             <tr
@@ -1552,9 +1556,9 @@ function onDrop(ev) {
               </td>
             </tr>
           </template>
+        </template>
       </tbody>
-      <!-- 表尾那排操作只挂在最后一张表下面（它管整条记录，不用每步一份） -->
-      <tfoot v-if="si === steps.length - 1">
+      <tfoot>
         <!-- 原来这里有一行「合计」（规模 / 固体 / 溶剂 / 瓶与磁子 + 右下角算式）。
              用户说没什么用处、圈出来让删，就整行撤了：规模在右上角「反应规模」里本来就有，
              溶剂、用量每行都写着。-> 变量块直接接在最后一条试剂下面。 -->
@@ -1563,8 +1567,7 @@ function onDrop(ev) {
       </tfoot>
     </table>
 
-    <!-- 表尾那排操作管的是整条记录（加试剂 / 加一步 / 套用配方…），
-         所以放在所有步骤表外面：别跟着最后一步的框一起被圈进去 -->
+    <!-- 表尾那排操作管的是整条记录（加试剂 / 加一步 / 套用配方…），摆在投料表外面 -->
     <div v-if="!locked" class="rtable-tools noprint">
       <div class="add-cell">
         <button class="add-row" @click="addRow(steps.length)"><Icon name="plus" :size="12" /> 添加试剂</button>
