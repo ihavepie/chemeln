@@ -8521,23 +8521,26 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   background: transparent;
   pointer-events: none;
 }
+/* 「＋ 自定义」原来是弹窗底部独占一整行、上面还画一道虚线，看着像多出来的一块空白
+   （用户截着这里问「这个位置要不要改一下」）。收成跟胶囊菜单**同一套语言**：
+   右下角一颗虚线小胶囊，不再另起分隔线，弹窗也就短了一截、少压投料表几行。 */
 .ruler-foot {
   display: flex;
-  justify-content: flex-start;
-  padding: 4px 10px 0;
-  margin-top: 2px;
-  border-top: 1px dotted var(--line-2);
+  justify-content: flex-end;
+  padding: 2px 8px 0;
 }
 .ruler-add {
-  border: 0;
+  border: 1px dashed var(--line-2);
+  border-radius: 5px;
   background: none;
-  padding: 0;
+  padding: 2px 8px;
   font: inherit;
   font-size: 10.5px;
   color: var(--ink-3);
   cursor: pointer;
+  transition: color 130ms, border-color 130ms;
 }
-.ruler-add:hover { color: var(--accent); }
+.ruler-add:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.35); }
 
 /* 记录页的滚动容器：滚到头别把橡皮筋传给外层（页面本身不该跟着动） */
 .editor { overscroll-behavior: contain; }
