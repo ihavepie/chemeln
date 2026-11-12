@@ -7912,12 +7912,22 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 
 /* 「条件」那一行并进投料表以后的样子：左边一栏写「条件」，右边五个字段横向排开。
    标签做成格子内的小字（不再单独一条表头带），整块跟投料表同一张表、同一套边框。 */
-.rtable .cond-attach-label {
-  font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em;
-  color: var(--ink-4); padding-left: 6px; vertical-align: middle; white-space: nowrap;
+/* 「条件」现在是投料表**上面**的一条：左边一栏写「条件」，右边五个字段横排，
+   跟下面的投料表同宽、同一个左边缘（表格是 width:100%，这条也用 padding 对齐） */
+.cond-above {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 5px;
 }
-.rtable .cond-attach-cell { padding: 4px 6px 5px; vertical-align: middle; }
-.rtable .cond-attach { border-top: 1px solid var(--line-2); }
+.cond-above-label {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.cond-above .cond-inline { flex: 1 1 auto; }
 .cond-inline {
   display: grid;
   /* 气氛 / 容器 和 装置 / 器皿 的标签最长，给它们宽一点；标签一律不换行 */

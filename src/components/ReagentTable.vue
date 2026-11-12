@@ -1063,6 +1063,12 @@ function onDrop(ev) {
       </label>
     </div>
 
+    <!-- 「条件」在投料表**上面**：纸质记录里也是先写反应条件、再列投料，少一截来回找 -->
+    <div v-if="$slots.cond" class="cond-above">
+      <span class="cond-above-label">条件</span>
+      <slot name="cond" />
+    </div>
+
     <table class="rtable" id="rtable">
       <colgroup>
         <col class="c-grip" /><col class="c-role" /><col class="c-name" /><col class="c-mw" />
@@ -1301,15 +1307,7 @@ function onDrop(ev) {
             </tr>
           </template>
         </template>
-              <!-- 「条件」跟投料表是同一张表：温度 / 时间 / 气氛 / 装置 / 光照横着排在最后一行 -->
-        <tr class="cond-attach">
-          <td class="grip-cell" />
-          <td class="cond-attach-label">条件</td>
-          <td colspan="7" class="cond-attach-cell">
-            <slot name="cond" />
-          </td>
-        </tr>
-      </tbody>
+            </tbody>
       <tfoot>
         <tr class="rtable-total">
           <td class="grip-cell" />
