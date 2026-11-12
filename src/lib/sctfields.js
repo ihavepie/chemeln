@@ -50,8 +50,12 @@ export function autoValue(source, exp, base, cond) {
   if (!exp) return '';
   // 这一格是照文献表写的（`none` = 基准那条，`same` = 条件没动），表里全是英文口径
   if (source === 'variation') {
-    // 这一行是记录「条件组」里的某个条件：它自己就写着「改了什么」，不用再跟基准比
-    if (cond) return String(cond.label || '').trim() || 'same';
+    // 这一行是记录「条件组」里的某个条件：用它自己的变量取值（或手写的「改了什么」）
+    if (cond) {
+      const vals = Object.values(cond.vars || {}).map((v) => String(v || '').trim()).filter(Boolean);
+      if (vals.length) return vals.join(' · ');
+      return String(cond.label || '').trim() || 'same';
+    }
     if (!base || base.id === exp.id) return 'none';
     const v = variations(base, exp);
     return v.length ? v.join(' · ') : 'same';

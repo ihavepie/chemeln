@@ -250,6 +250,9 @@ function ensureColumn(table, name, ddl) {
 /* 投料表里的「变量」行：这一组分不是固定条件，而是本次筛选在变的东西（配体 / 碱 / 添加剂…）。
    值就是反应式上的占位符（`L` / `B` / `A`），箭头上写成 `[L]`。 */
 ensureColumn('reagents', 'variable', "variable TEXT NOT NULL DEFAULT ''");
+/* 本次筛选还把哪些**字段**当变量（温度 / 时间…）：`[{key:'temperature', label:'T'}]`。
+   投料行的变量存在 `reagents.variable`，两边合起来就是这张记录的「变量集合」。 */
+ensureColumn('experiments', 'field_vars_json', "field_vars_json TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('experiments', 'conds_json', "conds_json TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('experiments', 'operator', "operator TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'ambient_temp', "ambient_temp TEXT NOT NULL DEFAULT ''");

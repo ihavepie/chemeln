@@ -139,7 +139,7 @@ const EXP_COLUMNS = [
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
   'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles', 'lit_note',
-  'no_yield', 'apparatus', 'light', 'kind', 'conds_json',
+  'no_yield', 'apparatus', 'light', 'kind', 'conds_json', 'field_vars_json',
 ];
 
 const NUMERIC_COLUMNS = new Set([
@@ -198,6 +198,45 @@ function normalizeEntries(body) {
     .filter(Boolean);
 }
 
+/** 能当「变量」的字段（白名单：这几个才有一致的字面语义） */
+const FIELD_VARS = new Set(['temperature', 'duration', 'atmosphere', 'concentration']);
+/** 字段默认占位符 */
+const FIELD_VAR_LABEL = { temperature: 'T', duration: 't', atmosphere: 'atm', concentration: 'M' };
+
+/** `field_vars_json` → `[{key,label}]`（只认白名单，label 缺就给默认） */
+function normalizeFieldVars(list) {
+  if (!Array.isArray(list)) return null;
+  const out = [];
+  for (const one of list.slice(0, 6)) {
+    const key = str(one && typeof one === 'object' ? one.key : one);
+    if (!FIELD_VARS.has(key) || out.some((x) => x.key === key)) continue;
+    const label = str(one && one.label).slice(0, 8) || FIELD_VAR_LABEL[key] || key;
+    out.push({ key, label });
+  }
+  return out;
+}
+
+function parseFieldVars(text) {
+  try {
+    const list = JSON.parse(String(text || '[]'));
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 条件组里每条条件的「变量取值」：`{L:'XPhos', T:'−40 °C'}`（键短、值短，别塞大段文字） */
+function normalizeCondVars(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  const out = {};
+  for (const [k, v] of Object.entries(obj).slice(0, 6)) {
+    const key = str(k).slice(0, 8);
+    const val = str(v).slice(0, 120);
+    if (key && val) out[key] = val;
+  }
+  return out;
+}
+
 /** `conds_json` → 数组（坏数据当空） */
 function parseConds(text) {
   try {
@@ -218,13 +257,20 @@ function normalizeConds(list) {
       yield_pct: y === null ? null : Math.max(0, Math.min(100, Math.round(y * 10) / 10)),
       sel: str(o.sel).slice(0, 60),                      // 「94:6」「99% ee」这种，手填
       note: str(o.note).slice(0, 200),
+      vars: normalizeCondVars(o.vars),   // 每个变量的取值（L / T / t…）
     };
-  }).filter((c) => c.label || c.yield_pct !== null || c.sel || c.note);
+  }).filter((c) => c.label || c.yield_pct !== null || c.sel || c.note || Object.keys(c.vars).length);
 }
 
 function normalizeExperiment(input) {
   const out = {};
   for (const key of EXP_COLUMNS) {
+    if (key === 'field_vars_json') {
+      const fv = normalizeFieldVars(input.field_vars);
+      if (fv) out.field_vars_json = JSON.stringify(fv);
+      else if (typeof input.field_vars_json === 'string') out.field_vars_json = input.field_vars_json;
+      continue;
+    }
     if (!(key in input) && key !== 'steps_json' && key !== 'conds_json') continue;
     if (key === 'conds_json') {
       const conds = normalizeConds(input.conds);
@@ -555,6 +601,7 @@ function getExperiment(id) {
   if (!exp) return null;
   exp.steps = parseSteps(exp.steps_json);
   exp.conds = parseConds(exp.conds_json);
+  exp.field_vars = parseFieldVars(exp.field_vars_json);
   exp.reagents = db.prepare('SELECT * FROM reagents WHERE exp_id = ? ORDER BY position, id').all(id);
   exp.attachments = db
     .prepare('SELECT * FROM attachments WHERE exp_id = ? ORDER BY category, id')
@@ -2939,6 +2986,7 @@ route('GET', '/api/screenings/:id', async (req, res, params) => {
   // 表里只存「选了哪些实验 + 每格手填的文本」；编号 / 条件 / 产率这些一直读记录本身，不会跟记录脱节
   const one = db.prepare(`SELECT e.id, e.code, e.title, e.date, e.status, e.kind, e.yield_pct, e.dr_ee, e.ee_pct,
                                  e.no_yield, e.solvent, e.temperature, e.duration, e.atmosphere, e.addition,
+                                 e.field_vars_json,
                                  e.product_name, e.product_mass, e.base_mmol,
                                  e.notes, e.conclusion, e.appearance, e.tlc_note,
                                  (SELECT group_concat(r.name, ' + ') FROM reagents r
@@ -2959,7 +3007,9 @@ route('GET', '/api/screenings/:id', async (req, res, params) => {
       cond: ci,
       cond_value: ci === null ? null : list[ci] || null,
       cells: e.cells || {},
-      exp: exp ? { ...exp, reagents: reagents.all(exp.id) } : null,
+      exp: exp
+        ? { ...exp, field_vars: parseFieldVars(exp.field_vars_json), reagents: reagents.all(exp.id) }
+        : null,
     };
   });
   ok(res, { screening: s, rows });

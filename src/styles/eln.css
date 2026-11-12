@@ -7873,3 +7873,18 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .cond-in[type='number'] { -moz-appearance: textfield; }
 .cond-in[type='number']::-webkit-outer-spin-button,
 .cond-in[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* 条件组表头那排「变量 [L] [T]」和「＋ 温度 / ＋ 时间」按钮 */
+.cond-vars { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-4); }
+.cond-var {
+  font-family: var(--mono); font-size: 9.5px; line-height: 15px; padding: 0 6px;
+  border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink);
+}
+.cond-varbtns { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+.cond-varbtn {
+  font-family: var(--mono); font-size: 9px; line-height: 1; padding: 3px 7px;
+  border-radius: 999px; border: 1px solid var(--line-2); background: transparent;
+  color: var(--ink-4); cursor: pointer;
+}
+.cond-varbtn:hover { color: var(--ink-2); border-color: var(--ink-4); }
+.cond-varbtn.on { color: var(--accent-ink); border-color: transparent; background: var(--accent-soft); }

@@ -78,9 +78,11 @@ export function schemeParts(model, compounds) {
     : byName.get(norm(model.product_name)) || null;
 
   // 箭头上下的条件不写「浓度」（那个数是按投料表折算出来的，常常是个没意义的 M 值，
-  // 化学式上写出来反而干扰）；溶剂 / 温度 / 时间照旧
-  const cond = [model.solvent, model.temperature, model.duration]
-    .map(str)
+  // 化学式上写出来反而干扰）；溶剂 / 温度 / 时间照旧。
+  // **被标成变量的字段写成占位符**（温度 → `[T]`）：具体取值由每个条件填，跟 `[L]` 一个道理。
+  const fv = new Map((model.field_vars || []).map((v) => [String(v.key), String(v.label || v.key)]));
+  const fieldText = (key, val) => (fv.has(key) ? `[${fv.get(key)}]` : str(val));
+  const cond = [str(model.solvent), fieldText('temperature', model.temperature), fieldText('duration', model.duration)]
     .filter(Boolean)
     .join('，');
 

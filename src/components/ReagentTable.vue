@@ -262,6 +262,7 @@ const ROLE_BY_EN = Object.fromEntries(Object.entries(ROLE_EN).map(([zh, en]) => 
 
 /** 手输时中文、英文都认：能对上就存回中文，对不上就按自定义组分存 */
 function setRoleText(r, raw) {
+  // 手输角色也算「设了角色」：同角色已有变量行时跟着继承（下面照旧走原来的匹配逻辑）
   const text = String(raw || '').trim();
   if (!text) {
     r.role = '';
@@ -269,6 +270,8 @@ function setRoleText(r, raw) {
   }
   const lower = text.toLowerCase();
   r.role = ROLE_EN[text] ? text : ROLE_ALIAS[lower] || ROLE_BY_EN[lower] || text;
+  if (!r.variable) r.variable = inheritedVar(r.role, r);
+  props.notify();
 }
 /** v1 的「底物行」= 第 1 步的第一行（不是整表第一行） */
 const baseRow = computed(() => rowsOf(0)[0] || null);
@@ -680,8 +683,16 @@ async function toggleVariable(r) {
   props.notify?.();
 }
 
+/** 同一角色已经标成变量了？新加这一行也默认是变量（筛配体时连续加几个配体不用一个个点） */
+function inheritedVar(role, self) {
+  const hit = props.model.rows.find((x) => x !== self && x.role === role && x.variable);
+  return hit ? hit.variable : '';
+}
+
 function setRole(r, role) {
   r.role = role;
+  // 同角色的变量跟着走：这一行还没标变量、而别的同角色行是变量 → 继承占位符
+  if (!r.variable) r.variable = inheritedVar(role, r);
   roleMenuFor.value = -1;
   props.notify();
 }
@@ -767,7 +778,11 @@ function pickFromLib(it, v) {
 }
 
 function addRow(step) {
-  const row = { step: step || steps.value.length, role: '试剂', eq: 1, mwText: '', amountText: '', name: '', note: '' };
+  const role = '试剂';
+  const row = {
+    step: step || steps.value.length, role, eq: 1, mwText: '', amountText: '', name: '', note: '',
+    variable: inheritedVar(role, null),   // 同角色已经是变量的，新行默认也当变量
+  };
   healRow(row);
   props.model.rows.push(row);
   props.notify();
@@ -776,7 +791,10 @@ function addRow(step) {
 /** 溶剂也是投料表的一行（以前单独摆在「条件」里，用户想直接在这里加） */
 function addSolvent() {
   // 溶剂行不填分子量 / 当量，只填量（mL / µL）
-  props.model.rows.push({ step: steps.value.length, role: '溶剂', eq: '', mmol: null, mw: null, mwText: '', amountText: '', name: '', note: '' });
+  props.model.rows.push({
+    step: steps.value.length, role: '溶剂', eq: '', mmol: null, mw: null, mwText: '', amountText: '', name: '', note: '',
+    variable: inheritedVar('溶剂', null),
+  });
   props.notify();
 }
 

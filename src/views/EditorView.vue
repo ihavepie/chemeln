@@ -87,8 +87,33 @@ const reagent = reactive({ base: null, steps: [], rows: [] });
  * 条件筛选页（`#/screenings`）会从这里拆行，不用为每个条件再建一条实验记录。
  */
 const conds = ref([]);
-/* 记录里标成「变量」的那一行（筛配体时配体拎出来）：条件组第一列的表头 / 占位提示跟着它变 */
-const varLabel = computed(() => String((reagent.rows.find((r) => r.variable) || {}).variable || ''));
+/**
+ * 本次筛选的「变量集合」= 投料表里标成变量的行（`reagents.variable`）+ 记录级字段变量（温度 / 时间…）。
+ * 条件组的列、反应式箭头上的占位符（`[L]` / `[T]`）都从这一个来源来。
+ */
+const fieldVars = ref([]);   // [{key:'temperature', label:'T'}]
+const COND_FIELDS = [
+  { key: 'temperature', label: '温度', ph: '−40 °C' },
+  { key: 'duration', label: '时间', ph: '6 h' },
+  { key: 'atmosphere', label: '气氛', ph: 'N₂' },
+];
+const condVars = computed(() => {
+  const out = [];
+  for (const r of reagent.rows) {
+    if (!r.variable) continue;
+    if (out.some((v) => v.ph === r.variable)) continue;
+    out.push({ key: `r:${r.variable}`, ph: r.variable, label: r.variable, src: r.name || r.role || '' });
+  }
+  for (const f of fieldVars.value) out.push({ key: `f:${f.key}`, ph: f.label, label: f.label, src: f.key });
+  return out;
+});
+const varLabel = computed(() => condVars.value.map((v) => `[${v.ph}]`).join(' '));
+function toggleFieldVar(f) {
+  const i = fieldVars.value.findIndex((v) => v.key === f.key);
+  if (i >= 0) fieldVars.value.splice(i, 1);
+  else fieldVars.value.push({ key: f.key, label: { temperature: 'T', duration: 't', atmosphere: 'atm' }[f.key] || f.key });
+  notify();
+}
 
 const FIELD_KEYS = Object.keys(fields);
 
@@ -132,11 +157,13 @@ function fill(e) {
   fields.no_yield = Number(e.no_yield) === 1 ? 1 : 0;   // 0/1 开关，别让它变成 null
   fields.product_compound_id = e.product_compound_id ?? null;
 
+  fieldVars.value = (Array.isArray(e.field_vars) ? e.field_vars : []).map((v) => ({ key: v.key, label: v.label || v.key }));
   conds.value = (Array.isArray(e.conds) ? e.conds : []).map((c) => ({
     label: c.label || '',
     yield_pct: c.yield_pct ?? null,
     sel: c.sel || '',
     note: c.note || '',
+    vars: { ...(c.vars || {}) },
   }));
 
   const raw = Array.isArray(e.steps) ? e.steps : [];
@@ -417,15 +444,29 @@ function payload() {
   body.base_mmol = reagent.base;
   body.steps = reagent.steps.map((s) => ({ ...s }));
   body.reagents = reagent.rows.map(({ mwText, amountText, ...r }) => r);
+  body.field_vars = fieldVars.value.map((v) => ({ key: v.key, label: v.label }));
   body.conds = conds.value
-    .filter((c) => String(c.label || '').trim() || c.yield_pct != null || String(c.sel || '').trim() || String(c.note || '').trim())
-    .map((c) => ({ label: c.label || '', yield_pct: c.yield_pct ?? null, sel: c.sel || '', note: c.note || '' }));
+    .filter(
+      (c) =>
+        String(c.label || '').trim() ||
+        c.yield_pct != null ||
+        String(c.sel || '').trim() ||
+        String(c.note || '').trim() ||
+        Object.values(c.vars || {}).some((v) => String(v || '').trim())
+    )
+    .map((c) => ({
+      label: c.label || '',
+      yield_pct: c.yield_pct ?? null,
+      sel: c.sel || '',
+      note: c.note || '',
+      vars: Object.fromEntries(Object.entries(c.vars || {}).filter(([, v]) => String(v || '').trim())),
+    }));
   return body;
 }
 
 /** 条件组：加一行 / 删一行（删除前把焦点那格的值也一并丢掉） */
 function addCond() {
-  conds.value.push({ label: '', yield_pct: null, sel: '', note: '' });
+  conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: {} });
   notify();
 }
 function removeCond(i) {
@@ -443,7 +484,8 @@ async function undoSave(ev) {
   reagent.base = prev.base_mmol ?? null;
   if (Array.isArray(prev.steps) && prev.steps.length) reagent.steps = prev.steps.map((x) => ({ ...x }));
   if (Array.isArray(prev.reagents)) reagent.rows = prev.reagents.map((r) => toRow(r));
-  if (Array.isArray(prev.conds)) conds.value = prev.conds.map((c) => ({ ...c }));
+  if (Array.isArray(prev.conds)) conds.value = prev.conds.map((c) => ({ ...c, vars: { ...(c.vars || {}) } }));
+  if (Array.isArray(prev.field_vars)) fieldVars.value = prev.field_vars.map((v) => ({ ...v }));
   notify();
   try {
     await flush();
@@ -709,11 +751,13 @@ const liveScheme = ref('');
 const liveSigShown = ref('');
 /* sig 只看「会进这张图的字段」，别把密度 / 用量那些也塞进来——它们一变就白重画一次，
    页面一打开就能对得上缓存（化合物库还没读进来也不影响）。版本号用来让旧缓存失效。 */
-const SCHEME_SIG_VERSION = 'v10';  // 改了出图规则就加一，让旧缓存失效（v10：条件行折行 + 箭头封顶 + 结构放大）
+const SCHEME_SIG_VERSION = 'v11';  // 改了出图规则就加一，让旧缓存失效（v10：条件行折行 + 箭头封顶 + 结构放大）
 const liveSig = computed(() =>
   SCHEME_SIG_VERSION +
   JSON.stringify({
-    r: (reagent.rows || []).map((r) => [r.role || '', r.name || '', String(r.eq ?? ''), r.compound_id ?? '']),
+    // 变量（投料行的占位符 + 字段变量）也要进 sig：标了变量箭头就写 [L]/[T]，缓存得跟着失效
+    r: (reagent.rows || []).map((r) => [r.role || '', r.name || '', String(r.eq ?? ''), r.compound_id ?? '', r.variable || '']),
+    fv: (fieldVars.value || []).map((v) => v.key).join(','),
     s: fields.solvent || '',
     t: fields.temperature || '',
     d: fields.duration || '',
@@ -738,7 +782,7 @@ async function renderLive() {
   try {
     // 化合物库还没读进来时（刚打开页面）先读一次，否则底物挂不上结构、反应式是空的
     if (!(store.compounds && store.compounds.length)) await loadCompounds();
-    const parts = schemeParts({ ...fields, reagents: reagent.rows }, store.compounds || []);
+    const parts = schemeParts({ ...fields, field_vars: fieldVars.value, reagents: reagent.rows }, store.compounds || []);
     if (!parts.reactants.length) {
       liveScheme.value = '';
       liveSigShown.value = '';
@@ -1461,6 +1505,25 @@ const openAttachment = (id) => {
             <div class="sec-head">
               <h3>条件组</h3>
               <span v-if="conds.length" class="cond-count">{{ conds.length }} 个条件</span>
+              <span v-if="condVars.length" class="cond-vars">
+                变量
+                <span v-for="v in condVars" :key="v.key" class="cond-var" :title="v.src ? `来自：${v.src}` : ''">
+                  [{{ v.ph }}]
+                </span>
+              </span>
+              <span v-if="!exp.locked" class="cond-varbtns">
+                <button
+                  v-for="f in COND_FIELDS"
+                  :key="f.key"
+                  type="button"
+                  class="cond-varbtn"
+                  :class="{ on: fieldVars.some((v) => v.key === f.key) }"
+                  :title="fieldVars.some((v) => v.key === f.key) ? `取消「${f.label}」变量` : `把「${f.label}」当本次筛选的变量`"
+                  @click="toggleFieldVar(f)"
+                >
+                  {{ fieldVars.some((v) => v.key === f.key) ? `− ${f.label}` : `＋ ${f.label}` }}
+                </button>
+              </span>
               <span class="spacer" />
               <button v-if="!exp.locked" type="button" class="cond-add" @click="addCond">＋ 加条件</button>
             </div>
@@ -1468,7 +1531,10 @@ const openAttachment = (id) => {
               <thead>
                 <tr>
                   <th class="cond-idx">#</th>
-                  <th>{{ varLabel ? `变量 [${varLabel}]` : '改了什么' }}</th>
+                  <template v-if="condVars.length">
+                    <th v-for="v in condVars" :key="v.key">[{{ v.ph }}]</th>
+                  </template>
+                  <th v-else>改了什么</th>
                   <th class="cond-num">产率 %</th>
                   <th class="cond-num">选择性</th>
                   <th>备注</th>
@@ -1478,12 +1544,23 @@ const openAttachment = (id) => {
               <tbody>
                 <tr v-for="(c, i) in conds" :key="i">
                   <td class="cond-idx">{{ i + 1 }}</td>
-                  <td>
+                  <template v-if="condVars.length">
+                    <td v-for="v in condVars" :key="v.key">
+                      <input
+                        v-model="c.vars[v.ph]"
+                        class="cond-in"
+                        :disabled="exp.locked"
+                        :placeholder="v.ph === 'T' ? '−40 °C' : v.ph === 't' ? '6 h' : v.ph === 'L' ? 'XPhos' : v.ph"
+                        @input="notify()"
+                      />
+                    </td>
+                  </template>
+                  <td v-else>
                     <input
                       v-model="c.label"
                       class="cond-in"
                       :disabled="exp.locked"
-                      :placeholder="varLabel ? `这个条件用的 ${varLabel}（如 XPhos）` : '−40 °C / LDA 1.2 eq / DCM 代替 THF'"
+                      placeholder="−40 °C / LDA 1.2 eq / DCM 代替 THF"
                       @input="notify()"
                     />
                   </td>
