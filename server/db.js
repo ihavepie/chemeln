@@ -339,6 +339,9 @@ ensureColumn('reagents', 'step', 'step INTEGER NOT NULL DEFAULT 1');
 // 空着 = 还没核过（新试剂第一次进库会自动核一次，查不到的也记下，免得每次保存都去敲网）
 // 手填过的字段（`mw` / `density`，逗号分隔）：手动改过的值不再被联网核对覆盖
 ensureColumn('reagent_lib', 'manual', "manual TEXT NOT NULL DEFAULT ''");
+// 固体：**不按密度折体积**。PubChem 给的「Density」对固体是结晶密度（TsCl 1.3325），
+// 拿它把 4.29 g 折成「3.22 mL」是错的（用户报过），所以单记一个标记。
+ensureColumn('reagent_lib', 'solid', 'solid INTEGER NOT NULL DEFAULT 0');
 ensureColumn('reagent_lib', 'checked_at', 'checked_at TEXT');
 ensureColumn('reagent_lib', 'check_state', "check_state TEXT NOT NULL DEFAULT ''");
 // 投料行可以指向化合物库里的化合物；实验产物也可以

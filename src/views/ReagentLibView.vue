@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import Icon from '../components/Icon.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
+import { useRoute } from 'vue-router';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { variantText } from '../lib/reagent.js';
 import { LOOKUP_SITES } from '../lib/lookup.js';
@@ -74,7 +75,9 @@ import AppModal from '../components/AppModal.vue';
  * 浓度 / 密度，再折一个「1 mmol ≈ 多少 g / 多少 µL」，称量的时候直接照着抄。
  */
 const items = ref([]);
-const q = ref('');
+const route = useRoute();
+// 从投料表的「核对 → 去试剂库」跳过来时 ?q=试剂名，直接筛到那一个
+const q = ref(String(route.query.q || ''));
 const loading = ref(true);
 
 const shown = computed(() => {
@@ -84,6 +87,18 @@ const shown = computed(() => {
     (it) => String(it.name || '').toLowerCase().includes(k) || String(it.role || '').includes(k)
   );
 });
+
+/** 标成固体 / 液体：固体不按密度折体积（TsCl 这种结晶密度折出来是错的） */
+async function toggleSolid(it) {
+  const next = it.solid ? 0 : 1;
+  try {
+    await api.reagentPatch(it.key || it.name.toLowerCase(), { solid: next });
+    await load();
+    toast(next ? `「${it.name}」记成固体：不按密度折体积` : `「${it.name}」记成液体：按密度折体积`, 'ok', 2400);
+  } catch (e) {
+    toast(e.message || '没存上', 'err');
+  }
+}
 
 const solidCount = computed(() => items.value.filter((it) => it.mw && !it.per_mmol_ul).length);
 const liveCount = computed(() => items.value.filter((it) => it.live > 0).length);
@@ -334,7 +349,18 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                   </span>
                 </span>
               </td>
-              <td class="rl-role">{{ it.role || '—' }}</td>
+              <td class="rl-role">
+                {{ it.role || '—' }}
+                <button
+                  type="button"
+                  class="rl-state"
+                  :class="{ 'is-solid': it.solid }"
+                  :title="it.solid ? '现在按固体记（不折体积）；点一下改成液体' : '现在按液体记（会按密度折体积）；点一下改成固体'"
+                  @click.stop="toggleSolid(it)"
+                >
+                  {{ it.solid ? '固' : '液' }}
+                </button>
+              </td>
               <td class="n mono rl-edit" title="点一下自己填（填过就不再被核对覆盖）" @click.stop="editNumber(it, 'mw')">
                 <span v-if="it.mw == null" :class="{ 'rl-miss': it.checkState === 'miss' }">{{ it.checkState === 'miss' ? '查无' : '—' }}</span>
                 <template v-else>{{Number(it.mw).toFixed(2) }}</template>

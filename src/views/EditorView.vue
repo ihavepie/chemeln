@@ -418,7 +418,12 @@ function fixReagentRows(rows) {
       r.mwText = Number(d.mw).toFixed(2);
       touched = true;
     }
-    if (num(r.density) === null && saneDensity(d.density)) {
+    // 词库里标成「固体」的（TsCl 这类）：标上行，密度就不参与折体积了
+    if (d.solid && !r.solid) {
+      r.solid = 1;
+      touched = true;
+    }
+    if (!d.solid && num(r.density) === null && saneDensity(d.density)) {
       r.density = saneDensity(d.density);
       touched = true;
     }

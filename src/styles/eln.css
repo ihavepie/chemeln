@@ -8827,3 +8827,98 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   border-top: 1px dotted var(--line-2);
   padding-top: 10px;
 }
+
+/* ---------- 投料表「说明」格里那颗「核对」 ----------
+   平时不占地方（hover 才浮出来），点开是这个词条的小对照卡：
+   MW / 密度 / 固体还是液体，能当场改（固体不按密度折体积）。 */
+.sheet .rtable td.note-td { position: relative; }
+.sheet .rtable .note-check {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: var(--paper);
+  padding: 1px 3px;
+  font: inherit;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.sheet .rtable tr:hover .note-check { opacity: 1; }
+.sheet .rtable .note-check:hover { color: var(--accent); }
+.check-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 80;
+  width: 236px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(20, 18, 14, 0.12);
+  padding: 9px 11px 8px;
+  text-align: left;
+}
+.check-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dotted var(--line-2);
+}
+.check-nm { font-size: 12.5px; color: var(--ink); }
+.check-meta { font-size: 10px; color: var(--ink-4); }
+.check-line { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11.5px; color: var(--ink-2); }
+.check-cap {
+  flex: 0 0 28px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.check-hint { font-size: 10px; color: var(--ink-4); }
+.check-chip {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.check-chip.on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.35); background: #f7f0ea; }
+.check-acts { display: flex; gap: 6px; margin-top: 7px; }
+.check-act {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 5px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.check-act:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.32); }
+
+/* 试剂库行里那颗「固 / 液」小签：点一下切换（固体不按密度折体积） */
+.rl-state {
+  margin-left: 5px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0 5px;
+  font: inherit;
+  font-size: 9.5px;
+  line-height: 14px;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.rl-state:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.32); }
+.rl-state.is-solid { color: #8a5a3a; background: #f3e7dc; border-color: rgba(168, 71, 31, 0.25); }
+/* 「核对」浮层翻到上方（表格底部那几行下面放不下时） */
+.check-menu.is-up { top: auto; bottom: calc(100% + 4px); }

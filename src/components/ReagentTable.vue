@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import Icon from './Icon.vue';
 import AppModal from './AppModal.vue';
 import { toast, confirm as confirmDialog } from '../lib/feedback.js';
@@ -88,7 +88,8 @@ function applyDict(r, d) {
   }
   // 词库里记着的组分 / 密度也一起带出来（密度只给溶剂，固体带密度会算出 µL）
   if (d.role && (!r.role || r.role === '试剂')) r.role = d.role;
-  if (num(r.density) === null && r.role === '溶剂' && saneDensity(d.density)) r.density = saneDensity(d.density);
+  if (d.solid) r.solid = 1;                       // 词库标成固体的（TsCl 这类）不按密度折体积
+  if (!d.solid && num(r.density) === null && r.role === '溶剂' && saneDensity(d.density)) r.density = saneDensity(d.density);
   pickerClose();
   props.notify();
 }
@@ -142,7 +143,7 @@ function dictHits(q) {
   if (!k) return [];
   return reagentDict()
     .filter((d) => d && d.name && d.name.toLowerCase().includes(k))
-    .map((d) => ({ _dict: true, name: d.name, mw: d.mw, conc: d.conc, density: d.density, role: d.role }));
+    .map((d) => ({ _dict: true, name: d.name, mw: d.mw, conc: d.conc, density: d.density, role: d.role, solid: d.solid }));
 }
 
 async function pickerSearch(q) {
@@ -651,6 +652,56 @@ async function lookupName(r, key0) {
   props.notify();
 }
 
+/* ---- 「核对」小浮层（说明格里那颗小字）----
+   说明格里平时只有备注，鼠标移上去露一个「核对」：点开能看见这个词条在试剂库里记的
+   MW / 密度 / 形态（固体还是液体），当场能改——液体才按密度折体积，
+   固体（TsCl 这种）密度是结晶密度，折出来的 µL 是错的。 */
+const checkRow = ref(null);
+const checkBusy = ref(false);
+/** 浮层往哪边弹：表格底部那几行下面没地方，就翻到上面去 */
+const checkUp = ref(false);
+function hasName(r) {
+  return !!String(r && r.name ? r.name : '').trim();
+}
+function openCheck(r, ev) {
+  const same = checkRow.value === r;
+  checkRow.value = same ? null : r;
+  if (same) return;
+  // 注意：`currentTarget` 在事件派发结束就变成 null，所以**当场**抓，别等到 nextTick
+  const cell = ev && ev.currentTarget ? ev.currentTarget.closest('td') : null;
+  const box = cell ? cell.getBoundingClientRect() : null;
+  checkUp.value = !!box && window.innerHeight - box.bottom < 210;   // 下面放不下就往上翻
+}
+function onDocDown(ev) {
+  if (!checkRow.value) return;
+  if (ev.target.closest?.('.check-menu, .note-check')) return;
+  checkRow.value = null;
+}
+onMounted(() => document.addEventListener('mousedown', onDocDown));
+onBeforeUnmount(() => document.removeEventListener('mousedown', onDocDown));
+
+/** 标成固体 / 液体：写进试剂库（以后打这个名字都按这个来），并把这一行重算一遍 */
+async function setSolid(r, solid) {
+  const key = String(r.name || '').trim().toLowerCase();
+  r.solid = solid ? 1 : 0;
+  syncAmount(r);
+  props.notify();
+  if (!key) return;
+  try {
+    await api.reagentPatch(key, { solid: solid ? 1 : 0 });
+    toast(solid ? '已记成固体：以后不按密度折体积' : '已记成液体：按密度折体积', 'ok', 2200);
+  } catch (e) {
+    toast(e.message || '没存上（只对这条记录生效）', 'warn');
+  }
+}
+
+/** 去试剂库看这个词条的完整信息（新标签页，别把当前记录顶掉） */
+function openReagentLib(r) {
+  const name = String(r.name || '').trim();
+  if (!name) return;
+  window.open(`${location.origin}/#/reagents?q=${encodeURIComponent(name)}`, '_blank');
+}
+
 /** 名字格失焦：没手填过 MW 就按名字核对一次（缓存命中很快，不会每次都发请求） */
 function verifyName(r) {
   const key = String(r.name || '').trim();
@@ -674,10 +725,18 @@ async function recheck(r) {
     onMw(r);
     changed.push(`MW ${round(Number(info.mw), 2)}`);
   }
-  if (info.props && info.props.density) {
+  // 熔点能看出是固体的：PubChem 那个密度是结晶密度，不拿它折体积（TsCl 被折成 3.22 mL 就是这么来的）
+  const mp = String((info.props && info.props.mp) || '');
+  const solidMp = (mp.match(/(-?\d+(?:\.\d+)?)/) || [])[1];
+  const isSolid = solidMp !== undefined && Number(solidMp) >= 25;
+  if (isSolid) {
+    r.solid = 1;
+    changed.push(`熔点 ${mp}，按固体记（不折体积）`);
+  } else if (info.props && info.props.density) {
     const d = Number(String(info.props.density).replace(/[^\d.]/g, ''));
     if (d > 0) {
       r.density = d;
+      r.solid = 0;
       changed.push(`密度 ${round(d, 3)}`);
     }
   }
@@ -739,8 +798,10 @@ function onName(r, commit = false) {
     if (d) {
       if (num(d.conc) !== null) { r.mwText = `${round(d.conc, 2)}M`; onMw(r); }
       else if (num(d.mw) !== null) { r.mwText = Number(d.mw).toFixed(2); onMw(r); }
+      // 固体（词库里标了 solid 的）：密度不参与折体积
+      if (d.solid) r.solid = 1;
       // 密度不再只管「溶剂」：HFIP 这种液体添加剂也按体积量（否则只能写 g）
-      if (num(r.density) === null && saneDensity(d.density)) r.density = saneDensity(d.density);
+      if (!d.solid && num(r.density) === null && saneDensity(d.density)) r.density = saneDensity(d.density);
       // 角色只在还没挑过的时候才替他填（用户自己选的组分不被覆盖）
       if (d.role && (!r.role || r.role === '试剂')) r.role = d.role;
     }
@@ -1393,6 +1454,35 @@ function onDrop(ev) {
               </td>
               <td class="note-td">
                 <input class="note-cell" data-f="note" :value="r.note" :placeholder="firstRow === r ? '说明' : ''" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
+                <button
+                  v-if="!locked && hasName(r)"
+                  type="button"
+                  class="note-check noprint"
+                  :title="`核对「${r.name}」在试剂库里的分子量 / 密度 / 固体还是液体`"
+                  @click.stop="openCheck(r, $event)"
+                >
+                  核对
+                </button>
+                <div v-if="checkRow === r" class="check-menu" :class="{ 'is-up': checkUp }" @click.stop>
+                  <div class="check-name">
+                    <span class="check-nm">{{ r.name }}</span>
+                    <span class="check-meta mono">{{ r.mwText ? `MW ${r.mwText}` : 'MW 空着' }}</span>
+                  </div>
+                  <div class="check-line">
+                    <span class="check-cap">密度</span>
+                    <span class="mono">{{ saneDensity(r.density) || '—' }}</span>
+                    <span class="check-hint">{{ r.solid ? '按固体记（不折体积）' : '会按密度折成 mL / µL' }}</span>
+                  </div>
+                  <div class="check-line">
+                    <span class="check-cap">形态</span>
+                    <button type="button" class="check-chip" :class="{ on: r.solid }" @click="setSolid(r, 1)">固体</button>
+                    <button type="button" class="check-chip" :class="{ on: !r.solid }" @click="setSolid(r, 0)">液体</button>
+                  </div>
+                  <div class="check-acts">
+                    <button type="button" class="check-act" :disabled="checkBusy" @click="recheck(r)">按 PubChem 重查</button>
+                    <button type="button" class="check-act" @click="openReagentLib(r); checkRow = null">去试剂库</button>
+                  </div>
+                </div>
               </td>
               <td class="rowend">
                 <button v-if="!locked" class="del noprint" title="删除该行" @click="removeRow(r)"><Icon name="x" :size="12" /></button>

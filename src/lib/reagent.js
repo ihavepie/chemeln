@@ -103,7 +103,13 @@ export const saneDensity = (v) => {
  *  配体、碱、催化剂、底物基本都是固体，按 g 称——PubChem 给的密度常是预测值，
  *  拿来折 µL 会得出「RuPhos 1 mmol = 363 µL」这种没意义的数（用户报过）。 */
 const VOLUME_ROLES = new Set(['溶剂', '添加剂', '试剂']);
-export const densityUsable = (r) => (VOLUME_ROLES.has(String((r && r.role) || '').trim()) ? saneDensity(r && r.density) : null);
+export const densityUsable = (r) =>
+  // 标成「固体」的（TsCl 这类）：密度是结晶密度，不能拿来折体积
+  r && r.solid
+    ? null
+    : VOLUME_ROLES.has(String((r && r.role) || '').trim())
+      ? saneDensity(r && r.density)
+      : null;
 
 export function amountText(r) {
   const mmol = num(r.mmol);

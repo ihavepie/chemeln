@@ -992,12 +992,12 @@ function bootstrap(query = {}) {
   }
   // 试剂库里核对过的 MW / 密度也带上：记录删了、或者那一行当时没填 MW，下次打这个名字也能自动带出来
   for (const l of db
-    .prepare("SELECT key, name, role, mw, conc, density FROM reagent_lib WHERE trim(role) <> '底物'")
+    .prepare("SELECT key, name, role, mw, conc, density, solid FROM reagent_lib WHERE trim(role) <> '底物'")
     .all()) {
     const prev = seen.get(l.key);
     if (!prev) {
-      if (l.mw != null || l.density != null || l.conc != null) {
-        seen.set(l.key, { name: l.name, role: str(l.role), mw: l.mw, conc: l.conc, density: l.density });
+      if (l.mw != null || l.density != null || l.conc != null || l.solid) {
+        seen.set(l.key, { name: l.name, role: str(l.role), mw: l.mw, conc: l.conc, density: l.density, solid: l.solid ? 1 : 0 });
       }
       continue;
     }
@@ -1006,6 +1006,7 @@ function bootstrap(query = {}) {
     if (prev.mw == null || (l.mw != null && coarseMw(prev.mw))) prev.mw = l.mw;
     if (prev.conc == null) prev.conc = l.conc;
     if (prev.density == null) prev.density = l.density;
+    if (l.solid) prev.solid = 1;                   // 库里的「固体」标记更权威（记录那行可能没标）
     if (!prev.role) prev.role = str(l.role);
   }
   const reagentDict = [...seen.values()].slice(0, 600);
@@ -4406,6 +4407,21 @@ async function pubchemLookup(kind, value) {
   };
 }
 
+/**
+ * 熔点文本 → 室温下是固体吗：「68-69」「65 °C」「1.4 at 20 °C」里的**第一个温度**说了算。
+ * ≥ 25 ℃ 当固体（PubChem 的 Density 对固体是结晶密度，不能拿来折体积）；
+ * ≤ 20 ℃ 当液体；认不出来返回 null（那就别乱改）。
+ */
+function mpIsSolid(mp) {
+  const m = String(mp || '').match(/(-?\d+(?:\.\d+)?)\s*(°?\s*C|℃)/i) || String(mp || '').match(/(-?\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const v = Number(m[1]);
+  if (!Number.isFinite(v)) return null;
+  if (v >= 25) return true;
+  if (v <= 20) return false;
+  return null;
+}
+
 /** PubChem 的「实验性质」那一节：熔点 / 沸点 / 密度 / 闪点 / 性状 / 溶解度
     （PUG REST 的 property 接口没有这些，只能走 pug_view，一次取一整节，约 78 KB） */
 const PUG_VIEW = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound';
@@ -4621,7 +4637,7 @@ function reagentLibRows(project, kw) {
   const projectArgs = project ? [project] : [];
   const lib = db
     .prepare(
-      `SELECT l.key, l.name, l.role, l.mw, l.conc, l.density, l.updated_at, l.checked_at, l.check_state,
+      `SELECT l.key, l.name, l.role, l.mw, l.conc, l.density, l.solid, l.updated_at, l.checked_at, l.check_state,
               (SELECT COUNT(*) FROM reagent_uses u WHERE u.key = l.key) AS used,
               (SELECT COUNT(DISTINCT r.exp_id) FROM reagents r JOIN experiments e ON e.id = r.exp_id
                 WHERE lower(trim(r.name)) = l.key ${project ? 'AND e.project = ?' : ''}) AS live,
@@ -4675,6 +4691,7 @@ function reagentLibRows(project, kw) {
         mw,
         conc: it.conc,
         density,
+        solid: it.solid ? 1 : 0,
         used: it.used,
         live: it.live,
         lastAt: it.last_at || '',
@@ -4690,7 +4707,7 @@ function reagentLibRows(project, kw) {
         // 「1 mmol ≈ 多少 µL」只对按体积量的组分有意义（溶剂 / 添加剂 / 普通试剂）；
         // 配体 / 碱 / 催化剂多是固体，按 g 称，别给它折 µL（RuPhos 被折成 363 µL）
         per_mmol_ul:
-          mw && density && DENSITY_ROLES.has(str(it.role).trim())
+          mw && density && !it.solid && DENSITY_ROLES.has(str(it.role).trim())
             ? Math.round((mw / density) * 10) / 10
             : null,
       };
@@ -4791,8 +4808,11 @@ async function verifyReagent(name, opts = {}) {
     if (calc != null) mw = calc;      // 分子式算出来的比某些源给的数字可信
   }
   if (mw == null && found && info.smiles) mw = mwFromSmiles(info.smiles);
+  // 熔点能看出来是固体的话（≥ 25 ℃），PubChem 那个「Density」就是结晶密度，
+  // 拿它折体积会得出「TsCl 4.29 g = 3.22 mL」这种错数 —— 不写密度、标成固体。
+  const solidFlag = mpIsSolid(info.props && info.props.mp);
   let density = null;
-  if (found && info.props && info.props.density) {
+  if (found && info.props && info.props.density && solidFlag !== true) {
     const d = Number(String(info.props.density).replace(/[^\d.]/g, ''));
     if (Number.isFinite(d) && d >= 0.3 && d <= 3.5) density = d;
   }
@@ -4802,13 +4822,14 @@ async function verifyReagent(name, opts = {}) {
   const coarse = prevMw === null || Math.round(prevMw * 100) % 10 === 0;
   db.prepare(
     `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density),
-            checked_at = ?, check_state = ?, updated_at = ? WHERE key = ?`
+            checked_at = ?, check_state = ?, updated_at = ?, solid = ? WHERE key = ?`
   ).run(
     !manual.has('mw') && mw != null && coarse ? mw : null,
-    manual.has('density') ? null : density,
+    manual.has('density') || solidFlag === true ? null : density,
     ts,
     found ? 'ok' : 'miss',
     ts,
+    solidFlag === null ? (row && row.solid ? 1 : 0) : solidFlag ? 1 : 0,
     key
   );
   return {
@@ -4817,6 +4838,8 @@ async function verifyReagent(name, opts = {}) {
     ok: found,
     state: found ? 'ok' : 'miss',
     source: info.source || 'pubchem',
+    solid: solidFlag,
+    mp: (info.props && info.props.mp) || '',
     mw,
     formula: info.formula || '',
     density,
@@ -4921,6 +4944,13 @@ route('PATCH', '/api/reagents/:key', async (req, res, params) => {
 
   // 手填 MW / 密度（只改这几个字段，不动名字）：填过就标记成 manual，
   // 以后「核对 / 自动核对」都不会再把它覆盖掉
+  // 固体标记：跟手填 MW / 密度分开处理（它不改数值，只决定要不要按密度折体积）
+  if (body.solid !== undefined) {
+    const solid = body.solid ? 1 : 0;
+    db.prepare('UPDATE reagent_lib SET solid = ?, updated_at = ? WHERE key = ?').run(solid, nowISO(), key);
+    return ok(res, { key, solid });
+  }
+
   const hasMarks = body.mw !== undefined || body.density !== undefined || body.conc !== undefined;
   if (hasMarks) {
     const marks = new Set(String(lib.manual || '').split(',').map((x) => x.trim()).filter(Boolean));
