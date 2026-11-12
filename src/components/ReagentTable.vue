@@ -1301,6 +1301,14 @@ function onDrop(ev) {
             </tr>
           </template>
         </template>
+              <!-- 「条件」跟投料表是同一张表：温度 / 时间 / 气氛 / 装置 / 光照横着排在最后一行 -->
+        <tr class="cond-attach">
+          <td class="grip-cell" />
+          <td class="cond-attach-label">条件</td>
+          <td colspan="7" class="cond-attach-cell">
+            <slot name="cond" />
+          </td>
+        </tr>
       </tbody>
       <tfoot>
         <tr class="rtable-total">
@@ -1408,6 +1416,5 @@ function onDrop(ev) {
       <div class="hint" style="margin-top: 8px">点击即选用该化合物；<kbd>Esc</kbd> 或点击对话框外侧关闭。</div>
     </AppModal>
 
-    <slot name="cond" />
   </section>
 </template>

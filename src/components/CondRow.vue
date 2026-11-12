@@ -62,67 +62,60 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <table class="rtable cond-table">
-    <colgroup>
-      <col v-for="f in fields" :key="f.key" :class="f.cls" />
-    </colgroup>
-    <thead>
-      <tr>
-        <th v-for="f in fields" :key="f.key">
-          {{ f.label }}
-          <!-- 这一栏当「筛选变量」用：标签旁边一颗小开关，开了就在箭头上写 [T] / [t] / [atm] -->
+  <!-- 这一块现在长在投料表的最后一行里（`条件` 那一行）：五个字段横着排，格子内联小标签 -->
+  <div class="cond-inline">
+    <div v-for="f in fields" :key="f.key" class="cond-f">
+      <span class="cond-f-label">
+        {{ f.label }}
+        <!-- 这一栏当「筛选变量」用：标签旁边一颗小开关，开了就在箭头上写 [T] / [t] / [atm] -->
+        <button
+          v-if="VAR_KEYS.has(f.key) && !locked"
+          type="button"
+          class="cond-var-tog"
+          :class="{ on: fieldVars.some((v) => v.key === f.key) }"
+          :title="fieldVars.some((v) => v.key === f.key) ? '取消这个变量（条件组里对应的列会消失）' : '把这一栏当本次筛选的变量'"
+          @click.stop="emit('toggle-var', f)"
+        >
+          {{ fieldVars.some((v) => v.key === f.key) ? `[${(fieldVars.find((v) => v.key === f.key) || {}).label}]` : '变量' }}
+        </button>
+      </span>
+      <span class="cond-f-val">
+        <span v-if="f.key in fixed" class="cond-fixed" title="来自投料表">{{ fixed[f.key] || '—' }}</span>
+        <template v-else>
+          <input
+            :class="{ 'is-var': fieldVars.some((v) => v.key === f.key) }"
+            :value="model[f.key]"
+            :title="model[f.key] || ''"
+            :placeholder="f.ph"
+            :disabled="locked"
+            spellcheck="false"
+            @input="onInput($event, f)"
+            @change="model[f.key] = $event.target.value; notify()"
+          />
           <button
-            v-if="VAR_KEYS.has(f.key) && !locked"
+            v-if="!locked"
             type="button"
-            class="cond-var-tog"
-            :class="{ on: fieldVars.some((v) => v.key === f.key) }"
-            :title="fieldVars.some((v) => v.key === f.key) ? '取消这个变量（条件组里对应的列会消失）' : '把这一栏当本次筛选的变量'"
-            @click.stop="emit('toggle-var', f)"
+            class="cond-caret"
+            aria-label="快速选择"
+            @click.stop="open = open === f.key ? '' : f.key"
           >
-            {{ fieldVars.some((v) => v.key === f.key) ? `[${(fieldVars.find((v) => v.key === f.key) || {}).label}]` : '变量' }}
+            <Icon name="down" :size="10" />
           </button>
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td v-for="f in fields" :key="f.key" class="cond-cell">
-          <span v-if="f.key in fixed" class="cond-fixed" title="来自投料表">{{ fixed[f.key] || '—' }}</span>
-          <template v-else>
-            <input
-              :class="{ 'is-var': fieldVars.some((v) => v.key === f.key) }"
-              :value="model[f.key]"
-              :placeholder="f.ph"
-              :disabled="locked"
-              spellcheck="false"
-              @input="onInput($event, f)"
-              @change="model[f.key] = $event.target.value; notify()"
-            />
-            <button
-              v-if="!locked"
-              type="button"
-              class="cond-caret"
-              aria-label="快速选择"
-              @click.stop="open = open === f.key ? '' : f.key"
-            >
-              <Icon name="down" :size="10" />
-            </button>
 
-            <div v-if="open === f.key" class="qmenu cond-menu" @click.stop>
-              <button
-                v-for="v in optionsFor(f.key)"
-                :key="v"
-                type="button"
-                class="qchip"
-                :aria-selected="String(model[f.key] || '') === v"
-                @click="pick(f.key, v)"
-              >
-                {{ v }}
-              </button>
-            </div>
-          </template>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+          <div v-if="open === f.key" class="qmenu cond-menu" @click.stop>
+            <button
+              v-for="v in optionsFor(f.key)"
+              :key="v"
+              type="button"
+              class="qchip"
+              :aria-selected="String(model[f.key] || '') === v"
+              @click="pick(f.key, v)"
+            >
+              {{ v }}
+            </button>
+          </div>
+        </template>
+      </span>
+    </div>
+  </div>
 </template>

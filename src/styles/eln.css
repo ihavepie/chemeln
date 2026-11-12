@@ -7897,7 +7897,7 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   font-family: var(--mono); font-size: 8.5px; line-height: 1;
   padding: 2px 5px; border-radius: 999px;
   border: 1px solid transparent; background: transparent;
-  color: #bdb8ae; cursor: pointer;
+  color: #bdb8ae; cursor: pointer; flex: 0 0 auto;
   /* 平时就露出来一点（藏起来的话根本不知道这栏能当变量），hover 才变清楚 */
   opacity: 0.5; transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
@@ -7909,3 +7909,41 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 /* 变量那一格填的是「标准条件」，但箭头／条件组里显示的是占位符 → 给个淡提示色 */
 .cond-cell input.is-var { color: var(--accent-ink); }
 .cond-cell input.is-var::placeholder { color: #d8c3b6; }
+
+/* 「条件」那一行并进投料表以后的样子：左边一栏写「条件」，右边五个字段横向排开。
+   标签做成格子内的小字（不再单独一条表头带），整块跟投料表同一张表、同一套边框。 */
+.rtable .cond-attach-label {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em;
+  color: var(--ink-4); padding-left: 6px; vertical-align: middle; white-space: nowrap;
+}
+.rtable .cond-attach-cell { padding: 4px 6px 5px; vertical-align: middle; }
+.rtable .cond-attach { border-top: 1px solid var(--line-2); }
+.cond-inline {
+  display: grid;
+  /* 气氛 / 容器 和 装置 / 器皿 的标签最长，给它们宽一点；标签一律不换行 */
+  grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr;
+  gap: 3px 14px;
+}
+.cond-f { min-width: 0; }
+.cond-f-label {
+  display: flex; align-items: center; gap: 4px;
+  font-family: var(--mono); font-size: 8.5px; color: var(--ink-4); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cond-f-val { position: relative; display: flex; align-items: center; }
+.cond-f-val input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid transparent; border-radius: 4px; background: transparent;
+  padding: 2px 16px 2px 2px; font: inherit; font-size: 12.5px; color: inherit;
+}
+.cond-f-val input:hover { background: #f8f7f2; }
+.cond-f-val input:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
+.cond-f-val input.is-var { color: var(--accent-ink); }
+.cond-f-val .cond-fixed { font-size: 12.5px; color: var(--ink-3); padding-left: 2px; }
+/* 下箭头贴着格的右边（不占输入框的宽度，不然「N₂，封管」这种长值会被挤掉半截） */
+.cond-f-val .cond-caret {
+  position: absolute; right: 1px; top: 50%; transform: translateY(-50%);
+  opacity: 0.45;
+}
+.cond-f:hover .cond-caret, .cond-f:focus-within .cond-caret { opacity: 1; }
+.cond-f-val input { padding-right: 15px; }
