@@ -189,7 +189,7 @@ function onYieldInput(ev, r) {
       <thead>
         <tr>
           <th v-if="multi" />
-          <th>产物名称</th><th v-if="!multi">性状</th><th class="n">产物 MW</th>
+          <th class="r-name">产物名称</th><th v-if="!multi">性状</th><th class="n">产物 MW</th>
           <th class="n">质量 / g</th>
           <th class="n">
             <span class="th-with-btn"
@@ -220,15 +220,8 @@ function onYieldInput(ev, r) {
           <td v-if="multi" class="res-step-cell">{{ r.label }}</td>
           <td>
             <div class="pick-wrap">
-              <!-- 名字在前、化合物标签在后：表头写的是「产物名称」，名字要跟表头左对齐
-                   （标签放前面会把名字顶到右边，整列看着跟表头错开一截） -->
-              <input
-                :value="r.rm.product_name"
-                :placeholder="multi ? (r.last ? '终产物' : '中间体') : 'C'"
-                :disabled="locked"
-                @input="r.rm.product_name = $event.target.value; notify()"
-                @change="notify()"
-              />
+              <!-- 化合物小签还在名字左边；它占的是一个**定宽**的槽（`--res-tag-w`），
+                   名字因此每行都从同一个位置开始，表头也对齐到这个位置上 -->
               <span v-if="linkedOf(r.rm)" class="prod-link">
                 <span
                   class="cmp-tag"
@@ -238,8 +231,16 @@ function onYieldInput(ev, r) {
                 >
                 <button v-if="!locked" class="cmp-unlink noprint" title="解除关联" @click.stop="unlink(r)"><Icon name="x" :size="9" /></button>
               </span>
+              <span v-else class="prod-slot" />
+              <input
+                :value="r.rm.product_name"
+                :placeholder="multi ? (r.last ? '终产物' : '中间体') : 'C'"
+                :disabled="locked"
+                @input="r.rm.product_name = $event.target.value; notify()"
+                @change="notify()"
+              />
               <button
-                v-else-if="!locked"
+                v-if="!locked && !linkedOf(r.rm)"
                 type="button"
                 class="pick-btn noprint"
                 title="从化合物库选"

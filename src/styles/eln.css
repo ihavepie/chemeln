@@ -9156,6 +9156,21 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 
 /* 结果表的数字列表头：右内边距跟格子里输入框的文字对齐（9px = 格子 3px + 输入框 6px） */
 .sheet .rtable.res-table thead th.n { padding-right: 9px; }
+/* 产物那一列：左边留一个定宽槽给小签（`--res-tag-w`），名字每行都从同一个位置起排；
+   表头按同样的偏移左缩进，就正好压在名字上面（小签宽窄不一会把名字顶得忽左忽右，踩过） */
+.pick-wrap .prod-slot,
+.pick-wrap .prod-link { flex: 0 0 var(--res-tag-w, 46px); min-width: 0; }
+.pick-wrap .prod-link { position: relative; justify-content: flex-start; }
+/* 小签最多占满这个槽（号长就省略号），解绑的 × 挂着 hover 才出现、不占宽度 */
+.pick-wrap .prod-link .cmp-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-wrap .prod-link .cmp-unlink {
+  position: absolute;
+  right: -9px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--paper);
+}
+.sheet .rtable.res-table thead th.r-name { padding-left: calc(var(--res-tag-w, 46px) + 12px); }
 /* 单步那条结果：产物名后面还要挂化合物小签，名字列表窄了名会被切（「Ts苄基环丁烷」就切过），
    从「性状 / 选择性」两列里匀一点出来 */
 .sheet .res-table:not(.is-multi) .r-appear { width: 12%; }
