@@ -9105,21 +9105,35 @@ body.is-picker-open .editor { overscroll-behavior: none; }
    「第 N 步」→ 这一步的条件行 → 这一步的列头 → 这一步的投料行，
    两步就是两张表（列宽还是同一套 colgroup，所以两张表的列是对齐的）。 */
 .rtable tr.step-cond-row > td { padding: 0 !important; }
-/* 单步那条条件行是六列 grid（多出来的一列给反应规模让位），多步这里五格铺满 */
+/* 单步那条条件行是六列 grid（多出来的一列给反应规模让位），多步这里五格铺满；
+   多步的每条表都带着条件行，所以这行压紧一点（值 11.5px，跟投料表的数字一个字号） */
 .step-cond-row .cond-above {
   grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr;
-  padding: 2px 2px 6px;
+  padding: 0 2px 3px;
+  gap: 0 14px;
 }
-/* 每一步自己的列头：跟主表头同一套字，底色淡一点，别跟上面的「第 N 步」抢 */
+.step-cond-row .cond-f-label { font-size: 8px; line-height: 1.4; }
+.step-cond-row .cond-f-val input { font-size: 11.5px; padding: 2px 4px; }
+/* 每一步的条件行不再挂「变量」小开关：筛条件的变量是整条记录的事，多步里摆两遍只是噪音 */
+.step-cond-row .cond-var-tog { display: none; }
+/* 每一步自己的列头：不铺色带，只留一条细线和那排小字（两张表各一份，铺底色会连成三道横杠） */
 .sheet .rtable tr.step-cols > th {
-  background: #f7f5ee;
-  border-bottom: 1px solid #e5e2d9;
-  font-weight: 500;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  background: transparent;
+  border-top: 1px solid #eeede7;
+  border-bottom: none;
+  font-size: 8.5px;
+  font-weight: 400;
+  color: #9a978f;
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
-/* 两张表之间留一段空：上一张表最后一行 → 虚线 → 下一张的「第 N 步」 */
-.sheet .rtable tr.step-head[data-step]:not([data-step='1']) .step-line { margin-top: 14px; }
+/* 两张表之间留一点空：上一张表最后一行 → 虚线 → 下一张的「第 N 步」 */
+.sheet .rtable tr.step-head[data-step]:not([data-step='1']) .step-line { margin-top: 9px; }
+/* 多步的「第 N 步」：一条虚线 + 一个小签，别再有右边那截格子（产物已经挪到结果表里） */
+.sheet .rtable tr.step-head[data-step]:not([data-step='1']) td { padding-top: 4px; }
+/* 两步连着两张表，每个步骤头再压一点，别一步一块大空白 */
+.sheet .rtable tr.step-head[data-step] td { padding-bottom: 0; }
+.sheet .rtable tr.step-head[data-step] .step-line { min-height: 15px; }
 
 /* 结果那张表：一步一行，左边挂一个「第 N 步」的小签 */
 .res-table .r-step { width: 48px; }

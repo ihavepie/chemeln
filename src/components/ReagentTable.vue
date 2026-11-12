@@ -1274,8 +1274,9 @@ function onDrop(ev) {
         <col class="c-grip" /><col class="c-role" /><col class="c-name" /><col class="c-mw" />
         <col class="c-eq" /><col class="c-mmol" /><col class="c-amt" /><col class="c-note" /><col class="c-del" />
       </colgroup>
-      <!-- 单步记录用这条表头；一步以上时每个步骤各带一份（读起来就是两张表，列也还是对齐的） -->
-      <thead v-if="singleStep">
+      <!-- 列头整张表只有一条：两步的列一模一样，每步再抄一遍那排小字只是噪音
+           （两张表靠「第 N 步」那条虚线和各自的投料行分开） -->
+      <thead>
         <tr>
           <th class="grip-cell" />
           <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
@@ -1295,19 +1296,10 @@ function onDrop(ev) {
                 <button type="button" class="step-caret noprint" @click="toggleCollapse(si)"><Icon name="chevron" :size="11" /></button>
                 <span class="step-no">第 {{ si + 1 }} 步</span>
                 <input class="step-label" :value="s.label" placeholder="本步内容" :disabled="locked" @change="onStepField(si, 'label', $event.target.value)" />
-                <!-- 一步以上：跟「变量」那条虚线一个路子——一条虚线隔开，右边挂这一步的两个关键格子 -->
+                <!-- 一步以上：跟「变量」那条虚线一个路子——一条虚线把这一步和下一步分开
+                     （这一步的产物（中间体）写在下面「结果」表对应那一行里，这里不再重复一次） -->
                 <template v-if="steps.length > 1">
                   <span class="step-rule" />
-                  <template v-if="si < steps.length - 1">
-                    <span class="step-tag">产物</span>
-                    <input
-                      class="step-prod"
-                      :value="s.product_name"
-                      placeholder="中间体"
-                      :disabled="locked"
-                      @change="onStepField(si, 'product_name', $event.target.value)"
-                    />
-                  </template>
                 </template>
                 <template v-else>
                   <template v-if="s.condition">
@@ -1347,20 +1339,12 @@ function onDrop(ev) {
             </td>
           </tr>
 
-          <!-- 一步以上：这一步的条件行 + 这一步自己的列表头，就贴在它的「第 N 步」下面
-               （用户：条件表和投料表一起，两步分别一张） -->
-          <template v-if="!singleStep">
-            <tr v-if="$slots.cond" class="step-cond-row">
-              <td colspan="9">
-                <div class="cond-above"><slot name="cond" :step="si" /></div>
-              </td>
-            </tr>
-            <tr class="step-cols">
-              <th class="grip-cell" />
-              <th>组分</th><th>试剂</th><th class="n">MW / 浓度</th>
-              <th class="n">当量</th><th class="n">mmol</th><th class="n">用量</th><th>说明</th><th class="noprint" />
-            </tr>
-          </template>
+          <!-- 一步以上：这一步的条件行紧贴着自己的投料行（用户：条件表和投料表一起，两步分别一个） -->
+          <tr v-if="!singleStep && $slots.cond" class="step-cond-row">
+            <td colspan="9">
+              <div class="cond-above"><slot name="cond" :step="si" /></div>
+            </td>
+          </tr>
 
           <template v-if="!collapsed.has(si)">
             <tr
@@ -1518,7 +1502,7 @@ function onDrop(ev) {
                 <input class="n calc amount-cell" data-f="amount" :value="r.amountText" :disabled="locked" @input="onAmountInput($event, r)" @change="onAmount(r)" @focus="focusHint(r, 'amount'); $event.target.select()" @blur="onAmount(r); blurHint()" @keydown="onKeydown($event, r, 'amount')" />
               </td>
               <td class="note-td">
-                <input class="note-cell" data-f="note" :value="r.note" :placeholder="firstRow === r ? '说明' : ''" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
+                <input class="note-cell" data-f="note" :value="r.note" placeholder="" :disabled="locked" @input="r.note = $event.target.value" @change="notify()" />
                 <button
                   v-if="!locked && showCheck && hasName(r)"
                   type="button"
