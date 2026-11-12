@@ -9,6 +9,7 @@ import { api } from '../api.js';
 import { prompt, toast, confirm } from '../lib/feedback.js';
 import { SOURCES } from '../lib/sctfields.js';
 import { schemeParts } from '../lib/expScheme.js';
+import { entriesFromPicked } from '../lib/screenEntries.js';
 import DocGrip from '../components/DocGrip.vue';
 
 /**
@@ -93,7 +94,7 @@ function save() {
       await api.saveScreening(id.value, {
         title: s.value.title,
         vars: fields.value,
-        entries: rows.value.map((r) => ({ exp_id: r.exp_id, cells: r.cells })),
+        entries: rows.value.map((r) => ({ exp_id: r.exp_id, cond: r.cond ?? null, cells: r.cells })),
       });
     } catch (e) {
       toast(e.message || '存不了', 'err');
@@ -104,9 +105,14 @@ function save() {
 }
 
 /* ---- 行 ---- */
-function addRows(picked) {
+async function addRows(picked) {
   pickOpen.value = false;
-  for (const expId of picked) if (!rows.value.some((r) => r.exp_id === expId)) rows.value.push({ exp_id: expId, cells: {}, exp: null });
+  // 有条件组的记录按条件展开（一行一个条件）；已经在这张表里的（同一条记录 + 同一个条件）跳过
+  const entries = await entriesFromPicked(picked);
+  for (const e of entries) {
+    if (rows.value.some((r) => r.exp_id === e.exp_id && (r.cond ?? null) === (e.cond ?? null))) continue;
+    rows.value.push({ ...e, exp: null });
+  }
   save();
   void load();
 }

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import ExpPick from '../components/ExpPick.vue';
+import { entriesFromPicked } from '../lib/screenEntries.js';
 import ScreeningTable from '../components/ScreeningTable.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
@@ -84,7 +85,7 @@ async function createTable(picked) {
   try {
     const sc = await api.createScreening({
       title: '未命名条件筛选',
-      exp_ids: picked,
+      entries: await entriesFromPicked(picked),
       vars: DEFAULT_FIELDS,
       project: store.project,
     });
@@ -99,7 +100,7 @@ async function asTable(g) {
   try {
     const sc = await api.createScreening({
       title: headOf(g),
-      exp_ids: g.members.map((m) => m.id),
+      entries: await entriesFromPicked(g.members.map((m) => m.id)),
       vars: DEFAULT_FIELDS,
       project: store.project,
     });

@@ -46,14 +46,19 @@ export const reagentText = (exp) =>
     .join(' · ');
 
 /** 自动列在某一行的值 */
-export function autoValue(source, exp, base) {
+export function autoValue(source, exp, base, cond) {
   if (!exp) return '';
   // 这一格是照文献表写的（`none` = 基准那条，`same` = 条件没动），表里全是英文口径
   if (source === 'variation') {
+    // 这一行是记录「条件组」里的某个条件：它自己就写着「改了什么」，不用再跟基准比
+    if (cond) return String(cond.label || '').trim() || 'same';
     if (!base || base.id === exp.id) return 'none';
     const v = variations(base, exp);
     return v.length ? v.join(' · ') : 'same';
   }
+  // 条件组里的产率 / 选择性优先用这一行自己填的，没填才回落到整条记录
+  if (source === 'yield' && cond && !isEmpty(cond.yield_pct)) return `${round(cond.yield_pct, 1)}%`;
+  if (source === 'sel' && cond && String(cond.sel || '').trim()) return String(cond.sel).trim();
   switch (source) {
     case 'reagent':
       return reagentText(exp);

@@ -7815,3 +7815,38 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 @media (max-width: 820px) {
   .phone-cmp { max-width: none; }
 }
+
+/* 记录页「条件组」：一次筛选批次里的 N 个条件（一行一个）。
+   刻意做得比投料表轻：只写「改了什么 + 产率 / 选择性 / 备注」，不加行线、不套卡片，
+   跟结果块是同一节（它本来就是结果的一部分）。 */
+.cond-group .sec-head { display: flex; align-items: baseline; gap: 8px; }
+.cond-count { font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
+.cond-add {
+  font-family: var(--mono); font-size: 10px; line-height: 1;
+  padding: 4px 9px; border-radius: 999px; border: 1px solid transparent;
+  background: #f4f2ee; color: var(--ink-2); cursor: pointer;
+}
+.cond-add:hover { background: #ece9e2; color: var(--ink); }
+.cond-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cond-table th {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; font-weight: 500;
+  color: var(--ink-4); text-align: left; padding: 0 4px 4px; border-bottom: 1px solid var(--line-2);
+}
+.cond-table td { padding: 2px 4px; }
+.cond-table .cond-idx { width: 22px; font-family: var(--mono); font-size: 10px; color: var(--ink-4); text-align: center; }
+.cond-table .cond-num { width: 84px; text-align: right; }
+.cond-table th.cond-num { text-align: right; }
+.cond-table .cond-del { width: 20px; }
+.cond-in {
+  width: 100%; box-sizing: border-box; border: 1px solid transparent; border-radius: 5px;
+  background: transparent; padding: 3px 5px; font: inherit; color: inherit;
+}
+.cond-in:hover { background: #f8f7f2; }
+.cond-in:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
+.cond-in.is-num { text-align: right; }
+.cond-x { border: 0; background: none; color: var(--ink-4); cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 4px; }
+.cond-x:hover { color: var(--accent); }
+.cond-hint { margin: 2px 0 0; font-size: 11px; color: var(--ink-4); }
+
+/* 筛选表：同一条记录拆出来的第几个条件（记录页「条件组」的第 N 行）——跟在编号后面，淡一点 */
+.sct-cond { font-family: var(--mono); font-size: 10px; color: var(--accent-ink); margin-left: 2px; }

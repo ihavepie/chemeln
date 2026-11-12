@@ -245,6 +245,9 @@ function ensureColumn(table, name, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
   if (!cols.includes(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
 }
+/* 条件组：一次筛选批次里的 N 个条件（一条记录 = 一次筛选，共享投料表 / 一张 TLC 板）。
+   `[{label, yield_pct, sel, note}]` —— 筛选表从这里拆行，不用为每个条件再建一条记录。 */
+ensureColumn('experiments', 'conds_json', "conds_json TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('experiments', 'operator', "operator TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'ambient_temp', "ambient_temp TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'ambient_humid', "ambient_humid TEXT NOT NULL DEFAULT ''");

@@ -55,7 +55,7 @@ const hasStd = computed(() => !!props.scheme);
 
 // 表头已经写了单位（产率 [%]），格子里就不再重复一个 %——文献里的数字是裸的
 const cell = (f, r) => {
-  const v = isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value);
+  const v = isManual(f) ? r.cells[f.key] || '' : autoValue(f.source, r.exp, base.value, r.cond_value);
   return unitOf(f) && typeof v === 'string' ? v.replace(/\s*%\s*$/, '') : v;
 };
 </script>
@@ -107,6 +107,8 @@ const cell = (f, r) => {
           <td class="sct-c-fix sct-sub">
             <button v-if="r.exp" class="linklike" @click="emit('open', r)">{{ r.exp.code }}</button>
             <span v-else class="mono muted">#{{ r.exp_id }}</span>
+            <!-- 同一批筛选里的第几个条件（记录页「条件组」的第 N 行） -->
+            <span v-if="r.cond != null" class="sct-cond" :title="r.cond_value?.label || ''">· {{ r.cond + 1 }}</span>
             <!-- 记录页那个「实验名」多半是空的（编号才是日常叫法），有才跟在编号后面 -->
             <span v-if="r.exp && r.exp.title" class="sct-title">{{ r.exp.title }}</span>
           </td>

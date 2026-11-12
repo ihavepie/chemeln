@@ -139,7 +139,7 @@ const EXP_COLUMNS = [
   'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
   'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles', 'lit_note',
-  'no_yield', 'apparatus', 'light', 'kind',
+  'no_yield', 'apparatus', 'light', 'kind', 'conds_json',
 ];
 
 const NUMERIC_COLUMNS = new Set([
@@ -170,10 +170,68 @@ function parseSteps(raw) {
   }
 }
 
+/**
+ * 条件组（`conds_json`）：一次筛选里的 N 个条件。
+ * 每个条件只需要「改了什么」+ 产率 / 选择性 / 备注——投料表、操作、TLC 都是整条记录共享的。
+ */
+/**
+ * 筛选表的条目：`{exp_id, cond, cells}`。
+ * `cond` = 该记录「条件组」里的第几个条件（0 起）；为空表示整条记录算一行。
+ * 兼容老格式：只给 `exp_ids` 数组时，一条记录一行。
+ */
+function normalizeEntries(body) {
+  const src = Array.isArray(body.entries)
+    ? body.entries
+    : (Array.isArray(body.exp_ids) ? body.exp_ids : []).map((id) => ({ exp_id: id }));
+  return src
+    .map((e) => {
+      const exp_id = Number(e && typeof e === 'object' ? e.exp_id : e);
+      if (!Number.isFinite(exp_id)) return null;
+      const c = e && typeof e === 'object' ? e.cond : null;
+      const cond = Number.isInteger(Number(c)) && c !== null && c !== '' ? Number(c) : null;
+      return {
+        exp_id,
+        cond,
+        cells: e && typeof e === 'object' && e.cells && typeof e.cells === 'object' ? e.cells : {},
+      };
+    })
+    .filter(Boolean);
+}
+
+/** `conds_json` → 数组（坏数据当空） */
+function parseConds(text) {
+  try {
+    const list = JSON.parse(String(text || '[]'));
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeConds(list) {
+  if (!Array.isArray(list)) return null;
+  return list.slice(0, 60).map((c) => {
+    const o = c && typeof c === 'object' ? c : {};
+    const y = numOrNull(o.yield_pct);
+    return {
+      label: str(o.label).slice(0, 200),                 // 「−40 °C」「LDA 1.2 eq」「DCM 代替 THF」
+      yield_pct: y === null ? null : Math.max(0, Math.min(100, Math.round(y * 10) / 10)),
+      sel: str(o.sel).slice(0, 60),                      // 「94:6」「99% ee」这种，手填
+      note: str(o.note).slice(0, 200),
+    };
+  }).filter((c) => c.label || c.yield_pct !== null || c.sel || c.note);
+}
+
 function normalizeExperiment(input) {
   const out = {};
   for (const key of EXP_COLUMNS) {
-    if (!(key in input) && key !== 'steps_json') continue;
+    if (!(key in input) && key !== 'steps_json' && key !== 'conds_json') continue;
+    if (key === 'conds_json') {
+      const conds = normalizeConds(input.conds);
+      if (conds) out.conds_json = JSON.stringify(conds);
+      else if (typeof input.conds_json === 'string') out.conds_json = input.conds_json;
+      continue;
+    }
     if (key === 'steps_json') {
       const steps = normalizeSteps(input.steps);
       if (steps) out.steps_json = JSON.stringify(steps);
@@ -495,6 +553,7 @@ function getExperiment(id) {
   const exp = db.prepare('SELECT * FROM experiments WHERE id = ?').get(id);
   if (!exp) return null;
   exp.steps = parseSteps(exp.steps_json);
+  exp.conds = parseConds(exp.conds_json);
   exp.reagents = db.prepare('SELECT * FROM reagents WHERE exp_id = ? ORDER BY position, id').all(id);
   exp.attachments = db
     .prepare('SELECT * FROM attachments WHERE exp_id = ? ORDER BY category, id')
@@ -2864,12 +2923,7 @@ route('POST', '/api/screenings', async (req, res) => {
       str(body.title) || '未命名条件筛选',
       str(body.note),
       JSON.stringify(Array.isArray(body.vars) ? body.vars : []),
-      JSON.stringify(
-        (Array.isArray(body.exp_ids) ? body.exp_ids : [])
-          .map(Number)
-          .filter((n) => Number.isFinite(n))
-          .map((id) => ({ exp_id: id, cells: {} }))
-      ),
+      JSON.stringify(normalizeEntries(body)),
       // 表归属哪个课题：优先用调用方给的当前课题，没给就按第一条实验的课题
       str(body.project) || projectOfEntry(body.exp_ids),
       ts,
@@ -2893,10 +2947,16 @@ route('GET', '/api/screenings/:id', async (req, res, params) => {
   const reagents = db.prepare(
     "SELECT role, name, eq, compound_id FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id"
   );
+  const condsOf = db.prepare('SELECT conds_json FROM experiments WHERE id = ?');
   const rows = s.entries.map((e) => {
     const exp = one.get(Number(e.exp_id));
+    // `cond` = 记录里「条件组」的下标：这一行是那条记录里的某一个条件
+    const ci = Number.isInteger(e.cond) ? e.cond : null;
+    const list = ci === null ? [] : parseConds(condsOf.get(Number(e.exp_id))?.conds_json);
     return {
       exp_id: Number(e.exp_id),
+      cond: ci,
+      cond_value: ci === null ? null : list[ci] || null,
       cells: e.cells || {},
       exp: exp ? { ...exp, reagents: reagents.all(exp.id) } : null,
     };

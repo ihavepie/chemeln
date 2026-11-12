@@ -81,6 +81,13 @@ const fields = reactive({
 
 const reagent = reactive({ base: null, steps: [], rows: [] });
 
+/**
+ * 条件组：一次筛选批次里的 N 个条件（本记录内的「小筛选表」）。
+ * 投料表 / 操作 / TLC 都是整条记录共享的，这里每行只写「改了什么」+ 产率 / 选择性 / 备注。
+ * 条件筛选页（`#/screenings`）会从这里拆行，不用为每个条件再建一条实验记录。
+ */
+const conds = ref([]);
+
 const FIELD_KEYS = Object.keys(fields);
 
 function toRow(r) {
@@ -121,6 +128,13 @@ function fill(e) {
   for (const k of FIELD_KEYS) if (k in e) fields[k] = e[k] ?? (typeof fields[k] === 'number' ? null : '');
   fields.no_yield = Number(e.no_yield) === 1 ? 1 : 0;   // 0/1 开关，别让它变成 null
   fields.product_compound_id = e.product_compound_id ?? null;
+
+  conds.value = (Array.isArray(e.conds) ? e.conds : []).map((c) => ({
+    label: c.label || '',
+    yield_pct: c.yield_pct ?? null,
+    sel: c.sel || '',
+    note: c.note || '',
+  }));
 
   const raw = Array.isArray(e.steps) ? e.steps : [];
   const list = raw.map((s) => ({
@@ -400,7 +414,20 @@ function payload() {
   body.base_mmol = reagent.base;
   body.steps = reagent.steps.map((s) => ({ ...s }));
   body.reagents = reagent.rows.map(({ mwText, amountText, ...r }) => r);
+  body.conds = conds.value
+    .filter((c) => String(c.label || '').trim() || c.yield_pct != null || String(c.sel || '').trim() || String(c.note || '').trim())
+    .map((c) => ({ label: c.label || '', yield_pct: c.yield_pct ?? null, sel: c.sel || '', note: c.note || '' }));
   return body;
+}
+
+/** 条件组：加一行 / 删一行（删除前把焦点那格的值也一并丢掉） */
+function addCond() {
+  conds.value.push({ label: '', yield_pct: null, sel: '', note: '' });
+  notify();
+}
+function removeCond(i) {
+  conds.value.splice(i, 1);
+  notify();
 }
 
 /** 撤销上一次保存：把上一版快照写回表单，随后自动保存会把它存回去（等于回滚一次） */
@@ -413,6 +440,7 @@ async function undoSave(ev) {
   reagent.base = prev.base_mmol ?? null;
   if (Array.isArray(prev.steps) && prev.steps.length) reagent.steps = prev.steps.map((x) => ({ ...x }));
   if (Array.isArray(prev.reagents)) reagent.rows = prev.reagents.map((r) => toRow(r));
+  if (Array.isArray(prev.conds)) conds.value = prev.conds.map((c) => ({ ...c }));
   notify();
   try {
     await flush();
@@ -1422,6 +1450,51 @@ const openAttachment = (id) => {
             ref="resBlock"
             :model="fields"
             :base="reagent.base" :notify="notify" :locked="exp.locked" @open-compound="(id) => router.push(`/compounds/${id}`)" />
+
+          <!-- 条件组：一次筛选批次里的 N 个条件。一行一个条件，只写「改了什么」+ 结果；
+               投料表 / 操作 / TLC 是整条记录共享的（一起做的、一起点的板）。
+               没有条件时只露一行「＋ 加条件」，不占平常记录的版面。 -->
+          <section v-if="sheetPrefs.conds !== false" class="sec sec-tight cond-group">
+            <div class="sec-head">
+              <h3>条件组</h3>
+              <span v-if="conds.length" class="cond-count">{{ conds.length }} 个条件</span>
+              <span class="spacer" />
+              <button v-if="!exp.locked" type="button" class="cond-add" @click="addCond">＋ 加条件</button>
+            </div>
+            <table v-if="conds.length" class="cond-table">
+              <thead>
+                <tr>
+                  <th class="cond-idx">#</th>
+                  <th>改了什么</th>
+                  <th class="cond-num">产率 %</th>
+                  <th class="cond-num">选择性</th>
+                  <th>备注</th>
+                  <th class="cond-del" />
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(c, i) in conds" :key="i">
+                  <td class="cond-idx">{{ i + 1 }}</td>
+                  <td>
+                    <input v-model="c.label" class="cond-in" :disabled="exp.locked" placeholder="−40 °C / LDA 1.2 eq / DCM 代替 THF" @input="notify()" />
+                  </td>
+                  <td class="cond-num">
+                    <input v-model="c.yield_pct" class="cond-in is-num" type="number" min="0" max="100" step="1" :disabled="exp.locked" placeholder="—" @input="notify()" />
+                  </td>
+                  <td class="cond-num">
+                    <input v-model="c.sel" class="cond-in" :disabled="exp.locked" placeholder="94:6 / 99% ee" @input="notify()" />
+                  </td>
+                  <td>
+                    <input v-model="c.note" class="cond-in" :disabled="exp.locked" placeholder="（选填）" @input="notify()" />
+                  </td>
+                  <td class="cond-del">
+                    <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个条件" @click="removeCond(i)">×</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else class="cond-hint">一次筛多个条件时用这张小表：一行一个条件，投料表 / 操作 / TLC 共用。</p>
+          </section>
 
         </article>
 
