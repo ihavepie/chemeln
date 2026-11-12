@@ -8418,3 +8418,17 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 /* `.var-vals` 原来是 `display: flex`：它会把 td 里的「时间节点」小标签挤到上一行。
    换成 inline-flex —— 标签和值就能排在同一行（td 本身还是 table-cell，colspan 照旧生效）。 */
 .sheet .rtable tr.rt-var .var-vals { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; vertical-align: middle; }
+
+/* 条件行那颗「变量开关」和下面变量块头的 `[t]` 小签**尺寸统一**（以前一个是 8.5px/无内边距、
+   一个是 9.5px/有描边，看着像两种东西）。统一到 9.5px / 16px 行高 / 内边距 6px。 */
+.cond-var-tog.on {
+  font-size: 9.5px;
+  line-height: 16px;
+  padding: 0 6px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(168, 71, 31, 0.22);
+  border-radius: 999px;
+  opacity: 1;
+}
