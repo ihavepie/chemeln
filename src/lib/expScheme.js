@@ -70,7 +70,8 @@ export function schemeParts(model, compounds) {
   const reactantIds = []; // 与 reactants 平行：反应式要按库里那份「带缩写的画」出图时用
   const reactantVers = []; // 与 reactants 平行：化合物的 updated_at —— 结构改过就得换一份画
   const others = []; // 试剂 / 催化剂 / 碱……能塞进箭头上方就塞，塞不下挪到下方
-  const loose = [];  // 写了名字但挂不上化合物库的底物：画不出结构，名字放箭头上，别默默吞掉
+  const loose = [];  // 没挂上结构的底物（画不出来）：**不写在箭头上**，见下面 subBelow
+  const subNames = []; // 投料表里所有「底物」行的名字：双底物要写成 `底物1 + 底物2`
   for (const r of model.reagents || []) {
     if (r.role === '溶剂') continue;
     const c = lookup(r);
@@ -79,9 +80,14 @@ export function schemeParts(model, compounds) {
       reactants.push(c.smiles);
       reactantIds.push(Number(c.id));
       reactantVers.push(String(c.updated_at || ''));
+      subNames.push(str(r.name) || str(c.name || c.code));
       continue;
     }
     if (r.role === '底物') {
+      // 另一个底物（双底物偶联那种）画不出结构，或者干脆不该画在箭头上——
+      // 它以「底物1 + 底物2」的形式挪到箭头下面（用户：不要放在反应式上，就放在下面）
+      const nm = str(r.name) || (c ? str(c.name || c.code) : '');
+      if (nm) subNames.push(nm);
       if (text) loose.push({ text, role: r.role });
       continue;
     }
@@ -94,7 +100,9 @@ export function schemeParts(model, compounds) {
       others.push({ text, role: r.role });
     }
   }
-  if (loose.length) others.unshift(...loose);
+  // 双底物：有底物画不出结构时，箭头下面单起一行 `底物1 + 底物2`；
+  // 两个都画出来的时候不写这行（左边已经是「结构1 + 结构2」，再写一遍是重复）
+  const subBelow = loose.length && subNames.length > 1 ? subNames.join(' + ') : '';
 
   const prod = model.product_compound_id
     ? byId.get(Number(model.product_compound_id)) || null
@@ -136,7 +144,7 @@ export function schemeParts(model, compounds) {
     loose: loose.length, // 有名字但挂不上库的底物，记录页据此提示
     // 试剂名按组分上色（Sub 棕 / Cat 紫 / Base 蓝 / Lig 绿 / Add 金…），跟投料表一致
     above: fit,
-    below: [over.length ? over : '', cond].filter(Boolean),
+    below: [over.length ? over : '', subBelow, cond].filter(Boolean),
   };
 }
 
