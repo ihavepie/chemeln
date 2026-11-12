@@ -11,7 +11,7 @@
 - **4780 = 正式运行的那套**：`public/` 里是 `vite build` 产物（`index.html` + `assets/`），由 `start.command` 起的服务直接发出去。
 - **5173 = 开发预览**：`preview.command` / `npm run dev` 起的 Vite，直接读 `src/`，改完热更新。**所有改动先在这里看效果**，确认后 `npm run build` 就会重新写进 `public/`。
 - `vite.config.js` 的 `build.outDir` 已经是 **`public`**（不再有 `dist/`）。**改完源码记得 build 一次**，否则 4780 上还是旧构建。
-- v1（原生 JS 那套）备份在 `.backup/public-v1-<时间>/`，要回退：把那份拷回 `public/`、`outDir` 改回去再 build。
+- v1（原生 JS 那套）**已退役**：备份在 `.backup/public-v1-<时间>/`，要回退就把那份拷回 `public/`、`outDir` 改回去再 build；**别再往 `public/` 写 v1 文件、也别新增原生 JS 页面**（`public/` 只由 `npm run build` 覆盖）。
 
 ## 3. 技术栈 / 启动 / 数据
 - 前端：Vue 3.5 `<script setup>`、vue-router 4（hash 模式）、Element Plus 2.8（zh-CN）、Vite 6，无 TypeScript、无状态管理库（一个 reactive store）。
@@ -85,7 +85,7 @@
 - `src/lib/reagent.js` — 角色表 `ROLES/ROLE_EN/ROLE_TONE`、`derive`（mmol→质量/体积）、`totals`、收率计算。**分子量要两位真小数**：`ATOMIC_WEIGHT` 用 IUPAC 多位值（少一位会把 P(Cy)3 算成 280.44）；记录里的粗值（280.4）由 `EditorView.fixReagentRows()` 换成更细的（280.43）；**密度不再只管溶剂**——词库里有合理密度就带上，HFIP 这种液体添加剂也按 µL 量。`eqLabel()` 是**当量文案唯一出处**（不到 1 写 `20 mol%`，其余 `1.0 eq`），箭头 / 列表 / 筛选表 / 手机版都调它。
 - `src/lib/autosave.js` — `useAutosave(payload, save, opts)`：JSON 快照监听 + 防抖；**卸载时会补一次 `flush()`**（最后不到 1 秒的输入不丢），`lastSaved` 记的是「请求发出那一刻」的快照。
 - `src/lib/autogrow.js` — 文本域跟着内容长（`v-autogrow` 用的 `growTextarea` / `growAll`）；`flattenTextareas(root)` 把文本域换成 div，**打印 / 存 PDF 前必须调**（textarea 只印得出自己那几行高，长表征会被截断，实测 12 行只出 5 行）。
-- `src/components/HistoryModal.vue` — 改动历史弹窗（`entity` = experiment / compound + `id`），读 `/api/history/...`；实验页和化合物页的 ⋯ 菜单里都有入口。
+- `src/components/HistoryModal.vue` — 改动历史弹窗（`entity` = experiment / compound + `id`），读 `/api/history/...`；两页的 ⋯ 菜单里都有入口。
 - `src/lib/lookup.js` — **结构信息查询**（`structureInfo(smiles)` / `nameInfo(name)` / `describeInfo(info)`）+ **外部数据库站点表 `LOOKUP_SITES`**（PubChem / ChemicalBook / NIST / TCI / CAS Common Chemistry；缺标识就返回空）+ 各自的 `pubchemUrl` / `chemicalBookUrl` / `nistUrl` / `tciUrl` / `casCommonUrl`：
   走 `/api/lookup`（链式查 **PubChem → OPSIN → Wikidata**，带缓存）：OPSIN 回 SMILES（前端本地算 MW），Wikidata 认**中文名**（`haswbstatement:P274`）；失败一律 null。
 - `src/lib/sheetprefs.js` — 「记录页显示哪几块」的前端偏好（`sheetPrefs` / `setSheetPref` / `showAllSheetBlocks` / `SHEET_BLOCKS`，存 localStorage `eln:sheet`，默认全开）；`EditorView` 用 `v-if` 挂着，关掉的块页面和打印都没有。
@@ -96,8 +96,6 @@
 - `src/lib/pagemenu.js` — **空白处右键的页面菜单**：`openPageMenu()` 的第一项是**刷新当前列表**，然后四个导航页，**「新建…」收进子菜单放最底下**（右键十次有九次是想刷新，新建顶着最上面太容易点错——用户报过）；`keepNativeMenu()` 判断这一下要不要让给系统（输入框、文本域、`contenteditable`、**选中了文字** → 让给系统，否则「复制粘贴」就没了）。挂在 `ContextMenu.vue` 的**冒泡**阶段 `document` contextmenu 上——卡片 / 组头 / 列表行自己会 `preventDefault + stopPropagation`，轮不到它，所以两者的菜单不会打架。
 - `src/lib/feedback.js` — `toast` / `confirm` / `prompt`（Element Plus 封装）。
 - `src/lib/ui.js` / `label.js` / `icons.js` — 状态与类别常量（`STATUSES` / `STATUS_TONE` / 窄地方用的 `STATUS_SHORT`）、附件分类 `CATEGORY_ORDER`/`CATEGORY_LABEL`（含 `literature` 文献图）、瓶子标签、内联 SVG 图标。**`RXN_TYPES`**（抬头反应类型的候选，照样能自己写）** + `COMPOUND_KINDS`**（化合物的类型）按一条路线的顺序排：底物 / 试剂 / 中间体 / 粗产物 / 纯化产物 / 产物 / 催化剂 / 配体 / 添加剂 / 标准品 / 其他 ——「中间体」就是「中间产物」，别再塞一个同义项进去；老数据里的「试剂」原本不在列表里，这次补上了。
-- `src/styles/eln.css` — 全站样式（v1 规则在前，v2 新增追加在文件末尾并写注释）。
-- `server/index.js` — HTTP 服务 + 全部路由。
 - `server/ocr.swift` — **本地 OCR**（`ocr <图片>` → `[{text,conf,x,y,w,h}]` JSON）：系统 Vision 认字，**不联网、不引第三方库**；首次用到才编到 `.cache/ocr`（同 `print.swift`），没 swiftc 就报错让用户手填。
 - `src/components/TlcOcr.vue` — TLC 那格右上角的「读图」按钮：把 TLC 照片交给 `/api/ocr`，认出展开剂 / Rf 就填（只补空格子），认不准就摊开一列「图里读到这些字」让人点一行。化合物页和实验页都用它（`scope` 传 `compound` / `attachment`）。
 - `src/lib/ocr.js` — 从 OCR 的字里认展开剂 / Rf：`guessSolvent()` 先把破折号 / 等号 / 全角冒号统一成分隔符，再把两个溶剂词归到标准简称（`SOLVENTS` 词典 + edit distance 1，`PE:IA-5-1` → `PE:EA = 5:1`），`guessRf()` 认 `Rf 0.45`。
@@ -105,7 +103,6 @@
 - `.cache/` — swift 编译产物 + clang module cache（由 `server/print.swift` 生成，不是数据）。
 - `server/db.js` — 建表 + `ensureColumn` 形式的增量迁移（新字段都走这里）。
 - `server/export.js` / `server/qr.js` — Markdown 导出 / 二维码。
-- `scripts/backup.js` — 数据备份：`VACUUM INTO` 出单文件库 + 拷 `attachments/`、`compounds/` 到 `.backups/<日期>/`，默认留 7 份（`--list` / `--keep N`）。
 - `public/` — **v2 的构建产物**（`npm run build` 写这里，4780 发的就是它）。`start.command`（起服务）/ `preview.command`（起服务 + Vite 5173）— 双击启动脚本。部署见 `CLOUD-DEPLOY.md`。
 
 ## 5. 我们的约定
@@ -116,7 +113,6 @@
 - **样式放哪**：新规则追加到 `src/styles/eln.css` 末尾并加一行注释说明作用域；改完用 grep 确认规则没插错位置（踩过坑）。
 - **新功能往哪写**：交互在组件内、纯逻辑进 `src/lib/*`、数据字段走 `server/db.js` 的 `ensureColumn` 迁移 + `server/index.js` 路由 + `api.js` + `store.js`。
 - **交互底线**：弹窗点背景可关、点内容绝不可关；输入框不触发文字拖选；破坏性操作先弹确认并写清后果。
-- **v1 已经退役**：不要再往 `public/` 里写 v1 的文件，也不再新增原生 JS 页面；`public/` 现在只由 `npm run build` 覆盖。
 
 ## 6. 当前进度
 
@@ -135,7 +131,7 @@
 - **`recordCategories` 是「筛选」用的、`categoriesOfProject` 是「归类」用的，别混**：筛选（中栏列表、卡片墙）在「全部课题」下必须全给，否则别的课题的分类不在列表里，那些卡片会落不进任何组、直接看不见；而记录页给一条记录选分类时只能用**它自己那个课题**的分类（`categoriesOfProject(scope, project)`）——不然会造出「记录在共用课题、分类在别的课题」的隐形错位。服务端 `liveCategoryId(value, scope, project)` 兜底：scope 不对、或分类属于别的课题（非共用分类），一律当悬空引用置 null。
 - **换课题要顺手清掉不兼容的分类**：记录页/化合物页的 `ProjPick` 走 `onProjectChange`，新课题里没有那个分类就把 `category_id` 置空（服务端保存时也会置空，但那样用户看不到「分类被丢了」）。
 - **删除是软删除**：`DELETE /api/experiments/:id` 只把快照塞进 `trash`、再把行删掉，**附件 / 化合物目录的文件不动**；只有 `DELETE /api/trash/:id`（彻底删除）才 `rm` 文件。清测试数据别忘「彻底删除」。
-- **`.editor` 是滚动容器，会把伸出纸外的书签裁掉**（`overflow-y:auto` 等于两轴都 auto）：书签 / 预览卡这种要「漂在纸外」的东西一律 `Teleport to="body"` + `position: fixed`，位置由 `getBoundingClientRect()` 算，并在 `.editor` 的 `scroll`、`window.resize`、切记录/切页时重算。
+- **`.editor` 是滚动容器，会把伸出纸外的书签裁掉**（`overflow-y:auto` 等于两轴 auto）：书签 / 预览卡这种要「漂在纸外」的东西一律 `Teleport to="body"` + `position: fixed`，位置由 `getBoundingClientRect()` 算，并在 `.editor` 的 `scroll`、`window.resize`、切记录/切页时重算。
 - **编辑页的异步响应必须校验 id**：`load()` / `saveNow()` / `refreshAttachments()` 都是「发请求 → 等回来 → 写进 `exp`」，等待期间用户可能已经切到别的记录。回来时先比 `route.params.id` / `exp.id` 还是不是发请求时那一条，不是就整份丢弃——否则旧记录的附件会显示到新记录上，此时点 TLC 的 × 删的是那条旧记录的附件行和磁盘文件。**savedLabel / autosave 也是对同一个坑**：`flush()` 里 `lastSaved` 要记「请求发出那一刻」的快照，不能用返回时的（返回时可能已经又改了）。
 - **记录页第 1 页现在多了一行**：结果表格下面是 `.res-sel`（选择性测定），在 `.sec-tight` 里跟着结果块一起打印。加别的行之前先想想页面还有多少余量——第 1 页本来就塞满了（反应式 + 投料表 + 条件 + 结果 + TLC）。
 - **化合物编号**：新建时留空会由服务端 `nextCompoundCode()` 自动给号（库里最大的纯数字 + 1）；`POST /api/compounds` 带显式编号撞号仍然报 409（别改成自动加后缀，用户填的就该报错）；只有「产物存库」走 `uniqueCompoundCode()` 自动加 `-2`。**曾经踩过**：产物存库直接用实验编号当化合物编号，加了唯一索引后会撞号 500。
