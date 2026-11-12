@@ -88,16 +88,23 @@ function onInput(ev, f) {
 /**
  * **单击 = 出选择（刻度滑条 / 胶囊），双击 = 直接改文字。**
  *
- * 关键在 `mousedown` 上拦：输入框是**按下那一刻**就拿焦点的，等到 click 再 blur 已经晚了
- * （光标先闪进去一下，用户看得很清楚）。所以单击直接 `preventDefault()` 不给焦点；
- * 双击的**第二下**放行，光标才落进去。已经在编辑中的格子不拦（不然里面选不了字）。
+ * 输入框平时是 `pointer-events: none`（CSS）：鼠标根本点不到它，也就不会拿焦点、
+ * 不会出现打字的 I 形光标、不会闪一下光标再消失 —— `mousedown` 里 `preventDefault()`
+ * 在 Safari 上拦不干净（试过，还是会进光标）。所以事件挂在**外层 `.cond-f-val`** 上：
+ * 单击 → 开选择；双击 → 手动 `focus()`（程序化聚焦不受 pointer-events 影响），
+ * 聚焦后 CSS 里再把 pointer-events 放开，编辑时还能点、能选字。
  */
 let downTimer = 0;
 let lastDownAt = 0;
+/** 正在用键盘编辑哪一格（用 class 控制，别指望 `:focus` —— WebKit 里算不准） */
+const editing = ref('');
 
 function onFieldDown(f, ev) {
   if (props.locked) return;
-  const el = ev.target;
+  if (ev.target.closest?.('.cond-caret')) return; // 小箭头有自己的点击
+  const box = ev.currentTarget;
+  const el = box?.querySelector?.('input');
+  if (!el) return;
   // 已经在编辑这一格：正常点、正常选字，别抢
   if (document.activeElement === el) return;
 
@@ -108,12 +115,13 @@ function onFieldDown(f, ev) {
   if (isDouble) {
     clearTimeout(downTimer);
     open.value = '';
+    editing.value = f.key;
     el.focus?.();
     el.select?.();
-    return; // 不 preventDefault —— 让光标正常落进去
+    return;
   }
 
-  ev.preventDefault(); // 单击：不给焦点，光标不会闪进来
+  ev.preventDefault();
   clearTimeout(downTimer);
   downTimer = setTimeout(() => {
     if (open.value !== f.key) open.value = f.key;
@@ -188,18 +196,18 @@ onBeforeUnmount(() => {
           {{ fieldVars.some((v) => v.key === f.key) ? `[${(fieldVars.find((v) => v.key === f.key) || {}).label}]` : '变量' }}
         </button>
       </span>
-      <span class="cond-f-val">
+      <span class="cond-f-val" @mousedown="onFieldDown(f, $event)">
         <span v-if="f.key in fixed" class="cond-fixed" title="来自投料表">{{ fixed[f.key] || '—' }}</span>
         <template v-else>
           <input
-            :class="{ 'is-var': fieldVars.some((v) => v.key === f.key) }"
+            :class="{ 'is-var': fieldVars.some((v) => v.key === f.key), 'is-editing': editing === f.key }"
             :value="model[f.key]"
             :title="model[f.key] || ''"
             :placeholder="f.ph"
             :disabled="locked"
-            @mousedown="onFieldDown(f, $event)"
             spellcheck="false"
             @input="onInput($event, f)"
+            @blur="editing = ''"
             @change="model[f.key] = $event.target.value; notify()"
           />
           <button

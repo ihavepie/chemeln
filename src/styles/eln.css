@@ -8550,3 +8550,14 @@ body.is-picker-open .editor { overscroll-behavior: none; }
    注：`:focus { cursor: text }` 写了也没用 —— WebKit 在文本输入框获得焦点时自己画 I 形光标，
    `getComputedStyle().cursor` 也照样报 `default`（实测），所以别在那儿绕。 */
 .cond-above .cond-f-val input { cursor: default; }
+
+/* 条件行的那几个值：**鼠标平时点不到输入框本身**（`pointer-events: none`）——
+   所以不会拿焦点、不会有打字的 I 形光标、也不会「闪一下光标再消失」。
+   单击由外层 `.cond-f-val` 接（开选择），双击由它 `focus()`（程序化聚焦不受影响）；
+   聚焦之后这里再把 pointer-events 放开，编辑时照样能点、能拖选文字。 */
+.cond-above .cond-f-val input { pointer-events: none; cursor: default; }
+.cond-above .cond-f-val input:focus { pointer-events: auto; cursor: text; }
+
+/* 编辑态用 class 切（`:focus` 在 WebKit 里对 pointer-events 算不准）：双击进来之后
+   才放开鼠标、才给 I 形光标，编辑时能点、能拖选文字。 */
+.cond-above .cond-f-val input.is-editing { pointer-events: auto; cursor: text; }
