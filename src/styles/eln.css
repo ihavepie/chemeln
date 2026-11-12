@@ -8272,3 +8272,11 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 /* 条件那一行左边原来有个「条件」小字，用户说不要（内容自己会说话）——
    去掉左边距后，第一格（反应温度）跟下面投料表的「组分」列左边缘对齐。 */
 .cond-above { padding-left: 0; padding-right: 0; }
+
+/* 变量行的 Entry 序号原来在「组分」列里右对齐（看着像缩进进去一截）——
+   改成左对齐，跟上面「变量」那两个字对齐。 */
+.sheet .rtable tr.rt-var td.var-idx-cell {
+  text-align: left;
+  padding-left: 6px;
+  padding-right: 0;
+}
