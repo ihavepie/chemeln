@@ -803,6 +803,38 @@ async function renderLive() {
     }
   }
 }
+/**
+ * 同一个变量槽（比如都标成 `[Cat]`）加了**多行**时，那些行的名字就是这一槽的候选，
+ * 自动补成条件组里的行（已经有了就不重复加）。只有一个候选时不自动加——那是标准条件。
+ * 为什么：筛催化剂/配体时连着加两个同类试剂，本来就是「两个候选」的意思，
+ * 不该让人再手动去条件组里敲一遍，也不该让投料表里同时躺着两个催化剂。
+ */
+function syncVarCandidates() {
+  const bySlot = new Map();
+  for (const r of reagent.rows) {
+    const slot = String(r.variable || '').trim();
+    const name = String(r.name || '').trim();
+    if (!slot || !name) continue;
+    if (!bySlot.has(slot)) bySlot.set(slot, []);
+    bySlot.get(slot).push(name);
+  }
+  let added = false;
+  for (const [slot, names] of bySlot) {
+    if (names.length < 2) continue;   // 只有一个候选 = 标准条件，交给用户自己填条件组
+    for (const name of names) {
+      const has = conds.value.some((c) => String((c.vars || {})[slot] || '').trim() === name);
+      if (has) continue;
+      conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name } });
+      added = true;
+    }
+  }
+  if (added) notify();
+}
+watch(
+  () => reagent.rows.map((r) => `${r.variable || ''}:${r.name || ''}`).join('|'),
+  () => syncVarCandidates()
+);
+
 watch(liveSig, () => scheduleLive());
 watch(() => (store.compounds || []).length, () => scheduleLive(50));
 

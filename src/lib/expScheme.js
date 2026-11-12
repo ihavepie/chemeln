@@ -52,6 +52,7 @@ export function schemeParts(model, compounds) {
     return byName.get(norm(r.name)) || null;
   };
 
+  const seenPlaceholder = new Set();   // 同一个变量槽（两行都标成 [Cat]）箭头上只写一次
   const reactants = [];
   const reactantIds = []; // 与 reactants 平行：反应式要按库里那份「带缩写的画」出图时用
   const others = []; // 试剂 / 催化剂 / 碱……能塞进箭头上方就塞，塞不下挪到下方
@@ -69,7 +70,14 @@ export function schemeParts(model, compounds) {
       if (text) loose.push({ text, role: r.role });
       continue;
     }
-    if (text) others.push({ text, role: r.role });
+    if (text) {
+      // 变量槽去重：同类型加了两行（都标成 [Cat]）时，箭头上只留一个 [Cat]
+      if (r.variable) {
+        if (seenPlaceholder.has(text)) continue;
+        seenPlaceholder.add(text);
+      }
+      others.push({ text, role: r.role });
+    }
   }
   if (loose.length) others.unshift(...loose);
 
