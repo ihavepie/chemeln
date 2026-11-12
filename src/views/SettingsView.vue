@@ -5,7 +5,8 @@ import AppModal from '../components/AppModal.vue';
 import { api } from '../api.js';
 import { peekPrefs, setPeekPref, PEEK_LABELS } from '../lib/peek.js';
 import { sheetPrefs, setSheetPref, showAllSheetBlocks, SHEET_BLOCKS } from '../lib/sheetprefs.js';
-import { loadBoot, setProject, settings, store, allCategories, addCategory } from '../store.js';
+import { loadBoot, setProject, settings, store, allCategories, addCategory, quickExtra } from '../store.js';
+import { QUICK } from '../lib/ui.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import DocGrip from '../components/DocGrip.vue';
 
@@ -299,6 +300,59 @@ async function removeCategory(g) {
 /* ---- 课题 ---- */
 
 const projects = computed(() => store.boot?.projects || []);
+
+/* ---- 常用选项（条件行那几个下拉里自己加的值）----
+   存服务端 settings 的 `quick:<字段>`，跟着 data/ 一起备份；页面上「＋ 自定义」加的
+   也是同一份数据，所以两边看到的是同一串。内置的那几条在 `lib/ui.js` 的 QUICK 里，
+   这里只显示、删不掉（删了代码里还会再来）。 */
+const QUICK_ROWS = [
+  { key: 'temperature', label: '反应温度' },
+  { key: 'duration', label: '时间节点' },
+  { key: 'atmosphere', label: '气氛 / 容器' },
+  { key: 'apparatus', label: '装置 / 器皿' },
+  { key: 'light', label: '光照 / 波长' },
+];
+const quickBuiltin = (key) => QUICK[`f-${key}`] || [];
+const quickOwn = (key) => quickExtra(key);
+
+async function saveQuickList(key, items) {
+  try {
+    await api.saveQuick(key, items);
+    await loadBoot();
+    return true;
+  } catch (e) {
+    toast(e.message || '没存上', 'err');
+    return false;
+  }
+}
+
+async function addQuick(f) {
+  const v = await prompt({
+    title: `加一条「${f.label}」常用选项`,
+    placeholder: '比如 45 ℃ / Ar 手套箱 / 光照 24 h',
+    confirmText: '加上',
+  });
+  const value = String(v || '').trim();
+  if (!value) return;
+  if (quickBuiltin(f.key).includes(value) || quickOwn(f.key).includes(value)) {
+    toast(`「${value}」本来就在里面`);
+    return;
+  }
+  if (await saveQuickList(f.key, [...quickOwn(f.key), value])) toast(`「${value}」加好了`);
+}
+
+async function delQuick(key, value) {
+  if (await saveQuickList(key, quickOwn(key).filter((x) => x !== value))) toast(`去掉了「${value}」`);
+}
+
+/** 自己加的那几条按顺序排在刻度条 / 胶囊后面，所以顺序就是这里挪出来的 */
+async function moveQuick(key, i, dir) {
+  const list = [...quickOwn(key)];
+  const j = i + dir;
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  await saveQuickList(key, list);
+}
 
 /** 改名会连带把记录、化合物、编号前缀、课题级设置一起搬过去 */
 async function renameProject(p) {
@@ -605,7 +659,7 @@ async function removeProject(p) {
 
       <section class="card">
         <div class="card-head"><h2 class="card-title"><span class="n">05</span>书签悬停预览</h2></div>
-        <p class="card-note">实验页纸面左边那排平行书签，鼠标停上去会浮一张预览卡。这里决定卡片上显示哪些块（只存在这台浏览器里，跟记录无关）。</p>
+        <p class="card-note">实验页纸面左边那排平行书签，鼠标停上去会浮一张预览卡。这里决定卡片上显示哪些块（每天都读浏览器里的缓存，同时存进记录本、换浏览器也还在）。</p>
         <div class="row" style="gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
           <label v-for="(label, key) in PEEK_LABELS" :key="key" style="display: flex; align-items: center; gap: 6px; cursor: pointer">
             <input type="checkbox" :checked="peekPrefs[key]" @change="setPeekPref(key, $event.target.checked)" />
@@ -621,13 +675,37 @@ async function removeProject(p) {
           <button class="btn btn-sm btn-ghost" @click="showAllSheetBlocks()">全部显示</button>
         </div>
         <p class="card-note">
-          实验记录那张 A4 上要出现哪几块。取消勾选的块，页面和打印 / 存 PDF 都不出现（内容不会丢，重新勾上就回来；只存在这台浏览器里）。
+          实验记录那张 A4 上要出现哪几块。取消勾选的块，页面和打印 / 存 PDF 都不出现（内容不会丢，重新勾上就回来）。
         </p>
         <div class="sheet-blocks">
           <label v-for="(label, key) in SHEET_BLOCKS" :key="key">
             <input type="checkbox" :checked="sheetPrefs[key]" @change="setSheetPref(key, $event.target.checked)" />
             {{ label }}
           </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2 class="card-title"><span class="n">07</span>常用选项</h2></div>
+        <p class="card-note">
+          条件行那几个下拉里「＋ 自定义」加的值都在这儿，两边同一份（存在记录本里，跟着 data/ 一起备份）。内置的那几条删不掉，自己加的用 <b>‹</b> <b>›</b> 调顺序。
+        </p>
+        <div class="quick-rows">
+          <div v-for="f in QUICK_ROWS" :key="f.key" class="quick-row">
+            <span class="quick-lbl">{{ f.label }}</span>
+            <span class="quick-chips">
+              <span v-for="v in quickBuiltin(f.key)" :key="`b-${v}`" class="qchip is-builtin">{{ v }}</span>
+              <span v-for="(v, i) in quickOwn(f.key)" :key="`o-${v}`" class="qchip is-own">
+                {{ v }}
+                <span class="qchip-acts">
+                  <button type="button" title="往前挪一格" :disabled="i === 0" @click="moveQuick(f.key, i, -1)">‹</button>
+                  <button type="button" title="往后挪一格" :disabled="i === quickOwn(f.key).length - 1" @click="moveQuick(f.key, i, 1)">›</button>
+                  <button type="button" class="is-del" title="删掉这条" @click="delQuick(f.key, v)">×</button>
+                </span>
+              </span>
+              <button type="button" class="qchip is-add" @click="addQuick(f)">＋ 添加</button>
+            </span>
+          </div>
         </div>
       </section>
 

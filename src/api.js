@@ -1,7 +1,8 @@
 /** 后端接口：路径和参数跟 v1 完全一致。 */
 
-async function request(path, { method = 'GET', body } = {}) {
+async function request(path, { method = 'GET', body, keepalive = false } = {}) {
   const init = { method, headers: {} };
+  if (keepalive) init.keepalive = true;   // 关页面时补推（页面已经没了，请求还得走完）
   if (body !== undefined) {
     if (body instanceof FormData) init.body = body;
     else {
@@ -162,6 +163,9 @@ export const api = {
   /** 核对一个试剂：服务端拿名字重查 PubChem / OPSIN / Wikidata，把 MW / 密度写回试剂库 */
   /** 条件行「常用选项」里自己加的那几条（存服务端 settings，跟着 data/ 一起备份） */
   saveQuick: (field, items) => request('/api/quick', { method: 'PUT', body: { field, items } }),
+  /** 页面设置（视图 / 显示哪几块 / 列宽…）：整张推上去，服务端按 key 的时间戳合并 */
+  saveUiPrefs: (prefs, { keepalive = false } = {}) =>
+    request('/api/uiprefs', { method: 'PUT', body: { prefs }, keepalive }),
   reagentsVerify: (name, force = false) => request('/api/reagents/verify', { method: 'POST', body: { name, force } }),
   // 全部核对：一次喂一批（服务端挑「没核过、MW 空着」的，或者给 names），返回还剩几个没核
   reagentsVerifyAll: (payload = {}) => request('/api/reagents/verify-all', { method: 'POST', body: payload }),

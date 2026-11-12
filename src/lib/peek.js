@@ -1,10 +1,11 @@
 import { reactive } from 'vue';
+import { onUiMerged, uiGet, uiSetIfChanged } from './uiprefs.js';
 
 /**
  * 编辑页「平行书签悬停预览」要显示哪些块。
- * 纯前端偏好（存 localStorage），跟记录本身无关，所以不进 settings 表。
+ * 纯界面偏好：走 `lib/uiprefs.js`（浏览器缓存 + 数据库长期存储），跟记录内容无关。
  */
-const KEY = 'eln:peek';
+const KEY = 'peek';
 const DEFAULTS = {
   conditions: true, // 溶剂 / 浓度 / 温度 / 时长 / 气氛
   substrates: true, // 底物 → 产物
@@ -14,22 +15,17 @@ const DEFAULTS = {
 };
 
 function read() {
-  try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
-  } catch {
-    return { ...DEFAULTS };
-  }
+  const v = uiGet(KEY, null);
+  return { ...DEFAULTS, ...(v && typeof v === 'object' ? v : {}) };
 }
 
 export const peekPrefs = reactive(read());
 
 export function setPeekPref(key, value) {
-  peekPrefs[key] = !!value;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(peekPrefs));
-  } catch {
-    /* 存不了就算了，本页仍然生效 */
-  }
+  const v = !!value;
+  if (peekPrefs[key] === v) return;
+  peekPrefs[key] = v;
+  uiSetIfChanged(KEY, { ...peekPrefs });
 }
 
 export const PEEK_LABELS = {
@@ -39,3 +35,6 @@ export const PEEK_LABELS = {
   conclusion: '结论',
   notes: '备注',
 };
+
+// 开机合并后回灌（另一台机器改过的话，这一页也跟着变）
+onUiMerged(() => Object.assign(peekPrefs, read()));

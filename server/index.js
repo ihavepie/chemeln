@@ -886,6 +886,43 @@ function settingsFor(project) {
   return out;
 }
 
+/**
+ * 「页面设置」的长期存储：存在 settings 表一个 `ui_prefs` 里，
+ * 结构是 `{ [key]: { v: 值, t: 时间戳 } }`（跟前端 `lib/uiprefs.js` 的本地缓存同一份格式）。
+ *
+ * 为什么要有这层：用户定的规矩是「浏览器当日常缓存，数据库当长期存储」——
+ * 前端改一下先写 localStorage（不阻塞），防抖后再把整张表推上来；
+ * 两边按 key 比时间戳合并，谁新用谁的。
+ *
+ * 只收白名单里的 key（都是纯界面偏好，不含任何记录内容）：
+ * `view` / `group` / `sheet` / `peek` / `docw` / `colw:<表名>`。
+ * 当前课题（`eln:project`）**故意不同步**：那是「这台机器上我正想看哪个课题」，别被别的设备改掉。
+ */
+const UI_PREF_KEY_RE = /^(view|group|sheet|peek|docw|colw:[a-z]{1,24})$/;
+const UI_PREF_LIMIT = 40;          // 最多几个 key
+const UI_PREF_VALUE_MAX = 20000;   // 单个值序列化后最多多长（列宽表也就几百字节）
+
+function readUiPrefs() {
+  try {
+    const v = JSON.parse(getSetting('ui_prefs') || '{}');
+    if (!v || typeof v !== 'object') return {};
+    const out = {};
+    for (const [k, e] of Object.entries(v)) {
+      if (!UI_PREF_KEY_RE.test(k)) continue;
+      if (!e || typeof e !== 'object' || !('v' in e)) continue;
+      out[k] = { v: e.v, t: Number(e.t) || 0 };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeUiPrefs(map) {
+  if (!Object.keys(map).length) db.prepare('DELETE FROM settings WHERE key = ?').run('ui_prefs');
+  else setSetting('ui_prefs', JSON.stringify(map));
+}
+
 /** query.project 有值就只统计这个课题；没值就是全本 */
 function bootstrap(query = {}) {
   const project = String(query.project || '').trim();
@@ -1030,6 +1067,8 @@ function bootstrap(query = {}) {
     syncLastAt: getSetting('sync_last_at') || '',
     canSync: fs.existsSync(path.join(__dirname, '..', 'scripts', 'sync-server.sh')),
     dataDir: DATA_DIR,
+    // 页面设置（浏览器那边先读本地缓存，开机时用这份按时间戳合并）
+    uiPrefs: readUiPrefs(),
   };
 }
 
@@ -1767,6 +1806,35 @@ route('PUT', '/api/settings', async (req, res) => {
   });
 });
 
+
+/* --- 页面设置：浏览器先写本地缓存，攒一下再整张推上来（按 key 的时间戳合并） --- */
+route('PUT', '/api/uiprefs', async (req, res) => {
+  const body = await readJson(req);
+  const incoming = body && typeof body.prefs === 'object' && body.prefs ? body.prefs : {};
+  const cur = readUiPrefs();
+  let changed = false;
+  for (const [key, entry] of Object.entries(incoming)) {
+    if (!UI_PREF_KEY_RE.test(key)) continue;                 // 白名单外的键直接不认
+    if (!entry || typeof entry !== 'object' || !('v' in entry)) continue;
+    let v = entry.v;
+    let s = '';
+    try {
+      s = JSON.stringify(v);
+    } catch {
+      continue;
+    }
+    if (s === undefined || s.length > UI_PREF_VALUE_MAX) continue;
+    if (s === 'null' || s === 'undefined') v = null;
+    const t = Number(entry.t) || Date.now();
+    if (!(key in cur) || t > (Number(cur[key].t) || 0)) {
+      cur[key] = { v, t };
+      changed = true;
+    }
+    if (Object.keys(cur).length > UI_PREF_LIMIT) break;
+  }
+  if (changed) writeUiPrefs(cur);
+  ok(res, { prefs: cur });
+});
 
 /* --- 「常用选项」：条件行那几个小下拉里，用户可以自己加（存 settings，跟着数据一起备份） --- */
 const QUICK_FIELDS = new Set(['temperature', 'duration', 'atmosphere', 'apparatus', 'light', 'solvent', 'concentration']);

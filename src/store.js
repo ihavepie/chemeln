@@ -1,7 +1,10 @@
 import { reactive } from 'vue';
 import { api } from './api.js';
+import { onUiMerged, uiGet, uiMerge, uiSetIfChanged } from './lib/uiprefs.js';
 
-/** 当前课题存在 localStorage：刷新页面还留在同一个「空间」里 */
+/** 当前课题存在 localStorage：刷新页面还留在同一个「空间」里。
+ *  这一项**故意不进「页面设置」的同步**——那是「这台机器上我正想看哪个课题」，
+ *  别被另一台设备打开过的课题改掉。 */
 const PROJECT_KEY = 'eln:project';
 const readProject = () => {
   try {
@@ -17,26 +20,18 @@ const saveProject = (name) => {
   } catch {}
 };
 
-/** 卡片 / 表格两种视图，按页记在自己的浏览器里 */
-const VIEW_KEY = 'eln:view';
+/** 卡片 / 表格两种视图，按页记（走 uiprefs：浏览器缓存 + 数据库长期存储） */
+const VIEW_KEY = 'view';
 const readViews = () => {
-  try {
-    const v = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
-    return v && typeof v === 'object' ? v : {};
-  } catch {
-    return {};
-  }
+  const v = uiGet(VIEW_KEY, {});
+  return v && typeof v === 'object' ? v : {};
 };
 
 /** 卡片墙按什么分组：'cat' 按分类（默认）/ 'kind' 按类型（化合物的底物/产物/配体…） */
-const GROUP_KEY = 'eln:group';
+const GROUP_KEY = 'group';
 const readGroups = () => {
-  try {
-    const v = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}');
-    return v && typeof v === 'object' ? v : {};
-  } catch {
-    return {};
-  }
+  const v = uiGet(GROUP_KEY, {});
+  return v && typeof v === 'object' ? v : {};
 };
 
 /** 一份全局状态：跟 v1 的 S 对象对应 */
@@ -64,19 +59,23 @@ export const viewOf = (kind) => (store.views?.[kind] === 'table' ? 'table' : 'ca
 
 export function setView(kind, mode) {
   store.views = { ...store.views, [kind]: mode === 'table' ? 'table' : 'card' };
-  try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify(store.views));
-  } catch {}
+  uiSetIfChanged(VIEW_KEY, store.views);
 }
 
 export const groupOf = (kind) => (store.groups?.[kind] === 'kind' ? 'kind' : 'cat');
 
 export function setGroup(kind, mode) {
   store.groups = { ...store.groups, [kind]: mode === 'kind' ? 'kind' : 'cat' };
-  try {
-    localStorage.setItem(GROUP_KEY, JSON.stringify(store.groups));
-  } catch {}
+  uiSetIfChanged(GROUP_KEY, store.groups);
 }
+
+// 开机合并后回灌（另一台机器改过视图/分组的话，这一页也跟着换）
+onUiMerged(() => {
+  const v = readViews();
+  if (JSON.stringify(v) !== JSON.stringify(store.views)) store.views = v;
+  const g = readGroups();
+  if (JSON.stringify(g) !== JSON.stringify(store.groups)) store.groups = g;
+});
 
 /**
  * 每次拉取领一个序号：连点两个课题、或者搜索框连续输入时，
@@ -92,6 +91,8 @@ export async function loadBoot() {
   const boot = await api.bootstrap(store.project);
   if (seq !== bootSeq) return store.boot;          // 期间又拉过一次，这份作废
   store.boot = boot;
+  // 页面设置：开机先跟数据库对一次（两边按 key 的时间戳合并，谁新用谁的）
+  uiMerge(boot.uiPrefs);
   // 课题被删了/改了名：清单里已经没有它，就退回「全部课题」，别卡在一个空空间里
   if (store.project && !(store.boot.projects || []).some((p) => p.name === store.project)) {
     store.project = '';

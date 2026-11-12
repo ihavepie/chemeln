@@ -1,27 +1,26 @@
 import { reactive, ref } from 'vue';
+import { uiGet, uiSetIfChanged } from './uiprefs.js';
 
 /**
  * 表格视图的表头拖拽改列宽（`ExpTable` / `CmpTable` 共用）。
  *
  * 按住某一列标题的右边界横拖：这一列变宽、**它旁边那列等量变窄**（最后一列则吃左边那列），
  * 所有列的宽度和不变，所以整张表不会跳、拖多少就是多少。
- * 宽度按表存进 localStorage（`eln:colw:<表名>`），下次进来还是你调好的样子。
+ * 宽度按表存进 `lib/uiprefs.js`（浏览器缓存 + 数据库长期存储），下次进来还是你调好的样子。
  *
  * 只吃鼠标事件（`mousedown` → window 上 `mousemove` / `mouseup`）：WebKit 里
  * 表格单元格上的 pointer 事件常被「拖选文字」吞掉，跟拖卡片那套一个理由。
  */
-const KEY = 'eln:colw:';
+const KEY = 'colw:';
 const MIN_W = 44;      // 任何一列都不能压到看不见
 
 export function useColResize(name, defaults) {
   const order = Object.keys(defaults);
 
   const read = () => {
-    try {
-      const v = JSON.parse(localStorage.getItem(KEY + name) || 'null');
-      // 只认表里真有的列：删列 / 改列名后残留的键别带进来
-      if (v && typeof v === 'object') for (const k of order) if (typeof v[k] === 'number') defaults[k] = v[k];
-    } catch {}
+    const v = uiGet(KEY + name, null);
+    // 只认表里真有的列：删列 / 改列名后残留的键别带进来
+    if (v && typeof v === 'object') for (const k of order) if (typeof v[k] === 'number') defaults[k] = v[k];
     return { ...defaults };
   };
 
@@ -30,9 +29,7 @@ export function useColResize(name, defaults) {
   let drag = null;
 
   const save = () => {
-    try {
-      localStorage.setItem(KEY + name, JSON.stringify({ ...widths }));
-    } catch {}
+    uiSetIfChanged(KEY + name, { ...widths });
   };
 
   function start(ev, colKey) {
