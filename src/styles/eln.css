@@ -7701,11 +7701,11 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
    现在铺满屏宽、不圆角 —— 它就是这一段的底，跟桌面中栏是同一个角色。 */
 .phone-cards {
   background: var(--bone);
-  /* 真正贴到屏幕两边：`.phone-cmp` 有 max-width: 560，光用 `margin: 0 -16px` 只撑出 32px，
-     在平板 / 宽一点的窗口里就露出一块居中的矩形，又变成「面板套卡片」。 */
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  padding: 12px calc(50vw - 50% + 16px) 6px;
+  /* 通栏底色：靠 `.phone-cmp` 在手机模式下不再限宽（见文件末尾的 820 断点）+ 这里只抵消它的左右内边距，
+     所以从屏幕左边缘铺到右边缘。**别用 `width:100vw` / `calc(50% - 50vw)` 那套**——
+     页面一旦有 max-width（560）或滚动条，算出来的位置就偏，宽窗口下会露出一块居中矩形（踩过两次）。 */
+  margin: 0 -16px;
+  padding: 12px 16px 6px;
   border-radius: 0;
 }
 .phone-cards .exp-card { margin-bottom: 10px; border-radius: 10px; }
@@ -7808,3 +7808,10 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .cmp-row-body .top { display: flex; align-items: center; gap: 6px; }
 .cmp-row-body .exp-title { display: block; }
 .cmp-row-body .exp-meta { color: var(--ink-4); font-size: 10.5px; }
+
+/* 手机模式下页面容器铺满：`.phone-cmp` 的 560 上限只在窄屏以内成立，
+   在平板 / 宽窗口（592–820）里它会把内容缩成居中一栏，通栏底色就变成一块「面板」。
+   铺满之后底色能用简单的负边距贴到屏幕两边，不用跟 `100vw` / 滚动条较劲。 */
+@media (max-width: 820px) {
+  .phone-cmp { max-width: none; }
+}
