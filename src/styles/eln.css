@@ -9350,3 +9350,43 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 @media (max-width: 900px) {
   .cmp-pickrow, .cmp-visual, .cmp-notes { grid-template-columns: 1fr; }
 }
+
+/* ---------- 对照页（多实验：挑选、并排、结论） ---------- */
+.cmp-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.cmp-pick {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 320px; padding: 3px 4px 3px 9px;
+  border-radius: 999px; background: var(--paper);
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.06);
+  font-size: 11px; color: var(--ink);
+}
+.cmp-pick .mono { color: var(--accent-ink); font-size: 11.5px; }
+.cmp-pick-title { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-pick-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; border: 0; border-radius: 999px;
+  background: transparent; color: var(--ink-4); cursor: pointer;
+}
+.cmp-pick-x:hover { background: #f2ece7; color: var(--bad); }
+
+/* 并排那排：列数跟着记录条数走（最多 4 列，再多横向滚） */
+.cmp-visual { grid-template-columns: repeat(var(--cmp-cols, 2), minmax(0, 1fr)); }
+.cmp-col-date { margin-left: auto; font-size: 10px; color: var(--ink-4); }
+
+.cmp-multi thead th { padding-bottom: 6px; }
+.cmp-multi tbody th { width: 108px; }
+.cmp-multi tbody td { font-size: 11.5px; }
+
+/* 结论 */
+.cmp-note-box { margin-top: 4px; background: var(--paper); border-radius: var(--r); padding: 10px 12px 12px; }
+.cmp-note-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.cmp-note-head .spacer { flex: 1; }
+.cmp-note-title { font-size: 12px; color: var(--ink); }
+.cmp-note-hint { font-size: 10px; color: var(--ink-4); }
+.cmp-note-input {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  border: 1px solid var(--line-2); border-radius: 6px; background: #fff;
+  padding: 8px 10px; font: inherit; font-size: 12.5px; line-height: 1.6; color: var(--ink);
+  outline: none;
+}
+.cmp-note-input:focus { border-color: var(--ink-4); background: #fdfcf9; }

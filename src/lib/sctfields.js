@@ -133,9 +133,11 @@ export function variations(base, cur) {
     if (a !== b) push(b || '无溶剂');
   }
 
-  // 规模变了就说一下用量（放大 / 缩小本身就是一次筛选）
-  if (cur.base_mmol != null && String(base.base_mmol ?? '') !== String(cur.base_mmol)) {
-    push(`${cur.base_mmol} mmol`);
+  // 规模变了就说一下用量（放大 / 缩小本身就是一次筛选）。
+  // 数字要**收一下**：mmol 是按底物反算出来的，0.2 和 0.1999677… 会直接甩一长串浮点数
+  if (cur.base_mmol != null) {
+    const fmt = (n) => String(Math.round(Number(n) * 1000) / 1000);
+    if (fmt(base.base_mmol ?? '') !== fmt(cur.base_mmol)) push(`${fmt(cur.base_mmol)} mmol`);
   }
 
   const bm = reagentMapOf(base);
