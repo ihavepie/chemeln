@@ -11,7 +11,7 @@
 - **4780 = 正式运行的那套**：`public/` 里是 `vite build` 产物（`index.html` + `assets/`），由 `start.command` 起的服务直接发出去。
 - **5173 = 开发预览**：`preview.command` / `npm run dev` 起的 Vite，直接读 `src/`，改完热更新。**所有改动先在这里看效果**，确认后 `npm run build` 就会重新写进 `public/`。
 - `vite.config.js` 的 `build.outDir` 已经是 **`public`**（不再有 `dist/`）。**改完源码记得 build 一次**，否则 4780 上还是旧构建。
-- v1（原生 JS 那套）**已退役**（备份在 `.backup/public-v1-<时间>/`）：`public/` 只由 `npm run build` 覆盖，别再往里写原生 JS 页面。
+- v1 已退役（备份在 `.backup/public-v1-*/`），`public/` 只由 `npm run build` 覆盖。
 
 ## 3. 技术栈 / 启动 / 数据
 - 前端：Vue 3.5 `<script setup>`、vue-router 4（hash 模式）、Element Plus 2.8（zh-CN）、Vite 6，无 TypeScript、无状态管理库（一个 reactive store）。
@@ -29,10 +29,10 @@
 ## 4. 目录结构（一句话一个）
 - `src/main.js` — 入口：挂 router / Element Plus / 全局指令。
 - `src/App.vue` — 外壳：桌面是「导轨 + 内容」；**手机（≤820px）不渲染导轨**，且只放行 `compound` 路由，其他路由显示一行提示（不给入口、不能跳转）。
-- `src/router.js` — 路由表：`/` 工作台、`/list` 实验记录（卡片 / 表格）、`/e/:id` 实验页、`/compounds` 化合物库（卡片 / 表格）、`/c/:id` 化合物页、`/screenings`（筛选清单 + 我的筛选表）、`/s/:id`（一张筛选表）、`/trash` 回收站、`/settings`。
+- `src/router.js` — 路由表：`/` 工作台、`/list` 实验记录（卡片 / 表格）、`/e/:id` 实验页、`/compounds` 化合物库（卡片 / 表格）、`/c/:id` 化合物页、`/screenings`（筛选清单 + 我的筛选表）、`/s/:id`（一张筛选表）、`/compare?ids=` 对照、`/trash` 回收站、`/settings`。
 - `src/store.js` — 全局 reactive 状态 + `loadBoot/loadList/loadCompounds`（三个都有**请求序号**，慢响应不会盖掉新数据）+ **当前课题 `store.project`**（`setProject/addProject`，存 localStorage）+ `recordCategories(scope)`（**筛选用**）/ `categoriesOfProject(scope, project)`（**给记录归类用**）/ `addCategory(name, scope)` + **视图模式 `views: {exp, cmp}`**（`viewOf(kind)` / `setView(kind, mode)`，走 `uiprefs` 的 `view`）+ 新建记录的两个入口 `createExperiment(categoryId?)` / `createCompound(categoryId?)`（不传就落当前分类筛选，传 `null` = 明确未分类）。（`api.saveSettings` 返回整个响应，不是 `settings`。）
 - `src/api.js` — 所有 REST 调用封装（路径与 v1 完全一致）。
-- `src/components/AppRail.vue` — 最左固定导航条；顶部有**课题切换器**（含新建课题）。下面那个大按钮**跟着页面变**：在化合物库 / 化合物页时是「＋ 新建化合物」，其余页面是「＋ 新建实验」。导航项：工作台 / 实验记录 / 化合物库 / 条件筛选 / **回收站**（带条数）/ 设置。
+- `src/components/AppRail.vue` — 最左固定导航条；顶部有**课题切换器**（含新建课题）。下面那个大按钮**跟着页面变**：在化合物库 / 化合物页时是「＋ 新建化合物」，其余页面是「＋ 新建实验」。导航项：工作台 / 实验记录 / 化合物库 / 条件筛选 / **对照** / **回收站**（带条数）/ 设置。
 - `src/components/SketcherModal.vue` — **画结构式弹窗**：iframe 里跑 **Ketcher**（`/vendor/ketcher/index.html`），「用这个结构」用 Ketcher 的异步接口 `getSmiles()` 取结构，交回调用方走 `lib/chem.js`（openchemlib）那条老路；**图直接用 Ketcher 自己渲的**（`getMol()` 拿带 S-group 的 molfile，手绘缩写得留着；用户要「画板画什么就出什么」）——算分子式 / MW、画结构 SVG、存成 `structure` 文件（出图前先过 `lib/abbrevspread.js` 把缩写基团的键补长）**Ketcher 的接口都是 Promise**，调用要 await。**要常挂、只切 `open`**（只切 `open`，不销毁 iframe）；每次打开按 `initial` 重载。
 - `vendor/ketcher/`（**构建产物，不进 git**）— Ketcher 独立版的打包结果（`index.html` + `assets/` + `wasm/` 里的 Indigo WASM + `raphael.min.js`），由 `scripts/build-ketcher.sh` 生成；服务端 `/vendor/*` 路由负责发（`serveVendor()`，MIME 补了 `.wasm/.woff2/.ttf/.map`）。
 - `vendor-build/ketcher/`（**源码进 git，node_modules 不进**）— Ketcher 小工程源码（`index.html` / `main.jsx` 挂 `ketcher-react` + `ketcher-standalone`，暴露 `window.sketcherApi`）；`npm install` + `vite build` 把产物写到 `vendor/ketcher/`。
@@ -114,8 +114,8 @@
 
 ## 6. 当前进度
 
-> 更早轮次（同一写法逐字搬走）在 **`HISTORY.md`**；本文件有 **64 KB 注入上限**，最近几轮留下面，再早的往下搬。加新内容前先看体积。
-- **最近几轮**：明细在 HISTORY；筛选表**别改回无衬线 / 满页宽**；**变量 = 投料表续篇**（`#vars` 槽 + 虚线；变量行挪到虚线下面、取消就回来）；候选名下拉 `CondCand.vue`（`condc-*`）；`onName()` 同名化合物不按名字重认；导出有「一页汇报卡（PDF）」。
+> 更早轮次在 **`HISTORY.md`**；本文件有 **64 KB 注入上限**，最近几轮留下面，再早的往下搬。加新内容前先看体积。
+- **最近几轮**：明细在 HISTORY；筛选表**别改回无衬线 / 满页宽**；**变量 = 投料表续篇**（`#vars` 槽 + 虚线；变量行挪到虚线下面、取消就回来）；候选名下拉 `CondCand.vue`；导出有「一页汇报卡（PDF）」。
 - **分支**：`try/record-kind`（回退 `git checkout main`），见 HISTORY。
 - **已完成**：v2 全功能已构建进 `public/`（4780 跑的就是 v2）；逐项清单在 `HISTORY.md`。
 - **半成品 / 待确认**：「本地结构图片识别（MolScribe 一类）」只讨论过、没做；部署到非 macOS 服务器时「存成 PDF」不可用（依赖 swift/WebKit）。
@@ -135,7 +135,7 @@
 - **编辑页的异步响应必须校验 id**：`load()` / `saveNow()` / `refreshAttachments()` 都是「发请求 → 等回来 → 写进 `exp`」，等待期间用户可能已经切到别的记录。回来时先比 `route.params.id` / `exp.id` 还是不是发请求时那一条，不是就整份丢弃——否则旧记录的附件会显示到新记录上，此时点 TLC 的 × 删的是那条旧记录的附件行和磁盘文件。**savedLabel / autosave 也是对同一个坑**：`flush()` 里 `lastSaved` 要记「请求发出那一刻」的快照，不能用返回时的（返回时可能已经又改了）。
 - **第 1 页很满**：结果块下面是 `.res-sel`（选择性测定）；加新行前先想余量。
 - **化合物编号**：新建时留空会由服务端 `nextCompoundCode()` 自动给号（库里最大的纯数字 + 1）；`POST /api/compounds` 带显式编号撞号仍然报 409（别改成自动加后缀，用户填的就该报错）；只有「产物存库」走 `uniqueCompoundCode()` 自动加 `-2`。**曾经踩过**：产物存库直接用实验编号当化合物编号，加了唯一索引后会撞号 500。
-- **`events` 是所有留痕的唯一来源**（**要能回溯**：每条 `changes` 带 `of/nf` 完整原值，`POST /api/history/:entity/:id/restore` 把某格改回去、投料表整表还原，恢复本身也留痕；`.backups/` 每天自动备一次，`ELN_AUTO_BACKUP=0` 关、`ELN_AUTO_BACKUP_HOURS` 调间隔）：新签名 `logEvent(entity, entityId, kind, { detail, fields, changes })`，老签名 `logEvent(expId, kind, detail)` 已废弃；`kind='edit'` 一定走 `logEdit(changes)`（`[{f,o,n}]`，服务端 5 分钟内合并，界面用 `fields` + `EXP_FIELD_LABELS/CMP_FIELD_LABELS` 拼中文、用 `changes` 展开改前改后）。**加新字段记得往这两个 label 表里补**，否则历史里显示英文字段名。
+- **`events` 是所有留痕的唯一来源**（**要能回溯**：每条 `changes` 带 `of/nf` 完整原值，`POST /api/history/:entity/:id/restore` 把某格改回去、投料表整表还原，恢复本身也留痕；`.backups/` 每天自动备一次，`ELN_AUTO_BACKUP=0` 关、`ELN_AUTO_BACKUP_HOURS` 调间隔）：新签名 `logEvent(entity, entityId, kind, { detail, fields, changes })`，老签名 `logEvent(expId, kind, detail)` 已废弃；`kind='edit'` 走 `logEdit(changes)`（`[{f,o,n}]`，5 分钟内合并）。**加新字段记得往这两个 label 表里补**，否则历史里显示英文字段名。
 - `node:sqlite` 需要 Node ≥ 22 且是实验特性，启动带 `NODE_OPTIONS=--disable-warning=ExperimentalWarning`。
 - 服务端 `listen` 失败会换端口 → 有多个 node 先 `lsof -nP -iTCP:4780 -sTCP:LISTEN` 查。
 - **「课题」和「分类」不是一回事**：课题是 `experiments.project` 文本字段，决定了**全站空间**（侧栏切换，统计/列表/导出跟着走），课题表本身不存在——清单来自 `GROUP BY project` 加 settings 里的 `projects_json`（用来记还没写记录的课题），每个课题的编号前缀存 `prefix:<课题>`（没设就按课题名自动生成，见 `derivedPrefix()`；实验编号按课题分开数）。分类是卡片墙里的分组，仍按分类走，两者叠加。
@@ -155,7 +155,7 @@
 - **溶剂是投料表的一行**（role=`溶剂`，「＋ 加溶剂」），`CondRow` 只剩温度/时间/气氛/装置/光照。老记录的 `fields.solvent` 由 `ensureSolventRow()` 补成表行；删光溶剂行时 `watch(solventFromTable)` 清字段。**溶剂行只填「量」**：MW / 当量 / mmol 三格是 `—` 也不参与计算（那三个计算里都跳过溶剂行），别再按当量折出 17 µL 那种数。**「用量」那格边打字只解析不回写**，失焦才规整成 `3 mL`（回写会吃字成「3mL23」）。
 - 结果区（`ResultBlock`）：`.row-del` 清空整行；产率表头 `∅` 切「不计产率」（`no_yield`）。新列走 `ensureColumn`。
 - Element Plus 的提示框要覆盖类名（`eln-toast` / `eln-messagebox`）。
-- **本机只有 Safari**：看版式用 `.cache/` 里 `swiftc` 编的 WKWebView 工具。
+- **本机只有 Safari**：版式用 `.cache/` 里的 WKWebView 工具看。
 - 依赖别升：Vue 3.5 / Vite 6 / EP 2.8 / openchemlib 9.25。
 
 ## 8. 用户怎么干活
