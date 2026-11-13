@@ -2300,6 +2300,8 @@ kbd {
 .sheet .rtable tr[data-tone] { --tone: var(--line-2); --tone-ink: var(--ink-2); }
 .sheet .rtable tr[data-tone="sub"] { --tone: #7c3315; --tone-ink: #7c3315; }
 .sheet .rtable tr[data-tone="base"] { --tone: #1f6c9f; --tone-ink: #1f6c9f; }
+/* 酸：青绿（跟「碱」的蓝、「配体」的墨绿都错开） */
+.sheet .rtable tr[data-tone="acid"] { --tone: #1b6e73; --tone-ink: #1b6e73; }
 .sheet .rtable tr[data-tone="cat"] { --tone: #6b4d8f; --tone-ink: #6b4d8f; }
 .sheet .rtable tr[data-tone="lig"] { --tone: #2f6b4f; --tone-ink: #2f6b4f; }
 .sheet .rtable tr[data-tone="sol"] { --tone: #8d8b84; --tone-ink: #8d8b84; }
@@ -2989,6 +2991,7 @@ kbd {
 
 .qchip[data-tone="sub"] { --tone: #7c3315; }
 .qchip[data-tone="base"] { --tone: #1f6c9f; }
+.qchip[data-tone="acid"] { --tone: #1b6e73; }
 .qchip[data-tone="cat"] { --tone: #6b4d8f; }
 .qchip[data-tone="lig"] { --tone: #2f6b4f; }
 .qchip[data-tone="sol"] { --tone: #8d8b84; }

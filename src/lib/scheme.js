@@ -20,6 +20,7 @@ import { roleTone } from './reagent.js';
 const TONE_COLOR = {
   sub: '#7c3315',
   base: '#1f6c9f',
+  acid: '#1b6e73',
   cat: '#6b4d8f',
   lig: '#2f6b4f',
   sol: '#8d8b84',

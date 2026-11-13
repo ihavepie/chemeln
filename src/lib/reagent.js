@@ -2,7 +2,7 @@ import { ref } from 'vue';
 
 /** 投料表用到的纯计算 —— 不碰 DOM，方便以后写测试。 */
 
-export const ROLES = ['底物', '试剂', '催化剂', '配体', '碱', '添加剂', '氧化剂', '还原剂', '溶剂', '其他'];
+export const ROLES = ['底物', '试剂', '催化剂', '配体', '碱', '酸', '添加剂', '氧化剂', '还原剂', '溶剂', '其他'];
 
 /** 组分在投料表里直接显示英文缩写（数据仍存中文，颜色 / 统计都按中文走） */
 export const ROLE_EN = {
@@ -11,6 +11,7 @@ export const ROLE_EN = {
   催化剂: 'Cat',
   配体: 'Lig',   // 别用 'L'：变量占位符就是 [L]，组分列也叫 L 会看混
   碱: 'Base',
+  酸: 'Acid',
   添加剂: 'Add',
   氧化剂: 'Ox',
   还原剂: 'Red',
@@ -24,6 +25,7 @@ export const ROLE_ALIAS = { lig: '配体', ligand: '配体', rg: '试剂', sub: 
 export const ROLE_TONE = {
   底物: 'sub',
   碱: 'base',
+  酸: 'acid',
   催化剂: 'cat',
   配体: 'lig',
   溶剂: 'sol',
