@@ -7582,7 +7582,8 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
   display: flex;
   align-items: baseline;
   gap: 6px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 10px 4px 5px;
   border: none;
   background: none;
@@ -7590,9 +7591,10 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
   font-size: 10.5px;
   letter-spacing: 0.06em;
   color: var(--ink-3);
-  cursor: pointer;
+  cursor: default;   /* 左键不再跳转，右键才是菜单 */
+  user-select: none;
 }
-.list-cat-head:hover { color: var(--ink); }
+.list-cat-row:hover .list-cat-head { color: var(--ink); }
 .list-cat-name { font-family: var(--mono); }
 .list-cat-count { font-family: var(--mono); font-size: 9.5px; color: var(--ink-4); }
 /* 空分类：一行淡淡的提示，拖东西过来时这一行会变高，别只有 20px 的落区 */

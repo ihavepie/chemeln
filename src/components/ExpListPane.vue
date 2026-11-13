@@ -7,7 +7,8 @@ import { store, loadList, loadBoot, recordCategories, addCategory, createExperim
 import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
 import { listDiff } from '../lib/expDiff.js';
-import { prompt, toast } from '../lib/feedback.js';
+import { confirm, prompt, toast } from '../lib/feedback.js';
+import { CTX_SEP, openCtxMenu } from '../lib/ctxmenu.js';
 import { createPointerSort } from '../lib/pointdrag.js';
 import { withFlip } from '../lib/flip.js';
 import { experimentMenu, groupMenu } from '../lib/rowmenu.js';
@@ -164,6 +165,55 @@ const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高�
    没记录的分类也留一行——那一行就是拖拽换分类的落点。
    在下拉里选了具体分类才平铺，不然看不出自己在看哪一段。 */
 const grouping = computed(() => !store.filters.category);
+
+/**
+ * 分类段头的右键菜单：左键不再「点一下就筛」（整列跳过去太容易误触），
+ * 该做的事都收进这里——只看这一类、在这里新建、改名、删掉（未分类那一段只有前两项）。
+ */
+function catMenu(ev, sec) {
+  const items = [
+    { key: 'only', label: `只看「${sec.name}」`, icon: 'search' },
+    { key: 'add', label: '在这里新建实验', icon: 'plus' },
+  ];
+  if (sec.catId != null) {
+    items.push(
+      CTX_SEP,
+      { key: 'rename', label: '重命名分类', icon: 'edit' },
+      { key: 'delete', label: '删除分类', icon: 'trash', danger: true }
+    );
+  }
+  openCtxMenu(ev, items, async (key) => {
+    if (key === 'only') return setFilter(sec.catId == null ? 'none' : String(sec.catId));
+    if (key === 'add') return createIn(sec);
+    if (key === 'rename') {
+      const name = await prompt({ title: '重命名分类', value: sec.name, confirmText: '改名' });
+      if (!name || name === sec.name) return;
+      try {
+        await api.saveCategory(sec.catId, { name });
+        await Promise.all([loadBoot(), loadList()]);
+      } catch (e) {
+        toast(e.message || '改不了', 'err');
+      }
+      return;
+    }
+    if (key === 'delete') {
+      const ok = await confirm({
+        title: `删除「${sec.name}」这个分类？`,
+        body: '分类里的记录会变成「未分类」，记录本身不会被删掉。',
+        confirmText: '删除',
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await api.deleteCategory(sec.catId);
+        if (String(store.filters.category) === String(sec.catId)) store.filters.category = '';
+        await Promise.all([loadBoot(), loadList()]);
+      } catch (e) {
+        toast(e.message || '删不掉', 'err');
+      }
+    }
+  });
+}
 
 /** 在某个分类段里新建一条实验（`catId = null` = 未分类那一段，明确落未分类） */
 async function createIn(sec) {
@@ -379,18 +429,13 @@ function onStackFace(row) {
         :data-drag-group="sec.key"
         :data-drag-count="sec.rows.length"
       >
-        <!-- 分类名点一下就把下拉切到这一类（再点一次别的分类才能回来）；
-             右边那颗＋就在这个分类里新建，别新建到「未分类」去 -->
-        <div v-if="grouping" class="list-cat-row">
-          <button
-            type="button"
-            class="list-cat-head"
-            :title="`只看「${sec.name}」`"
-            @click="setFilter(sec.catId == null ? 'none' : String(sec.catId))"
-          >
+        <!-- 分类这一行不在左键上做事（点一下就整列跳过去，太容易误触）：
+             **右键**出菜单（只看这一类 / 在这里新建 / 改名 / 删掉），右边那颗＋是新建 -->
+        <div v-if="grouping" class="list-cat-row" @contextmenu="catMenu($event, sec)">
+          <span class="list-cat-head">
             <span class="list-cat-name">{{ sec.name }}</span>
             <span class="list-cat-count">{{ sec.rows.length }}</span>
-          </button>
+          </span>
           <button
             type="button"
             class="list-cat-add"

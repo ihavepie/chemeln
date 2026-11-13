@@ -6,7 +6,7 @@ import { api } from '../api.js';
 import { store, loadBoot, loadCompounds, recordCategories, createCompound } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
-import { openCtxMenu } from '../lib/ctxmenu.js';
+import { CTX_SEP, openCtxMenu } from '../lib/ctxmenu.js';
 import { compoundMenu } from '../lib/rowmenu.js';
 import { compoundSourceLabel } from '../lib/ui.js';
 import { createPointerSort } from '../lib/pointdrag.js';
@@ -126,10 +126,22 @@ function groupMenu(ev, g) {
   openCtxMenu(
     ev,
     [
+      { key: 'only', label: `只看「${g.name}」`, icon: 'search' },
+      { key: 'add', label: '在这里新建化合物', icon: 'plus' },
+      CTX_SEP,
       { key: 'rename', label: '重命名分类', icon: 'edit' },
       { key: 'delete', label: '删除分类', icon: 'trash', danger: true },
     ],
     async (key) => {
+      if (key === 'only') {
+        store.compoundFilters.category = String(g.id);
+        await loadCompounds();
+        return;
+      }
+      if (key === 'add') {
+        create(g.id);
+        return;
+      }
       if (key === 'rename') {
         const name = await prompt({ title: '重命名分类', value: g.name, confirmText: '改名' });
         if (!name || name === g.name) return;
