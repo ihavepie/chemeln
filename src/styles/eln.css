@@ -2160,23 +2160,25 @@ kbd {
 /* 右侧留出放大镜的位置，长名字别压在图标上 */
 .rtable .name-cell input { padding-right: 22px; }
 /* 试剂名右侧的「去 PubChem 查」：平时几乎看不见，hover 才显形，不抢正文 */
-/* 名称格右边两颗小按钮：常用的「从化合物库选一个」贴右，PubChem 那颗让到左边一格 */
+/* 名称格右边的小按钮：常用的「从化合物库选一个」（六边形，平时就露着，用户之前圈出来问
+   「要不要明显一点」）贴右；PubChem 那颗让到左边一格、鼠标进这一行才露 */
 .name-browse {
-  position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
-  width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 4px; background: transparent; color: #d2cdc4;
-  cursor: pointer; padding: 0; opacity: 0.3; transition: opacity .12s;
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 19px; height: 19px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: #9e978a;
+  cursor: pointer; padding: 0; opacity: 0.7; transition: opacity .12s, color .12s;
 }
-/* 平时淡淡地露一点（不然谁也不知道这儿能点），鼠标进这一行就显形 */
-.rtable tr:hover .name-browse, .name-browse:focus-visible { opacity: 1; }
+.rtable tr:hover .name-browse, .name-browse:focus-visible { opacity: 1; color: #6f665c; }
 .name-browse:hover { color: #6f665c; background: #f1ece4; }
 .name-lookup {
-  position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
-  width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 4px; background: transparent; color: #d2cdc4;
-  cursor: pointer; padding: 0; opacity: 0; transition: opacity .12s;
+  position: absolute; right: 23px; top: 50%; transform: translateY(-50%);
+  width: 19px; height: 19px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: #9e978a;
+  cursor: pointer; padding: 0; opacity: 0; transition: opacity .12s, color .12s;
 }
-.rtable tr:hover .name-lookup, .name-lookup:focus-visible { opacity: 1; }
+/* PubChem 那颗平时不摆出来（MW 本来就是按名字自动查的，重查走「说明」格里的核对浮层），
+   鼠标进这一行才露——平时只有一颗明确的「库」按钮 */
+.rtable tr:hover .name-lookup, .name-lookup:focus-visible { opacity: 1; color: #6f665c; }
 .name-lookup:hover { color: #6f665c; background: #f1ece4; }
 /* 这个名字 PubChem 里没有（自造缩写 / 金属配合物）：右上角一个小暖点，
    不弹提示、不挡录数据，鼠标移上去才解释「手填 MW 就会记住」 */

@@ -1467,7 +1467,7 @@ function onDrop(ev) {
                   title="从化合物库选一个（也可以直接输名字）"
                   @click.stop="openBrowse(r)"
                 >
-                  <Icon name="molecule" :size="11" />
+                  <Icon name="molecule" :size="13" />
                 </button>
                 <button
                   v-if="!locked && String(r.name || '').trim() && !r.compound_id"
@@ -1477,7 +1477,7 @@ function onDrop(ev) {
                   title="按名字去 PubChem 查 MW / 密度"
                   @click.stop="recheck(r)"
                 >
-                  <Icon name="search" :size="10" />
+                  <Icon name="search" :size="12" />
                 </button>
 
                 <!-- 结构式预览：这一行链了库里的化合物，鼠标移上来就显示 -->
