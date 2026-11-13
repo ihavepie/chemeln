@@ -2160,8 +2160,18 @@ kbd {
 /* 右侧留出放大镜的位置，长名字别压在图标上 */
 .rtable .name-cell input { padding-right: 22px; }
 /* 试剂名右侧的「去 PubChem 查」：平时几乎看不见，hover 才显形，不抢正文 */
+/* 名称格右边两颗小按钮：常用的「从化合物库选一个」贴右，PubChem 那颗让到左边一格 */
+.name-browse {
+  position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+  width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: #d2cdc4;
+  cursor: pointer; padding: 0; opacity: 0.3; transition: opacity .12s;
+}
+/* 平时淡淡地露一点（不然谁也不知道这儿能点），鼠标进这一行就显形 */
+.rtable tr:hover .name-browse, .name-browse:focus-visible { opacity: 1; }
+.name-browse:hover { color: #6f665c; background: #f1ece4; }
 .name-lookup {
-  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
   width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 4px; background: transparent; color: #d2cdc4;
   cursor: pointer; padding: 0; opacity: 0; transition: opacity .12s;

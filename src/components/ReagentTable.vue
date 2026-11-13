@@ -222,6 +222,12 @@ function pinPreview(r) {
   preview.open = true;
 }
 
+/** 点这一格才显示结构卡；点在输入框、按钮、已经弹出的卡上不算（以前点进名字框也会弹一张，把下面的行挡住） */
+function onNameCellClick(r, ev) {
+  if (ev.target.closest?.('input, button, .cmp-pop, .cmp-pick')) return;
+  pinPreview(r);
+}
+
 function unpinPreview() {
   preview.pinned = false;
   preview.open = false;
@@ -1423,7 +1429,7 @@ function onDrop(ev) {
                 </div>
 
               </td>
-              <td class="name-cell" @click="pinPreview(r)">
+              <td class="name-cell" @click="onNameCellClick(r, $event)">
                 <input
                   data-f="name"
                   :value="r.name"
@@ -1436,8 +1442,18 @@ function onDrop(ev) {
                   @change="onName(r, true)"
                   @keydown="onKeydown($event, r, 'name')"
                   @blur="onNameBlur(r)"
-                  @dblclick.prevent="openBrowse(r)"
                 />
+                <!-- 「从化合物库选一个」以前藏在双击里：点一下名字框、再点一下（想挪光标）就会被当成双击弹出来，
+                     现在给一颗明确的小按钮，双击不再触发任何弹窗 -->
+                <button
+                  v-if="!locked && !r.compound_id"
+                  type="button"
+                  class="name-browse noprint"
+                  title="从化合物库选一个（也可以直接输名字）"
+                  @click.stop="openBrowse(r)"
+                >
+                  <Icon name="molecule" :size="11" />
+                </button>
                 <button
                   v-if="!locked && String(r.name || '').trim() && !r.compound_id"
                   type="button"
