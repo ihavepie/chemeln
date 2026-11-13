@@ -6,6 +6,7 @@ import CompoundsView from './views/CompoundsView.vue';
 import CompoundDetail from './views/CompoundDetail.vue';
 import ScreeningsView from './views/ScreeningsView.vue';
 import ScreeningView from './views/ScreeningView.vue';
+import CompareView from './views/CompareView.vue';
 import SettingsView from './views/SettingsView.vue';
 import TrashView from './views/TrashView.vue';
 import ReagentLibView from './views/ReagentLibView.vue';
@@ -30,6 +31,7 @@ export const router = createRouter({
     },
     { path: '/screenings', name: 'screenings', component: ScreeningsView },
     { path: '/s/:id', name: 'screening', component: ScreeningView },
+    { path: '/compare', name: 'compare', component: CompareView },
     { path: '/reagents', name: 'reagents', component: ReagentLibView },
     { path: '/trash', name: 'trash', component: TrashView },
     { path: '/settings', name: 'settings', component: SettingsView },

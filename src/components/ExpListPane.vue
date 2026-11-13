@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import CatPick from './CatPick.vue';
+import ExpPick from './ExpPick.vue';
 import { store, loadList, loadBoot, recordCategories, addCategory, createExperiment } from '../store.js';
 import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
@@ -215,7 +216,20 @@ function catMenu(ev, sec) {
   });
 }
 
-/** 在某个分类段里新建一条实验（`catId = null` = 未分类那一段，明确落未分类） */
+/** 「与另一条对照」：卡片右键里挑，选完并排打开 /compare */
+const compareFrom = ref(null);
+function askCompare(it) {
+  compareFrom.value = it || null;
+}
+function onComparePicked(list) {
+  const id = Number((list || [])[0]);
+  const from = compareFrom.value;
+  compareFrom.value = null;
+  if (!id || !from) return;
+  router.push(`/compare?a=${from.id}&b=${id}`);
+}
+
+/** 在某个分类段里新建一条实验（`catId == null` = 未分类那一段，明确落未分类） */
 async function createIn(sec) {
   const exp = await createExperiment(sec.catId == null ? null : sec.catId);
   router.push(`/e/${exp.id}`);
@@ -459,7 +473,7 @@ function onStackFace(row) {
           :data-drag-index="ri"
           @mousedown="onRowDown($event, row)"
           @click="goRow(row.one.id)"
-          @contextmenu="experimentMenu($event, row.one, router, { category: sec.catId == null ? null : { id: sec.catId, name: sec.name } })"
+          @contextmenu="experimentMenu($event, row.one, router, { category: sec.catId == null ? null : { id: sec.catId, name: sec.name }, onCompare: askCompare })"
         >
           <div class="top">
             <span class="exp-code">{{ row.one.code }}</span>
@@ -598,6 +612,15 @@ function onStackFace(row) {
         <div v-if="showSlot(sec, sec.rows.length)" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
         <div v-if="grouping && !sec.rows.length" class="list-cat-blank">拖一条记录到这里</div>
       </section>
+
+      <ExpPick
+        :model-value="!!compareFrom"
+        title="跟哪条记录对照？"
+        confirm-text="并排看"
+        :exclude="compareFrom ? [compareFrom.id] : []"
+        @close="compareFrom = null"
+        @confirm="onComparePicked"
+      />
 
       <div v-if="!store.items.length" class="empty-note">
         {{ store.filters.q ? '无匹配记录' : '暂无实验记录。' }}
