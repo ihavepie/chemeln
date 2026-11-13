@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import ExpPick from '../components/ExpPick.vue';
@@ -13,8 +13,9 @@ import { DEFAULT_FIELDS } from '../lib/sctfields.js';
 import { eqLabel, num, round } from '../lib/reagent.js';
 
 /**
- * 把**多条**实验摊在一起：反应式 / TLC 并排，条件、投料、结果逐行对齐，
- * 不一样的地方标出来，底下写结论——顺手能存成一张筛选表（进「条件筛选 → 我的筛选表」）。
+ * 把**多条**实验摊在一起：反应式 / 结果 / TLC 一条一列，下面只列「不一样」的行。
+ * 相同的一律收进一行「相同」（点开才摊平），一条都没填的行直接不出现——
+ * 用户要的是信息陈列：变的那一两行要一眼看见，别被九成相同的行埋掉。
  * 只读，不改任何记录。
  */
 const route = useRoute();
@@ -100,12 +101,21 @@ const mass = (v) => (num(v) == null ? '' : `${round(num(v), 4)} g`);
 const pct = (v) => (num(v) == null ? '' : `${round(num(v), 1)}%`);
 const scale = (e) => (num(e.base_mmol) == null ? '' : `${round(num(e.base_mmol), 3)} mmol`);
 
-/** 一行：各条记录在这格的值 + 是否「不全一样」 */
-function row(label, getter) {
-  const vals = exps.value.map((e) => txt(getter(e)));
-  const filled = vals.filter((v) => v !== '');
-  return { label, vals, diff: filled.length > 1 && new Set(filled).size > 1 };
+/**
+ * 一行 = 一个字段在各条记录里的值，分三档：
+ * `empty` 一条都没填（不显示）、`same` 每条都有值且全一样（收进「相同」）、`diff` 其余（摊在表里）。
+ * 注意 `same` 要求**每条都填了**：只有一条填了值（`RuPhos — — 20 mol%`）是加/去试剂，
+ * 属于差异，不能因为「去重后只剩一个值」就当成相同（踩过）。
+ * 以前这两种都照原样画出来，于是满屏「—」和整片一样的行，真正变的那一两行反而找不着。
+ */
+function rowOf(label, vals) {
+  const norm = vals.map((v) => String(v == null ? '' : v).trim());
+  const filled = norm.filter(Boolean).length;
+  const empty = filled === 0;
+  const same = !empty && filled === norm.length && new Set(norm).size === 1;
+  return { label, vals, empty, same, diff: !empty && !same };
 }
+const row = (label, getter) => rowOf(label, exps.value.map((e) => txt(getter(e))));
 
 const condRows = computed(() => [
   row('溶剂', (e) => e.solvent),
@@ -117,12 +127,13 @@ const condRows = computed(() => [
   row('反应规模', (e) => scale(e)),
 ]);
 
+/** `minor` = 派生量（MW / 质量算得出来），只在「全部字段」里露 —— 摆出来只会挤掉真正要看的那两行 */
 const resultRows = computed(() => [
   row('产物', (e) => e.product_name),
-  row('产物 MW', (e) => mw(e.product_mw)),
-  row('质量', (e) => mass(e.product_mass)),
   row('产率', (e) => (Number(e.no_yield) === 1 ? '不计' : pct(e.yield_pct))),
   row('选择性', (e) => e.dr_ee),
+  { ...row('产物 MW', (e) => mw(e.product_mw)), minor: true },
+  { ...row('质量', (e) => mass(e.product_mass)), minor: true },
 ]);
 
 /** 投料：按试剂名对齐（同一行 = 同一个试剂在各条记录里的当量） */
@@ -138,20 +149,68 @@ const reagentRows = computed(() => {
     return m;
   });
   const keys = [...new Set(maps.flatMap((m) => [...m.keys()]))];
-  return keys.map((k) => {
-    const vals = maps.map((m) => m.get(k) || '');
-    const filled = vals.filter(Boolean);
-    return { name: k, vals, diff: filled.length > 1 && new Set(filled).size > 1 };
-  });
+  return keys.map((k) => rowOf(k, maps.map((m) => m.get(k) || '')));
 });
 
+/** 分段按因果顺序排：条件 → 投料 → 结果（结果压在最下面，读起来跟筛选表一样） */
+const sections = computed(() => [
+  { key: 'cond', title: '条件', rows: condRows.value },
+  { key: 'reag', title: '投料（当量）', rows: reagentRows.value },
+  { key: 'res', title: '结果', rows: resultRows.value },
+]);
+
+/* 折叠：默认只看差异；「全部字段」摊开所有（空行这时才以「—」出现） */
+const showAll = ref(false);
+const openSame = reactive({});
+// 只挑了一条记录时没啥可折叠的，照旧整张列出来
+const allRows = computed(() => showAll.value || picked.value.length < 2);
+
+const sectionHas = (sec) => {
+  const list = visible(sec);
+  return list.length > 0 && (allRows.value || list.some((r) => r.diff || r.same));
+};
+/** 「全部字段」时什么都不筛；平时派生量（MW / 质量）和一条都没填的行都不出现 */
+function visible(sec) {
+  return showAll.value ? sec.rows : sec.rows.filter((r) => !r.minor && !r.empty);
+}
+function rowsOf(sec) {
+  const list = visible(sec);
+  if (allRows.value) return list;
+  const diff = list.filter((r) => r.diff);
+  return openSame[sec.key] ? [...diff, ...list.filter((r) => r.same)] : diff;
+}
+const sameOf = (sec) => (allRows.value || openSame[sec.key] ? [] : visible(sec).filter((r) => r.same));
+const sameSummary = (sec) =>
+  sameOf(sec)
+    .map((r) => {
+      const v = r.vals.find((x) => String(x || '').trim()) || '';
+      // 只有「—」的行（试剂没填当量）就别写成「RuPhos —」，光留个名字
+      return v && v !== '—' ? `${r.label} ${v}` : r.label;
+    })
+    .join(' · ');
+function toggleSame(key) {
+  openSame[key] = !openSame[key];
+}
+
+/* ---------- 每条一列：结果放大（产率 + 相对第一列差多少） ---------- */
+const yieldValue = (e) => (e && Number(e.no_yield) === 1 ? null : num(e.yield_pct));
+const yieldText = (e) => {
+  const y = yieldValue(e);
+  return y == null ? (Number(e.no_yield) === 1 ? '不计' : '—') : `${round(y, 1)}%`;
+};
+const selText = (e) => txt(e.dr_ee) || (num(e.ee_pct) == null ? '' : `${e.ee_pct}% ee`);
+// 基准 = 挑进来的第一条；只有它自己时不给差量
+const baseYield = computed(() => (picked.value.length > 1 ? yieldValue(picked.value[0]) : null));
+function yieldDelta(e) {
+  const y = yieldValue(e);
+  if (baseYield.value == null || y == null) return '';
+  const d = Math.round((y - baseYield.value) * 10) / 10;
+  if (!d) return '';
+  return `${d > 0 ? '+' : '−'}${Math.abs(d)}`;
+}
+
 /** 顶部：哪几行不一样 */
-const diffLabels = computed(() => {
-  const out = [];
-  for (const r of [...condRows.value, ...resultRows.value]) if (r.diff) out.push(r.label);
-  for (const r of reagentRows.value) if (r.diff) out.push(r.name);
-  return out;
-});
+const diffLabels = computed(() => sections.value.flatMap((s) => s.rows.filter((r) => r.diff).map((r) => r.label)));
 
 /* ---------- TLC ---------- */
 const tlcOf = (e) => ((e && e.attachments) || []).filter((at) => (at.category || '') === 'tlc');
@@ -221,8 +280,8 @@ async function saveAsScreening() {
         <div>
           <h1 class="page-title">对照</h1>
           <p class="page-desc">
-            把几条记录摊在一起：反应式、TLC 排在前面，条件 / 投料 / 结果逐行对齐，<b>不一样的地方标出来</b>，
-            底下可以直接写结论，顺手存成一张筛选表。只读，不改记录。
+            一条一列摊开，下面<b>只列不一样的行</b>——一样的收进「相同」，没填的不出现；
+            结论自己写，顺手能存成一张筛选表。
           </p>
         </div>
         <span class="spacer" />
@@ -243,23 +302,33 @@ async function saveAsScreening() {
           <Icon name="plus" :size="12" /> {{ picked.length ? '再加一条' : '挑记录' }}
         </button>
         <button v-if="picked.length" class="btn btn-sm btn-ghost" @click="go([])">清空</button>
+        <span class="spacer" />
+        <button v-if="picked.length" class="btn btn-sm btn-ghost" @click="showAll = !showAll">
+          {{ showAll ? '只看差异' : '全部字段' }}
+        </button>
       </div>
 
       <div v-if="loading" class="cmp-empty">读取中…</div>
       <div v-else-if="!picked.length" class="cmp-empty">
-        先挑两条记录（最多 5 条）——条件、投料、结果会按行对齐，不同的地方标出来。
+        先挑两条记录（最多 5 条）——条件、投料、结果会按行对齐，不一样的地方摊在前面。
       </div>
 
       <template v-else>
-        <!-- 并排：反应式 + TLC -->
+        <!-- 并排：反应式 → 结果 → TLC -->
         <div class="cmp-visual" :style="{ '--cmp-cols': Math.min(picked.length, 4) }">
           <section v-for="(e, i) in picked" :key="`v${e.id}`" class="cmp-col">
             <div class="cmp-col-head">
               <span class="mono">{{ e.code }}</span>
+              <span v-if="i === 0 && picked.length > 1" class="cmp-base-tag">基准</span>
               <span class="cmp-col-date">{{ e.date }}</span>
             </div>
             <div v-if="svgs[i]" class="cmp-scheme" v-html="svgs[i]" />
             <div v-else class="cmp-scheme cmp-scheme-empty">（还没有能画的反应式）</div>
+            <div v-if="yieldText(e) !== '—' || selText(e)" class="cmp-res">
+              <span class="cmp-res-y mono">{{ yieldText(e) }}</span>
+              <span v-if="yieldDelta(e)" class="cmp-res-d mono">{{ yieldDelta(e) }}</span>
+              <span v-if="selText(e)" class="cmp-res-sel">{{ selText(e) }}</span>
+            </div>
             <div v-if="tlcOf(e).length" class="cmp-tlc">
               <figure v-for="at in tlcOf(e)" :key="at.id">
                 <img
@@ -275,7 +344,7 @@ async function saveAsScreening() {
           </section>
         </div>
 
-        <!-- 逐行对齐 -->
+        <!-- 逐行对齐：只有差异行 + 一行折叠的「相同」 -->
         <table class="cmp-table cmp-multi">
           <thead>
             <tr>
@@ -284,22 +353,37 @@ async function saveAsScreening() {
             </tr>
           </thead>
           <tbody>
-            <tr class="cmp-sec"><td :colspan="picked.length + 1">条件</td></tr>
-            <tr v-for="r in condRows" :key="`c${r.label}`" :class="{ 'is-diff': r.diff }">
-              <th>{{ r.label }}</th>
-              <td v-for="(v, i) in r.vals" :key="i">{{ v || '—' }}</td>
-            </tr>
-            <tr class="cmp-sec"><td :colspan="picked.length + 1">结果</td></tr>
-            <tr v-for="r in resultRows" :key="`r${r.label}`" :class="{ 'is-diff': r.diff }">
-              <th>{{ r.label }}</th>
-              <td v-for="(v, i) in r.vals" :key="i">{{ v || '—' }}</td>
-            </tr>
-            <template v-if="reagentRows.length">
-              <tr class="cmp-sec"><td :colspan="picked.length + 1">投料（当量）</td></tr>
-              <tr v-for="r in reagentRows" :key="`g${r.name}`" :class="{ 'is-diff': r.diff }">
-                <th>{{ r.name }}</th>
-                <td v-for="(v, i) in r.vals" :key="i">{{ v || '—' }}</td>
-              </tr>
+            <template v-for="sec in sections" :key="sec.key">
+              <template v-if="sectionHas(sec)">
+                <tr class="cmp-sec"><td :colspan="picked.length + 1">{{ sec.title }}</td></tr>
+                <tr
+                  v-for="r in rowsOf(sec)"
+                  :key="`${sec.key}-${r.label}`"
+                  :class="{ 'is-diff': r.diff && picked.length > 1, 'is-same': r.same && picked.length > 1 }"
+                >
+                  <th>{{ r.label }}</th>
+                  <td v-for="(v, i) in r.vals" :key="i">{{ v || '—' }}</td>
+                </tr>
+                <tr v-if="sameOf(sec).length" class="cmp-same-row">
+                  <th>相同</th>
+                  <td :colspan="picked.length">
+                    <button class="cmp-same-tog" :title="`展开这 ${sameOf(sec).length} 项`" @click="toggleSame(sec.key)">
+                      <span class="cmp-same-txt">{{ sameSummary(sec) }}</span>
+                      <span class="cmp-same-n">{{ sameOf(sec).length }} 项</span>
+                      <Icon name="down" :size="10" />
+                    </button>
+                  </td>
+                </tr>
+                <tr v-else-if="!allRows && openSame[sec.key]" class="cmp-same-row">
+                  <th>相同</th>
+                  <td :colspan="picked.length">
+                    <button class="cmp-same-tog" @click="toggleSame(sec.key)">
+                      <span class="cmp-same-txt">收起</span>
+                      <Icon name="arrow-left" :size="10" />
+                    </button>
+                  </td>
+                </tr>
+              </template>
             </template>
           </tbody>
         </table>

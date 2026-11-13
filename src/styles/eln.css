@@ -9390,3 +9390,35 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   outline: none;
 }
 .cmp-note-input:focus { border-color: var(--ink-4); background: #fdfcf9; }
+
+/* ---------- 对照页：干净陈列（相同折叠 / 空行不显示 / 结果放大） ---------- */
+/* 挑记录那一行末尾的「全部字段」靠右："spacer 只在各自容器里才 flex" */
+.cmp-picks .spacer { flex: 1; }
+/* 第一条列上那颗「基准」小签：下面的产率差量是相对它算的 */
+.cmp-base-tag {
+  display: inline-flex; align-items: center; height: 14px; padding: 0 5px;
+  border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 9px; letter-spacing: 0.04em;
+}
+/* 每条一列的结果条：产率放大成一眼能比的大小，右边挂选择性 */
+.cmp-res { display: flex; align-items: baseline; gap: 5px; margin-top: 9px; }
+.cmp-res-y { font-size: 17px; line-height: 1; color: var(--ink); letter-spacing: -0.01em; }
+.cmp-res-d { font-size: 10.5px; color: var(--accent-ink); }
+.cmp-res-sel { margin-left: auto; font-size: 10.5px; color: var(--ink-3); }
+/* 「相同」那一行：点开才把这几行摊平 */
+.cmp-table tr.is-same > th { color: var(--ink-4); }
+.cmp-table tr.is-same > td { color: var(--ink-3); }
+.cmp-same-row > th { color: var(--ink-4); font-size: 10px; }
+.cmp-same-row > td { padding-top: 2px; }
+.cmp-same-tog {
+  display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%;
+  padding: 2px 0; border: 0; background: transparent;
+  color: var(--ink-3); font: inherit; font-size: 11px; text-align: left; cursor: pointer;
+}
+.cmp-same-tog:hover { color: var(--ink); }
+.cmp-same-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-same-n { flex: 0 0 auto; color: var(--ink-4); font-size: 10px; }
+.cmp-same-tog svg { flex: 0 0 auto; align-self: center; }
+/* 对照页的 TLC 只为「看一眼」，压到 190 高；不裁图（height auto + contain），
+   否则三张板图占满一屏、变量表要滚下去才看得见 */
+.cmp-col .cmp-tlc img { max-height: 190px; }
