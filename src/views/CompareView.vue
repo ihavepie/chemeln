@@ -189,7 +189,8 @@ function openRecord(id) {
         </div>
         <span class="spacer" />
         <span v-if="diffLabels.length" class="cmp-diffsum">
-          不同：<b>{{ diffLabels.join(' · ') }}</b>
+          不同：<b>{{ diffLabels.slice(0, 7).join(' · ') }}</b>
+          <template v-if="diffLabels.length > 7"> 等 {{ diffLabels.length }} 处</template>
         </span>
       </header>
 

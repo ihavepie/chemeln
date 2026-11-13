@@ -100,6 +100,10 @@ export const ICONS = {
     "vb": "0 0 24 24",
     "inner": "<circle cx=\"6\" cy=\"12\" r=\"1.5\" fill=\"currentColor\"/><circle cx=\"12\" cy=\"12\" r=\"1.5\" fill=\"currentColor\"/><circle cx=\"18\" cy=\"12\" r=\"1.5\" fill=\"currentColor\"/>"
   },
+  "compare": {
+    "vb": "0 0 24 24",
+    "inner": "<rect x=\"3.2\" y=\"4.6\" width=\"7.4\" height=\"14.8\" rx=\"1.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/><rect x=\"13.4\" y=\"4.6\" width=\"7.4\" height=\"14.8\" rx=\"1.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/>"
+  },
   "molecule": {
     "vb": "0 0 24 24",
     "inner": "<path d=\"M12 3.4l6.6 3.8v7.6L12 18.6l-6.6-3.8V7.2z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"12\" cy=\"3.4\" r=\"1.4\" fill=\"currentColor\"/><circle cx=\"18.6\" cy=\"15\" r=\"1.4\" fill=\"currentColor\"/><circle cx=\"5.4\" cy=\"15\" r=\"1.4\" fill=\"currentColor\"/>"

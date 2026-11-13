@@ -22,6 +22,7 @@ const nav = computed(() => {
     { key: 'compounds', to: '/compounds', label: '化合物库', ic: 'molecule', count: b?.compoundCount ?? '' },
     { key: 'reagents', to: '/reagents', label: '试剂库', ic: 'flask', count: b?.reagentCount ?? '' },
     { key: 'screenings', to: '/screenings', label: '条件筛选', ic: 'table', count: b?.totals?.groups ?? '' },
+    { key: 'compare', to: '/compare', label: '对照', ic: 'compare', count: '' },
     { key: 'trash', to: '/trash', label: '回收站', ic: 'trash', count: b?.trashCount || '' },
     { key: 'settings', to: '/settings', label: '设置', ic: 'settings', count: '' },
   ];
