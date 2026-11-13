@@ -428,10 +428,11 @@ function onStackFace(row) {
         :class="{ 'is-drop-target': drop && drop.key === sec.key }"
         :data-drag-group="sec.key"
         :data-drag-count="sec.rows.length"
+        @contextmenu="catMenu($event, sec)"
       >
         <!-- 分类这一行不在左键上做事（点一下就整列跳过去，太容易误触）：
              **右键**出菜单（只看这一类 / 在这里新建 / 改名 / 删掉），右边那颗＋是新建 -->
-        <div v-if="grouping" class="list-cat-row" @contextmenu="catMenu($event, sec)">
+        <div v-if="grouping" class="list-cat-row">
           <span class="list-cat-head">
             <span class="list-cat-name">{{ sec.name }}</span>
             <span class="list-cat-count">{{ sec.rows.length }}</span>
@@ -458,7 +459,7 @@ function onStackFace(row) {
           :data-drag-index="ri"
           @mousedown="onRowDown($event, row)"
           @click="goRow(row.one.id)"
-          @contextmenu="experimentMenu($event, row.one, router)"
+          @contextmenu="experimentMenu($event, row.one, router, { category: sec.catId == null ? null : { id: sec.catId, name: sec.name } })"
         >
           <div class="top">
             <span class="exp-code">{{ row.one.code }}</span>

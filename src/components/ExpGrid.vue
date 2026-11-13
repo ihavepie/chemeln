@@ -341,7 +341,7 @@ function groupMenu(ev, g) {
                 :data-drag-index="ci"
                 @mousedown="onCardDown($event, card)"
                 @click="openCard(card)"
-                @contextmenu="experimentMenu($event, card.it, router, { groupSize: card.members.length })"
+                @contextmenu="experimentMenu($event, card.it, router, { groupSize: card.members.length, category: g.id == null ? null : { id: g.id, name: g.name } })"
               >
                 <div
                   class="grid-thumb"
@@ -387,7 +387,7 @@ function groupMenu(ev, g) {
               :data-drag-index="ci"
               @mousedown="onCardDown($event, card)"
               @click="openCard(card)"
-              @contextmenu="experimentMenu($event, card.it, router)"
+              @contextmenu="experimentMenu($event, card.it, router, { category: g.id == null ? null : { id: g.id, name: g.name } })"
             >
               <div
                   class="grid-thumb"

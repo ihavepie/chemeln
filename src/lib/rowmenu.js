@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { loadBoot, loadCompounds, loadList, store } from '../store.js';
+import { createCompound, createExperiment, loadBoot, loadCompounds, loadList, store } from '../store.js';
 import { confirm, toast } from './feedback.js';
 import { CTX_SEP, openCtxMenu } from './ctxmenu.js';
 import { printCompoundLabel } from './label.js';
@@ -50,6 +50,26 @@ async function removeExperiment(it, router) {
   }
 }
 
+/** 在某个分类里新建一条实验并跳进去（课题跟着分类走，见 store.createExperiment） */
+async function newInCategory(cat, router) {
+  try {
+    const e = await createExperiment(cat.id);
+    router.push(`/e/${e.id}`);
+  } catch (err) {
+    toast(err.message || '建不了新记录', 'err');
+  }
+}
+
+/** 在某个分类里新建一个化合物档案并跳进去 */
+async function newCompoundInCategory(cat, router) {
+  try {
+    const c = await createCompound(cat.id);
+    router.push(`/c/${c.id}`);
+  } catch (err) {
+    toast(err.message || '建不了新档案', 'err');
+  }
+}
+
 async function newParallel(it, router) {
   try {
     const e = await api.parallel(it.id);
@@ -89,6 +109,8 @@ async function toggleLock(it) {
 export function experimentMenu(ev, it, router, opts = {}) {
   const items = [];
   const size = Number(opts.groupSize || 0);
+  // 在某个分类里右键（`opts.category`）：多一项「就在这个分类里新建」，不用先切筛选
+  const cat = opts.category || null;
   items.push(
     { key: 'open', label: '打开记录', icon: 'file' },
     { key: 'parallel', label: '新建平行实验', icon: 'plus' },
@@ -98,8 +120,20 @@ export function experimentMenu(ev, it, router, opts = {}) {
     CTX_SEP,
     { key: 'delete', label: size > 1 ? '只删这条' : '移入回收站', icon: 'trash', danger: true }
   );
+  if (cat && cat.id != null) {
+    items.push(
+      CTX_SEP,
+      { key: 'here', label: `在「${cat.name}」里新建实验`, icon: 'plus' },
+      { key: 'onlyhere', label: `只看「${cat.name}」`, icon: 'search' }
+    );
+  }
   openCtxMenu(ev, items, (key) => {
     if (key === 'open') return void router.push(`/e/${it.id}`);
+    if (key === 'here') return void newInCategory(cat, router);
+    if (key === 'onlyhere') {
+      store.filters.category = String(cat.id);
+      return void loadList();
+    }
     if (key === 'parallel') return void newParallel(it, router);
     if (key === 'duplicate') return void duplicateExperiment(it, router);
     if (key === 'lock') return void toggleLock(it);
@@ -127,7 +161,8 @@ async function removeCompound(c, router) {
 }
 
 /** 化合物卡片右键：列表行里就带结构 id，瓶签直接能打 */
-export function compoundMenu(ev, c, router) {
+export function compoundMenu(ev, c, router, opts = {}) {
+  const cat = opts.category || null;
   const items = [
     { key: 'open', label: '打开档案', icon: 'file' },
     { key: 'label', label: '打印瓶签', icon: 'print' },
@@ -135,7 +170,19 @@ export function compoundMenu(ev, c, router) {
     CTX_SEP,
     { key: 'delete', label: '移入回收站', icon: 'trash', danger: true },
   ];
+  if (cat && cat.id != null) {
+    items.push(
+      CTX_SEP,
+      { key: 'here', label: `在「${cat.name}」里新建化合物`, icon: 'plus' },
+      { key: 'onlyhere', label: `只看「${cat.name}」`, icon: 'search' }
+    );
+  }
   openCtxMenu(ev, items, (key) => {
+    if (key === 'here') return void newCompoundInCategory(cat, router);
+    if (key === 'onlyhere') {
+      store.compoundFilters.category = String(cat.id);
+      return void loadCompounds();
+    }
     if (key === 'open') return void router.push(`/c/${c.id}`);
     if (key === 'label') return void printCompoundLabel(c, { owner: store.boot?.settings?.owner_name });
     if (key === 'copycode') return void copyText(c.code, '编号');

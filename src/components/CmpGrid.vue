@@ -230,7 +230,7 @@ function groupMenu(ev, g) {
               :data-drag-index="ci"
               @mousedown="onCardDown($event, c)"
               @click="openCard(c)"
-              @contextmenu="compoundMenu($event, c, router)"
+              @contextmenu="compoundMenu($event, c, router, { category: g.id == null ? null : { id: g.id, name: g.name } })"
             >
               <div class="grid-thumb is-structure">
                 <img v-if="c.structure_id" :src="`/api/compound-files/${c.structure_id}`" alt="" loading="lazy" draggable="false" />
