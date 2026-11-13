@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api } from '../api.js';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 import { compoundDict, store } from '../store.js';
 
 /**
@@ -120,6 +121,7 @@ function onFocus() {
   if (props.disabled) return;
   q.value = '';
   hi.value = -1;
+  markPopupOpen();
   open.value = true;
   ensureLib();
   nextTick(() => requestAnimationFrame(measure));
@@ -129,6 +131,7 @@ function onInput(ev) {
   emit('update:modelValue', ev.target.value);
   q.value = ev.target.value;
   hi.value = -1;
+  markPopupOpen();
   open.value = true;
   ensureLib();
   nextTick(() => requestAnimationFrame(measure));
@@ -159,6 +162,7 @@ function onKey(ev) {
 }
 
 function onDocDown(ev) {
+  if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (!open.value) return;
   if (!wrap.value?.contains(ev.target)) open.value = false;
 }

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import { store, loadBoot, loadList, setProject, addProject, createCompound } from '../store.js';
@@ -53,6 +54,7 @@ function toggleProjects() {
     projPos.value = { top: Math.round(r.bottom + 5), left: Math.round(r.left), width: Math.max(140, Math.round(r.width) + 16) };
   }
   projOpen.value = !projOpen.value;
+  if (projOpen.value) markPopupOpen();
 }
 
 /** 当前课题的前缀（品牌副标题跟着显示，一眼知道自己在哪个本子里） */
@@ -62,6 +64,7 @@ const activePrefix = computed(() => {
 });
 
 function onDocClick(ev) {
+  if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (!ev.target.closest?.('.proj-switch')) projOpen.value = false;
 }
 function onKey(ev) {

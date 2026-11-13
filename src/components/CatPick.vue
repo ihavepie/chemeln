@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 import Icon from './Icon.vue';
 
 /**
@@ -38,6 +39,7 @@ function pick(v) {
 }
 
 function onDocClick(ev) {
+  if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (!ev.target.closest?.('.cat-pick-wrap')) open.value = false;
 }
 
@@ -61,7 +63,7 @@ onBeforeUnmount(() => {
       type="button"
       class="cat-trigger"
       :title="showAll ? `按分类筛：${current}` : `分类：${current}`"
-      @click.stop="open = !open"
+      @click.stop="open = !open; if (open) markPopupOpen()"
     >
       <span class="cat-trigger-label">{{ current }}</span>
       <Icon name="down" :size="10" class="cat-caret" />

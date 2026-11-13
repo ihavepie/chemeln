@@ -6,6 +6,7 @@ import { QUICK } from '../lib/ui.js';
 import { api } from '../api.js';
 import { loadBoot, quickExtra } from '../store.js';
 import { prompt, toast } from '../lib/feedback.js';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 
 const props = defineProps({
   model: { type: Object, required: true },
@@ -135,6 +136,7 @@ function onFieldDown(f, ev) {
   // 130ms 就开（以前 180ms，感觉「点了没反应」）；再点同一格 = 收起来
   downTimer = setTimeout(() => {
     open.value = open.value === f.key ? '' : f.key;
+    if (open.value) markPopupOpen();
   }, 130);
 }
 
@@ -164,6 +166,7 @@ watch(open, (v, old) => {
 /* 点外面 / 按 Esc 就把下拉收起来（之前只能再点一次箭头，很卡手） */
 function onDocClick(ev) {
   if (!open.value) return;
+  if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (
     ev.target.closest?.('.cond-menu') ||
     ev.target.closest?.('.cond-caret') ||

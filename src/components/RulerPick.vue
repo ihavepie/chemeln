@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ignoreOutsideClick } from '../lib/popguard.js';
 
 /**
  * 「刻度滑条」选择（温度 / 时间用）：不是滚轮，是**按住往左右拖**的那种——
@@ -138,6 +139,8 @@ function onItemClick(i) {
 }
 
 function onDocDown(ev) {
+  // 刻度带是 CondRow 点开的：刚打开那一下外面点击别把弹层关掉
+  if (ignoreOutsideClick()) return;
   if (wrap.value && !wrap.value.contains(ev.target)) emit('close');
 }
 function onKey(ev) {

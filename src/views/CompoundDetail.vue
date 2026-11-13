@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import CatPick from '../components/CatPick.vue';
@@ -117,6 +118,7 @@ const sketcherOpen = ref(false);   // 画结构式（Ketcher 画板）
 const historyOpen = ref(false);
 
 function closeMenus(e) {
+  if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (!e.target.closest?.('.menu-wrap')) moreMenu.value = false;
 }
 
@@ -840,7 +842,7 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
       <button class="btn btn-sm" title="立刻保存一次" @click="saveNow">保存</button>
       <button class="btn btn-sm btn-ghost" title="放弃本次修改，恢复到打开时的内容" @click="resetForm">重置</button>
       <div class="menu-wrap">
-        <button class="btn btn-sm btn-ghost" title="更多" @click.stop="moreMenu = !moreMenu">
+        <button class="btn btn-sm btn-ghost" title="更多" @click.stop="moreMenu = !moreMenu; if (moreMenu) markPopupOpen()">
           <Icon name="dots" :size="15" />
         </button>
         <div v-if="moreMenu" class="menu">

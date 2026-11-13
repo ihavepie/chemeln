@@ -1,5 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 import Icon from './Icon.vue';
 
 /**
@@ -40,6 +41,7 @@ function toggle() {
     pos.value = { top, left, width, maxHeight: est };
   }
   open.value = !open.value;
+  if (open.value) markPopupOpen();
 }
 
 function pick(name) {
@@ -48,6 +50,7 @@ function pick(name) {
 }
 
 function onDocClick(ev) {
+  if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (!ev.target.closest?.('.proj-pick')) open.value = false;
 }
 function onKey(ev) {

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 import { useRoute, useRouter } from 'vue-router';
 import AppModal from '../components/AppModal.vue';
 import ExperimentMobile from '../components/ExperimentMobile.vue';
@@ -689,6 +690,7 @@ async function newCategory() {
 }
 
 function closeMenus(e) {
+  if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (!e.target.closest?.('.menu-wrap')) moreMenu.value = false;
   if (!e.target.closest?.('.status-wrap')) statusMenu.value = false;
   if (!e.target.closest?.('.rxn-wrap')) rxnMenu.value = false;
@@ -2091,7 +2093,7 @@ const openAttachment = (id) => {
         <button class="btn btn-sm" :disabled="exp.locked" title="立即保存（⌘S）" @click="doSave">保存</button>
         <button class="btn btn-sm btn-ghost" :disabled="exp.locked" title="放弃本次修改，恢复到打开时的内容" @click="doReset">重置</button>
         <div class="menu-wrap">
-          <button class="btn btn-sm btn-ghost" title="更多" @click.stop="moreMenu = !moreMenu">
+          <button class="btn btn-sm btn-ghost" title="更多" @click.stop="moreMenu = !moreMenu; if (moreMenu) markPopupOpen()">
             <Icon name="dots" :size="15" />
           </button>
           <div v-if="moreMenu" class="menu">
@@ -2214,8 +2216,8 @@ const openAttachment = (id) => {
                         placeholder="反应类型"
                         :disabled="exp.locked"
                         title="反应类型：改当量 / 放大实验 / 转化…（也可以自己写）"
-                        @click.stop="rxnMenu = true"
-                        @focus="rxnMenu = true"
+                        @click.stop="rxnMenu = true; markPopupOpen()"
+                        @focus="rxnMenu = true; markPopupOpen()"
                         @keydown.esc="rxnMenu = false"
                       />
                       <div v-if="rxnMenu && !exp.locked" class="rxn-menu">
@@ -2244,7 +2246,7 @@ const openAttachment = (id) => {
                 <th>状态</th>
                 <td class="tight status-cell">
                   <div class="status-wrap">
-                    <button type="button" class="status-chip" :class="`tone-${STATUS_TONE[fields.status] || 'plain'}`" @click.stop="statusMenu = !statusMenu">
+                    <button type="button" class="status-chip" :class="`tone-${STATUS_TONE[fields.status] || 'plain'}`" @click.stop="statusMenu = !statusMenu; if (statusMenu) markPopupOpen()">
                       {{ fields.status }}
                     </button>
                     <div v-if="statusMenu" class="status-menu">

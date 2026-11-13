@@ -129,7 +129,8 @@
 - **换课题要顺手清掉不兼容的分类**：记录页/化合物页的 `ProjPick` 走 `onProjectChange`，新课题里没有那个分类就把 `category_id` 置空（服务端保存时也会置空，但那样用户看不到「分类被丢了」）。
 - **删除是软删除**：`DELETE /api/experiments/:id` 只把快照塞进 `trash`、再把行删掉，**附件 / 化合物目录的文件不动**；只有 `DELETE /api/trash/:id`（彻底删除）才 `rm` 文件。**删 `trash` 行要 `entity` + `entity_id` 一起筛**：实验 id 跟化合物 id 数字会撞，只按 entity_id 删会误删回收站里别人的条目（踩过，从 `.backups/` 捞回来）。
 - **纸放得下就不许滚**：`EditorView` 量 `scrollHeight − paddingBottom`，够一屏就给 `.editor` 挂 `is-fit`（`overflow-y:hidden`）；底部 120px 呼吸位以前会让页面白滚。
-- **`.editor` 是滚动容器，会把伸出纸外的书签裁掉**（`overflow-y:auto` 等于两轴 auto）：书签 / 预览卡这种要「漂在纸外」的东西一律 `Teleport to="body"` + `position: fixed`，位置由 `getBoundingClientRect()` 算，并在 `.editor` 的 `scroll`、`window.resize`、切记录/切页时重算。
+- **弹窗「太灵敏」的根治**：所有「点外面就关」的弹层都走 `src/lib/popguard.js`——打开时 `markPopupOpen()`，关闭处理开头 `if (ignoreOutsideClick()) return;`（刚开 320ms 内外面那下不算数，双击的第二下不会把弹层秒关）。**新加弹层记得照做**，别自己在 document 上裸挂 click。
+- **`.editor` 是滚动容器，会把伸出纸外的书签裁掉**：书签 / 预览卡这种要「漂在纸外」的一律 `Teleport to="body"` + `position: fixed`，位置用 `getBoundingClientRect()` 算，并在滚动 / resize / 切记录时重算。
 - **编辑页的异步响应必须校验 id**：`load()` / `saveNow()` / `refreshAttachments()` 都是「发请求 → 等回来 → 写进 `exp`」，等待期间用户可能已经切到别的记录。回来时先比 `route.params.id` / `exp.id` 还是不是发请求时那一条，不是就整份丢弃——否则旧记录的附件会显示到新记录上，此时点 TLC 的 × 删的是那条旧记录的附件行和磁盘文件。**savedLabel / autosave 也是对同一个坑**：`flush()` 里 `lastSaved` 要记「请求发出那一刻」的快照，不能用返回时的（返回时可能已经又改了）。
 - **第 1 页很满**：结果块下面是 `.res-sel`（选择性测定）；加新行前先想余量。
 - **化合物编号**：新建时留空会由服务端 `nextCompoundCode()` 自动给号（库里最大的纯数字 + 1）；`POST /api/compounds` 带显式编号撞号仍然报 409（别改成自动加后缀，用户填的就该报错）；只有「产物存库」走 `uniqueCompoundCode()` 自动加 `-2`。**曾经踩过**：产物存库直接用实验编号当化合物编号，加了唯一索引后会撞号 500。

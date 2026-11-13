@@ -10,6 +10,7 @@ import { uiSetIfChanged } from '../lib/uiprefs.js';
 import { compoundDict, reagentDict, store } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
 import { analyzeSmiles } from '../lib/chem.js';
+import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 
 const props = defineProps({
   model: { type: Object, required: true },
@@ -38,6 +39,7 @@ const browse = reactive({ open: false, row: null, q: '', items: [], index: 0, up
 let browseTimer = null;
 
 async function openBrowse(r) {
+  markPopupOpen();
   browse.row = r;
   browse.q = '';
   browse.index = 0;
@@ -163,6 +165,7 @@ async function pickerSearch(q) {
   picker.items = items.slice(0, 8).concat(extra).slice(0, 8);
   picker.index = 0;
   picker.updatedAt = Date.now();
+  markPopupOpen();
   picker.open = true;
 }
 
@@ -217,6 +220,7 @@ function pinPreview(r) {
     return;
   }
   // 记的是「哪一行」而不是「哪个化合物」——两行挂同一个化合物时只弹一行
+  markPopupOpen();
   preview.row = r;
   preview.pinned = true;
   preview.open = true;
@@ -698,6 +702,7 @@ function hasName(r) {
 }
 function openCheck(r, ev) {
   const same = checkRow.value === r;
+  markPopupOpen();
   checkRow.value = same ? null : r;
   if (same) return;
   // 注意：`currentTarget` 在事件派发结束就变成 null，所以**当场**抓，别等到 nextTick
@@ -706,6 +711,7 @@ function openCheck(r, ev) {
   checkUp.value = !!box && window.innerHeight - box.bottom < 210;   // 下面放不下就往上翻
 }
 function onDocDown(ev) {
+  if (ignoreOutsideClick()) return;
   if (!checkRow.value) return;
   if (ev.target.closest?.('.check-menu, .note-check')) return;
   checkRow.value = null;
@@ -1062,6 +1068,7 @@ function toggleRoleMenu(r, ev) {
   const rect = ev.currentTarget.getBoundingClientRect();
   // 下面放不下就往上开（菜单 11 个胶囊，约 110–150px）
   roleMenuUp.value = rect.bottom + 150 > window.innerHeight;
+  markPopupOpen();
   roleMenuFor.value = idx;
 }
 
@@ -1070,6 +1077,7 @@ function closeRoleMenu() {
 }
 
 function onDocClick(ev) {
+  if (ignoreOutsideClick()) return;   // 刚弹出来的那一下点击不算「点外面」
   if (preview.pinned && !ev.target.closest?.('.cmp-pop') && !ev.target.closest?.('.name-cell')) unpinPreview();
   if (picker.open && !ev.target.closest?.('.cmp-pick') && !ev.target.closest?.('[data-f="name"]')) pickerClose();
   if (roleMenuFor.value === -1) return;
