@@ -159,10 +159,24 @@ function yieldDelta(e) {
   return `${d > 0 ? '+' : '−'}${Math.abs(d)}`;
 }
 
-/* ---------- TLC：小图（照汇报卡那排 46mm 板子），点了看大图 ---------- */
+/* ---------- TLC：自由对比 ----------
+   板子从卡片里拿出来单独并排：挑哪几条记录就出哪几张板子，不跟基准 / 变量 / 列宽绑，
+   谁跟谁比由用户自己看（他明确要的就是「自由对比 TLC」）。 */
 const tlcOf = (e) => ((e && e.attachments) || []).filter((at) => (at.category || '') === 'tlc');
 const fileUrl = (at) => `/api/files/${at.id}`;
 const preview = ref(null);
+const tlcList = computed(() =>
+  picked.value.flatMap((e) =>
+    tlcOf(e).map((at) => ({
+      id: at.id,
+      code: e.code,
+      src: fileUrl(at),
+      name: at.original_name || 'TLC',
+      // 展开剂 / Rf 一般记在附件备注里，没写就看记录那一格
+      note: txt(at.note) || txt(e.tlc_note),
+    }))
+  )
+);
 
 /* ---------- 明细（默认收着） ---------- */
 const showAll = ref(false);
@@ -337,18 +351,25 @@ async function saveAsScreening() {
               <span v-if="selText(e)" class="cmp-res-sel">{{ selText(e) }}</span>
             </div>
             <div v-if="txt(e.product_name)" class="cmp-prod">产物 {{ txt(e.product_name) }}</div>
-            <div v-if="tlcOf(e).length" class="cmp-tlc is-thumb">
-              <figure v-for="at in tlcOf(e)" :key="at.id">
-                <img
-                  :src="fileUrl(at)"
-                  :alt="at.original_name || 'TLC'"
-                  loading="lazy"
-                  @click="preview = { src: fileUrl(at), name: at.original_name || 'TLC' }"
-                />
-              </figure>
-            </div>
           </section>
         </div>
+
+        <!-- TLC 自由对比：所有板子并排，各自带编号 + 展开剂，点开看大图 -->
+        <section v-if="tlcList.length" class="cmp-tlc-box">
+          <div class="cmp-note-head">
+            <span class="cmp-note-title">TLC 对比</span>
+            <span class="cmp-note-hint">{{ tlcList.length }} 张 · 点开看大图</span>
+          </div>
+          <div class="cmp-tlc is-free">
+            <figure v-for="t in tlcList" :key="t.id">
+              <img :src="t.src" :alt="t.name" loading="lazy" @click="preview = { src: t.src, name: t.name }" />
+              <figcaption>
+                <span class="mono">{{ t.code }}</span>
+                <span v-if="t.note" class="cmp-tlc-note">{{ t.note }}</span>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
 
         <!-- 明细：逐项对齐的整张表，默认收着 -->
         <table v-if="showAll" class="cmp-table cmp-multi">
