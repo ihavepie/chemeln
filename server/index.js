@@ -4032,6 +4032,109 @@ function runPrint(bin, args) {
   });
 }
 
+/* ---------------- 排版板（自由画布） ---------------- */
+
+const safeBoardItems = (r) => {
+  try {
+    const v = JSON.parse((r && r.items_json) || '[]');
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+};
+
+const parseBoard = (r) =>
+  r && {
+    id: r.id,
+    title: r.title,
+    project: r.project,
+    page: r.page || 'a4p',
+    items: safeBoardItems(r),
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+
+route('GET', '/api/boards', async (req, res, params, url) => {
+  // 跟其它东西一样按课题分：传了 project 就只给这个课题的板
+  const project = str(Object.fromEntries(url.searchParams.entries()).project);
+  const rows = db
+    .prepare(`SELECT * FROM boards ${project ? 'WHERE project = ?' : ''} ORDER BY updated_at DESC, id DESC`)
+    .all(...(project ? [project] : []));
+  ok(res, {
+    items: rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      project: r.project,
+      page: r.page,
+      count: safeBoardItems(r).length,
+      updated_at: r.updated_at,
+    })),
+  });
+});
+
+route('POST', '/api/boards', async (req, res) => {
+  const body = await readJson(req);
+  const ts = nowISO();
+  const row = db
+    .prepare(`INSERT INTO boards(title, project, page, items_json, created_at, updated_at) VALUES (?,?,?,?,?,?)`)
+    .run(
+      str(body.title) || '排版板',
+      str(body.project),
+      str(body.page) || 'a4p',
+      JSON.stringify(Array.isArray(body.items) ? body.items : []),
+      ts,
+      ts
+    );
+  ok(res, { board: parseBoard(db.prepare('SELECT * FROM boards WHERE id = ?').get(Number(row.lastInsertRowid))) });
+});
+
+route('GET', '/api/boards/:id', async (req, res, params) => {
+  const b = parseBoard(db.prepare('SELECT * FROM boards WHERE id = ?').get(Number(params.id)));
+  if (!b) return fail(res, 404, '排版板不存在');
+  ok(res, { board: b });
+});
+
+route('PUT', '/api/boards/:id', async (req, res, params) => {
+  const id = Number(params.id);
+  if (!db.prepare('SELECT 1 AS x FROM boards WHERE id = ?').get(id)) return fail(res, 404, '排版板不存在');
+  const body = await readJson(req);
+  const fields = [];
+  const values = [];
+  for (const [key, col] of [['title', 'title'], ['project', 'project'], ['page', 'page']]) {
+    if (key in body) {
+      fields.push(`${col} = ?`);
+      values.push(str(body[key]));
+    }
+  }
+  if ('items' in body) {
+    fields.push('items_json = ?');
+    values.push(JSON.stringify(Array.isArray(body.items) ? body.items.slice(0, 400) : []));
+  }
+  fields.push('updated_at = ?');
+  values.push(nowISO());
+  db.prepare(`UPDATE boards SET ${fields.join(', ')} WHERE id = ?`).run(...values, id);
+  ok(res, { board: parseBoard(db.prepare('SELECT * FROM boards WHERE id = ?').get(id)) });
+});
+
+route('DELETE', '/api/boards/:id', async (req, res, params) => {
+  db.prepare('DELETE FROM boards WHERE id = ?').run(Number(params.id));
+  ok(res, {});
+});
+
+/* 素材抽屉要的 TLC 清单：一条记录可以有好几张板子 */
+route('GET', '/api/tlc', async (req, res, params, url) => {
+  const project = str(Object.fromEntries(url.searchParams.entries()).project);
+  const rows = db
+    .prepare(
+      `SELECT a.id, a.exp_id, a.original_name, a.note, e.code AS exp_code, e.title AS exp_title
+         FROM attachments a JOIN experiments e ON e.id = a.exp_id
+        WHERE a.category = 'tlc' ${project ? 'AND e.project = ?' : ''}
+        ORDER BY e.id DESC, a.id`
+    )
+    .all(...(project ? [project] : []));
+  ok(res, { items: rows });
+});
+
 const pageDoc = (fragment, css) =>
   `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${fragment}</body></html>`;
 

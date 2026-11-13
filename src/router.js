@@ -10,6 +10,8 @@ import CompareView from './views/CompareView.vue';
 import SettingsView from './views/SettingsView.vue';
 import TrashView from './views/TrashView.vue';
 import ReagentLibView from './views/ReagentLibView.vue';
+import BoardsView from './views/BoardsView.vue';
+import BoardView from './views/BoardView.vue';
 import MobileHome from './components/MobileHome.vue';
 
 /** 手机上只放这几页（扫瓶签看档案 / 看记录 / 拍照上传），其它一律送到 `#/m` */
@@ -33,6 +35,8 @@ export const router = createRouter({
     { path: '/s/:id', name: 'screening', component: ScreeningView },
     { path: '/compare', name: 'compare', component: CompareView },
     { path: '/reagents', name: 'reagents', component: ReagentLibView },
+    { path: '/boards', name: 'boards', component: BoardsView },
+    { path: '/b/:id', name: 'board', component: BoardView },
     { path: '/trash', name: 'trash', component: TrashView },
     { path: '/settings', name: 'settings', component: SettingsView },
     { path: '/:pathMatch(.*)*', redirect: '/' },

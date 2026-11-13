@@ -50,6 +50,16 @@ export const api = {
   /* 本机 → 服务器 单向同步（只有主库那台有这个接口） */
   syncServer: () => request('/api/sync/server', { method: 'POST' }),
 
+  /* 排版板（自由画布）：一张板 = 一堆绝对定位的素材 */
+  boards: (project = '') => request(`/api/boards${project ? `?project=${encodeURIComponent(project)}` : ''}`),
+  board: (id) => request(`/api/boards/${id}`),
+  createBoard: (body) => request('/api/boards', { method: 'POST', body }),
+  saveBoard: (id, body) => request(`/api/boards/${id}`, { method: 'PUT', body }),
+  deleteBoard: (id) => request(`/api/boards/${id}`, { method: 'DELETE' }),
+
+  /* 素材抽屉：本课题所有 TLC 板子（带记录编号） */
+  tlc: (project = '') => request(`/api/tlc${project ? `?project=${encodeURIComponent(project)}` : ''}`),
+
   /* 自己生成 PDF：返回二进制，不走 JSON */
   printPdf: async (body) => {
     const res = await fetch('/api/print/pdf', {

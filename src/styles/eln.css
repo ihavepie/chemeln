@@ -9460,3 +9460,101 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .cmp-tlc.is-free figcaption { flex-wrap: wrap; max-width: 300px; row-gap: 2px; }
 .cmp-tlc.is-free .cmp-tlc-code { color: var(--accent-ink); }
 .cmp-tlc.is-free .cmp-tlc-file { color: var(--ink-4); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* ---------- 排版板（自由画布）：列表 + 画布 + 素材抽屉 ---------- */
+.board-list { display: flex; flex-direction: column; }
+.board-row {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 6px; border-radius: 6px; cursor: pointer;
+}
+.board-row:hover { background: #f7f5f0; }
+.board-row-title { font-size: 13px; color: var(--ink); }
+.board-row-meta { font-size: 10.5px; color: var(--ink-4); }
+.board-row-proj {
+  font-size: 9.5px; color: var(--accent-ink); background: #f7f0ea;
+  border-radius: 999px; padding: 1px 7px;
+}
+.board-row-del {
+  margin-left: auto; width: 18px; height: 18px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: var(--ink-4);
+  cursor: pointer; opacity: 0; transition: opacity .12s, color .12s;
+}
+.board-row:hover .board-row-del { opacity: 1; }
+.board-row-del:hover { color: var(--bad); background: var(--bad-soft); }
+
+/* 头部：板名就地改 */
+.board-head { align-items: flex-start; }
+.board-head-main { min-width: 0; }
+.board-title {
+  display: block; width: 100%; max-width: 520px;
+  padding: 1px 4px; margin: 0 0 3px -4px;
+  border: 0; border-radius: 5px; background: transparent;
+  font-family: "Iowan Old Style", Georgia, serif;
+  font-size: 24px; line-height: 1.25; color: var(--ink); outline: none;
+}
+.board-title:focus { background: #f8f7f2; }
+.board-saved { font-size: 10.5px; color: var(--ink-4); }
+
+/* 左抽屉 + 右画布 */
+.board-wrap { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 16px; align-items: start; }
+.board-drawer {
+  background: var(--paper); border-radius: var(--r); padding: 6px 8px 10px;
+  max-height: calc(100vh - 250px); overflow-y: auto;
+}
+.board-drawer-h { font-size: 9px; letter-spacing: 0.08em; color: var(--ink-4); margin: 8px 2px 5px; }
+.board-drawer-empty { font-size: 10.5px; color: var(--ink-4); line-height: 1.5; padding: 0 2px 2px; }
+.board-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.board-thumb {
+  padding: 0; border: 0; border-radius: 4px; overflow: hidden; cursor: pointer;
+  height: 62px; display: flex; align-items: center; justify-content: center;
+  background: #fbfaf7;
+}
+.board-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.board-thumb.is-wide { grid-column: span 2; height: 44px; background: #fff; }
+.board-thumb:hover { outline: 1px solid var(--accent); }
+.board-addtext { width: 100%; justify-content: center; }
+
+/* 画布：白纸等比缩放，素材按百分比绝对定位 */
+.board-stage { display: flex; justify-content: center; align-items: flex-start; min-width: 0; }
+.board-page {
+  position: relative; background: #fff; border-radius: 3px;
+  box-shadow: 0 2px 12px rgba(20, 18, 14, 0.10);
+  overflow: hidden;
+}
+.board-item { position: absolute; cursor: move; }
+.board-item img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+.board-item.is-sel { outline: 1px solid var(--accent); outline-offset: 2px; }
+.board-item.is-text { cursor: move; }
+.board-text {
+  font-size: calc(30 * var(--bscale, 1) * 1px); line-height: 1.5;
+  color: var(--ink); white-space: pre-wrap; word-break: break-word;
+}
+.board-cap {
+  margin-top: calc(18 * var(--bscale, 1) * 1px);
+  font-size: calc(28 * var(--bscale, 1) * 1px);
+  line-height: 1.3; color: #4a4740; text-align: center; word-break: break-word;
+}
+.board-grip {
+  position: absolute; right: -5px; bottom: -5px; width: 11px; height: 11px;
+  border-radius: 2px; background: var(--accent); cursor: nwse-resize;
+}
+.board-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--ink-4); pointer-events: none;
+}
+
+/* 选中那一块的浮动工具条 */
+.board-tools { display: flex; align-items: center; justify-content: flex-end; gap: 2px; margin-top: 10px; }
+.board-tools-name { font-size: 10.5px; color: var(--ink-3); margin-right: 6px; }
+.board-tool {
+  border: 0; background: transparent; font: inherit; font-size: 11px;
+  color: var(--ink-2); padding: 3px 8px; border-radius: 5px; cursor: pointer;
+}
+.board-tool:hover { background: #f1efeb; color: var(--ink); }
+.board-tool.is-danger:hover { background: var(--bad-soft); color: var(--bad); }
+/* 抽屉滚很长时「加一段文字」别被挤到看不见：贴住抽屉底部 */
+.board-drawer .board-addtext {
+  position: sticky; bottom: 0; margin-top: 4px;
+  background: var(--paper); box-shadow: 0 -6px 8px -6px rgba(20, 18, 14, 0.12);
+}

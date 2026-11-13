@@ -125,6 +125,19 @@ CREATE TABLE IF NOT EXISTS screenings (
 /* 实验的「容器」：一个组装若干条实验。
    kind = repeat（同一条件重复/平行）| screen（筛条件）| scope（扩底物）
    以前只有一个 group_id 字符串，语义全靠 variant 文字，无法区分「重复」和「筛选」。 */
+/* 排版板（自由画布）：一张板 = 一堆绝对定位的 items（TLC 图 / 反应式 / 文字）。
+   坐标用 0.1mm 的整数（A4 = 2100 × 2970），屏幕按百分比显示、导 PDF 时 ÷10 得 mm。 */
+CREATE TABLE IF NOT EXISTS boards (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  title      TEXT    NOT NULL DEFAULT '',
+  project    TEXT    NOT NULL DEFAULT '',
+  page       TEXT    NOT NULL DEFAULT 'a4p',
+  items_json TEXT    NOT NULL DEFAULT '[]',
+  created_at TEXT    NOT NULL,
+  updated_at TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_boards_project ON boards(project);
+
 CREATE TABLE IF NOT EXISTS exp_groups (
   id         TEXT PRIMARY KEY,
   kind       TEXT NOT NULL DEFAULT 'repeat',

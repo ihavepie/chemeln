@@ -234,3 +234,10 @@
   ③ 这一区**不跟基准、变量、列宽绑**：谁跟谁比由用户自己看——他这次要的就是这个自由（不是我前面猜的「基准可换 / 字段可勾」）。
   验证（5173）：三条同组记录 → 4 张板子并排（SJ-2-2 三张 + SJ-2-6 一张），不裁图、超出换行；点开大图正常；没 TLC 的记录这一区直接不出现。
 - **TLC 图注要留着（用户：「图注需要保留吧」）**：拆成自由对比区时只写了「编号 + 展开剂」，把**文件名**那一截丢了（老版是 `at.note || at.original_name`）。图注现在三截：**编号**（强调色）+ 展开剂/Rf（附件 `note`，没写回落到记录的 `tlc_note`）+ **原文件名**（`ink-4`、10px、过长 ellipsis，`title` 里给全名）。实测这批数据附件 note 和记录的 `tlc_note` 都是空的，只有 `original_name`（`粘贴-1794365984090-1.png` / `1000051761.jpg`），所以之前等于只剩编号。
+- **新增「排版板」＝自由画布（用户拿自己 ChemDraw 里拼的汇报页问「可以类似这样自由吗」，选了「先看方案再动手」→ 看完方案说「试试」）**：设计稿在 `BOARD-DESIGN.md`，第一版落地如下。
+  ① **数据**：`boards` 表（`title / project / page / items_json / created_at / updated_at`），`items` 每项 `{id,type:'tlc'|'scheme'|'text',ref,code,x,y,w,caption,z}`。**坐标 0.1mm 整数**（A4 = 2100×2970）：屏幕按百分比摆，导 PDF 时 ÷10 得 mm；**图片只存宽**，高按原图比例。
+  ② **接口**：`GET/POST /api/boards`、`GET/PUT/DELETE /api/boards/:id` + `GET /api/tlc?project=`（素材抽屉要的 TLC 清单，join experiments 拿编号）。**`PUT` 只认 title/project/page/items 四个字段**，items 上限 400。
+  ③ **画布**（`BoardView.vue`）：白纸按「可视高度」等比缩放（`min(100%, clamp(360px, calc((100vh-210px)*比例), 780px))`），素材 `left/top/width` 全部用百分比 + `--bscale` 换算字号（图注 / 文字块跟着纸缩放）。拖动、右下角缩放都是 mouse 事件；方向键 1mm、Shift 10mm；双击改图注（`feedback.prompt`）；工具条 置顶/置底/水平居中/删除。
+  ④ **导 PDF**：`boardHtml()` 把 items 拼成一张 210×297mm 的绝对定位 HTML，走现成的 `/api/print/pdf`（`server/print.swift`），不新写导出器。
+  验证（WKWebView + 真接口）：建板 → 点素材加进画布（两张 TLC + 一张反应式）；拖动后 `left 5.71%→19.62%`、`top 13.47%→20.03%`；拖右下角 `w 29.52%→42.29%`；加一段文字 → 变成 4 块、Delete 又回到 3 块；防抖自动存（`GET /api/boards/1` 里 items 与屏幕一致）；**导出 PDF 实测**（用真 `lib/board.js` 拼页面 POST `/api/print/pdf`，`sips` 转图看过：两张板子 62mm 并排 + 各自图注 + 下方反应式 + 图注，都在 A4 内）。测试板已删（`boards` 回到 0 行），没碰任何记录。
+  **注意**：服务端加了新表/新路由，**必须重启 4780**（`npm run serve`）才生效；我重启过一次。
