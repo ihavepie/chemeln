@@ -1399,12 +1399,27 @@ function onDrop(ev) {
                     spellcheck="false"
                     @change="setRoleText(r, $event.target.value); notify()"
                   />
-                  <button v-if="!locked" type="button" class="role-caret noprint" title="从固定组分里选" @click.stop="toggleRoleMenu(r, $event)">
+                  <button
+                    v-if="!locked"
+                    type="button"
+                    class="role-caret noprint"
+                    title="从固定组分里选"
+                    @mousedown.prevent
+                    @click.stop="toggleRoleMenu(r, $event)"
+                  >
                     <Icon name="down" :size="11" />
                   </button>
                 </div>
                 <!-- 点菜单空白处也算「有反应」：直接关掉，别让那一下像是没点到 -->
-                <div v-if="roleMenuFor === rows.indexOf(r)" class="qmenu role-menu" :class="{ up: roleMenuUp }" @click.stop="closeRoleMenu">
+                <!-- 菜单面板上 `@mousedown.prevent`：不然按住胶囊就会顺手选中表格里的字，
+                     鼠标一抖那一下就成了拖选、click 不触发（用户报「有时候点不生效」） -->
+                <div
+                  v-if="roleMenuFor === rows.indexOf(r)"
+                  class="qmenu role-menu"
+                  :class="{ up: roleMenuUp }"
+                  @mousedown.prevent
+                  @click.stop="closeRoleMenu"
+                >
                   <button
                     v-for="role in ROLES"
                     :key="role"

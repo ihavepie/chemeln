@@ -2389,6 +2389,10 @@ kbd {
 
 .qcaret:hover { color: var(--ink-2); background: #f1efeb; }
 
+/* 选择器面板（组分 / 条件 / 时间刻度…）：一律不许选字——按住胶囊的时候
+   一选字就把 click 变成拖选，点了像没反应 */
+.qmenu { user-select: none; -webkit-user-select: none; }
+
 .qmenu {
   position: absolute;
   top: calc(100% + 5px);
@@ -2955,6 +2959,8 @@ kbd {
 }
 
 .sheet .rtable .role-caret:hover { color: var(--ink); background: #f2f0e9; }
+/* 箭头那颗按钮点得到的地方再宽一点（原来只有 11px 图标那么大，边上 1–2px 就点空了） */
+.sheet .rtable .role-caret { padding: 3px 4px; margin-right: -1px; user-select: none; }
 
 /* 组分选择：和「反应温度」那类选择器一样的胶囊面板 */
 .sheet .rtable .role-menu { min-width: 196px; max-width: 268px; }
