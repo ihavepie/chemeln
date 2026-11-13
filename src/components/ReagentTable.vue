@@ -5,7 +5,7 @@ import AppModal from './AppModal.vue';
 import { toast, confirm as confirmDialog } from '../lib/feedback.js';
 import { api } from '../api.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { ROLES, ROLE_ALIAS, ROLE_EN, amountDecimals, amountText, derive, eqLabel, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, setAmountDecimals, totals, variantText, vesselHint, volText } from '../lib/reagent.js';
+import { ROLES, ROLE_ALIAS, ROLE_EN, amountDecimals, amountText, derive, eqLabel, eqNum, mwText as mwFmt, num, parseMwCell, roleTone, round, rowKind, saneDensity, setAmountDecimals, setVolumeDecimals, totals, variantText, vesselHint, volText, volumeDecimals } from '../lib/reagent.js';
 import { uiSetIfChanged } from '../lib/uiprefs.js';
 import { compoundDict, reagentDict, store } from '../store.js';
 import { nameInfo } from '../lib/lookup.js';
@@ -271,19 +271,29 @@ const shownRows = (i) => rowsOf(i).filter((r) => !(props.dropVarRows && r.variab
  * 存在页面设置里（`reagentPrec`），改完把每行重算一遍，页面上立刻变。
  */
 const PREC_STEPS = [0, 2, 3, 4];
+const precOpen = ref(false);
+/** 按钮上写「质量 · 体积」两个档位（自适应写 `自`），两样都是自适应时只写「小数位」 */
 const precLabel = computed(() => {
-  const n = amountDecimals();
-  return n ? `${n} 位小数` : '自适应';
+  const m = amountDecimals();
+  const v = volumeDecimals();
+  if (!m && !v) return '小数位';
+  return `${m || '自'}·${v || '自'}`;
 });
-function cyclePrec() {
-  const cur = amountDecimals();
-  const next = PREC_STEPS[(PREC_STEPS.indexOf(cur) + 1) % PREC_STEPS.length];
-  setAmountDecimals(next);
-  uiSetIfChanged('reagentPrec', next);
+const precRows = computed(() => [
+  { key: 'mass', label: '质量（g）', cur: amountDecimals() },
+  { key: 'vol', label: '体积（mL / µL）', cur: volumeDecimals() },
+]);
+function setPrec(key, n) {
+  if (key === 'mass') {
+    setAmountDecimals(n);
+    uiSetIfChanged('reagentPrec', n);
+  } else {
+    setVolumeDecimals(n);
+    uiSetIfChanged('reagentPrecVol', n);
+  }
   // 只重排「用量」的写法：每行都 syncAmount 一遍（recomputeAll 会跳过第一行，第一行的量就不跟着变）
   for (const r of rows.value) syncAmount(r);
   props.notify();
-  toast(next ? `用量显示 ${next} 位小数` : '用量按量级自适应（2 / 3 / 4 位）', 'ok', 1800);
 }
 
 /** 按相态整理：每一步内部「固体 → 液体 → 溶剂」，同相态之间保持现有顺序 */
@@ -1077,6 +1087,7 @@ function closeRoleMenu() {
 }
 
 function onDocClick(ev) {
+  if (precOpen.value && !ev.target.closest?.('.prec-wrap')) precOpen.value = false;
   if (ignoreOutsideClick()) return;   // 刚弹出来的那一下点击不算「点外面」
   if (preview.pinned && !ev.target.closest?.('.cmp-pop') && !ev.target.closest?.('.name-cell')) unpinPreview();
   if (picker.open && !ev.target.closest?.('.cmp-pick') && !ev.target.closest?.('[data-f="name"]')) pickerClose();
@@ -1617,13 +1628,34 @@ function onDrop(ev) {
         <button class="add-row" title="按固体 → 液体 → 溶剂重排（会改存盘顺序）" @click="sortByPhase">
           <Icon name="down" :size="12" /> 按相态整理
         </button>
-        <button
-          class="add-row"
-          :title="`用量显示：${precLabel}（点一下切：自适应 → 2 → 3 → 4 位）`"
-          @click="cyclePrec"
-        >
-          <Icon name="hash" :size="12" /> {{ precLabel }}
-        </button>
+        <!-- 用量小数位：质量和体积分开设（称量和量体积的精度本来就不是一回事） -->
+        <span class="prec-wrap">
+          <button
+            class="add-row"
+            :title="`用量小数位：质量 ${amountDecimals() || '自适应'}、体积 ${volumeDecimals() || '自适应'}（点开改）`"
+            @mousedown.prevent
+            @click.stop="precOpen = !precOpen; if (precOpen) markPopupOpen()"
+          >
+            <Icon name="hash" :size="12" /> {{ precLabel }}
+          </button>
+          <div v-if="precOpen" class="qmenu prec-menu" @mousedown.prevent>
+            <div v-for="row in precRows" :key="row.key" class="prec-row">
+              <span class="prec-lbl">{{ row.label }}</span>
+              <span class="prec-chips">
+                <button
+                  v-for="v in PREC_STEPS"
+                  :key="v"
+                  type="button"
+                  class="qchip"
+                  :class="{ 'is-on': row.cur === v }"
+                  @click.stop="setPrec(row.key, v)"
+                >
+                  {{ v || '自适应' }}
+                </button>
+              </span>
+            </div>
+          </div>
+        </span>
         <span class="spacer" />
         <button class="add-row" @click="emit('recipe')"><Icon name="copy" :size="12" /> 套用配方</button>
       </div>

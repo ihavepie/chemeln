@@ -9229,3 +9229,35 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 }
 /* 多步的结果表一行里格子多，别让「性状」那格把产物名挤没 */
 .res-table td input { min-width: 0; }
+
+/* 投料表工具行的「小数位」：一个小弹层，质量 / 体积各一排胶囊（自适应 · 2 · 3 · 4 位） */
+.prec-wrap { position: relative; display: inline-flex; }
+.prec-menu {
+  left: 0;
+  top: auto;
+  bottom: calc(100% + 6px);   /* 工具行在最底下，往上开 */
+  display: block;
+  min-width: 236px;
+  padding: 8px 9px;
+}
+.prec-row { display: flex; align-items: center; gap: 8px; }
+.prec-row + .prec-row { margin-top: 6px; }
+.prec-lbl {
+  flex: 0 0 auto;
+  width: 86px;
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.prec-chips { display: flex; gap: 4px; }
+.prec-chips .qchip {
+  flex: 1 1 auto;
+  justify-content: center;
+  font-size: 10.5px;
+  padding: 2px 6px;
+}
+.prec-chips .qchip.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}

@@ -16,7 +16,7 @@ import {
   SHEET_FX,
   SHEET_KINDS,
 } from '../lib/sheetprefs.js';
-import { amountDecimals, setAmountDecimals } from '../lib/reagent.js';
+import { amountDecimals, setAmountDecimals, setVolumeDecimals, volumeDecimals } from '../lib/reagent.js';
 import { uiSetIfChanged } from '../lib/uiprefs.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickExtra } from '../store.js';
 import { QUICK } from '../lib/ui.js';
@@ -321,7 +321,12 @@ const DECIMAL_OPTS = [
   { v: 3, t: '3 位' },
   { v: 4, t: '4 位' },
 ];
-function pickDecimals(v) {
+function pickDecimals(which, v) {
+  if (which === 'vol') {
+    setVolumeDecimals(v);
+    uiSetIfChanged('reagentPrecVol', v);
+    return;
+  }
   setAmountDecimals(v);
   uiSetIfChanged('reagentPrec', v);
 }
@@ -752,7 +757,7 @@ async function removeProject(p) {
           </label>
 
           <div class="sheet-fx-row is-static">
-            <span class="sheet-fx-name">投料表「用量」小数位</span>
+            <span class="sheet-fx-name">投料表「用量」小数位 · 质量（g）</span>
             <span class="sheet-fx-chips">
               <button
                 v-for="opt in DECIMAL_OPTS"
@@ -760,12 +765,28 @@ async function removeProject(p) {
                 type="button"
                 class="qchip"
                 :class="{ 'is-on': amountDecimals() === opt.v }"
-                @click="pickDecimals(opt.v)"
+                @click="pickDecimals('mass', opt.v)"
               >
                 {{ opt.t }}
               </button>
             </span>
-            <span class="sheet-fx-sub">所有记录类型共用；投料表工具行那颗按钮也是它</span>
+            <span class="sheet-fx-sub">称到的固体按 g 写；固定位数时尾零留着（2.671 → 2.6710）</span>
+          </div>
+          <div class="sheet-fx-row is-static">
+            <span class="sheet-fx-name">投料表「用量」小数位 · 体积（mL / µL）</span>
+            <span class="sheet-fx-chips">
+              <button
+                v-for="opt in DECIMAL_OPTS"
+                :key="opt.v"
+                type="button"
+                class="qchip"
+                :class="{ 'is-on': volumeDecimals() === opt.v }"
+                @click="pickDecimals('vol', opt.v)"
+              >
+                {{ opt.t }}
+              </button>
+            </span>
+            <span class="sheet-fx-sub">液体 / 溶剂行；固定位数只收小数部分，30 mL 不会写成 30.000 mL</span>
           </div>
         </div>
       </section>
