@@ -172,8 +172,9 @@ const tlcList = computed(() =>
       code: e.code,
       src: fileUrl(at),
       name: at.original_name || 'TLC',
-      // 展开剂 / Rf 一般记在附件备注里，没写就看记录那一格
+      // 图注照旧保留：编号 + 展开剂/Rf（附件备注，没写就看记录那一格）+ 文件名
       note: txt(at.note) || txt(e.tlc_note),
+      file: txt(at.original_name),
     }))
   )
 );
@@ -364,8 +365,9 @@ async function saveAsScreening() {
             <figure v-for="t in tlcList" :key="t.id">
               <img :src="t.src" :alt="t.name" loading="lazy" @click="preview = { src: t.src, name: t.name }" />
               <figcaption>
-                <span class="mono">{{ t.code }}</span>
+                <span class="mono cmp-tlc-code">{{ t.code }}</span>
                 <span v-if="t.note" class="cmp-tlc-note">{{ t.note }}</span>
+                <span v-if="t.file" class="cmp-tlc-file" :title="t.file">{{ t.file }}</span>
               </figcaption>
             </figure>
           </div>
