@@ -5866,6 +5866,14 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   cursor: pointer;
 }
 .grid-group-add:hover { background: #f2f1ec; color: var(--accent-ink); }
+/* 有内容的分类：那颗「＋」平时收起来，鼠标进这一组才露（0 条的分类一直写着「新建…」） */
+.grid-group-head .grid-group-add.is-quiet { opacity: 0; width: 0; padding: 0; margin: 0; overflow: hidden; }
+.grid-group-head:hover .grid-group-add.is-quiet {
+  opacity: 1;
+  width: auto;
+  padding: 1px 6px 1px 4px;
+  margin-left: 2px;
+}
 
 /* 空分类的拖拽落点：不拖东西时不占高度 */
 .grid-drop-line {
@@ -9261,3 +9269,17 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   border-color: var(--accent);
   color: var(--accent-ink);
 }
+
+/* 分类段头右边那颗「就在这里新建」：平时很淡，鼠标进这一段才显形 */
+.list-cat-row { display: flex; align-items: center; gap: 4px; }
+.list-cat-row .list-cat-head { flex: 1 1 auto; min-width: 0; }
+.list-cat-add {
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent;
+  color: #c7c2b8; cursor: pointer; padding: 0;
+  opacity: 0; transition: opacity .12s, color .12s;
+}
+.list-cat:hover .list-cat-add { opacity: 1; }
+.list-cat-add:hover { color: var(--ink); background: #f1ece4; }

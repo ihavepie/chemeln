@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from './Icon.vue';
 import CatPick from './CatPick.vue';
-import { store, loadList, loadBoot, recordCategories, addCategory } from '../store.js';
+import { store, loadList, loadBoot, recordCategories, addCategory, createExperiment } from '../store.js';
 import { STATUSES, STATUS_SHORT, STATUS_TONE } from '../lib/ui.js';
 import { api } from '../api.js';
 import { listDiff } from '../lib/expDiff.js';
@@ -164,6 +164,12 @@ const dragH = ref(74);        // 占位格高度 = 被拖那张卡的真实高�
    没记录的分类也留一行——那一行就是拖拽换分类的落点。
    在下拉里选了具体分类才平铺，不然看不出自己在看哪一段。 */
 const grouping = computed(() => !store.filters.category);
+
+/** 在某个分类段里新建一条实验（`catId = null` = 未分类那一段，明确落未分类） */
+async function createIn(sec) {
+  const exp = await createExperiment(sec.catId == null ? null : sec.catId);
+  router.push(`/e/${exp.id}`);
+}
 
 const sections = computed(() => {
   const all = rows.value;
@@ -373,17 +379,27 @@ function onStackFace(row) {
         :data-drag-group="sec.key"
         :data-drag-count="sec.rows.length"
       >
-        <!-- 分类名点一下就把下拉切到这一类（再点一次别的分类才能回来） -->
-        <button
-          v-if="grouping"
-          type="button"
-          class="list-cat-head"
-          :title="`只看「${sec.name}」`"
-          @click="setFilter(sec.catId == null ? 'none' : String(sec.catId))"
-        >
-          <span class="list-cat-name">{{ sec.name }}</span>
-          <span class="list-cat-count">{{ sec.rows.length }}</span>
-        </button>
+        <!-- 分类名点一下就把下拉切到这一类（再点一次别的分类才能回来）；
+             右边那颗＋就在这个分类里新建，别新建到「未分类」去 -->
+        <div v-if="grouping" class="list-cat-row">
+          <button
+            type="button"
+            class="list-cat-head"
+            :title="`只看「${sec.name}」`"
+            @click="setFilter(sec.catId == null ? 'none' : String(sec.catId))"
+          >
+            <span class="list-cat-name">{{ sec.name }}</span>
+            <span class="list-cat-count">{{ sec.rows.length }}</span>
+          </button>
+          <button
+            type="button"
+            class="list-cat-add"
+            :title="`在「${sec.name}」里新建实验`"
+            @click.stop="createIn(sec)"
+          >
+            <Icon name="plus" :size="11" />
+          </button>
+        </div>
         <template v-for="(row, ri) in sec.rows" :key="row.key">
           <div v-if="showSlot(sec, ri)" class="list-drop-slot" :style="{ height: `${dragH}px` }" />
         <!-- 普通记录 -->

@@ -177,9 +177,15 @@ function groupMenu(ev, g) {
           <span class="grid-group-name">{{ g.name }}</span>
           <span class="grid-group-n">{{ g.items.length }}</span>
           <span v-if="!store.project && g.project" class="grid-group-proj">{{ g.project }}</span>
-          <!-- 0 条的分类只占这一行：一个小「＋」就地新建，不再撑一整格虚线 -->
-          <button v-if="!g.items.length" class="grid-group-add" @click="create(g.id)">
-            <Icon name="plus" :size="11" /><span>新建化合物</span>
+          <!-- 每个分类的组头都能就地新建（在这个分类里，不是「未分类」）；
+               0 条的分类直接写出「新建化合物」，有内容的平时只露一颗小「＋」，鼠标进这一组才显形 -->
+          <button
+            class="grid-group-add"
+            :class="{ 'is-quiet': g.items.length }"
+            :title="`在「${g.name}」里新建化合物`"
+            @click="create(g.id)"
+          >
+            <Icon name="plus" :size="11" /><span v-if="!g.items.length">新建化合物</span>
           </button>
         </div>
 

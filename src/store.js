@@ -153,23 +153,32 @@ const filteredCat = (value) => (value && value !== 'none' ? Number(value) : null
  * 新建一条实验 / 一个化合物：工具栏和卡片墙的「＋」都走这里。
  * categoryId 不传 = 跟着当前筛选；显式传 null = 明确不归类（未分类那一组）。
  */
+/**
+ * 新建实验。`categoryId = undefined` 跟着当前筛选走，传 `null` = 明确未分类，传数字 = 落这个分类。
+ * **指定了分类时，课题要跟着分类走**：分类属于哪个课题、记录就落哪个课题——否则在「全部课题」
+ * 下点某个分类的＋新建，记录会落进共用课题、分类又被服务端判成悬空引用清掉（踩过）。
+ */
 export async function createExperiment(categoryId = undefined) {
+  const catId = categoryId === undefined ? filteredCat(store.filters.category) : categoryId;
+  const cat = catId == null ? null : recordCategories('experiment').find((c) => Number(c.id) === Number(catId));
   const exp = await api.createExperiment({
     title: '',
     date: new Date().toISOString().slice(0, 10),
     status: '进行中',
-    category_id: categoryId === undefined ? filteredCat(store.filters.category) : categoryId,
-    project: store.project,   // 「全部课题」下新建的落进共用课题
+    category_id: catId,
+    project: cat ? cat.project || '' : store.project,   // 「全部课题」下新建的落进共用课题
   });
   await Promise.all([loadBoot(), loadList()]);
   return exp;
 }
 
 export async function createCompound(categoryId = undefined) {
+  const catId = categoryId === undefined ? filteredCat(store.compoundFilters.category) : categoryId;
+  const cat = catId == null ? null : recordCategories('compound').find((c) => Number(c.id) === Number(catId));
   const cmp = await api.createCompound({
     kind: '底物',
-    category_id: categoryId === undefined ? filteredCat(store.compoundFilters.category) : categoryId,
-    project: store.project,
+    category_id: catId,
+    project: cat ? cat.project || '' : store.project,
   });
   await Promise.all([loadBoot(), loadCompounds()]);
   return cmp;
