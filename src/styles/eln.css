@@ -9434,3 +9434,17 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .cmp-tlc.is-thumb figure { flex: 0 0 auto; }
 .cmp-tlc.is-thumb img { width: auto; max-width: 100%; max-height: 78px; border-radius: 3px; }
 .cmp-tlc.is-thumb figcaption { display: none; }
+
+/* ---------- 对照页：突出变量（相同的条件只写一次，卡片上是它自己的变量） ---------- */
+.cmp-same-brief { margin: -2px 0 12px; font-size: 11px; line-height: 1.7; color: var(--ink-3); }
+.cmp-same-brief-k {
+  display: inline-block; margin-right: 7px; padding: 0 6px;
+  border-radius: 999px; background: #f3efe8; color: var(--ink-4);
+  font-size: 9.5px; letter-spacing: 0.04em; vertical-align: 1px;
+}
+/* 卡片上的主角：这一条相对基准改了什么（基准那条自己写「基准」，淡一点） */
+.cmp-col .cmp-var.is-lead { margin-top: 9px; font-size: 13px; line-height: 1.45; color: var(--accent-ink); }
+.cmp-col .cmp-var.is-lead.is-base { font-size: 12px; color: var(--ink-4); }
+/* TLC 是「区别」本身，要比得出来：统一 150px 高、放不下就换行（不裁图） */
+.cmp-tlc.is-thumb { flex-wrap: wrap; overflow: visible; }
+.cmp-tlc.is-thumb img { max-height: 150px; }

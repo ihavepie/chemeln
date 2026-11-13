@@ -105,12 +105,34 @@ const scale = (e) => (num(e.base_mmol) == null ? '' : `${round(num(e.base_mmol),
 /** 溶剂现在是投料表的一行（role=溶剂），老记录才看 `solvent` 字段 */
 const solventOf = (e) => txt(((e && e.reagents) || []).find((r) => r.role === '溶剂' && txt(r.name))?.name) || txt(e.solvent);
 
+/** 条件那几格，顺序就是卡片上 / 那一行的顺序 */
+const COND_FIELDS = [
+  ['溶剂', solventOf],
+  ['温度', (e) => e.temperature],
+  ['时间', (e) => e.duration],
+  ['气氛', (e) => e.atmosphere],
+  ['装置', (e) => e.apparatus],
+  ['光照', (e) => e.light],
+  ['规模', (e) => scale(e)],
+];
+
 /** 条件一行（照汇报卡的 `card-cond`）：空的自动略过，不摆占位 */
-const condLine = (e) =>
-  [solventOf(e), e.temperature, e.duration, e.atmosphere, e.apparatus, e.light, scale(e)]
-    .map(txt)
-    .filter(Boolean)
-    .join(' · ');
+const condLine = (e) => COND_FIELDS.map(([, get]) => txt(get(e))).filter(Boolean).join(' · ');
+
+/**
+ * 几条记录的**共同条件**：只在卡片上方写一次。
+ * 「突出变量」靠的就是这个——每一列不再重复同一串条件，剩下没被抽走的才是变量。
+ */
+const commonConds = computed(() => {
+  const list = picked.value;
+  if (list.length < 2) return [];
+  const out = [];
+  for (const [, get] of COND_FIELDS) {
+    const v = txt(get(list[0]));
+    if (v && list.every((e) => txt(get(e)) === v)) out.push(v);
+  }
+  return out;
+});
 
 /** 相对第一个（基准）改了什么：文案直接复用筛选表那套 `variations()`，两处口径一致 */
 const base = computed(() => picked.value[0] || null);
@@ -290,7 +312,12 @@ async function saveAsScreening() {
       </div>
 
       <template v-else>
-        <!-- 一条一列：编号 / 反应式 / 条件一行 / 改了什么 / 结果 / 产物 / TLC 小图 -->
+        <!-- 几条都一样的条件只写一次，卡片上剩下的才是变量 -->
+        <div v-if="commonConds.length" class="cmp-same-brief">
+          <span class="cmp-same-brief-k">相同</span>{{ commonConds.join(' · ') }}
+        </div>
+
+        <!-- 一条一列：编号 / 反应式 / 变量 / 结果 / 产物 / TLC -->
         <div class="cmp-visual" :style="{ '--cmp-cols': Math.min(picked.length, 4) }">
           <section v-for="(e, i) in picked" :key="`v${e.id}`" class="cmp-col">
             <div class="cmp-col-head">
@@ -300,8 +327,10 @@ async function saveAsScreening() {
             </div>
             <div v-if="svgs[i]" class="cmp-scheme" v-html="svgs[i]" />
             <div v-else class="cmp-scheme cmp-scheme-empty">（还没有能画的反应式）</div>
-            <div v-if="condLine(e)" class="cmp-cond">{{ condLine(e) }}</div>
-            <div v-if="varLine(e)" class="cmp-var">{{ varLine(e) }}</div>
+            <div v-if="picked.length > 1" class="cmp-var is-lead" :class="{ 'is-base': !varLine(e) }">
+              {{ varLine(e) || '基准' }}
+            </div>
+            <div v-else-if="condLine(e)" class="cmp-cond">{{ condLine(e) }}</div>
             <div v-if="yieldText(e) !== '—' || selText(e)" class="cmp-res">
               <span class="cmp-res-y mono">{{ yieldText(e) }}</span>
               <span v-if="yieldDelta(e)" class="cmp-res-d mono">{{ yieldDelta(e) }}</span>
