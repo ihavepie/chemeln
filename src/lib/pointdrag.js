@@ -199,6 +199,35 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     return { cards, groups };
   }
 
+  /** 落在卡片哪一半：横向网格看左右、竖向列表看上下（取离中心更远的那个轴当主轴） */
+  function gapOf(c, x, yy) {
+    const dx = c.w > 0 ? (x - (c.l + c.w / 2)) / (c.w / 2) : 0;
+    const dy = c.h > 0 ? (yy - (c.t + c.h / 2)) / (c.h / 2) : 0;
+    const after = Math.abs(dx) >= Math.abs(dy) ? dx > 0 : dy > 0;
+    return c.idx + (after ? 1 : 0);
+  }
+
+  /**
+   * 落在「组里但没有卡片」的地方（段头、卡片之间的空隙、卡片下面那片空白）：
+   * 以前一律 append 到这一组末尾——跨分类拖的时候，明明指在「未分类」最上面，
+   * 落点却排到那一组的最底下，看着就是「有点奇怪」。现在按**离得最近的那张卡片**
+   * 加同样的前后判定来算插入位：指着段头就是这一组第 0 位，指着下面空白就是末尾。
+   */
+  function gapInGroup(cards, groupKey, x, yy) {
+    const inGroup = cards.filter((c) => c.groupKey === groupKey);
+    if (!inGroup.length) return 0;
+    let best = inGroup[0];
+    let bestD = Infinity;
+    for (const c of inGroup) {
+      const d = Math.hypot(x - (c.l + c.w / 2), yy - (c.t + c.h / 2));
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return gapOf(best, x, yy);
+  }
+
   function hitTestBySnapshot(x, y) {
     const snap = st && st.snap;
     if (!snap) return null;
@@ -206,16 +235,12 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     const yy = y + adj;
     for (const c of snap.cards) {
       if (x >= c.l && x <= c.l + c.w && yy >= c.t && yy <= c.t + c.h) {
-        // 落在卡片哪一半：横向网格看左右、竖向列表看上下（取离中心更远的那个轴当主轴）
-        const dx = c.w > 0 ? (x - (c.l + c.w / 2)) / (c.w / 2) : 0;
-        const dy = c.h > 0 ? (yy - (c.t + c.h / 2)) / (c.h / 2) : 0;
-        const after = Math.abs(dx) >= Math.abs(dy) ? dx > 0 : dy > 0;
-        return { groupKey: c.groupKey, gapAt: c.idx + (after ? 1 : 0) };
+        return { groupKey: c.groupKey, gapAt: gapOf(c, x, yy) };
       }
     }
     for (const g of snap.groups) {
       if (x >= g.l && x <= g.l + g.w && yy >= g.t && yy <= g.t + g.h) {
-        return { groupKey: g.groupKey, gapAt: g.count };
+        return { groupKey: g.groupKey, gapAt: gapInGroup(snap.cards, g.groupKey, x, yy) };
       }
     }
     return null;
@@ -241,7 +266,14 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
       return { groupKey, gapAt: idx + (after ? 1 : 0) };
     }
     const group = el.closest('[data-drag-group][data-drag-count]');
-    if (group) return { groupKey: group.dataset.dragGroup, gapAt: Number(group.dataset.dragCount) };
+    if (group) {
+      const gk = group.dataset.dragGroup;
+      const cards = [...group.querySelectorAll('[data-drag-card]')].map((n) => {
+        const r = n.getBoundingClientRect();
+        return { groupKey: n.dataset.dragGroup, idx: Number(n.dataset.dragIndex), l: r.left, t: r.top, w: r.width, h: r.height };
+      });
+      return { groupKey: gk, gapAt: gapInGroup(cards, gk, x, y) };
+    }
     return null;
   }
 
