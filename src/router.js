@@ -6,7 +6,6 @@ import CompoundsView from './views/CompoundsView.vue';
 import CompoundDetail from './views/CompoundDetail.vue';
 import ScreeningsView from './views/ScreeningsView.vue';
 import ScreeningView from './views/ScreeningView.vue';
-import CompareView from './views/CompareView.vue';
 import SettingsView from './views/SettingsView.vue';
 import TrashView from './views/TrashView.vue';
 import ReagentLibView from './views/ReagentLibView.vue';
@@ -33,7 +32,8 @@ export const router = createRouter({
     },
     { path: '/screenings', name: 'screenings', component: ScreeningsView },
     { path: '/s/:id', name: 'screening', component: ScreeningView },
-    { path: '/compare', name: 'compare', component: CompareView },
+    // 「对照」页已撤（用户：排版板够了），老链接直接送到排版板
+    { path: '/compare', redirect: '/boards' },
     { path: '/reagents', name: 'reagents', component: ReagentLibView },
     { path: '/boards', name: 'boards', component: BoardsView },
     { path: '/b/:id', name: 'board', component: BoardView },

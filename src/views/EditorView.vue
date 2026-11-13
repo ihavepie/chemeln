@@ -1144,20 +1144,6 @@ const prevPrefers = computed(() => {
     .filter((e) => Number(e.id) !== Number(exp.value?.id) && mine.has(Number(e.product_compound_id)))
     .map((e) => e.id);
 });
-/** 「与其他记录对照」：挑一条，跟当前这条并排看（/compare） */
-const comparePickOpen = ref(false);
-function openComparePick() {
-  moreMenu.value = false;
-  markPopupOpen();
-  comparePickOpen.value = true;
-}
-function openCompareWith(list) {
-  comparePickOpen.value = false;
-  const id = Number((list || [])[0]);
-  if (!id || !exp.value) return;
-  router.push(`/compare?a=${exp.value.id}&b=${id}`);
-}
-
 function openPrevPick() {
   moreMenu.value = false;
   prevPickOpen.value = true;
@@ -2136,7 +2122,6 @@ const openAttachment = (id) => {
             <button @click="undoSave()"><Icon name="undo" :size="13" /> 撤销上次保存</button>
             <button @click="newParallel()"><Icon name="plus" :size="13" /> 新建平行实验</button>
             <button @click="openProductBind()"><Icon name="molecule" :size="13" /> 绑定产物…</button>
-            <button @click="openComparePick()"><Icon name="file" :size="13" /> 与其他记录对照…</button>
             <button @click="openPrevPick()"><Icon name="arrow-left" :size="13" /> 接上一步…</button>
             <button v-if="prevExp" @click="unlinkPrev(); moreMenu = false"><Icon name="x" :size="13" /> 断开上一步（{{ prevExp.code }}）</button>
             <button v-if="prevExp" @click="toggleChainDraw(); moreMenu = false">
@@ -2712,15 +2697,6 @@ const openAttachment = (id) => {
     />
 
     <!-- 「接上一步」：从记录里挑一条当这条的前一步（产物正好是本条底物的排前面） -->
-    <ExpPick
-      :model-value="comparePickOpen"
-      title="跟哪条记录对照？"
-      confirm-text="并排看"
-      :exclude="exp ? [exp.id] : []"
-      @close="comparePickOpen = false"
-      @confirm="openCompareWith"
-    />
-
     <ExpPick
       :model-value="prevPickOpen"
       title="这一步接在哪条记录后面？"

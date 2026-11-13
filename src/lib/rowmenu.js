@@ -120,7 +120,6 @@ export function experimentMenu(ev, it, router, opts = {}) {
     CTX_SEP,
     { key: 'delete', label: size > 1 ? '只删这条' : '移入回收站', icon: 'trash', danger: true }
   );
-  items.push(CTX_SEP, { key: 'compare', label: '与另一条对照…', icon: 'file' });
   if (cat && cat.id != null) {
     items.push(
       CTX_SEP,
@@ -130,11 +129,6 @@ export function experimentMenu(ev, it, router, opts = {}) {
   }
   openCtxMenu(ev, items, (key) => {
     if (key === 'open') return void router.push(`/e/${it.id}`);
-    if (key === 'compare') {
-      // 挑第二个人由调用方处理（列表里挂的是 ExpPick）
-      opts.onCompare?.(it);
-      return;
-    }
     if (key === 'here') return void newInCategory(cat, router);
     if (key === 'onlyhere') {
       store.filters.category = String(cat.id);

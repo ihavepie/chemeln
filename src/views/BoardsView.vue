@@ -63,7 +63,7 @@ const when = (ts) => String(ts || '').replace('T', ' ').slice(0, 16);
       <header class="page-head">
         <div>
           <h1 class="page-title">排版板</h1>
-          <p class="page-desc">自由画布：把 TLC 板、反应式、文字拖到纸上随意摆，导出 PDF 贴进汇报里。</p>
+          <p class="page-desc">自由画布：一条记录里的编号 / 反应式 / 条件 / 投料 / 结果 / 结论 / TLC，加上文字，随便摆在一张 A4 上，导出 PDF 贴进汇报里。</p>
         </div>
         <span class="spacer" />
         <button class="btn btn-sm" @click="create"><Icon name="plus" :size="12" /> 新建排版板</button>
@@ -71,7 +71,7 @@ const when = (ts) => String(ts || '').replace('T', ' ').slice(0, 16);
 
       <div v-if="loading" class="cmp-empty">读取中…</div>
       <div v-else-if="!items.length" class="cmp-empty">
-        还没有排版板。点右上「新建排版板」，把 TLC 图拖上去试一下。
+        还没有排版板。点右上「新建排版板」，从左边挑几块摆上去试试。
       </div>
 
       <div v-else class="board-list">
