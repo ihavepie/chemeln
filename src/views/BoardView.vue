@@ -228,20 +228,118 @@ async function addBlock(e, key) {
   syncCursor();
 }
 
-/** 结论块：板上写「结论 / 推理」用，双击改文字 */
-function addConcl() {
-  const w = 1600;
-  const { x, y } = nextPos(w);
-  push({ id: uid(), type: 'block', block: 'concl', text: '双击写结论', x, y, w });
+/* ---------------- 工具：先点工具，再在纸上点 / 拖（像 ChemDraw 的画布） ----------------
+   以前点「箭头」就直接在页尾落一根、位置还得再挪；现在工具是「拿在手上」的：
+   点一下工具进入落笔状态（按钮高亮 + 顶部提示），然后在纸上点 / 拖才真的加 —— 箭头和方框
+   是**按下拖到松手**决定位置、长度、方向，点一下不动就给默认大小；Esc 或右键收笔。 */
+const TOOLS = [
+  { key: 'text', label: '文字', hint: '在纸上点一下放文字' },
+  { key: 'concl', label: '结论', hint: '在纸上点一下放结论块' },
+  { key: 'arrow', label: '箭头', hint: '在纸上拖一根箭头（点一下 = 默认长度）' },
+  { key: 'box', label: '方框', hint: '在纸上拖一个框（点一下 = 默认大小）' },
+];
+const tool = ref('');
+const toolHint = computed(() => (TOOLS.find((t) => t.key === tool.value) || {}).hint || '');
+const draft = ref(null); // 拖着的那块先按 itemHtml 画出来，松手前就看得到粗细 / 方向
+const draw = reactive({ on: false, kind: '', x0: 0, y0: 0, x1: 0, y1: 0, moved: false });
+
+function armTool(kind) {
+  tool.value = tool.value === kind ? '' : kind;
+  draft.value = null;
+  sel.value = '';
 }
 
-/** 箭头 / 方框：不动记录数据，纯粹是画布上画示意图用的 */
-async function addShape(shape) {
-  const w = shape === 'arrow' ? 1500 : 1400;
-  const h = shape === 'arrow' ? 200 : 600;
-  const { x, y } = nextPos(w);
-  await push({ id: uid(), type: 'shape', shape, x, y, w, h, color: SHAPE_COLORS[0].v });
+/** 屏幕坐标 → 画布单位。
+    坑：Safari 里 `zoom` 元素的 `getBoundingClientRect()` **位置要再乘一次 zoom，尺寸却是没缩的**
+    （实测 zoom .619 时 rect.left 1170 / 真实可视 724 = 1170×.619，而 rect.width 794 / 可视 491 = 794×.619）。
+    所以左边 / 上边都得 `× zoom` 才是眼睛看到的那条边，不乘的话落笔点整块偏掉。 */
+function pointAt(ev) {
+  const r = pageEl.value.getBoundingClientRect();
+  const z = zoom.value || 1;
+  const k = unitsPerPx();
+  return { x: Math.round((ev.clientX - r.left * z) * k), y: Math.round((ev.clientY - r.top * z) * k) };
+}
+
+function onDrawDown(ev) {
+  if (!tool.value || ev.button !== 0) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  const p = pointAt(ev);
+  Object.assign(draw, { on: true, kind: tool.value, x0: p.x, y0: p.y, x1: p.x, y1: p.y, moved: false });
+  if (draw.kind === 'arrow' || draw.kind === 'box') draft.value = shapeFrom(draw);
+  window.addEventListener('mousemove', onDrawMove);
+  window.addEventListener('mouseup', endDraw);
+}
+
+function onDrawMove(ev) {
+  if (!draw.on) return;
+  const p = pointAt(ev);
+  draw.x1 = p.x;
+  draw.y1 = p.y;
+  if (!draw.moved && Math.hypot(draw.x1 - draw.x0, draw.y1 - draw.y0) > 12) draw.moved = true;
+  if (draw.kind === 'arrow' || draw.kind === 'box') draft.value = shapeFrom(draw);
+}
+
+/** 「按下 → 现在」折算成一块：拖了就按拖出来的范围，点一下（位移 < 1.2mm）给默认大小 */
+function shapeFrom(d) {
+  const W = pageSize.value.w;
+  const H = pageSize.value.h;
+  const color = SHAPE_COLORS[0].v;
+  const dx = d.x1 - d.x0;
+  const dy = d.y1 - d.y0;
+  if (d.kind === 'arrow') {
+    if (!d.moved || Math.abs(dx) < 60) {
+      const w = 1500;
+      return { type: 'shape', shape: 'arrow', x: clamp(d.x0, 0, W - w), y: d.y0, w, h: 200, dir: 'right', color };
+    }
+    const len = clamp(Math.abs(dx), 300, W);
+    return { type: 'shape', shape: 'arrow', x: dx < 0 ? clamp(d.x0 - len, 0, W - len) : clamp(d.x0, 0, W - len), y: d.y0, w: len, h: 200, dir: dx < 0 ? 'left' : 'right', color };
+  }
+  if (!d.moved || (Math.abs(dx) < 60 && Math.abs(dy) < 60)) {
+    const w = 1400;
+    const h = 600;
+    return { type: 'shape', shape: 'box', x: clamp(d.x0, 0, W - w), y: clamp(d.y0, 0, H - h), w, h, color };
+  }
+  const w = clamp(Math.abs(dx), 120, W);
+  const h = clamp(Math.abs(dy), 120, H);
+  return { type: 'shape', shape: 'box', x: clamp(dx < 0 ? d.x0 - w : d.x0, 0, W - w), y: clamp(dy < 0 ? d.y0 - h : d.y0, 0, H - h), w, h, color };
+}
+
+async function endDraw() {
+  window.removeEventListener('mousemove', onDrawMove);
+  window.removeEventListener('mouseup', endDraw);
+  if (!draw.on) return;
+  const kind = draw.kind;
+  const at = { x: draw.x0, y: draw.y0 };
+  const built = draft.value;
+  draw.on = false;
+  draft.value = null;
+  const W = pageSize.value.w;
+  const H = pageSize.value.h;
+  if (kind === 'text' || kind === 'concl') {
+    const w = kind === 'text' ? 1200 : 1600;
+    await push({
+      id: uid(),
+      ...(kind === 'text' ? { type: 'text', text: '写点什么' } : { type: 'block', block: 'concl', text: '双击写结论' }),
+      x: clamp(at.x, 0, W - w),
+      y: clamp(at.y, 0, H - 100),
+      w,
+    });
+  } else if (built) {
+    await push({ id: uid(), ...built });
+  }
   syncCursor();
+}
+
+/** 右键 = 收笔（工具还拿在手上时会先被这里吃掉，不弹页面菜单） */
+function cancelDraw() {
+  if (!tool.value && !draw.on) return false;
+  tool.value = '';
+  draft.value = null;
+  window.removeEventListener('mousemove', onDrawMove);
+  window.removeEventListener('mouseup', endDraw);
+  draw.on = false;
+  return true;
 }
 
 /** 改颜色 / 粗细 / 箭头方向（就地改，靠防抖自动存） */
@@ -256,13 +354,6 @@ function toggleThick(it) {
 function flipShape(it) {
   it.dir = it.dir === 'left' ? 'right' : 'left';
   touch();
-}
-
-async function addText() {
-  const w = 1200;
-  const { x, y } = nextPos(w);
-  await push({ id: uid(), type: 'text', text: '写点什么', x, y, w });
-  syncCursor();
 }
 
 /* 多选：对比表 / 成组摆放都要从记录里挑几条 */
@@ -612,12 +703,20 @@ function endDrag() {
   window.removeEventListener('mouseup', endDrag);
 }
 
+/** 右键：工具还拿在手上就收笔（不然会跟页面右键菜单打架） */
+function onPageCtx(ev) {
+  if (cancelDraw()) ev.preventDefault();
+}
+
 /* ---------------- 键盘 ---------------- */
 
 function onKey(ev) {
   const tag = (ev.target && ev.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || ev.target?.isContentEditable) return;
-  if (ev.key === 'Escape') return (sel.value = '');
+  if (ev.key === 'Escape') {
+    if (cancelDraw()) return;
+    return (sel.value = '');
+  }
   const it = selItem.value;
   if (!it) return;
   if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'd' || ev.key === 'D')) {
@@ -781,15 +880,18 @@ onBeforeUnmount(() => {
             </button>
             <button class="btn btn-sm btn-ghost" @click="removeBoard">删除</button>
           </div>
-          <!-- 收集工具：不摆变量、不上纸的东西都从这儿加 -->
+          <!-- 收集工具：都先「拿在手上」，再在纸上点 / 拖（像 ChemDraw 的画布） -->
           <div class="board-acts-row board-palette">
-            <button class="btn btn-sm btn-ghost" @click="addText"><Icon name="plus" :size="12" /> 文字</button>
-            <button class="btn btn-sm btn-ghost" @click="addConcl"><Icon name="plus" :size="12" /> 结论</button>
-            <button class="btn btn-sm btn-ghost" title="画一根箭头（示意流程用）" @click="addShape('arrow')">
-              <Icon name="plus" :size="12" /> 箭头
-            </button>
-            <button class="btn btn-sm btn-ghost" title="画一个方框（圈一组东西用）" @click="addShape('box')">
-              <Icon name="plus" :size="12" /> 方框
+            <span v-if="tool" class="board-armed-hint">{{ toolHint }} · Esc 收笔</span>
+            <button
+              v-for="t in TOOLS"
+              :key="t.key"
+              class="btn btn-sm btn-ghost"
+              :class="{ 'is-on': tool === t.key }"
+              :title="t.hint"
+              @click="armTool(t.key)"
+            >
+              <Icon name="plus" :size="12" /> {{ t.label }}
             </button>
           </div>
         </div>
@@ -799,7 +901,23 @@ onBeforeUnmount(() => {
       <div v-else class="board-wrap">
         <!-- 画布：一张 A4，靠 zoom 缩进可视区，纸里全是 mm 单位 -->
         <div ref="stageEl" class="board-stage" :class="{ 'is-pinned': pinned }" @mousedown.self="sel = ''">
-          <div ref="pageEl" class="bd-page board-page" :style="{ width: mm(pageSize.w), height: mm(pageSize.h), zoom }" @mousedown.self="sel = ''">
+          <div
+            ref="pageEl"
+            class="bd-page board-page"
+            :class="{ 'is-armed': !!tool }"
+            :style="{ width: mm(pageSize.w), height: mm(pageSize.h), zoom }"
+            @mousedown.self="sel = ''"
+            @mousedown.capture="onDrawDown"
+            @contextmenu="onPageCtx"
+          >
+            <!-- 拖着的那块：先按 itemHtml 画出来，松手前就看得到粗细 / 方向 -->
+            <div
+              v-if="draft"
+              class="bd-item board-item is-draft"
+              :style="{ left: mm(draft.x), top: mm(draft.y), width: mm(draft.w), height: mm(draft.h) }"
+            >
+              <div class="bd-body" v-html="itemHtml(draft, null, ctxOf())" />
+            </div>
             <div
               v-for="it in items"
               :key="it.id"

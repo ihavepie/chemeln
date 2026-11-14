@@ -1874,6 +1874,9 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .board-head-acts { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 .board-acts-row { display: flex; align-items: center; gap: 6px; }
 .board-acts-row.board-palette { gap: 2px; }
+/* 工具「拿在手上」时：按钮高亮 + 一句提示（箭头 / 方框要先拖，不是一点就落） */
+.board-palette .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.board-armed-hint { font-size: 10.5px; color: var(--accent-ink); margin-right: 8px; }
 .board-title {
   display: block; width: 100%; max-width: 520px;
   padding: 1px 4px; margin: 0 0 3px -4px;
@@ -1944,6 +1947,9 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   box-shadow: 0 2px 14px rgba(20, 18, 14, 0.12);
 }
 .board-item { cursor: move; }
+/* 落笔状态：整张纸都是十字光标，拖出来的是形状 */
+.board-page.is-armed, .board-page.is-armed .board-item { cursor: crosshair; }
+.board-item.is-draft { opacity: 0.62; pointer-events: none; }
 .board-item.is-sel { outline: 0.35mm solid rgba(168, 71, 31, 0.5); outline-offset: 1.2mm; }
 .board-grip {
   position: absolute; right: -2mm; bottom: -2mm; width: 4mm; height: 4mm;
