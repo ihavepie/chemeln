@@ -12,6 +12,7 @@ import {
   sheetTlcMax,
   setTlcMax,
   TLC_N_OPTS,
+  TLC_N_LABEL,
   sheetSchemeFmt,
   setSchemeFmt,
   SCHEME_FMT_OPTS,
@@ -826,7 +827,7 @@ async function removeProject(p) {
             <span class="sheet-fx-sub">{{ SCHEME_FMT_OPTS.find((o) => o.key === sheetSchemeFmt.fmt)?.hint || '' }}</span>
           </div>
           <div class="sheet-fx-row is-static">
-            <span class="sheet-fx-name">结果表最右那格 · 一次摆几张板</span>
+            <span class="sheet-fx-name">结果表最右那格 · 挂几张板</span>
             <span class="sheet-fx-chips">
               <button
                 v-for="n in TLC_N_OPTS"
@@ -836,10 +837,10 @@ async function removeProject(p) {
                 :class="{ 'is-on': sheetTlcMax.n === n }"
                 @click="setTlcMax(n)"
               >
-                {{ n }} 张
+                {{ TLC_N_LABEL[n] }}
               </button>
             </span>
-            <span class="sheet-fx-sub">一条记录常贴好几块板（0.5 h / 2 h / 过夜、各条件对照）；这里只影响结果表那格，第 2 页 TLC 区照旧全列</span>
+            <span class="sheet-fx-sub">一条记录常贴好几块板（0.5 h / 2 h / 过夜、各条件对照）；「不挂」= 结果表不放这一列（第 2 页 TLC 区照旧全列）</span>
           </div>
           <div class="sheet-fx-row is-static">
             <span class="sheet-fx-name">投料表「用量」小数位 · 质量（g）</span>

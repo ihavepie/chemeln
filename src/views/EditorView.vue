@@ -2539,7 +2539,7 @@ const openAttachment = (id) => {
             :steps="reagent.steps"
             :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind"
             :yield-default="sheetFx.yield" :tlc="tlcShots" :exp-id="exp.id"
-            :show-appear="sheetFx.resAppear" :show-dr-ee="sheetFx.resDrEe" :show-tlc="sheetFx.resTlc"
+            :show-appear="sheetFx.resAppear" :show-dr-ee="sheetFx.resDrEe"
             :tlc-max="sheetTlcMax.n"
             @refresh="refreshAttachments"
             @open-compound="(id) => router.push(`/compounds/${id}`)"

@@ -30,8 +30,7 @@ const props = defineProps({
   /** 结果表里那几列要不要出现（设置页 06 → 块里的功能，按记录类型各记一套） */
   showAppear: { type: Boolean, default: true },
   showDrEe: { type: Boolean, default: true },
-  showTlc: { type: Boolean, default: true },
-  /** 最右那格一次摆几张板（1–3） */
+  /** 最右那格挂几张板（**0 = 不挂这一列**，1–3 张） */
   tlcMax: { type: Number, default: 1 },
 });
 const emit = defineEmits(['open-compound', 'refresh']);
@@ -45,11 +44,11 @@ const refShots = computed(() => {
   const id = Number(props.model.tlc_shot_id);
   const hit = id ? props.tlc.find((a) => Number(a.id) === id) : null;
   const rest = props.tlc.filter((a) => a !== hit).sort((a, b) => Number(b.id) - Number(a.id));
-  return [...(hit ? [hit] : []), ...rest].slice(0, Math.max(1, Number(props.tlcMax) || 1));
+  return [...(hit ? [hit] : []), ...rest].slice(0, Math.max(0, Number(props.tlcMax) || 0));
 });
 /** 那一列多宽跟着张数走（一张 38px 左右，别让 26px 的缩略图挤成一团） */
 const tlcColW = computed(() => `${refShots.value.length * 28 + 10}px`);
-const hasTlcCol = computed(() => !!props.showTlc && props.tlc.length > 0);
+const hasTlcCol = computed(() => Number(props.tlcMax) > 0 && props.tlc.length > 0);
 function openShot(a) {
   shot.value = { src: `/api/files/${a.id}`, name: a.original_name || 'TLC' };
 }
