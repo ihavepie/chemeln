@@ -25,6 +25,7 @@ import {
 } from '../lib/sheetprefs.js';
 import { amountDecimals, setAmountDecimals, setVolumeDecimals, volumeDecimals } from '../lib/reagent.js';
 import { onUiMerged, uiGet, uiSetIfChanged } from '../lib/uiprefs.js';
+import { CARD_STYLES, CARD_RADII, cardPref, setCardStyle, resetCardStyle } from '../lib/cardstyle.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickFull, quickList } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 
@@ -334,6 +335,18 @@ function pickDecimals(which, v) {
   }
   setAmountDecimals(v);
   uiSetIfChanged('reagentPrec', v);
+}
+
+/* ---- 卡片质感（页面里的白卡 / 排版板那张画布卡）---- */
+const card = ref(cardPref());
+function pickCardStyle(key) {
+  card.value = setCardStyle({ style: key });
+}
+function pickCardRadius(value) {
+  card.value = setCardStyle({ radius: value });
+}
+function cardReset() {
+  card.value = resetCardStyle();
 }
 
 /* ---- 二级侧边栏：把设置分成 5 块，一块一块看（用户：「设置这边开始有点复杂了」）----
@@ -980,6 +993,35 @@ function setScrollSwitch(v) {
             <input type="checkbox" :checked="peekPrefs[key]" @change="setPeekPref(key, $event.target.checked)" />
             {{ label }}
           </label>
+        </div>
+      </section>
+
+      <section v-if="mod === 'ui'" id="set-card" class="card">
+        <div class="card-head"><h2 class="card-title">卡片</h2></div>
+        <p class="card-note">
+          页面里那些白卡（排版板的画布、试剂库 / 回收站列表…）的质感。改完立刻生效，所有页面一起变。
+        </p>
+        <div class="row" style="gap: 8px; flex-wrap: wrap; margin-bottom: 10px">
+          <button
+            v-for="s in CARD_STYLES"
+            :key="s.key"
+            class="btn btn-sm"
+            :class="{ 'is-on': card.style === s.key }"
+            :title="s.hint"
+            @click="pickCardStyle(s.key)"
+          >{{ s.label }}</button>
+        </div>
+        <div class="row" style="gap: 8px; align-items: center">
+          <span style="font-size: 11.5px; color: var(--ink-4)">圆角</span>
+          <button
+            v-for="r in CARD_RADII"
+            :key="r.value"
+            class="btn btn-sm"
+            :class="{ 'is-on': card.radius === r.value }"
+            @click="pickCardRadius(r.value)"
+          >{{ r.label }}</button>
+          <span class="spacer" />
+          <button class="btn btn-sm btn-ghost" @click="cardReset">恢复默认</button>
         </div>
       </section>
 

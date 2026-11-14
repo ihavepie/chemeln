@@ -12,6 +12,14 @@ import './styles/el-theme.css';
 import App from './App.vue';
 import { router } from './router.js';
 import { growAll, growTextarea } from './lib/autogrow.js';
+import { applyCardStyle } from './lib/cardstyle.js';
+
+// 卡片质感（设置 › 界面）在挂载前先套上，免得先闪一下默认样式
+try {
+  applyCardStyle();
+} catch {
+  /* 读不到偏好就用默认 */
+}
 
 /** v1 的入场动画：CSS 里 [data-anim] 初始 opacity:0，进入视口后加 .in */
 const animObserver = new IntersectionObserver(

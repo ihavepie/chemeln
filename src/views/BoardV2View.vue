@@ -767,8 +767,8 @@ load();
 /* 画布本体＝一张大卡片 */
 .bv2-card {
   position: relative; flex: 1 1 auto; min-height: 0;
-  border-radius: 10px; background: #fff; overflow: hidden;
-  box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(20, 18, 14, 0.05);
+  border-radius: var(--card-r, 10px); background: var(--card-bg, #fff); overflow: hidden;
+  box-shadow: var(--card-shadow, 0 0 0 1px var(--line), 0 2px 6px rgba(20, 18, 14, 0.05));
 }
 .bv2-loading { display: flex; align-items: center; justify-content: center; color: var(--ink-4); font-size: 12px; }
 /* 素材栏收起：画布拿满整条宽度，左边留一个小小的展开把手 */
