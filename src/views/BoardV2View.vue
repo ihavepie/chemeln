@@ -54,6 +54,9 @@ async function blobToDataURL(url) {
 }
 
 let fileSeq = 0;
+/** 文件 id 要**全局唯一**（Excalidraw 的场景是跨会话存的）：以前按 f1/f2 数，
+    重开页面后新图又拿到 f1，把所有引用 f1 的元素一起换成了新图。 */
+const nextFileId = (prefix) => `${prefix}${Date.now().toString(36)}${(fileSeq += 1).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const files = {}; // 迁移过程中造出来的二进制，跟着场景一起存
 const fresh = []; // 还没交给 Excalidraw 的新图（updateScene 不带 files，得走 addFiles）
 /** 同一个块只渲一次：再点一次直接用上次那张图，不再等 0.4 秒 */
@@ -61,7 +64,7 @@ const fileCache = {};
 
 async function addFile(url, key) {
   if (key && fileCache[key]) return fileCache[key];
-  const id = `f${(fileSeq += 1)}`;
+  const id = nextFileId('f');
   const { dataURL, mimeType } = await blobToDataURL(url);
   files[id] = { id, dataURL, mimeType, created: Date.now(), lastRetrieved: Date.now() };
   fresh.push(files[id]);
@@ -100,7 +103,7 @@ async function rasterBlock(it, key) {
     fr.onerror = () => reject(new Error('读图失败'));
     fr.readAsDataURL(blob);
   });
-  const id = `b${(fileSeq += 1)}`;
+  const id = nextFileId('b');
   files[id] = { id, dataURL, mimeType: 'image/png', created: Date.now(), lastRetrieved: Date.now() };
   fresh.push(files[id]);
   const got = { id, size: await imageSize(dataURL) };
@@ -318,22 +321,22 @@ async function loadDrawer() {
   }
 }
 
-/** 新块落点：接着纸上已有的内容往下排（别叠在别人身上），排到纸底再从纸顶来 */
+/**
+ * 新块落点：**放在你正看着的地方**（视口正中），连续放几个就斜着错开一点。
+ * 以前是「接着纸上已有内容往下排」，纸上被摆乱之后新块会跑到很远的角落。
+ */
+let cascade = 0;
 function nextPos(wPx, hPx) {
-  const x = 60;
-  let bottom = 24;
+  const k = (cascade = (cascade + 1) % 8);
   try {
-    for (const el of exApi.getSceneElements()) {
-      if (el.locked || el.isDeleted) continue; // A4 白纸不算
-      if (el.x + (el.width || 0) < 0) continue;
-      bottom = Math.max(bottom, el.y + (el.height || 0));
-    }
+    const st = exApi.getAppState();
+    const zoom = (st.zoom && st.zoom.value) || 1;
+    const cx = (st.width || 0) / 2 / zoom - st.scrollX; // 视口中心的场景坐标
+    const cy = (st.height || 0) / 2 / zoom - st.scrollY;
+    return { x: Math.round(cx - wPx / 2 + k * 14), y: Math.round(cy - hPx / 2 + k * 14) };
   } catch {
-    /* 还没 ready */
+    return { x: 60, y: 40 + k * 14 };
   }
-  let y = Math.round(bottom + 24);
-  if (y + hPx > 1090) y = 40;
-  return { x, y };
 }
 
 /** 把 skeleton 加到画布上（走 updateScene，Excalidraw 自己维护版本 / 撤销栈） */
@@ -402,9 +405,10 @@ const peekHtml = computed(() => {
   if (!p || p.kind !== 'block') return '';
   const d = expCache[p.expId];
   if (!d) return '<div class="bd-ph">读取中…</div>';
-  const mm = (CHIP_W[p.key] || 1300) / 10;
   const it = { type: 'block', block: p.key, ref: p.expId, w: CHIP_W[p.key] || 1300 };
-  return `<div class="bd-body" style="width:${mm}mm">${itemHtml(it, d, ctxOf())}</div>`;
+  // 反应式是张图，直接按浮卡宽度给（给毫米宽会溢出去被裁）
+  const w = p.key === 'react' ? `${p.w - 22}px` : `${(CHIP_W[p.key] || 1300) / 10}mm`;
+  return `<div class="bd-body" style="width:${w}">${itemHtml(it, d, ctxOf())}</div>`;
 });
 
 /** 预览按「真实毫米宽」排完再缩到浮卡宽度 */

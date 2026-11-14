@@ -2021,6 +2021,8 @@ body.is-board-dragging { cursor: grabbing; }
 .bd-peek-h { display: flex; align-items: baseline; gap: 6px; font-size: 10px; color: var(--ink-4); margin-bottom: 6px; }
 .bd-peek-h .mono { color: var(--accent-ink); }
 .bd-peek-body { max-height: 62vh; overflow: hidden; }
+/* 预览里的图（反应式 SVG / 截图）按浮卡宽度缩，别溢出被裁 */
+.bd-peek-body img { display: block; width: 100%; height: auto; }
 /* TLC 那张让它自己定宽（窄板就不留一大片白），跟附件预览一个道理 */
 .bd-peek-img { display: block; max-width: 300px; max-height: 56vh; border-radius: 3px; }
 
