@@ -17,7 +17,6 @@ const SettingsView = () => import('./views/SettingsView.vue');
 const TrashView = () => import('./views/TrashView.vue');
 const ReagentLibView = () => import('./views/ReagentLibView.vue');
 const BoardsView = () => import('./views/BoardsView.vue');
-const BoardView = () => import('./views/BoardView.vue');
 const MobileHome = () => import('./components/MobileHome.vue');
 
 /** 手机上只放这几页（扫瓶签看档案 / 看记录 / 拍照上传），其它一律送到 `#/m` */
@@ -43,9 +42,8 @@ export const router = createRouter({
     { path: '/compare', redirect: '/boards' },
     { path: '/reagents', name: 'reagents', component: ReagentLibView },
     { path: '/boards', name: 'boards', component: BoardsView },
-    // 排版板 = Excalidraw 那套画布（老 HTML 画布退到 /b-old/:id，随时能切）
+    // 排版板 = Excalidraw 那套画布（老 HTML 画布已废弃）
     { path: '/b/:id', name: 'board', component: () => import('./views/BoardV2View.vue') },
-    { path: '/b-old/:id', name: 'board-old', component: BoardView },
     { path: '/b2/:id', redirect: (to) => `/b/${to.params.id}` },
     { path: '/trash', name: 'trash', component: TrashView },
     { path: '/settings', name: 'settings', component: SettingsView },

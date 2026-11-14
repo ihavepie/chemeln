@@ -259,7 +259,7 @@ async function load() {
 }
 
 /* ---------------- 左侧素材栏：点一下就把那块放到纸上 ----------------
-   老画布那套（搜索 / 悬停预览）先留在 /b-old，这里是最直接的「点一个块」+「点一张板」。 */
+   点一个块 / 一张 TLC 就落到纸上；悬停出预览（老 HTML 画布已废弃，功能都搬到这里了）。 */
 const exps = ref([]);
 const drawerOpen = ref(localStorage.getItem('eln:bdDrawer') !== '0');
 /** 专注：连最左导航导轨也收起来，整窗都是画布 */
@@ -485,11 +485,17 @@ function fitPaper(a) {
     const W = st.width || 0;
     const H = st.height || 0;
     if (!W || !H) return;
-    const pad = 14;
-    const z = Math.min((W - pad * 2) / paper.width, (H - pad * 2) / paper.height);
+    // 上边要多留一条给浮着的工具条，其余三边留白
+    const padX = 18;
+    const padTop = 56;
+    const padBottom = 18;
+    const boxW = W - padX * 2;
+    const boxH = H - padTop - padBottom;
+    const z = Math.min(boxW / paper.width, boxH / paper.height);
     const zoom = Math.max(0.1, Math.min(3, Math.round(z * 100) / 100));
-    const scrollX = W / 2 / zoom - (paper.x + paper.width / 2);
-    const scrollY = H / 2 / zoom - (paper.y + paper.height / 2);
+    // screenX = (x + scrollX) * zoom；把纸摆进「工具条以下那块」的正中
+    const scrollX = (padX + (boxW - paper.width * zoom) / 2) / zoom - paper.x;
+    const scrollY = (padTop + (boxH - paper.height * zoom) / 2) / zoom - paper.y;
     a.updateScene({ appState: { zoom: { value: zoom }, scrollX, scrollY }, captureUpdate: 'NEVER' });
   } catch {
     /* 版本差异，忽略 */
@@ -702,30 +708,27 @@ load();
     </Teleport>
 
     <div class="bv2-stage">
-      <!-- 顶部那一条只放 Excalidraw 的工具（它靠 CSS 从画布里浮上来），右边浮一排板级操作 -->
-      <div class="bv2-tools" />
-      <div class="bv2-fbar">
-        <span class="bv2-title" :title="board ? board.title : ''">{{ board ? board.title : '排版板' }}</span>
-        <span class="bv2-saved">{{ saving ? '保存中…' : '已保存' }}</span>
-        <button v-if="deletedBox" class="btn btn-sm btn-ghost" @click="restoreDeleted">恢复上次内容</button>
-        <button class="btn btn-sm btn-ghost" :disabled="!!downloading" @click="exportPng">存图</button>
-        <button class="btn btn-sm" :disabled="!!downloading" @click="exportPdf">
-          <Icon name="download" :size="12" /> 导出 PDF
-        </button>
-        <button class="btn btn-sm btn-ghost" title="打开旧画布（HTML 版）" @click="router.push(`/b-old/${route.params.id}`)">
-          <Icon name="arrow-left" :size="12" /> 旧画布
-        </button>
-      </div>
-      <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
-      <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
-      <div v-if="loading" class="cmp-empty">读取中…</div>
-      <div v-else class="bv2-canvas" :class="{ 'is-fitted': fitted }">
+      <div v-if="loading" class="bv2-card bv2-loading">读取中…</div>
+      <!-- 画布 = 一张大卡片：和侧边栏、窗口边都留出空隙；工具与板级操作都浮在卡片里面 -->
+      <div v-else class="bv2-card bv2-canvas" :class="{ 'is-fitted': fitted }">
         <div v-if="failed" class="bv2-fail">
           <p>这个画布起不来：{{ failed }}</p>
-          <p class="bv2-fail-hint">先回旧画布也能用，把上面的报错截图发我就能定位。</p>
-          <button class="btn btn-sm" @click="router.push(`/b-old/${route.params.id}`)">回旧画布</button>
+          <p class="bv2-fail-hint">把上面的报错截图发我就能定位。</p>
         </div>
         <ExcalidrawHost v-else ref="hostEl" :initial="initial" @ready="onReady" @fail="failed = $event" @change="onChange" />
+
+        <!-- 板级操作：浮在卡片右上角 -->
+        <div class="bv2-fbar">
+          <span class="bv2-title" :title="board ? board.title : ''">{{ board ? board.title : '排版板' }}</span>
+          <span class="bv2-saved">{{ saving ? '保存中…' : '已保存' }}</span>
+          <button v-if="deletedBox" class="btn btn-sm btn-ghost" @click="restoreDeleted">恢复上次内容</button>
+          <button class="btn btn-sm btn-ghost" :disabled="!!downloading" @click="exportPng">存图</button>
+          <button class="btn btn-sm" :disabled="!!downloading" @click="exportPdf">
+            <Icon name="download" :size="12" /> 导出 PDF
+          </button>
+        </div>
+        <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
+        <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
       </div>
     </div>
   </div>
@@ -737,7 +740,18 @@ load();
 .bv2 .bd-chip.is-busy { background: var(--accent-soft); color: var(--accent-ink); }
 .bv2 .bd-thumb:disabled, .bv2 .bd-chip:disabled { opacity: 0.55; cursor: default; }
 /* 整个内容区就是画布：只有顶上一条 46px 给工具用，其余全给纸 */
-.bv2-stage { position: relative; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.bv2-stage {
+  position: relative; flex: 1 1 auto; min-width: 0;
+  display: flex; flex-direction: column;
+  padding: 12px 14px 14px 12px;   /* 跟侧边栏 / 窗口边留出空隙 */
+}
+/* 画布本体＝一张大卡片 */
+.bv2-card {
+  position: relative; flex: 1 1 auto; min-height: 0;
+  border-radius: 10px; background: #fff; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(20, 18, 14, 0.05);
+}
+.bv2-loading { display: flex; align-items: center; justify-content: center; color: var(--ink-4); font-size: 12px; }
 /* 素材栏收起：画布拿满整条宽度，左边留一个小小的展开把手 */
 .bv2-drawer { position: relative; transition: flex-basis 0.16s ease; }
 .bv2-drawer.is-closed { flex-basis: 0; width: 0; border-right: 0; padding: 0; overflow: hidden; }
@@ -754,15 +768,14 @@ load();
 }
 .bv2-focus.is-on { color: var(--accent-ink); }
 .bv2-dopen {
-  position: absolute; left: 6px; top: 14px; z-index: 7;
+  position: absolute; left: 6px; top: 58px; z-index: 7;
   width: 20px; height: 20px; border: 0; border-radius: 4px;
   background: #fff; box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12);
   color: var(--ink-3); cursor: pointer; font-size: 13px; line-height: 1;
 }
-.bv2-tools { flex: 0 0 auto; height: 46px; }
 .bv2-fbar {
-  position: absolute; top: 0; right: 10px; z-index: 6;
-  display: flex; align-items: center; gap: 6px; height: 46px;
+  position: absolute; top: 6px; right: 10px; z-index: 6;
+  display: flex; align-items: center; gap: 6px; height: 38px;
 }
 .bv2-title {
   max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -775,7 +788,7 @@ load();
 }
 .bv2-fail-hint { color: var(--ink-4); font-size: 11.5px; }
 .bv2-saved { font-size: 10.5px; color: var(--ink-4); margin-right: 2px; }
-.bv2-canvas { flex: 1 1 auto; min-height: 0; overflow: visible; opacity: 0; }
+.bv2-canvas { opacity: 0; }
 .bv2-canvas.is-fitted { opacity: 1; transition: opacity 140ms ease; }
 /* 窗口窄的时候：板名让位、工具按钮缩一圈，别跟右边那排操作叠在一起 */
 @media (max-width: 1460px) {
@@ -794,10 +807,17 @@ load();
 .bv2-canvas :deep(.HintViewer),
 .bv2-canvas :deep(.disable-zen-mode) { display: none !important; }
 
-/* 工具条从纸面上挪到画布上方那一条（.bv2-tools 46px，正好放它）。
-   根节点默认 overflow:hidden，会把这排工具裁掉 —— 放开才能浮出去 */
-.bv2-canvas :deep(.excalidraw) { overflow: visible; }
-.bv2-canvas :deep(.FixedSideContainer_side_top) { top: -46px; left: 0; right: 0; bottom: auto; height: auto; }
+/* 工具条浮在卡片左上角（不再占用单独一条） */
+.bv2-canvas :deep(.App-top-bar) { display: flex !important; justify-content: flex-start !important; align-items: flex-start; }
+.bv2-canvas :deep(.App-top-bar > *) { margin-left: 0 !important; }
+
+/* 窄一点的时候 Excalidraw 会切成「手机版」UI（容器 < ~730px）：那套会多出
+   右边一排「素材库 / 锁 / 手」和左下角的汉堡菜单 —— 全藏掉，只留工具条 */
+.bv2-canvas :deep(.mobile-misc-tools-container) { display: none !important; }
+.bv2-canvas :deep(.main-menu-trigger) { display: none !important; }
+/* 手机版底部那条（汉堡 + 撤销/重做）也不要：撤销用 ⌘Z，画面留干净 */
+.bv2-canvas :deep(.App-bottom-bar) { display: none !important; }
+.bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 8px; right: 8px; bottom: auto; height: auto; }
 .bv2-canvas :deep(.App-menu_top) { display: flex; justify-content: flex-start; gap: 0; }
 .bv2-canvas :deep(.shapes-section) { justify-content: flex-start; }
 </style>
