@@ -9602,9 +9602,35 @@ body.is-board-dragging { cursor: grabbing; }
 .tv-chip:hover { border-color: var(--ink-4); color: var(--ink); }
 .tv-chip.on { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
 .tv-chip:disabled { opacity: 0.55; cursor: default; }
+.tlc-ref { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.tlc-ref-btn {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 210px;
+  padding: 2px 7px 2px 2px; border: 1px solid var(--line-2); border-radius: 5px;
+  background: #fff; cursor: zoom-in; font: inherit; font-size: 10.5px; color: var(--ink-3);
+}
+.tlc-ref-btn:hover { border-color: var(--ink-4); color: var(--ink); }
+.tlc-ref-btn img { height: 22px; width: auto; max-width: 34px; object-fit: contain; border-radius: 2px; background: #fbfaf7; }
+.tlc-ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlc-ref-swap {
+  border: 0; background: transparent; font: inherit; font-size: 10.5px;
+  color: var(--ink-3); cursor: pointer; padding: 2px 4px; border-radius: 4px;
+}
+.tlc-ref-swap:hover { background: #f1efeb; color: var(--ink); }
+.tlc-ref-empty { margin-left: auto; font-size: 10.5px; color: var(--ink-4); }
+.tlc-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.tlc-pick-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px;
+  padding: 6px; border: 1px solid var(--line-2); border-radius: 6px; background: #fff; cursor: pointer;
+  font: inherit; font-size: 10px; color: var(--ink-3);
+}
+.tlc-pick-opt img { height: 60px; width: auto; max-width: 100%; object-fit: contain; }
+.tlc-pick-opt.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
 .tlc-shots { display: flex; gap: 5px; margin-left: auto; }
 .tlc-shots img {
   height: 22mm; width: auto; max-width: 80px; object-fit: contain;
   border-radius: 3px; background: #fbfaf7; cursor: zoom-in;
 }
 .tlc-more { align-self: center; font-size: 11px; color: var(--ink-4); }
+/* 排版板抽屉：顶部「整组」两个按钮、底部「文字 / 结论」并排 */
+.board-addrow { width: 100%; }
+.board-addrow .btn { flex: 1 1 0; justify-content: center; }

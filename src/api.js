@@ -54,7 +54,7 @@ export const api = {
   boards: (project = '') => request(`/api/boards${project ? `?project=${encodeURIComponent(project)}` : ''}`),
   board: (id) => request(`/api/boards/${id}`),
   createBoard: (body) => request('/api/boards', { method: 'POST', body }),
-  saveBoard: (id, body) => request(`/api/boards/${id}`, { method: 'PUT', body }),
+  saveBoard: (id, body, opts = {}) => request(`/api/boards/${id}`, { method: 'PUT', body, keepalive: !!opts.keepalive }),
   deleteBoard: (id) => request(`/api/boards/${id}`, { method: 'DELETE' }),
 
   /* 素材抽屉：本课题所有 TLC 板子（带记录编号） */

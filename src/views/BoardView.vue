@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
+import ExpPick from '../components/ExpPick.vue';
 import { api } from '../api.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { downloadBlob } from '../lib/print.js';
@@ -84,7 +85,13 @@ async function load() {
     const t = await api.tlc(b.project || '');
     groupTlc(t.items);
     // 板上已有的块，得把记录读进来才画得出
-    const need = [...new Set(items.value.filter((it) => it.type === 'block' || it.type === 'scheme').map((it) => it.ref))];
+    const need = [
+      ...new Set(
+        items.value.flatMap((it) =>
+          it.block === 'compare' ? (it.refs || []) : it.type === 'block' || it.type === 'scheme' ? [it.ref] : []
+        )
+      ),
+    ].filter(Boolean);
     await Promise.all(need.map(ensureExp));
   } catch (e) {
     toast(e.message || '读不到这张板', 'err');
@@ -100,18 +107,32 @@ function touch() {
   timer = setTimeout(saveNow, 700);
 }
 
-async function saveNow() {
+async function saveNow(keepalive = false) {
   const b = board.value;
-  if (!b || saving.value) return;
-  saving.value = true;
+  if (!b) return;
+  if (saving.value && !keepalive) return;
+  if (!keepalive) saving.value = true;
   try {
-    await api.saveBoard(b.id, { title: b.title, project: b.project, page: b.page, items: items.value });
+    await api.saveBoard(
+      b.id,
+      { title: b.title, project: b.project, page: b.page, items: items.value },
+      { keepalive }
+    );
     dirty = false;
   } catch (e) {
     toast(e.message || '保存失败', 'err');
   } finally {
     saving.value = false;
   }
+}
+
+/**
+ * 关窗口 / 切走时补一次：拖动、摆块之后 700ms 才存，页面这会儿被关掉就丢了
+ * （`onBeforeUnmount` 只在路由切换时跑，关标签页不会）。keepalive 让请求照发。
+ */
+function flushNow() {
+  if (!dirty || !board.value) return;
+  void saveNow(true);
 }
 
 watch(items, touch, { deep: true });
@@ -193,10 +214,56 @@ async function addBlock(e, key) {
   syncCursor();
 }
 
+/** 结论块：板上写「结论 / 推理」用，双击改文字 */
+function addConcl() {
+  const w = 1600;
+  const { x, y } = nextPos(w);
+  push({ id: uid(), type: 'block', block: 'concl', text: '双击写结论', x, y, w });
+}
+
 async function addText() {
   const w = 1200;
   const { x, y } = nextPos(w);
   await push({ id: uid(), type: 'text', text: '写点什么', x, y, w });
+  syncCursor();
+}
+
+/* 多选：对比表 / 成组摆放都要从记录里挑几条 */
+const cmpPick = ref(false);
+const groupPick = ref(false);
+
+const ctxOf = () => ({ get: (id) => expCache[id] });
+const codeOf = (id) => (expCache[id] && expCache[id].code) || '';
+
+/** 对比表：挑 2–8 条，排成一张「编号 / 改了什么 / TLC 判断 / 产率」的小表 */
+async function onComparePicked(ids) {
+  cmpPick.value = false;
+  const refs = [...new Set((ids || []).map(Number).filter(Boolean))].slice(0, 8);
+  if (refs.length < 2) return toast('至少挑两条', 'warn');
+  await Promise.all(refs.map(ensureExp));
+  const w = 1700;
+  const { x, y } = nextPos(w);
+  push({ id: uid(), type: 'block', block: 'compare', refs, x, y, w });
+  await nextTick();
+  syncCursor();
+}
+
+/** 成组摆放：一条记录一组「条件 + TLC 判断」，竖着排下来，正好当筛选总结 */
+async function onGroupPicked(ids) {
+  groupPick.value = false;
+  const refs = [...new Set((ids || []).map(Number).filter(Boolean))];
+  if (!refs.length) return;
+  await Promise.all(refs.map(ensureExp));
+  const w = 1500;
+  const start = nextPos(w);
+  let y = start.y;
+  for (const id of refs) {
+    const base = { x: start.x, w, ref: id, code: codeOf(id), caption: '' };
+    push({ id: uid(), type: 'block', block: 'conds', y, ...base });
+    push({ id: uid(), type: 'block', block: 'verdict', y: y + 90, ...base });
+    y += 250;
+  }
+  await nextTick();
   syncCursor();
 }
 
@@ -232,7 +299,7 @@ function duplicate(it) {
 }
 
 async function editCaption(it) {
-  if (it.type === 'text') {
+  if (it.type === 'text' || (it.block === 'concl')) {
     const v = await prompt({ title: '改文字', value: it.text, confirmText: '好' });
     if (v != null) it.text = v;
     return;
@@ -392,7 +459,7 @@ async function exportPdf() {
   exporting.value = true;
   try {
     const name = `${board.value.title || '排版板'}.pdf`;
-    const html = boardHtml(items.value, pageSize.value, expOf);
+    const html = boardHtml(items.value, pageSize.value, expOf, ctxOf());
     const blob = await api.printPdf({ pages: [html], css: PRINT_CSS, filename: name });
     downloadBlob(blob, name);
     toast('PDF 好了，一张 A4', 'ok');
@@ -431,6 +498,8 @@ onMounted(async () => {
   ro = new ResizeObserver(fit);
   if (stageEl.value) ro.observe(stageEl.value);
   window.addEventListener('keydown', onKey);
+  window.addEventListener('pagehide', flushNow);
+  window.addEventListener('beforeunload', flushNow);
 });
 
 onBeforeUnmount(() => {
@@ -438,6 +507,8 @@ onBeforeUnmount(() => {
   if (dirty) void saveNow();
   if (ro) ro.disconnect();
   window.removeEventListener('keydown', onKey);
+  window.removeEventListener('pagehide', flushNow);
+  window.removeEventListener('beforeunload', flushNow);
   endDrag();
   document.getElementById('board-page-css')?.remove();
 });
@@ -467,6 +538,12 @@ onBeforeUnmount(() => {
       <div v-else class="board-wrap">
         <!-- 素材抽屉：按记录分组，一条记录能放的块都在这儿 -->
         <aside class="board-drawer">
+          <div class="board-drawer-h">整组</div>
+          <div class="bd-rec-chips">
+            <button class="bd-chip" title="挑几条记录排成一张对比表" @click="cmpPick = true">对比表…</button>
+            <button class="bd-chip" title="挑几条记录，各生成「条件 + TLC 判断」并竖排" @click="groupPick = true">成组摆放…</button>
+          </div>
+
           <div class="board-drawer-h">素材 · {{ exps.length }} 条记录</div>
           <div v-for="e in exps" :key="e.id" class="bd-rec">
             <div class="bd-rec-head">
@@ -489,9 +566,10 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div v-if="!exps.length" class="board-drawer-empty">这个课题还没有实验记录</div>
-          <button class="btn btn-sm btn-ghost board-addtext" @click="addText">
-            <Icon name="plus" :size="12" /> 加一段文字
-          </button>
+          <div class="bd-rec-chips board-addrow">
+            <button class="btn btn-sm btn-ghost" @click="addText"><Icon name="plus" :size="12" /> 文字</button>
+            <button class="btn btn-sm btn-ghost" @click="addConcl"><Icon name="plus" :size="12" /> 结论</button>
+          </div>
         </aside>
 
         <!-- 画布：一张 A4，靠 zoom 缩进可视区，纸里全是 mm 单位 -->
@@ -507,7 +585,7 @@ onBeforeUnmount(() => {
               @mousedown="startDrag($event, it, 'move')"
               @dblclick="editCaption(it)"
             >
-              <div class="bd-body" v-html="itemHtml(it, expOf(it))" />
+              <div class="bd-body" v-html="itemHtml(it, expOf(it), ctxOf())" />
               <span v-if="sel === it.id" class="board-grip" title="拖动改宽度" @mousedown.stop="startDrag($event, it, 'size')" />
             </div>
             <div v-if="guideAt.x != null" class="board-guide is-v" :style="{ left: mm(guideAt.x) }" />
@@ -533,5 +611,20 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <ExpPick
+      :model-value="cmpPick"
+      title="哪几条排进对比表？"
+      confirm-text="生成对比表"
+      @close="cmpPick = false"
+      @confirm="onComparePicked"
+    />
+    <ExpPick
+      :model-value="groupPick"
+      title="哪几条各生成「条件 + TLC 判断」？"
+      confirm-text="竖排摆好"
+      @close="groupPick = false"
+      @confirm="onGroupPicked"
+    />
   </div>
 </template>

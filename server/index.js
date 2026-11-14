@@ -136,7 +136,7 @@ const EXP_COLUMNS = [
   'code', 'title', 'date', 'status', 'project', 'rxn_type', 'literature', 'objective',
   'solvent', 'concentration', 'temperature', 'duration', 'atmosphere', 'workup', 'procedure',
   'product_name', 'appearance', 'yield_pct', 'dr_ee', 'characterization', 'notes', 'conclusion',
-  'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note', 'tlc_verdict',
+  'base_mmol', 'operator', 'ambient_temp', 'ambient_humid', 'product_mass', 'product_mw', 'tlc_note', 'tlc_verdict', 'tlc_shot_id',
   'ee_pct', 'sel_method', 'sel_condition', 'sel_rt',
   'steps_json', 'product_compound_id', 'category_id', 'group_id', 'scheme_rxn', 'scheme_smiles', 'lit_note',
   'no_yield', 'apparatus', 'light', 'kind', 'conds_json', 'field_vars_json',
@@ -145,7 +145,7 @@ const EXP_COLUMNS = [
 
 const NUMERIC_COLUMNS = new Set([
   'yield_pct', 'base_mmol', 'product_mass', 'product_mw', 'product_compound_id', 'category_id', 'ee_pct',
-  'no_yield', 'prev_exp_id', 'chain_draw',
+  'no_yield', 'prev_exp_id', 'chain_draw', 'tlc_shot_id',
 ]);
 
 /** 反应步骤：一条记录里可以有多个阶段，阶段之间夹着后处理就是「两步连开」。 */
@@ -347,7 +347,7 @@ const EXP_FIELD_LABELS = {
   apparatus: '装置 / 器皿', light: '光照 / 波长', kind: '记录类型',
   workup: '后处理', procedure: '操作步骤', product_name: '产物', appearance: '性状', yield_pct: '产率',
   dr_ee: '选择性', characterization: '表征数据', notes: '实验现象', conclusion: '结论',
-  base_mmol: '反应规模', product_mass: '产物质量', product_mw: '产物分子量', tlc_note: 'TLC', tlc_verdict: 'TLC 判断',
+  base_mmol: '反应规模', product_mass: '产物质量', product_mw: '产物分子量', tlc_note: 'TLC', tlc_verdict: 'TLC 判断', tlc_shot_id: 'TLC 板图',
   category_id: '分类', product_compound_id: '产物挂库', code: '编号', steps_json: '步骤与条件',
   ee_pct: 'ee 数值', sel_method: '选择性测定方式', sel_condition: '手性柱与流动相', sel_rt: '保留时间',
   reagents: '投料表',

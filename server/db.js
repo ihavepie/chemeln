@@ -275,6 +275,8 @@ ensureColumn('experiments', 'product_mw', 'product_mw REAL');
 ensureColumn('experiments', 'tlc_note', "tlc_note TEXT NOT NULL DEFAULT ''");
 // TLC 判断：小反应筛条件时常常「只看板子」，产率过几天才称；这一格是排在产率前面的一层结果
 ensureColumn('experiments', 'tlc_verdict', "tlc_verdict TEXT NOT NULL DEFAULT ''");
+// 结果区引用的那张板（attachments.id）：记录里不用铺一排在纸上，点开看大图就行
+ensureColumn('experiments', 'tlc_shot_id', 'tlc_shot_id INTEGER');
 ensureColumn('experiments', 'steps_json', "steps_json TEXT NOT NULL DEFAULT '[]'");
 // 加料（补加试剂的时间点）和搅拌转速：以前是在库里手改的，没写迁移 →
 // 新装一份数据库会因为「no such column: addition」直接起不来（造演示数据时踩到）

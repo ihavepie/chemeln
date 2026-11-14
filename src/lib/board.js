@@ -1,3 +1,5 @@
+import { variations } from './sctfields.js';
+
 /**
  * 排版板（自由画布）：把记录里的东西摆到一张 A4 上。
  *
@@ -30,6 +32,8 @@ export const BLOCKS = [
   { key: 'reagents', label: '投料', w: 1500 },
   { key: 'result', label: '结果', w: 1300 },
   { key: 'verdict', label: 'TLC 判断', w: 1400 },
+  { key: 'compare', label: '对比表', w: 1700 },
+  { key: 'concl', label: '结论', w: 1600 },
   { key: 'notes', label: '结论', w: 1400 },
 ];
 
@@ -157,25 +161,64 @@ export function blockHtml(kind, exp) {
   }
 }
 
+/**
+ * 「对比表」：把挑中的几条记录排成一张小表 —— 板子这边是用来「对比 + 下结论」的，
+ * 表格比一堆散块更直接：编号 / 相对基准改了什么 / TLC 判断 / 产率。
+ * `ctx.get(id)` 拿记录（BoardView 的 expCache）。
+ */
+function compareHtml(it, ctx) {
+  const get = (ctx && ctx.get) || (() => null);
+  const rows = (it.refs || []).map(get).filter(Boolean);
+  if (rows.length < 2) return '<div class="bd-ph">（对比表至少要两条记录）</div>';
+  const base = rows[0];
+  const cols = it.cols && it.cols.length ? it.cols : ['variation', 'verdict', 'yield'];
+  const yld = (e) => (Number(e.no_yield) === 1 ? '不计' : e.yield_pct != null ? `${num(e.yield_pct, 1)}%` : '待测');
+  const cell = (e, col) => {
+    if (col === 'variation') {
+      if (e.id === base.id) return '基准';
+      const v = variations(base, e);
+      if (!v.length) return '重复';
+      // 拿两条不相干的反应来比时会列出十几项，表里只留前三项
+      return v.length > 3 ? `${v.slice(0, 3).join(' · ')} 等 ${v.length} 项` : v.join(' · ');
+    }
+    if (col === 'verdict') return String(e.tlc_verdict || '').trim() || '—';
+    if (col === 'yield') return yld(e);
+    if (col === 'conds') return [solventOf(e), e.temperature, e.duration].filter(Boolean).join(' · ');
+    return String(e[col] || '');
+  };
+  const head = cols
+    .map((c) => `<th>${c === 'variation' ? '改了什么' : c === 'verdict' ? 'TLC 判断' : c === 'yield' ? '产率' : c === 'conds' ? '条件' : esc(c)}</th>`)
+    .join('');
+  const body = rows
+    .map((e) => `<tr><td class="mono">${esc(e.code || '')}</td>${cols.map((c) => `<td>${esc(cell(e, c))}</td>`).join('')}</tr>`)
+    .join('');
+  return `<table class="bd-tb bd-cmp"><thead><tr><th>编号</th>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
 /** 一块素材 → HTML（图注统一挂在最下面） */
-export function itemHtml(it, exp) {
+export function itemHtml(it, exp, ctx) {
   if (!it) return '';
   const cap = String(it.caption || '').trim() ? `<div class="bd-cap">${esc(it.caption)}</div>` : '';
   if (it.type === 'tlc') return `<img src="/api/files/${it.ref}" alt="">${cap}`;
   if (it.type === 'text') return `<div class="bd-text">${esc(it.text)}</div>${cap}`;
   // scheme 是老数据（现在统一成 block: react）
   const kind = it.type === 'scheme' ? 'react' : it.block;
+  // 「结论」块：自带小标题的文字块，跟普通「文字」区分开（板上才是下结论的地方）
+  if (kind === 'concl') {
+    return `<div class="bd-h2">结论</div><div class="bd-text">${esc(it.text || '双击写结论')}</div>${cap}`;
+  }
+  if (kind === 'compare') return compareHtml(it, ctx) + cap;
   return blockHtml(kind, exp) + cap;
 }
 
 /** 导 PDF：一张固定尺寸的白纸 + 绝对定位的素材（单位 mm，跟屏幕上完全一致） */
-export function boardHtml(items, page = PAGE.a4p, expOf = () => null) {
+export function boardHtml(items, page = PAGE.a4p, expOf = () => null, ctx = null) {
   const blocks = (items || [])
     .filter((it) => it && it.type)
     .map(
       (it) =>
         `<div class="bd-item" style="left:${(it.x / 10).toFixed(2)}mm;top:${(it.y / 10).toFixed(2)}mm;width:${(it.w / 10).toFixed(2)}mm">` +
-        `${itemHtml(it, expOf(it))}</div>`
+        `${itemHtml(it, expOf(it), ctx)}</div>`
     );
   return `<div class="bd-page" style="width:${page.w / 10}mm;height:${page.h / 10}mm">${blocks.join('')}</div>`;
 }
@@ -190,6 +233,10 @@ export const BOARD_CSS = `
   text-align: center; word-break: break-word; }
 .bd-text { font-size: 9.5pt; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 .bd-h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 11.5pt; line-height: 1.35; }
+.bd-h2 { font-family: "SF Mono", Menlo, monospace; font-size: 7pt; letter-spacing: 0.1em; color: #a09c93;
+  margin-bottom: 1.2mm; }
+table.bd-cmp { font-size: 7.6pt; }
+table.bd-cmp td.mono { font-family: "SF Mono", Menlo, monospace; white-space: nowrap; }
 .bd-sub { margin-top: 1mm; font-size: 7.5pt; color: #6d6862; }
 .bd-kv { font-size: 8.8pt; line-height: 1.65; color: #1c1b19; }
 .bd-kv .k { font-size: 6.8pt; color: #a09c93; margin-right: 1.2mm; }

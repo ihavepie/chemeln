@@ -33,6 +33,21 @@ const emit = defineEmits(['open-compound']);
 
 const picking = ref(false);
 const shot = ref(null); // 点开的大图（TLC 板子）
+const pickShot = ref(false); // 「换一张板」的小弹层
+
+/** 结果区引用的那张板：优先用记录里明确引用的，只有一张时就默认那张 */
+const refShot = computed(() => {
+  const id = Number(props.model.tlc_shot_id);
+  const hit = id ? props.tlc.find((a) => Number(a.id) === id) : null;
+  return hit || (props.tlc.length === 1 ? props.tlc[0] : null);
+});
+
+function chooseShot(a) {
+  if (props.locked) return;
+  props.model.tlc_shot_id = Number(a.id);
+  pickShot.value = false;
+  props.notify();
+}
 const list = ref([]);
 const picked = ref(null);
 /** 正在挑「产物是库里的哪个化合物」的那一行（多步时每行各挑各的） */
@@ -310,17 +325,24 @@ function onYieldInput(ev, r) {
           {{ v }}
         </button>
       </div>
-      <div v-if="tlc.length" class="tlc-shots">
-        <img
-          v-for="a in tlc.slice(0, 3)"
-          :key="a.id"
-          :src="`/api/files/${a.id}`"
-          :alt="a.original_name || 'TLC'"
-          loading="lazy"
-          @click="shot = { src: `/api/files/${a.id}`, name: a.original_name || 'TLC' }"
-        />
-        <span v-if="tlc.length > 3" class="tlc-more">+{{ tlc.length - 3 }}</span>
+      <!-- 结果区只挂一个「板图」引用（不在纸上铺一排行）：点缩略看大图，多张时右边能换 -->
+      <div v-if="refShot" class="tlc-ref">
+        <button
+          type="button"
+          class="tlc-ref-btn"
+          title="点开看大图"
+          @click="shot = { src: `/api/files/${refShot.id}`, name: refShot.original_name || 'TLC' }"
+        >
+          <img :src="`/api/files/${refShot.id}`" :alt="refShot.original_name || 'TLC'" loading="lazy" />
+          <span class="tlc-ref-name">{{ refShot.original_name || '板图' }}</span>
+        </button>
+        <button v-if="tlc.length > 1 && !locked" type="button" class="tlc-ref-swap" title="换一张板" @click="pickShot = true">
+          换
+        </button>
       </div>
+      <span v-else-if="tlc.length > 1" class="tlc-ref-empty">有 {{ tlc.length }} 张板，
+        <button v-if="!locked" type="button" class="tlc-ref-swap" @click="pickShot = true">选一张</button>
+      </span>
     </div>
 
     <div v-if="showSel" class="res-sel">
@@ -349,6 +371,22 @@ function onYieldInput(ev, r) {
       <template v-else-if="info.calc !== null">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　实测产率 <b>{{ round(info.calc, 1) }}%</b></template><template v-else>理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template></div>
 
     <FilePreview v-if="shot" :src="shot.src" :name="shot.name" @close="shot = null" />
+
+    <AppModal v-if="pickShot" title="结果区挂哪张 TLC 板" confirm-text="就这张" @close="pickShot = false" @confirm="pickShot = false">
+      <div class="tlc-pick">
+        <button
+          v-for="a in tlc"
+          :key="a.id"
+          type="button"
+          class="tlc-pick-opt"
+          :class="{ 'is-on': Number(model.tlc_shot_id) === Number(a.id) }"
+          @click="chooseShot(a)"
+        >
+          <img :src="`/api/files/${a.id}`" alt="" loading="lazy" />
+          <span>{{ a.original_name || 'TLC' }}</span>
+        </button>
+      </div>
+    </AppModal>
 
     <AppModal v-if="picking" title="产物是库里的哪个化合物" confirm-text="选它" @close="picking = false" @confirm="applyPick">
       <div class="recipe-list">
