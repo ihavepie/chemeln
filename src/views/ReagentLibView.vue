@@ -7,6 +7,7 @@ import { useRoute } from 'vue-router';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { variantText } from '../lib/reagent.js';
 import { LOOKUP_SITES } from '../lib/lookup.js';
+import { openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
 
 // 自定义检索站点（设置里加的）：url 模板里 {name} 换成试剂名
 const customSites = ref([]);
@@ -21,6 +22,34 @@ const extSites = (name) => {
     .filter((s) => s.href);
   return [...builtin, ...mine];
 };
+
+/** 行尾「⋯」菜单：改名、删除，和「去哪个库查这个试剂」 */
+function rowMenu(ev, it) {
+  const sites = extSites(it.name);
+  const items = [
+    { key: 'rename', label: '改名' },
+    { key: 'del', label: '删除', danger: true },
+    CTX_SEP,
+    ...sites.map((s, i) => ({ key: `site:${i}`, label: `${s.label} 检索` })),
+    ...(sites.length ? [CTX_SEP] : []),
+    { key: 'sites', label: '检索站点…' },
+  ];
+  openCtxMenu(ev, items, (key) => {
+    if (key === 'rename') return renameEntry(it);
+    if (key === 'del') return removeEntry(it);
+    if (key === 'sites') return openSites();
+    if (key.startsWith('site:')) {
+      const href = (sites[Number(key.slice(5))] || {}).href;
+      if (href) {
+        const a = document.createElement('a');
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.click();
+      }
+    }
+  });
+}
 
 async function openSites() {
   try {
@@ -318,6 +347,18 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
         </div>
 
         <table class="rl-table">
+          <colgroup>
+            <col />
+            <col class="rl-c-role" />
+            <col class="rl-c-mw" />
+            <col class="rl-c-dens" />
+            <col class="rl-c-per" />
+            <col class="rl-c-num" />
+            <col class="rl-c-num" />
+            <col class="rl-c-when" />
+            <col class="rl-c-state" />
+            <col class="rl-c-more" />
+          </colgroup>
           <thead>
             <tr>
               <th>试剂</th>
@@ -328,7 +369,8 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <th class="n">次数</th>
               <th class="n">在用</th>
               <th class="n">最近使用</th>
-              <th class="n rl-acts-h" />
+              <th class="n">状态</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -381,31 +423,29 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 {{ it.lastCode || '' }}
                 <span v-if="it.lastAt" class="rl-date">{{ it.lastAt }}</span>
               </td>
-              <td class="n rl-rowacts">
-                <button type="button" class="rl-act" @click.stop="renameEntry(it)">改名</button>
-                <button type="button" class="rl-act is-danger" @click.stop="removeEntry(it)">删除</button>
-              </td>
               <td class="n">
+                <!-- 状态胶囊：点一下就是核对（没查过）/ 重核（查过）；查不到时旁边给一个站外入口 -->
                 <button
                   type="button"
-                  class="rl-check"
+                  class="rl-state"
+                  :class="{
+                    'is-done': it.checkedAt && it.checkState !== 'miss',
+                    'is-miss': it.checkState === 'miss',
+                  }"
                   :disabled="checking === it.name || allRun"
+                  :title="it.checkState === 'miss' ? '三个库都没查到：点一下重新查，或去外部库看一眼' : it.checkedAt ? '已核对过，点一下重新查' : '点一下按 PubChem / OPSIN 核对'"
                   @click.stop="verify(it)"
-                >
-                  {{ checking === it.name ? '查询中…' : it.checkedAt ? '重核' : '核对' }}
-                </button>
-                <!-- 三个库都查不到时，给几个能直接跳到外部库检索的入口（自己看一眼再手填 MW） -->
-                <template v-if="it.checkState === 'miss'">
-                  <a
-                    v-for="s in extSites(it.name)"
-                    :key="s.label"
-                    class="rl-ext"
-                    :href="s.href"
-                    target="_blank"
-                    rel="noopener"
-                    @click.stop
-                  >{{ s.label }}↗</a>
-                </template>
+                >{{ checking === it.name ? '查询中…' : it.checkState === 'miss' ? '查不到' : it.checkedAt ? '已核对' : '待核对' }}</button>
+                <button
+                  v-if="it.checkState === 'miss'"
+                  type="button"
+                  class="rl-ext-btn"
+                  title="去外部数据库检索这个试剂"
+                  @click.stop="rowMenu($event, it)"
+                >↗</button>
+              </td>
+              <td class="n">
+                <button type="button" class="rl-more" title="改名 / 删除 / 站外检索" @click.stop="rowMenu($event, it)">⋯</button>
               </td>
             </tr>
           </tbody>

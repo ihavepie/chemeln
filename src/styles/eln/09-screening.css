@@ -355,7 +355,7 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-empty { padding: 40px 0; text-align: center; font-size: 12.5px; color: var(--ink-4); }
 .rl-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .rl-table th {
-  padding: 6px 8px;
+  padding: 4px 8px 9px;
   font-weight: 500;
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -365,6 +365,15 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
   white-space: nowrap;
 }
 .rl-table th.n, .rl-table td.n { text-align: right; }
+/* 列宽：表头和数据对得上，数字列不再各自漂 */
+.rl-c-role { width: 78px; }
+.rl-c-mw { width: 76px; }
+.rl-c-dens { width: 118px; }
+.rl-c-per { width: 152px; }
+.rl-c-num { width: 54px; }
+.rl-c-when { width: 156px; }
+.rl-c-state { width: 74px; }
+.rl-c-more { width: 28px; }
 .rl-table td { padding: 9px 8px; }
 .rl-table tbody tr { cursor: pointer; }
 .rl-table tbody tr:hover { background: #faf9f6; }
@@ -374,18 +383,28 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-date { margin-left: 6px; color: var(--ink-4); opacity: 0.8; }
 /* 试剂库里「当前引用为 0」的条目：数字淡一点，表示这个试剂现在没记录在用 */
 .rl-table .rl-zero { color: var(--ink-4); opacity: 0.55; }
-.rl-check {
-  padding: 2px 8px;
-  border: 1px solid var(--line-2);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-3);
-  font-size: 11px;
-  cursor: pointer;
-  transition: color 0.12s, border-color 0.12s, background 0.12s;
+/* 状态胶囊：待核对 / 已核对 / 查不到（点一下就是核对） */
+.rl-state {
+  border: 0; background: none; padding: 2px 4px; border-radius: 5px;
+  font-size: 11px; line-height: 1.5; color: var(--ink-4); cursor: pointer;
+  white-space: nowrap;
 }
-.rl-check:hover { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
-.rl-check:disabled { opacity: 0.5; cursor: default; }
+.rl-state:hover:not(:disabled) { color: var(--accent-ink); background: #fdf7f3; }
+.rl-state.is-done { color: var(--ink-3); }
+.rl-state.is-miss { color: var(--bad, #b4423a); }
+.rl-state:disabled { opacity: 0.55; cursor: default; }
+.rl-ext-btn {
+  border: 0; background: none; padding: 0 2px; cursor: pointer;
+  font-size: 11px; color: var(--ink-3); line-height: 1;
+}
+.rl-ext-btn:hover { color: var(--accent-ink); }
+.rl-more {
+  border: 0; background: none; cursor: pointer; padding: 0 4px;
+  font-size: 13px; line-height: 1; color: var(--ink-4);
+  opacity: 0; transition: opacity 0.12s;
+}
+.rl-table tbody tr:hover .rl-more { opacity: 1; }
+.rl-more:hover { color: var(--ink); }
 /* 试剂库页头那颗「全部核对」：跟行尾的「核对」同一路质感，只是稍宽一点、带条数 */
 .rl-allcheck {
   height: 30px;
