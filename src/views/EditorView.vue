@@ -594,6 +594,7 @@ watch(
   () => route.params.id,
   async (id, old) => {
     if (!id || id === old) return;
+    paperOut();                     // 先把旧的一页推走（数据还在路上，正好盖住等待）
     try {
       if (dirty.value) await flush();
     } catch {
@@ -610,7 +611,7 @@ watch(
     // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
     await nextTick();
     editorEl.value?.scrollTo({ top: 0 });
-    animatePaper();
+    paperIn();
   }
 );
 
@@ -737,9 +738,9 @@ onUiMerged(() => {
 let wheelAcc = 0;
 let wheelLast = 0;
 let wheelLock = 0;
-const WHEEL_TRIGGER = 140;   // 累计这么多像素才算一次「故意再滚」
-const WHEEL_IDLE = 380;      // 手停这么久就重新累计
-const WHEEL_COOLDOWN = 700;  // 切完这么长时间内不再切
+const WHEEL_TRIGGER = 44;    // 累计这么多像素就算一次「故意再滚」（用户：滚太多了，收小）
+const WHEEL_IDLE = 320;      // 手停这么久就重新累计
+const WHEEL_COOLDOWN = 460;  // 切完这么长时间内不再切（刚好接住一次「推」的动画）
 /**
  * 换记录时纸面「平缓进来」：方向跟手势走（往下滚 / ↓ / 点下面那条 = 从下往上浮，反之亦然）。
  * 直接给 `.editor-inner` 挂一个 300ms 的 keyframes，`offsetWidth` 强制重排让动画重放；
@@ -749,19 +750,35 @@ const WHEEL_COOLDOWN = 700;  // 切完这么长时间内不再切
 let paperTimer = 0;
 let navDir = 1;
 const reducedMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-function animatePaper(dir = navDir, ms = 300) {
-  if (reducedMotion) return;
-  const root = editorEl.value?.querySelector('.editor-inner');
+const PAPER_CLASSES = ['paper-in-down', 'paper-in-up', 'paper-out-down', 'paper-out-up'];
+function paperRoot() {
+  return reducedMotion ? null : editorEl.value?.querySelector('.editor-inner') || null;
+}
+/** 推走旧的那一页（切记录一开始就播，趁数据还在路上，所以看得见「被推走」） */
+let paperSafety = 0;
+function paperOut(dir = navDir) {
+  const root = paperRoot();
   if (!root) return;
-  const cls = dir < 0 ? 'paper-in-up' : 'paper-in-down';
-  root.classList.remove('paper-in-down', 'paper-in-up');
+  root.classList.remove(...PAPER_CLASSES);
   void root.offsetWidth;
-  root.classList.add(cls);
+  root.classList.add(dir < 0 ? 'paper-out-up' : 'paper-out-down');
+  // 数据回来得慢就把旧的先放回去（别让纸一直半透明），新的一页到了再推
+  clearTimeout(paperSafety);
+  paperSafety = window.setTimeout(() => root.classList.remove('paper-out-down', 'paper-out-up'), 420);
+}
+/** 把新的那一页推进来（从推走的方向接手，接成一整段「推」的感觉） */
+function paperIn(dir = navDir) {
+  const root = paperRoot();
+  if (!root) return;
+  root.classList.remove(...PAPER_CLASSES);
+  void root.offsetWidth;
+  root.classList.add(dir < 0 ? 'paper-in-up' : 'paper-in-down');
+  clearTimeout(paperSafety);
   clearTimeout(paperTimer);
   paperTimer = window.setTimeout(() => {
-    root.classList.remove(cls);
+    root.classList.remove(...PAPER_CLASSES);
     updateRail();
-  }, ms);
+  }, 320);
 }
 
 /** 上下一条：**按左栏显示顺序**（`store.listOrder`，分类分组 + 卡片堆展开后的序列）走，

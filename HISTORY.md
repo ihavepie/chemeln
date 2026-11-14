@@ -406,3 +406,7 @@
   现在两处统一走 `neighborExp(step)`，池子按 `store.listOrder` → `store.items` → `siblings` 依次退。`store.listOrder` 是新加的（`ExpListPane` 里 `visualOrder` = 分类分组 → 行 → 卡片堆成员 id 平铺，`watch(..., {immediate:true})` 写进 store），所以顺序**就是眼睛看到的那个顺序**：平行实验之间照旧一条一条走，走到组尾自然进下一条普通记录，往上同理。
   `↑/↓` 的说明也从「平行实验上下切换」改成「上 / 下一条记录（含平行实验）」（设置页 04 快捷键那一片）。动画和侧栏滚动不用另做——都在 `route.params.id` 的 watcher 里，任何方式切记录都会播。
   验证（WKWebView + 真接口，直接看 `location.hash`）：`/e/206`（SJ-2-8，平行组最后一个成员）按 ↓ → `183`（SJ-2-7，**组外**的普通记录）✓ 这正是用户要的；从 `/e/183` 连按 ↑ → `206` → `182`（SJ-2-6）→ `129`（SJ-2-2），组内外一路往回走 ✓；到列表尽头再按就停住（不绕回）。
+- **「推」的动画 + 滚轮门槛调小（用户：「就是那种推的感觉，鼠标滚轮要滚的太多了」）**。
+  ① 动画从「新页淡入」改成两段接起来的「推」：切记录一开始先 `paperOut(dir)` —— 旧纸顺着方向滑走（`paper-out-down/up`，130ms，`translateY(∓26px)` + 淡到 0.12，`forwards` 停在推走的位置），数据到齐后 `paperIn(dir)` 从反方向接手推进来（`paper-in-down/up`，260ms，`translateY(±26px)` + 0.12 → 1）。因为 out 是在 `flush()` + `load()` **之前**就开始的，等待时间正好被这段推走盖住；万一网络慢，加了个 420ms 的兜底把旧纸放回来（不然纸一直半透明）。往下滚 = 内容往上被推走、新页从下面上来。`prefers-reduced-motion` / 打印时都不播。
+  ② 滚轮门槛 140px → **44px**（`WHEEL_TRIGGER`），冷却 700ms → **460ms**（`WHEEL_IDLE` 380 → 320）：一次鼠标滚轮一格就够触发，不用一直滚到底再攒一大截。
+  验证（WKWebView）：两个 `deltaY: 30` 的 wheel（共 60px）就切到了下一条，探针读到 class 序列 `paper-out-down → paper-in-down` ✓；连发 8 个 `deltaY: 60`（共 480px）也只切了一次（冷却挡住了后面的）✓。
