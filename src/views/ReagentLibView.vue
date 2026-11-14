@@ -464,7 +464,6 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
             <col class="rl-c-num" />
             <col class="rl-c-num" />
             <col class="rl-c-when" />
-            <col class="rl-c-links" />
             <col class="rl-c-more" />
           </colgroup>
           <thead>
@@ -477,7 +476,6 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <th class="n">次数</th>
               <th class="n">在用</th>
               <th class="n">最近使用</th>
-              <th class="n">外部库</th>
               <th />
             </tr>
           </thead>
@@ -506,6 +504,19 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                     title="去外部数据库检索这个试剂"
                     @click.stop="rowMenu($event, it)"
                   >↗</button>
+                  <!-- 外部库直达链接（解析出 CID / CAS 后才出现） -->
+                  <span class="rl-links">
+                    <a
+                      v-for="l in sitesForRow(it)"
+                      :key="l.key"
+                      class="rl-link"
+                      :href="l.href"
+                      target="_blank"
+                      rel="noopener"
+                      :title="`在 ${l.label} 打开`"
+                      @click.stop
+                    >{{ l.label }}</a>
+                  </span>
                 </span>
                 <!-- 同一个试剂用过的当量（一条记录填一条，这里按试剂归拢） -->
                 <span v-if="it.variants && it.variants.length" class="rl-vars">
@@ -550,22 +561,6 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <td class="n mono rl-last">
                 {{ it.lastCode || '' }}
                 <span v-if="it.lastAt" class="rl-date">{{ it.lastAt }}</span>
-              </td>
-              <td class="n">
-                <!-- 外部库：用解析出来的 CID / CAS 拼的直达链接（鼠标停上去看是哪个库） -->
-                <span class="rl-links">
-                  <a
-                    v-for="l in sitesForRow(it)"
-                    :key="l.key"
-                    class="rl-link"
-                    :href="l.href"
-                    target="_blank"
-                    rel="noopener"
-                    :title="`在 ${l.label} 打开`"
-                    @click.stop
-                  >{{ l.label }}</a>
-                  <span v-if="!sitesForRow(it).length" class="rl-link is-idle">…</span>
-                </span>
               </td>
               <td class="n">
                 <button type="button" class="rl-more" title="改名 / 删除 / 站外检索" @click.stop="rowMenu($event, it)">⋯</button>

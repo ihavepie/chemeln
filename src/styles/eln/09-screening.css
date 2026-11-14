@@ -371,9 +371,9 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-c-role { width: 92px; }
 .rl-c-mw { width: 64px; }
 .rl-c-dens { width: 92px; }
-.rl-c-per { width: 96px; }
+.rl-c-per { width: 104px; }
 .rl-c-num { width: 44px; }
-.rl-c-when { width: 92px; }
+.rl-c-when { width: 104px; }
 .rl-c-more { width: 22px; }
 .rl-table td { padding: 9px 6px; vertical-align: middle; white-space: normal; }
 /* 数字与状态列：上下左右都居中，跟表头对齐 */
@@ -446,9 +446,10 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-links { line-height: 1.6; }
 /* 外部库用小链接排成两行（td 必须是 table-cell，所以换行靠里面这个 span） */
 .rl-links { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0 6px; }
+.rl-links { display: inline-flex; flex-wrap: wrap; gap: 0 6px; }
 .rl-link {
-  font-size: 10px; color: var(--ink-3); text-decoration: none;
-  margin: 0 3px 0 0; white-space: nowrap; letter-spacing: -0.01em;
+  font-size: 9.5px; color: var(--ink-4); text-decoration: none;
+  white-space: nowrap; letter-spacing: -0.01em; line-height: 1.4;
 }
 .rl-link:hover { color: var(--accent-ink); text-decoration: underline; }
 .rl-link.is-idle { color: var(--ink-4); opacity: 0.4; }
@@ -484,7 +485,7 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 /* 试剂库里「这个试剂用过的当量 / 用量」小签（用得最多的那颗是强调色）。
    这排小签是「试剂的子记录」，要能一眼看清、还好点——所以做成正常大小的胶囊
    （以前 9px 高 14px，又小又难点，用户说像小字）。 */
-.rl-name-top { display: flex; align-items: center; gap: 6px; }
+.rl-name-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .rl-nm { display: block; }
 .rl-vars { display: inline-flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 .rl-var,
