@@ -8187,61 +8187,35 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .sheet .rtable tr.rt-var .cond-in { font-size: 12.5px; }
 .sheet .rtable tr.rt-var .cond-eq { text-align: right; }
 
-/* 结果块里的「各条件结果」：变量在投料表下面，数字在这儿 */
-.condres { margin-top: 8px; padding-top: 7px; border-top: 1px dotted var(--line-2); }
-.condres-lbl { display: block; font-size: 10px; letter-spacing: 0.12em; color: var(--ink-4); margin-bottom: 3px; }
-.condres-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  column-gap: 10px;
-  row-gap: 1px;
-  padding: 2px 0;
-  font-size: 12px;
-}
-.condres-n { flex: 0 0 16px; font-size: 10px; color: var(--ink-4); }
-.condres-what {
-  flex: 1 1 130px;
-  min-width: 0;
+/* 结果块里的「各条件结果」：变量在投料表下面，数字在这儿。
+   用户圈出来问「这两行怎么办」——原来的 flex 排法把「产率 / 选择性 / 备注」三组标签
+   在每行重复一遍，两行都空着时满屏是一样的占位字（`94:6 / 99% ee`），看着像复制了一份数据。
+   现在收成一张 `.rtable` 小表：表头只写一次，一行一个候选，占位符统一成「—」。 */
+.condres { margin-top: 9px; padding-top: 7px; border-top: 1px dotted var(--line-2); }
+.condres-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; }
+.condres-head .lbl { letter-spacing: 0.12em; }
+.condres-table { table-layout: fixed; }
+.condres-table th { padding-bottom: 4px; }
+.condres-table .cr-n { width: 18px; }
+.condres-table .cr-y { width: 54px; }
+.condres-table .cr-sel { width: 108px; }
+.condres-table .cr-note { width: 126px; }
+.condres-table td { padding: 2px 4px; }
+/* 条件那格：一条候选可能有几样变量（`[L] RuPhos · 20%`），长了就省略、悬停看全 */
+.condres-table .cr-what {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-1);
+  max-width: 0;
 }
-.condres-f { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; color: var(--ink-4); font-size: 10.5px; }
-.condres-f.is-wide .condres-in { width: 112px; }
-/* 备注吃剩下的宽度：一行的信息量刚好塞得下，不会把「备注」挤到第二行 */
-.condres-f.is-note { flex: 1 1 88px; min-width: 70px; }
-.condres-f.is-note .condres-in { width: 100%; }
-.condres-in {
-  width: 46px;
-  height: 21px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  padding: 2px 4px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--ink-1);
-  text-align: left;
-}
-.condres-num { width: 40px; text-align: right; font-family: var(--mono); }
-.condres-in:hover { background: #f8f7f2; }
-.condres-in:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
-.condres-u { font-size: 10.5px; color: var(--ink-4); }
-/* 「各条件结果」这几个小格：标签别折行、数字输入也别露出系统步进箭头 */
-.condres-f > span { white-space: nowrap; }
-.condres-f.is-note { flex: 1 1 120px; min-width: 96px; }
-.condres-in[type='number'] { -moz-appearance: textfield; }
-.condres-in[type='number']::-webkit-outer-spin-button,
-.condres-in[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-/* 「备注」让宽度自己缩（窄屏也留在一行里），条件多的时候结果块才不会翻倍变高 */
-.condres-f.is-note { flex: 0 1 96px; min-width: 56px; }
-/* 一行放得下的最小基准宽：摘要 100 / 选择性 104 / 备注 84（合计 456 < 纸面内宽），
-   再宽了就由「摘要」那格吸收，窄屏才会折行 */
-.condres-what { flex: 1 1 100px; }
-.condres-f.is-wide .condres-in { width: 104px; }
-.condres-f.is-note { flex: 0 1 84px; min-width: 46px; }
+.condres-table .cr-n { font-size: 10px; color: var(--ink-4); }
+.condres-table input { padding: 3px 6px; }
+.condres-table input::placeholder { color: var(--ink-4); }
+.condres-table input[type='number'] { -moz-appearance: textfield; }
+.condres-table input[type='number']::-webkit-outer-spin-button,
+.condres-table input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 
 /* 合计行右下角那句算式（「苄基氨基环丁酮：0.2 mmol × 433.57 = 0.0867 g」）不再常显——
    用户圈出来说「不应该在中间，删掉也行」。现在由模板 `v-if="focus"` 控制：

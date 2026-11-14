@@ -256,12 +256,14 @@ const varRows = computed(() => {
 });
 
 
-/** 结果块里那一行「这个条件改了什么」 */
+/** 结果块里那一行「这个条件改了什么」（带当量：`[L] RuPhos · 20%`，光看名字分不清两个 20% 还是 5%） */
 function condWhat(c) {
   const parts = [];
   for (const v of condVars.value) {
     const val = String(c.vars?.[v.ph] || '').trim();
-    if (val) parts.push(`[${v.ph}] ${val}`);
+    if (!val) continue;
+    const eq = String(c.varEq?.[v.ph] ?? '').trim();
+    parts.push(eq ? `[${v.ph}] ${val} · ${eq}` : `[${v.ph}] ${val}`);
   }
   if (parts.length) return parts.join(' · ');
   return String(c.label || '').trim() || '（还没填变量）';
@@ -2545,35 +2547,57 @@ const openAttachment = (id) => {
             @open-compound="(id) => router.push(`/compounds/${id}`)"
           >
             <template #conds>
+              <!-- 一次筛好几个条件时，每个条件的产率 / 选择性 / 备注放在这里（变量在投料表下面）。
+                   用户圈出来说「两行占位符看着像复制了一份」→ 收成一张小表：表头只写一遍，
+                   占位符统一成「—」，跟上面结果表同一套 `.rtable` 排法。 -->
               <div v-if="conds.length && sheetPrefs.conds" class="condres">
-                <span class="condres-lbl">各条件结果</span>
-                <div v-for="(c, i) in conds" :key="`r${i}`" class="condres-row">
-                  <span class="condres-n mono">{{ i + 1 }}</span>
-                  <span class="condres-what">{{ condWhat(c) }}</span>
-                  <label class="condres-f">
-                    <span>产率</span>
-                    <input
-                      v-model="c.yield_pct"
-                      class="condres-in condres-num"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      :disabled="exp.locked"
-                      placeholder="—"
-                      @input="notify()"
-                    />
-                    <span class="condres-u">%</span>
-                  </label>
-                  <label class="condres-f is-wide">
-                    <span>选择性</span>
-                    <input v-model="c.sel" class="condres-in" :disabled="exp.locked" placeholder="94:6 / 99% ee" @input="notify()" />
-                  </label>
-                  <label class="condres-f is-note">
-                    <span>备注</span>
-                    <input v-model="c.note" class="condres-in" :disabled="exp.locked" placeholder="（选填）" @input="notify()" />
-                  </label>
+                <div class="condres-head">
+                  <span class="lbl">各条件结果</span>
+                  <span class="lbl-note">一行一个候选</span>
                 </div>
+                <table class="rtable condres-table">
+                  <colgroup>
+                    <col class="cr-n" />
+                    <col />
+                    <col class="cr-y" />
+                    <col class="cr-sel" />
+                    <col class="cr-note" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th />
+                      <th>条件</th>
+                      <th class="n">产率 / %</th>
+                      <th>选择性</th>
+                      <th>备注</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(c, i) in conds" :key="`r${i}`">
+                      <td class="cr-n mono">{{ i + 1 }}</td>
+                      <td class="cr-what" :title="condWhat(c)">{{ condWhat(c) }}</td>
+                      <td>
+                        <input
+                          v-model="c.yield_pct"
+                          class="n"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          :disabled="exp.locked"
+                          placeholder="—"
+                          @input="notify()"
+                        />
+                      </td>
+                      <td>
+                        <input v-model="c.sel" :disabled="exp.locked" placeholder="—" @input="notify()" />
+                      </td>
+                      <td>
+                        <input v-model="c.note" :disabled="exp.locked" placeholder="选填" @input="notify()" />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </template>
           </ResultBlock>
