@@ -6,6 +6,8 @@ import { compoundDict } from '../store.js';
 import { api } from '../api.js';
 import { num, round, yieldInfo } from '../lib/reagent.js';
 import { applyNumeric } from '../lib/numinput.js';
+import { TLC_VERDICTS } from '../lib/ui.js';
+import FilePreview from './FilePreview.vue';
 
 const props = defineProps({
   model: { type: Object, required: true },
@@ -24,10 +26,13 @@ const props = defineProps({
    * 所以最后一行直接读写 `model`，前面几步写 `steps[i]`。
    */
   steps: { type: Array, default: () => [] },
+  /** 这条记录的 TLC 板图（`category === 'tlc'` 的附件）：小反应只看板子时，结果这块就靠它们 */
+  tlc: { type: Array, default: () => [] },
 });
 const emit = defineEmits(['open-compound']);
 
 const picking = ref(false);
+const shot = ref(null); // 点开的大图（TLC 板子）
 const list = ref([]);
 const picked = ref(null);
 /** 正在挑「产物是库里的哪个化合物」的那一行（多步时每行各挑各的） */
@@ -63,6 +68,13 @@ const noYield = computed(
 );
 /** 多步记录不给那种「整条不计产率」的开关：哪一步没算产率就把那格空着 */
 const showNoYieldBtn = computed(() => !multi.value && !kindNoYield.value);
+
+/** TLC 判断：点一下设档，再点一次取消（没看清就空着） */
+function setVerdict(v) {
+  if (props.locked) return;
+  props.model.tlc_verdict = props.model.tlc_verdict === v ? '' : v;
+  props.notify();
+}
 
 function toggleNoYield() {
   if (props.locked) return;
@@ -258,7 +270,7 @@ function onYieldInput(ev, r) {
               class="n"
               inputmode="decimal"
               :value="r.last && noYield ? '' : (r.rm.yield_pct ?? '')"
-              :placeholder="r.last && noYield ? '—' : multi ? '' : '自动'"
+              :placeholder="r.last && noYield ? '—' : multi ? '' : (model.tlc_verdict && !r.rm.yield_pct ? '待测' : '自动')"
               :disabled="locked || (r.last && noYield)"
               @input="onYieldInput($event, r)"
             />
@@ -282,6 +294,35 @@ function onYieldInput(ev, r) {
         <input class="n" :value="model.dr_ee" placeholder="> 20:1" :disabled="locked" @input="model.dr_ee = $event.target.value; notify()" @change="notify()" />
       </label>
     </div>
+    <!-- TLC 判断：小反应筛条件时先看板子，产率过几天才称 —— 这一行是排在产率前面的一层结果 -->
+    <div class="res-tlc">
+      <span class="sel-cap">TLC 判断</span>
+      <div class="tlc-verdicts">
+        <button
+          v-for="v in TLC_VERDICTS"
+          :key="v"
+          type="button"
+          class="tv-chip"
+          :class="{ on: model.tlc_verdict === v }"
+          :disabled="locked"
+          @click="setVerdict(v)"
+        >
+          {{ v }}
+        </button>
+      </div>
+      <div v-if="tlc.length" class="tlc-shots">
+        <img
+          v-for="a in tlc.slice(0, 3)"
+          :key="a.id"
+          :src="`/api/files/${a.id}`"
+          :alt="a.original_name || 'TLC'"
+          loading="lazy"
+          @click="shot = { src: `/api/files/${a.id}`, name: a.original_name || 'TLC' }"
+        />
+        <span v-if="tlc.length > 3" class="tlc-more">+{{ tlc.length - 3 }}</span>
+      </div>
+    </div>
+
     <div v-if="showSel" class="res-sel">
       <span class="sel-cap">选择性测定</span>
       <label class="sel-f">
@@ -306,6 +347,8 @@ function onYieldInput(ev, r) {
          但「称到的比理论还多」那种异常还是要报 -->
     <div v-if="info.theo && (!multi || info.over)" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>
       <template v-else-if="info.calc !== null">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　实测产率 <b>{{ round(info.calc, 1) }}%</b></template><template v-else>理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template></div>
+
+    <FilePreview v-if="shot" :src="shot.src" :name="shot.name" @close="shot = null" />
 
     <AppModal v-if="picking" title="产物是库里的哪个化合物" confirm-text="选它" @close="picking = false" @confirm="applyPick">
       <div class="recipe-list">

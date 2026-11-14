@@ -77,7 +77,7 @@ const fields = reactive({
   title: '', date: '', status: '进行中', operator: '', ambient_temp: '', ambient_humid: '',
   project: '', rxn_type: '', literature: '', objective: '', solvent: '', concentration: '',
   temperature: '', duration: '', atmosphere: '', apparatus: '', light: '', workup: '', procedure: '', product_name: '',
-  appearance: '', yield_pct: '', product_mass: '', product_mw: '', tlc_note: '', dr_ee: '',
+  appearance: '', yield_pct: '', product_mass: '', product_mw: '', tlc_note: '', tlc_verdict: '', dr_ee: '',
   ee_pct: '', sel_method: '', sel_condition: '', sel_rt: '',
   characterization: '', notes: '', conclusion: '', product_compound_id: null, category_id: null,
   no_yield: 0,
@@ -2438,7 +2438,7 @@ const openAttachment = (id) => {
             :model="fields"
             :steps="reagent.steps"
             :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind"
-            :yield-default="sheetFx.yield" :show-sel="sheetFx.sel"
+            :yield-default="sheetFx.yield" :show-sel="sheetFx.sel" :tlc="tlcShots"
             @open-compound="(id) => router.push(`/compounds/${id}`)"
           >
             <template #conds>

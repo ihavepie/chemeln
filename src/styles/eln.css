@@ -9591,3 +9591,20 @@ body.is-board-dragging { cursor: grabbing; }
 /* 放得下的时候把那 120px 呼吸位也收掉：万一哪天判定没跟上，也只会多出一点空白，
    不会让人往下滚一大段空页（用户报的「没超出页面但还是会滚动」就是滚进了这段 padding） */
 .editor.is-fit { padding-bottom: 24px; }
+
+/* ---------- 结果块里的「TLC 判断」一行（小反应只看板子时的第一层结果） ---------- */
+.res-tlc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.tlc-verdicts { display: flex; gap: 4px; flex-wrap: wrap; }
+.tv-chip {
+  border: 1px solid var(--line-2); background: #fff; border-radius: 999px;
+  padding: 2px 9px; font: inherit; font-size: 11px; color: var(--ink-2); cursor: pointer;
+}
+.tv-chip:hover { border-color: var(--ink-4); color: var(--ink); }
+.tv-chip.on { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
+.tv-chip:disabled { opacity: 0.55; cursor: default; }
+.tlc-shots { display: flex; gap: 5px; margin-left: auto; }
+.tlc-shots img {
+  height: 22mm; width: auto; max-width: 80px; object-fit: contain;
+  border-radius: 3px; background: #fbfaf7; cursor: zoom-in;
+}
+.tlc-more { align-self: center; font-size: 11px; color: var(--ink-4); }

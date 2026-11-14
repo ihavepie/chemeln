@@ -29,6 +29,7 @@ export const BLOCKS = [
   { key: 'conds', label: '条件', w: 1400 },
   { key: 'reagents', label: '投料', w: 1500 },
   { key: 'result', label: '结果', w: 1300 },
+  { key: 'verdict', label: 'TLC 判断', w: 1400 },
   { key: 'notes', label: '结论', w: 1400 },
 ];
 
@@ -133,6 +134,17 @@ export function blockHtml(kind, exp) {
         ['质量', mass],
       ]);
       return html ? `<div class="bd-kv">${html}</div>` : '<div class="bd-ph">（还没有结果）</div>';
+    }
+
+    case 'verdict': {
+      // 小反应筛条件时先看板子：一条记录一行「TLC 判断 + 展开剂/Rf」，几条摞起来就是一张筛选总结
+      const t = String(exp.tlc_verdict || '').trim();
+      const note = String(exp.tlc_note || '').trim();
+      const html = kv([
+        ['TLC 判断', t],
+        ['展开剂 / Rf', note],
+      ]);
+      return html ? `<div class="bd-kv">${html}</div>` : '<div class="bd-ph">（还没填 TLC 判断）</div>';
     }
 
     case 'notes': {

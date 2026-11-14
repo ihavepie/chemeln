@@ -266,3 +266,9 @@
   ② 量的时机错：只在挂载 + 窗口 resize + `[exp, page, liveScheme]` 变化时量，谱图 / 反应式图 / 字体异步到位后就不再重量（实测 1435 高的窗口里内容底 1286，`is-fit` 却是 false）。
   改法：`updateEditorFit()` 改成量 **`.editor-inner` 的真实底边 + 24px** 与 `clientHeight` 比；`scheduleFit()` 立即量 + 下一帧 + 250ms + 900ms 各补一拍；`ResizeObserver` 同时盯 `.editor-inner` 和 `.sheet`；监听容器的 `load`（捕获，图片）和 `document.fonts.ready`；`.editor` 加 `overscroll-behavior: contain`；`is-fit` 时顺便把 120px 呼吸位收成 24px。
   验证（WKWebView 三档窗口，把量测值直接画在页面上截图）：**1600×1300** → `class="editor is-fit"`、内容底 1219 + 24 ≤ 1300、`scrollTop=400` 设不动（**滚不动 ✓**）；**2196×1435** → `is-fit=true`、内容底 1286、可滚=false；**1280×820** → 内容底 1202 > 820，`class="editor"`（无 is-fit）、`scrollTop=400` 生效 —— 该滚的时候照旧滚，没滚坏。
+- **结果块加一层「TLC 判断」+ 修「反应式上的条件超出了」（用户：「如果变量实验但结果只有 TLC 呢，大部分小反应的变量实验都是看 TLC，然后再去详细产率」→ 选了「结果块自带 TLC」+ 五档）**
+  ① **字段**：`experiments.tlc_verdict`（`ensureColumn`，老记录空串不受影响）；`EXP_COLUMNS` 白名单 + `FIELD_LABELS`（中文「TLC 判断」）一起补，**别忘了 `EditorView` 的 `fields` 也要加这个键**——`FIELD_KEYS = Object.keys(fields)` 同时管「读进页面」和「保存 payload」，漏了就点了不落库（第一版就是这样：界面上选中了、库里还是空串）。
+  ② **界面**：结果块表格下面多一行「TLC 判断」——五档胶囊（`lib/ui.js` 的 `TLC_VERDICTS`：原料消失 / 部分转化 / 有新点 / 明显副点 / 没反应，再点一次取消），右边并排**最多 3 张 22mm 板图**（多出来显示 `+N`，点开 `FilePreview`）。产率那格在「选了判断但还没称」时占位写**「待测」**。
+  ③ **排版板**：`BLOCKS` 多一个「TLC 判断」块（`blockHtml` 的 `verdict`：判断 + 展开剂/Rf 两行），几条记录摞起来就是一张筛选总结页；抽屉胶囊也补上。
+  ④ **顺手修的**：`composeChainSvg` 的箭头上方条件**以前硬排一行 + 箭头封顶 360**，长条件会直接画出箭头区域、压到结构上甚至被裁掉（用户截图「反应式上的条件超出了」）。现在「先排一行，塞不下折两行」，箭头节点宽度取 `max(arrowLen, capW) + 26`，字永远在框里。**改完发现老图还是旧的**——`scheme_cache` 只按投料表 `sig` + 结构指纹判新旧，排版改动不算，所以加了 `server/db.js` 的 `SCHEME_LAYOUT_VER`（启动时按它一次性清空缓存），以后改反应式排版记得 +1。
+  验证（WKWebView + 真接口）：点「部分转化」→ 库里 `tlc_verdict="部分转化"`、产率占位变「待测」；再点同一颗 → 回到 `""`（测试后已还原，没留在用户记录里）。排版板上两块 verdict：`TLC 判断 部分转化` / `（还没填 TLC 判断）`。给 8 个试剂的条件排在箭头上方时：改前 svg 942×270、那行字 478px 且贴着结构；改后 286×290、折成两行（290..430 / 195..525），探针确认没有字出画布或压结构。第 1 页 sheet 高度 1065 → 1035（预算 1106），**仍是一页的量**（TLC 小图压到 22mm、最多 3 张就是为了这个）。

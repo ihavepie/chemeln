@@ -204,6 +204,7 @@ function chipsOf(e) {
   const out = [{ key: 'title', label: '编号' }];
   if (e.has_scheme) out.push({ key: 'react', label: '反应式' });
   out.push({ key: 'conds', label: '条件' }, { key: 'reagents', label: '投料' }, { key: 'result', label: '结果' });
+  out.push({ key: 'verdict', label: 'TLC 判断' });
   out.push({ key: 'notes', label: '结论' });
   return out;
 }

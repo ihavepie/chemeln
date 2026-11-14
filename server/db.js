@@ -273,6 +273,8 @@ ensureColumn('experiments', 'ambient_humid', "ambient_humid TEXT NOT NULL DEFAUL
 ensureColumn('experiments', 'product_mass', 'product_mass REAL');
 ensureColumn('experiments', 'product_mw', 'product_mw REAL');
 ensureColumn('experiments', 'tlc_note', "tlc_note TEXT NOT NULL DEFAULT ''");
+// TLC 判断：小反应筛条件时常常「只看板子」，产率过几天才称；这一格是排在产率前面的一层结果
+ensureColumn('experiments', 'tlc_verdict', "tlc_verdict TEXT NOT NULL DEFAULT ''");
 ensureColumn('experiments', 'steps_json', "steps_json TEXT NOT NULL DEFAULT '[]'");
 // 加料（补加试剂的时间点）和搅拌转速：以前是在库里手改的，没写迁移 →
 // 新装一份数据库会因为「no such column: addition」直接起不来（造演示数据时踩到）
@@ -329,6 +331,19 @@ ensureColumn('screenings', 'project', "project TEXT NOT NULL DEFAULT ''");
   }
 }
 // 一次性把现有投料行的「用法」灌进标签表；之后只靠保存时追加（有 `migr:` 标记，删掉的标签不会被重新灌回来）
+/* 反应式排版改过就 +1：老缓存里的 SVG 是按旧排版画的，不清掉会一直显示旧图
+   （用户报「反应式上的条件超出了」，改了排版却看不到变化，就是缓存没失效）。
+   注意：不只是「看着不对」，缓存里那张是真的把字画出了箭头区域。 */
+const SCHEME_LAYOUT_VER = 2;
+if (Number(getSetting('migr:scheme_layout_ver') || 0) < SCHEME_LAYOUT_VER) {
+  try {
+    db.exec('DELETE FROM scheme_cache');
+  } catch {
+    /* 还没有这张表就算了 */
+  }
+  setSetting('migr:scheme_layout_ver', String(SCHEME_LAYOUT_VER));
+}
+
 if (!getSetting('migr:variant_uses')) {
   const rows = db
     .prepare("SELECT exp_id, name, role, eq, volume_ul FROM reagents WHERE trim(name) <> '' ORDER BY id")
