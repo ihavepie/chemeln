@@ -1,3 +1,11 @@
+- **「还是拖不动 / 新画布加载不出来」的排查（结论：多半是页面没刷新）**。
+  每次 `npm run build` 都会清空 `public/` 并换掉资源文件名，而 4780 发的是 `no-store` 的 index.html + 带 hash 的 chunk；
+  **已经打开的页面**点「新画布」时会去拿**刚刚被删掉**的旧 chunk，于是路由懒加载失败、看起来就是「点了没反应 / 加载不出来」，
+  而且页面里跑的还是**上一版代码**（所以修好的拖拽也没生效）。两手：
+  ① `router.onError` 里认「动态 import 失败」这类报错 → 先写回 hash 再 `location.reload()` 一次（8 秒内不重复，防死循环）；
+  ② 设置页最底下加「**构建于 MM-DD HH:MM**」，时间来自**服务端**读 `public/index.html` 的 mtime（bootstrap 的 `buildAt`）——
+     服务端算，浏览器不可能缓存错，一眼就能看出「你在跑旧构建」。顺手把 vite 里那个 `define: __BUILD_TIME__` 撤了（define 会被 Vite 的产物缓存住、连跑两次 build 时间不变，踩了）。
+  验证：`/settings` 的 `.version-line` 文本 = `… · 构建于 11-14 21:27`，跟 `date` 对得上；`/b2/<临时板>` 在当前构建里能正常出画布（白纸 + TLC 图 + 文字，`-webkit-user-drag:none`、`dragstart` 已拦）。
 - **排版板新画布试作：把 Excalidraw 塞进来（`/b2/:id`）**（用户：「感觉自己做还是不太行……可以先学习一下其他的画布」）。
   先修了两个真 bug：① **图片块拖不动**——`<img>` 默认自带 HTML5 拖放，一按住就起 dragstart、把 mousemove/mouseup 全吞了（AGENTS 里 pointdrag 那条早就记过这个坑，板上没防）；修法 = `BOARD_CSS` 里 `.bd-item img { -webkit-user-drag:none }` + stage 上 `@dragstart.prevent`。② **箭头「自己冒出来」**——原来 `onDrawDown` 一按下就先按默认大小画草稿（`shapeFrom` 在 `moved=false` 时给 1500×200），于是松手前先闪一块默认箭头；现在按下不画，动了才画。
   然后按用户点单上了 Excalidraw：`npm i @excalidraw/excalidraw react react-dom`（0.18.1 / React 18.3.1，走 `.npm-cache`），

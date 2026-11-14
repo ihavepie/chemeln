@@ -52,6 +52,21 @@ export const router = createRouter({
   ],
 });
 
+/* 懒加载的页面 chunk 拿不到（最典型：刚 `npm run build` 换了文件名，而这个页面还是旧的），
+   路由会静默失败、看起来就是「点了没反应 / 页面加载不出来」。
+   本机单人用，直接整页刷新一次就能拿到新构建——比让人猜「是不是没刷新」强。 */
+router.onError((err, to) => {
+  const msg = String((err && err.message) || err || '');
+  const stale = /dynamically imported module|Importing a module script failed|Loading chunk|module script/i.test(msg);
+  if (!stale) return;
+  const key = 'eln:stale-reload';
+  const last = Number(sessionStorage.getItem(key) || 0);
+  if (Date.now() - last < 8000) return; // 刷过还是不行就别死循环
+  sessionStorage.setItem(key, String(Date.now()));
+  if (to && to.fullPath) location.hash = to.fullPath;
+  location.reload();
+});
+
 // 手机上打开根地址 / 桌面版页面（工作台、化合物墙、设置…）→ 直接进「最近实验」
 // 以前是在 App.vue 的 onMounted 里判断，那时 route.name 还没定，结果只显示「请到电脑上用」。
 router.beforeEach((to) => {

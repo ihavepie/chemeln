@@ -1093,6 +1093,14 @@ function bootstrap(query = {}) {
     dataDir: DATA_DIR,
     // 页面设置（浏览器那边先读本地缓存，开机时用这份按时间戳合并）
     uiPrefs: readUiPrefs(),
+    // 构建时间 = public/index.html 的 mtime：换了构建但页面没刷新时，设置页底部会显示旧时间
+    buildAt: (() => {
+      try {
+        return fs.statSync(path.join(PUBLIC_DIR, 'index.html')).mtime.toISOString();
+      } catch {
+        return '';
+      }
+    })(),
   };
 }
 

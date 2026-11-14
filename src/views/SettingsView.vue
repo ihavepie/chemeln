@@ -346,6 +346,15 @@ const SET_MODS = [
   { key: 'ui', n: '04', label: '界面', desc: '快捷键与书签悬停预览（这些是这台机器上的界面偏好）。' },
   { key: 'page', n: '05', label: '记录页', desc: 'A4 上显示哪几块、块里的功能、反应式排版与常用选项。' },
 ];
+/** 构建时间（服务端按 public/index.html 的 mtime 给）：页面没刷新时这里还是旧的 */
+const buildAt = computed(() => {
+  const t = String((store.boot && store.boot.buildAt) || '');
+  const d = t ? new Date(t) : null;
+  if (!d || Number.isNaN(d.getTime())) return '未知';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+});
+
 const mod = ref(uiGet('setMod', 'book'));
 /** 哪些模块是展开的（存 `uiprefs` 的 `setOpen`，跟 `setMod` 一样换浏览器/重开都还在）。
     没存过 = 只展开当前那块。 */
@@ -1181,7 +1190,7 @@ function setScrollSwitch(v) {
         </div>
       </section>
 
-        <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上</p>
+        <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上 · 构建于 {{ buildAt }}</p>
       </div>
     </div>
   </div>
