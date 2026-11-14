@@ -35,7 +35,9 @@ onMounted(async () => {
       elements: Array.isArray(init.elements) ? init.elements : [],
       appState: { viewBackgroundColor: '#f5f4f1', currentItemStrokeColor: '#1c1b19', ...(init.appState || {}) },
       files: init.files || {},
-      scrollToContent: true,
+      // 别让 Excalidraw 自己 fit：它按「所有元素」算，板上有画到纸外的图就会把纸挤歪，
+      // 而且它比我们晚一拍执行，看起来就是「先正了一下又跳回去」。fit 由外面按 A4 纸做。
+      scrollToContent: false,
     };
 
     root = createRoot(host.value);

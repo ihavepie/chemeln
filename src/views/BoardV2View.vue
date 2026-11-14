@@ -260,6 +260,14 @@ async function load() {
    老画布那套（搜索 / 悬停预览）先留在 /b-old，这里是最直接的「点一个块」+「点一张板」。 */
 const exps = ref([]);
 const drawerOpen = ref(localStorage.getItem('eln:bdDrawer') !== '0');
+/** 专注：连最左导航导轨也收起来，整窗都是画布 */
+const focus = ref(localStorage.getItem('eln:bdFocus') === '1');
+function toggleFocus() {
+  focus.value = !focus.value;
+  localStorage.setItem('eln:bdFocus', focus.value ? '1' : '0');
+  document.body.classList.toggle('is-board-focus', focus.value);
+  setTimeout(() => exApi && fitPaper(exApi), 260);
+}
 function toggleDrawer() {
   drawerOpen.value = !drawerOpen.value;
   localStorage.setItem('eln:bdDrawer', drawerOpen.value ? '1' : '0');
@@ -477,7 +485,9 @@ function fitPaper(a) {
 function onReady(a) {
   exApi = a;
   if (import.meta.env.DEV) window.__exApi = a; // 只在开发预览里挂个把手，方便量几何
+  // 120ms 先摆一次，600ms 再补一次（图 / 字体晚到会把布局顶一下，不补就会「跳回去」）
   setTimeout(() => fitPaper(a), 120);
+  setTimeout(() => fitPaper(a), 600);
 }
 
 let timer = 0;
@@ -578,7 +588,10 @@ async function exportPdf() {
 
 window.addEventListener('blur', unpeek);
 
+if (focus.value) document.body.classList.add('is-board-focus');
+
 onBeforeUnmount(() => {
+  document.body.classList.remove('is-board-focus');
   window.removeEventListener('blur', unpeek);
   unpeek();
   clearTimeout(timer);
@@ -675,6 +688,7 @@ load();
         </button>
       </div>
       <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
+      <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
       <div v-if="loading" class="cmp-empty">读取中…</div>
       <div v-else class="bv2-canvas">
         <div v-if="failed" class="bv2-fail">
@@ -703,6 +717,13 @@ load();
   font-size: 14px; line-height: 1; padding: 0 2px;
 }
 .bv2-dtoggle:hover { color: var(--ink-2); }
+.bv2-focus {
+  position: absolute; left: 6px; bottom: 8px; z-index: 7;
+  width: 22px; height: 22px; border: 0; border-radius: 4px;
+  background: #fff; box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12);
+  color: var(--ink-3); cursor: pointer; font-size: 12px; line-height: 1;
+}
+.bv2-focus.is-on { color: var(--accent-ink); }
 .bv2-dopen {
   position: absolute; left: 6px; top: 14px; z-index: 7;
   width: 20px; height: 20px; border: 0; border-radius: 4px;

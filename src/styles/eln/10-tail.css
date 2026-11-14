@@ -2253,3 +2253,8 @@ body.is-board-dragging { cursor: grabbing; }
 }
 .board-swatch:hover { transform: scale(1.12); }
 .board-swatch.is-on { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent); }
+
+/* 排版板「专注」：导轨列宽归零 + 不可见，整窗都是画布。
+   别写 display:none —— grid 会把 workspace 顶进第 1 列（= --rail 那么宽），整页直接白 */
+body.is-board-focus .app { --rail: 0px; }
+body.is-board-focus .rail { visibility: hidden; overflow: hidden; pointer-events: none; }
