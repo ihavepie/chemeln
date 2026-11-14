@@ -16,7 +16,7 @@ const props = defineProps({
   /** 关掉 Excalidraw 自带的一些按钮，跟本子其它地方一致一点 */
   viewMode: { type: Boolean, default: false },
 });
-const emit = defineEmits(['ready', 'change']);
+const emit = defineEmits(['ready', 'change', 'fail']);
 
 const host = ref(null);
 const err = ref('');
@@ -58,6 +58,7 @@ onMounted(async () => {
   } catch (e) {
     err.value = String((e && e.message) || e);
     console.error('[excalidraw]', e);
+    emit('fail', err.value);
   }
 });
 

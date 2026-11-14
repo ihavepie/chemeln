@@ -27,6 +27,7 @@ const router = useRouter();
 const board = ref(null);
 const initial = ref(null);
 const loading = ref(true);
+const failed = ref('');
 const skipped = ref(0);
 const hostEl = ref(null);
 let exApi = null;
@@ -505,7 +506,12 @@ load();
       </header>
       <div v-if="loading" class="cmp-empty">读取中…</div>
       <div v-else class="bv2-canvas">
-        <ExcalidrawHost ref="hostEl" :initial="initial" @ready="onReady" @change="onChange" />
+        <div v-if="failed" class="bv2-fail">
+          <p>这个画布起不来：{{ failed }}</p>
+          <p class="bv2-fail-hint">先回旧画布也能用，把上面的报错截图发我就能定位。</p>
+          <button class="btn btn-sm" @click="router.push(`/b-old/${route.params.id}`)">回旧画布</button>
+        </div>
+        <ExcalidrawHost v-else ref="hostEl" :initial="initial" @ready="onReady" @fail="failed = $event" @change="onChange" />
       </div>
     </div>
   </div>
@@ -516,6 +522,12 @@ load();
 .bv2-drawer { flex: 0 0 250px; }
 .bv2 .bd-chip.is-busy { background: var(--accent-soft); color: var(--accent-ink); }
 .bv2 .bd-thumb:disabled, .bv2 .bd-chip:disabled { opacity: 0.55; cursor: default; }
+.bv2-fail {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; padding: 24px;
+  background: var(--canvas); text-align: center; font-size: 12.5px; color: var(--ink-2);
+}
+.bv2-fail-hint { color: var(--ink-4); font-size: 11.5px; }
 .bv2-inner { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: 26px 28px 16px; max-width: none; }
 .bv2-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 14px; flex: 0 0 auto; }
 .bv2-head-main { min-width: 0; }

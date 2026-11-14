@@ -26,7 +26,48 @@ const animObserver = new IntersectionObserver(
   { rootMargin: '0px 0px -40px 0px', threshold: 0.01 }
 );
 
+/**
+ * 兜底报错面板：本机单人用、又只有 Safari，出了问题没法看 devtools 的时候，
+ * 至少让错误**出现在页面上**（截图就能定位）。只在真的抛错时出现，可关掉。
+ */
+function fatalPanel(msg, detail) {
+  let box = document.getElementById('eln-fatal');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'eln-fatal';
+    box.style.cssText = [
+      'position:fixed', 'left:16px', 'bottom:16px', 'z-index:99999',
+      'max-width:min(720px,80vw)', 'max-height:44vh', 'overflow:auto',
+      'background:#fff6f6', 'border:1px solid #e7bdbd', 'border-radius:10px',
+      'padding:10px 12px 8px', 'box-shadow:0 8px 24px rgba(20,18,14,.16)',
+      'font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace', 'color:#7c1f1f',
+      'white-space:pre-wrap', 'word-break:break-word',
+    ].join(';');
+    const close = document.createElement('button');
+    close.textContent = '×';
+    close.style.cssText = 'float:right;border:0;background:transparent;font-size:15px;line-height:1;color:#a8471f;cursor:pointer';
+    close.onclick = () => box.remove();
+    box.appendChild(close);
+    document.body.appendChild(box);
+  }
+  const line = document.createElement('div');
+  line.textContent = `${new Date().toLocaleTimeString()}  ${msg}${detail ? `  (${detail})` : ''}`;
+  box.appendChild(line);
+}
+
+window.addEventListener('error', (e) => {
+  if (!e || !e.message) return;
+  fatalPanel(e.message, `${e.filename || ''}:${e.lineno || 0}`);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e && e.reason;
+  fatalPanel(`Promise: ${String((r && r.message) || r || '未知错误')}`, '');
+});
+
 const app = createApp(App);
+app.config.errorHandler = (err, _inst, info) => {
+  fatalPanel(String((err && err.message) || err || '渲染出错'), info);
+};
 app.directive('anim', {
   mounted(el, binding) {
     el.setAttribute('data-anim', '');
