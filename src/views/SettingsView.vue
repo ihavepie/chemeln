@@ -634,6 +634,20 @@ function setEdgeFlip(v) {
   edgeFlip.value = !!v;
   uiSetIfChanged('edgeFlip', !!v);
 }
+/** 纸边热区的长相（`edgeFlipLook`）：soft 悬停才浮 / quiet 不画 / always 一直淡淡显示 */
+const EDGE_LOOKS = [
+  { key: 'soft', label: '悬停才浮出来' },
+  { key: 'quiet', label: '什么都不画' },
+  { key: 'always', label: '一直淡显' },
+];
+const edgeLook = ref(String(uiGet('edgeFlipLook', 'soft') || 'soft'));
+onUiMerged(() => {
+  edgeLook.value = String(uiGet('edgeFlipLook', 'soft') || 'soft');
+});
+function setEdgeLook(k) {
+  edgeLook.value = k;
+  uiSetIfChanged('edgeFlipLook', k);
+}
 /** 滚轮力度：滚多少像素才切一条（`scrollWheel`） */
 const WHEEL_PRESETS = [
   { key: 'light', label: '轻一点', px: 44 },
@@ -981,6 +995,21 @@ function setScrollSwitch(v) {
           <input type="checkbox" :checked="edgeFlip" @change="setEdgeFlip($event.target.checked)" />
           <span>点纸左右两侧的空白翻页</span>
         </label>
+        <div v-if="edgeFlip" class="set-row set-row-indent mt8">
+          <span class="set-row-l">纸边那颗箭头的出场</span>
+          <span class="set-row-chips">
+            <button
+              v-for="o in EDGE_LOOKS"
+              :key="o.key"
+              type="button"
+              class="qchip"
+              :class="{ 'is-on': edgeLook === o.key }"
+              @click="setEdgeLook(o.key)"
+            >
+              {{ o.label }}
+            </button>
+          </span>
+        </div>
         <div class="set-row mt8">
           <span class="set-row-l">滚轮切一条要滚多少</span>
           <span class="set-row-chips">

@@ -748,6 +748,8 @@ const scrollSwitch = ref(uiGet('scrollSwitch', true) !== false);
 /** 「点纸左右两侧的空白翻页」（设置页 04，`edgeFlip`，默认开）：只用鼠标也能翻。
     两条透明的热点带贴在编辑区左右那两条空白里，中间是纸，互不遮挡。 */
 const edgeFlip = ref(uiGet('edgeFlip', true) !== false);
+/** 热区长相：`soft` 悬停才浮一颗淡圆按钮（默认）/ `quiet` 什么都不画 / `always` 一直淡淡地显示 */
+const edgeLook = ref(String(uiGet('edgeFlipLook', 'soft') || 'soft'));
 const edgeBox = reactive({ left: {}, right: {} });
 /** 量一下纸东西两侧的空白有多大、纸在哪（写进 fixed 的热点带） */
 function updateEdgeBox() {
@@ -779,6 +781,7 @@ onUiMerged(() => {
   scrollSwitch.value = uiGet('scrollSwitch', true) !== false;
   pageAnim.value = uiGet('pageAnim', true) !== false;
   edgeFlip.value = uiGet('edgeFlip', true) !== false;
+  edgeLook.value = String(uiGet('edgeFlipLook', 'soft') || 'soft');
   nextTick(updateEdgeBox);
   wheelPreset.value = String(uiGet('scrollWheel', 'light') || 'light');
 });
@@ -2349,7 +2352,7 @@ const openAttachment = (id) => {
     <div
       v-if="exp && edgeFlip && !isPhone"
       class="edge-flip is-l noprint"
-      :class="{ 'is-off': prevPageNum == null }"
+      :class="[`look-${edgeLook}`, { 'is-off': prevPageNum == null }]"
       :style="edgeBox.left"
       title="上一页（←）"
       aria-label="上一页"
@@ -2360,7 +2363,7 @@ const openAttachment = (id) => {
     <div
       v-if="exp && edgeFlip && !isPhone"
       class="edge-flip is-r noprint"
-      :class="{ 'is-off': nextPageNum == null }"
+      :class="[`look-${edgeLook}`, { 'is-off': nextPageNum == null }]"
       :style="edgeBox.right"
       title="下一页（→）"
       aria-label="下一页"

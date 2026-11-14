@@ -718,10 +718,32 @@ body {
   color: transparent;
   transition: color 140ms var(--ease), background 140ms var(--ease);
 }
-.edge-flip:hover { color: var(--ink-4); background: rgba(20, 18, 14, 0.022); }
 .edge-flip.is-off { cursor: default; }
-.edge-flip.is-off:hover { color: transparent; background: transparent; }
-.edge-arrow { font-family: var(--sans); font-size: 26px; line-height: 1; user-select: none; }
+/* 箭头做成一颗很小的圆按钮、平时完全看不见，移上去才慢慢浮出来 —— 比整条缝盖一层底色柔和得多 */
+.edge-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-3);
+  background: var(--paper);
+  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.09);
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 240ms var(--ease), transform 260ms var(--ease);
+  user-select: none;
+}
+.edge-flip:hover .edge-arrow { opacity: 1; transform: none; }
+.edge-flip.is-off .edge-arrow { display: none; }
+/* 三种长相：soft 悬停才浮（默认）/ quiet 什么都不画 / always 一直淡淡地在 */
+.edge-flip.look-quiet .edge-arrow { display: none; }
+.edge-flip.look-always .edge-arrow { opacity: 0.55; transform: none; }
+.edge-flip.look-always:hover .edge-arrow { opacity: 1; }
 @media print {
   .edge-flip { display: none !important; }
 }
@@ -731,6 +753,7 @@ body {
 .set-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
 .set-row-l { font-size: 11.5px; color: var(--ink-3); }
 .set-row-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.set-row-indent { padding-left: 22px; }   /* 挂在某个勾选项下面的子设置，缩进一格 */
 /* 翻页箭头：贴在页签两边，小小的、没有底色（用户：鼠标点比记快捷键省事，但快捷键留着） */
 .pg-arrow {
   flex: 0 0 auto;
