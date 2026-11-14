@@ -6,6 +6,8 @@ import { store } from '../store.js';
 import { useRoute } from 'vue-router';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { ROLE_EN, roleTone, variantText } from '../lib/reagent.js';
+import { useColResize } from '../lib/colresize.js';
+import { uiGet, uiSetIfChanged } from '../lib/uiprefs.js';
 import { LOOKUP_SITES, nameInfo } from '../lib/lookup.js';
 import { ctxMenu, openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
 import { setPageMenu } from '../lib/pagemenu.js';
@@ -14,6 +16,26 @@ import { router } from '../router.js';
 
 // 自定义检索站点（设置里加的）：url 模板里 {name} 换成试剂名
 const customSites = ref([]);
+
+/** 表格列宽（拖表头右边界，宽度存 uiprefs 的 colw:reagents） */
+const COLDEFS = [
+  { key: 'name', label: '试剂', w: 300 },
+  { key: 'role', label: '角色', w: 92 },
+  { key: 'mw', label: '分子量', w: 70 },
+  { key: 'dens', label: '密度 / 浓度', w: 108 },
+  { key: 'per', label: '1 mmol 折算', w: 104 },
+  { key: 'used', label: '次数', w: 48 },
+  { key: 'live', label: '在用', w: 48 },
+  { key: 'when', label: '最近使用', w: 110 },
+  { key: 'more', label: '', w: 26 },
+];
+const { tableEl, start: startResize, colStyle } = useColResize(
+  'reagents',
+  Object.fromEntries(COLDEFS.map((c) => [c.key, c.w]))
+);
+
+/** 外部库链接：常显 / 悬停才出现（设置 › 界面 › 试剂库链接） */
+const linksMode = ref(uiGet('reagentLinks', 'always'));
 const sitesOpen = ref(false);
 const sitesDraft = ref([]);
 
@@ -454,29 +476,21 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
           </span>
         </div>
 
-        <table class="rl-table">
+        <table ref="tableEl" class="rl-table">
           <colgroup>
-            <col />
-            <col class="rl-c-role" />
-            <col class="rl-c-mw" />
-            <col class="rl-c-dens" />
-            <col class="rl-c-per" />
-            <col class="rl-c-num" />
-            <col class="rl-c-num" />
-            <col class="rl-c-when" />
-            <col class="rl-c-more" />
+            <col v-for="c in COLDEFS" :key="c.key" :style="colStyle(c.key)" />
           </colgroup>
           <thead>
             <tr>
-              <th>试剂</th>
-              <th>角色</th>
-              <th class="n">分子量</th>
-              <th class="n">密度 / 浓度</th>
-              <th class="n">1 mmol 折算</th>
-              <th class="n">次数</th>
-              <th class="n">在用</th>
-              <th class="n">最近使用</th>
-              <th />
+              <th
+                v-for="c in COLDEFS"
+                :key="c.key"
+                :data-col="c.key"
+                :class="['name', 'role'].includes(c.key) ? '' : 'n'"
+              >
+                {{ c.label }}
+                <span class="col-grip" :title="'拖动改「' + (c.label || '操作') + '」的列宽'" @mousedown="startResize($event, c.key)" />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -505,7 +519,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                     @click.stop="rowMenu($event, it)"
                   >↗</button>
                   <!-- 外部库直达链接（解析出 CID / CAS 后才出现） -->
-                  <span class="rl-links">
+                  <span class="rl-links" :class="{ 'is-hoveronly': linksMode === 'hover' }">
                     <a
                       v-for="l in sitesForRow(it)"
                       :key="l.key"

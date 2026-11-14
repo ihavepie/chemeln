@@ -337,6 +337,13 @@ function pickDecimals(which, v) {
   uiSetIfChanged('reagentPrec', v);
 }
 
+/* ---- 试剂库外部库链接：常显 / 悬停才出现 ---- */
+const rlLinks = ref(uiGet('reagentLinks', 'always'));
+function setRlLinks(v) {
+  rlLinks.value = v;
+  uiSetIfChanged('reagentLinks', v);
+}
+
 /* ---- 卡片质感（页面里的白卡 / 排版板那张画布卡）---- */
 const card = ref(cardPref());
 function pickCardStyle(key) {
@@ -993,6 +1000,17 @@ function setScrollSwitch(v) {
             <input type="checkbox" :checked="peekPrefs[key]" @change="setPeekPref(key, $event.target.checked)" />
             {{ label }}
           </label>
+        </div>
+      </section>
+
+      <section v-if="mod === 'ui'" id="set-reagent-links" class="card">
+        <div class="card-head"><h2 class="card-title">试剂库的外部库链接</h2></div>
+        <p class="card-note">
+          试剂库里每个试剂名后面那排 PubChem / CB / NIST / TCI / CAS 链接。常显好找；只在悬停这一行时出现，列表更干净。
+        </p>
+        <div class="row" style="gap: 8px; flex-wrap: wrap">
+          <button class="btn btn-sm" :class="{ 'is-on': rlLinks === 'always' }" @click="setRlLinks('always')">常显</button>
+          <button class="btn btn-sm" :class="{ 'is-on': rlLinks === 'hover' }" @click="setRlLinks('hover')">悬停才出现</button>
         </div>
       </section>
 

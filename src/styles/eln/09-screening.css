@@ -368,13 +368,6 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 }
 .rl-table th.n, .rl-table td.n { text-align: right; }
 /* 列宽：表头和数据对得上，数字列不再各自漂 */
-.rl-c-role { width: 92px; }
-.rl-c-mw { width: 64px; }
-.rl-c-dens { width: 92px; }
-.rl-c-per { width: 104px; }
-.rl-c-num { width: 44px; }
-.rl-c-when { width: 104px; }
-.rl-c-more { width: 22px; }
 .rl-table td { padding: 9px 6px; vertical-align: middle; white-space: normal; }
 /* 数字与状态列：上下左右都居中，跟表头对齐 */
 .rl-table th.n, .rl-table td.n { text-align: center; }
@@ -442,15 +435,19 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-legend-dot.is-done { color: #2f7d4f; }
 .rl-legend-dot.is-miss { color: #c0392f; }
 /* 外部库那一列：小链接，鼠标停才浮出下划线 */
-.rl-c-links { width: 118px; }
 .rl-links { line-height: 1.6; }
 /* 外部库用小链接排成两行（td 必须是 table-cell，所以换行靠里面这个 span） */
 .rl-links { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0 6px; }
-.rl-links { display: inline-flex; flex-wrap: wrap; gap: 0 6px; }
+.rl-links { display: inline-flex; flex-wrap: wrap; gap: 0 7px; margin-left: 10px; }
 .rl-link {
-  font-size: 9.5px; color: var(--ink-4); text-decoration: none;
+  font-size: 9.5px; color: var(--ink-3);
+  text-decoration: underline; text-decoration-color: #d9d4c9; text-underline-offset: 2px;
   white-space: nowrap; letter-spacing: -0.01em; line-height: 1.4;
 }
+.rl-link:hover { color: var(--accent-ink); text-decoration-color: var(--accent); }
+/* 设置里选「悬停才出现」时：整行 hover 才浮出来 */
+.rl-links.is-hoveronly { opacity: 0; transition: opacity 0.1s; }
+.rl-table tbody tr:hover .rl-links.is-hoveronly { opacity: 1; }
 .rl-link:hover { color: var(--accent-ink); text-decoration: underline; }
 .rl-link.is-idle { color: var(--ink-4); opacity: 0.4; }
 .rl-ext-btn {
@@ -485,8 +482,8 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 /* 试剂库里「这个试剂用过的当量 / 用量」小签（用得最多的那颗是强调色）。
    这排小签是「试剂的子记录」，要能一眼看清、还好点——所以做成正常大小的胶囊
    （以前 9px 高 14px，又小又难点，用户说像小字）。 */
-.rl-name-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.rl-nm { display: block; }
+.rl-name-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.rl-nm { display: block; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
 .rl-vars { display: inline-flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 .rl-var,
 .lib-var {
