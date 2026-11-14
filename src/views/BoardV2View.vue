@@ -34,6 +34,8 @@ let exApi = null;
 const saving = ref(false);
 /** 第一次摆好之前先把画布藏起来：不然会看到「默认 100% → 缩到整页」那一下闪 */
 const fitted = ref(false);
+/** 载入时顺手把几对「图 + 图注」编了组：ready 之后存一次（不然下次又散着） */
+const groupedOnLoad = ref(0);
 
 /** 0.1mm → CSS px（96dpi）：A4 = 794 × 1123 */
 const K = 96 / 25.4 / 10;
@@ -188,9 +190,13 @@ async function migrate(items) {
       try {
         const f = await addFile(`/api/files/${it.ref}`);
         const hPx = Math.round((w * f.size.h) / f.size.w);
-        sk.push({ type: 'image', x, y, width: w, height: hPx, fileId: f.id, status: 'saved' });
+        const gid = newGroupId();
+        sk.push({ type: 'image', x, y, width: w, height: hPx, fileId: f.id, status: 'saved', groupIds: [gid] });
         const cap = String(it.caption || '').trim();
-        if (cap) sk.push(...captionSk(cap, x, y + hPx + 4, w));
+        if (cap) {
+          const capSk = captionSk(cap, x, y + hPx + 4, w).map((c) => ({ ...c, groupIds: [gid] }));
+          sk.push(...capSk);
+        }
       } catch {
         skipped.value += 1;
       }
@@ -240,6 +246,10 @@ async function load() {
     const b = (await api.board(route.params.id)).board;
     board.value = b;
     const els = (b.scene && Array.isArray(b.scene.elements) && b.scene.elements.length) ? b.scene.elements : null;
+    if (els) {
+      const n = groupLooseCaptions(els);
+      if (n) groupedOnLoad.value = n;
+    }
     const alive = els ? els.filter((e) => !e.isDeleted) : [];
     // 元素全被删了（⌘A + Delete / 清空画布）：东西还在 JSON 里，先给个「恢复」按钮，别自作主张盖回来
     if (els && !alive.length) {
@@ -353,10 +363,48 @@ function nextPos(wPx, hPx) {
   }
 }
 
-/** 把 skeleton 加到画布上（走 updateScene，Excalidraw 自己维护版本 / 撤销栈） */
-async function insertSkeletons(sk) {
+const newGroupId = () => `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/**
+ * 老板子里图注和图是分开的两块（拖图时图注留在原地）。
+ * 这里把「左边缘基本对齐、就在图正下方 26px 内、自己还没编组」的文字跟那张图编到一组，
+ * 载入时顺手整理一次（已经编过组的不动；想拆开就选中按 ⇧⌘G）。
+ */
+function groupLooseCaptions(els) {
+  const live = els.filter((e) => !e.isDeleted);
+  const imgs = live.filter((e) => e.type === 'image');
+  const texts = live.filter((e) => e.type === 'text');
+  let changed = 0;
+  for (const t of texts) {
+    if (t.groupIds && t.groupIds.length) continue;
+    const img = imgs.find(
+      (i) =>
+        (!i.groupIds || !i.groupIds.length) &&
+        Math.abs(i.x - t.x) <= 8 &&
+        t.y >= i.y + (i.height || 0) - 4 &&
+        t.y <= i.y + (i.height || 0) + 28
+    );
+    if (!img) continue;
+    const gid = newGroupId();
+    img.groupIds = [gid];
+    t.groupIds = [gid];
+    changed += 1;
+  }
+  return changed;
+}
+
+
+/**
+ * 把 skeleton 加到画布上（走 updateScene，Excalidraw 自己维护版本 / 撤销栈）。
+ * `group` 为真时，这一批元素**编成一个组**——比如 TLC 图和它的图注，拖一个两个一起动。
+ */
+async function insertSkeletons(sk, group = false) {
   const EX = await import('@excalidraw/excalidraw');
   const els = EX.convertToExcalidrawElements(sk, { regenerateIds: false });
+  if (group && els.length > 1) {
+    const gid = newGroupId();
+    for (const e of els) e.groupIds = [gid];
+  }
   // 新图的二进制必须先塞进 Excalidraw 的文件表，否则元素只是张「破图」占位
   if (fresh.length) exApi.addFiles(fresh.splice(0));
   const cur = exApi.getSceneElements();
@@ -474,7 +522,7 @@ async function addTlc(e, t) {
     // 图注跟着图一起落：图注是附件里早就写好那句（老画布也是这么干的）
     const cap = String(t.note || '').trim();
     if (cap) sk.push(...captionSk(cap, x, y + hPx + 4, w));
-    await insertSkeletons(sk);
+    await insertSkeletons(sk, sk.length > 1); // 图和图注编一组，拖着一起走
   } catch (err) {
     toast(err.message || '放不上去', 'err');
   } finally {
@@ -530,6 +578,12 @@ function onReady(a) {
     requestAnimationFrame(() => {
       fitted.value = true;
     });
+    if (groupedOnLoad.value) {
+      const els = a.getSceneElements();
+      a.updateScene({ elements: els, captureUpdate: 'NEVER' });
+      pending = { elements: els, appState: a.getAppState() };
+      void saveNow();
+    }
   }, 120);
   // 舞台尺寸变了（收素材栏 / 专注 / 拖窗口）跟着重新摆；尺寸没变就不动，免得打断正在看的位置
   const box = st => `${st.width}x${st.height}`;
