@@ -241,7 +241,7 @@ async function load() {
       deletedBox.value = { elements: els, appState: b.scene.appState || {}, files: b.scene.files || {} };
       initial.value = { elements: [], appState: { viewBackgroundColor: '#f5f4f1' }, files: {} };
     } else if (els) {
-      initial.value = { elements: els, appState: { ...(b.scene.appState || {}), viewBackgroundColor: '#f5f4f1' }, files: b.scene.files || {} };
+      initial.value = { elements: els, appState: { viewBackgroundColor: '#f5f4f1' }, files: b.scene.files || {} };
     } else {
       const elements = await migrate(b.items || []);
       initial.value = { elements, appState: { viewBackgroundColor: '#f5f4f1' }, files: { ...files } };
@@ -259,6 +259,11 @@ async function load() {
 /* ---------------- 左侧素材栏：点一下就把那块放到纸上 ----------------
    老画布那套（搜索 / 悬停预览）先留在 /b-old，这里是最直接的「点一个块」+「点一张板」。 */
 const exps = ref([]);
+const drawerOpen = ref(localStorage.getItem('eln:bdDrawer') !== '0');
+function toggleDrawer() {
+  drawerOpen.value = !drawerOpen.value;
+  localStorage.setItem('eln:bdDrawer', drawerOpen.value ? '1' : '0');
+}
 const tlcByExp = ref({});
 const q = ref('');
 const busyKeys = ref(new Set()); // 同时可以放好几个（各点各的，别把整栏都禁用）
@@ -286,9 +291,7 @@ function restoreDeleted() {
   const els = box.elements.map((e) => ({ ...e, isDeleted: false }));
   exApi.updateScene({ elements: els, captureUpdate: 'IMMEDIATELY' });
   deletedBox.value = null;
-  void import('@excalidraw/excalidraw').then(() => {
-    exApi.scrollToContent(exApi.getSceneElements(), { fitToContent: false });
-  });
+  setTimeout(() => fitPaper(exApi), 80);
 }
 
 async function loadDrawer() {
@@ -457,16 +460,24 @@ async function addText() {
 }
 
 /* ---------------- 存回场景（防抖 800ms） ---------------- */
+/**
+ * 把 **A4 那张纸**塞进视口（不是「所有元素」）：老 items 里有画到纸外的箭头，
+ * 按内容 fit 会把纸挤到一边、右边还被裁掉。`initialData.scrollToContent` 在异步 import 下也不一定生效。
+ */
+function fitPaper(a) {
+  try {
+    const els = a.getSceneElements();
+    const paper = els.find((e) => e.type === 'rectangle' && e.locked) || els;
+    a.scrollToContent(paper, { fitToContent: true });
+  } catch {
+    /* 版本差异，忽略 */
+  }
+}
+
 function onReady(a) {
   exApi = a;
-  // 把整张纸放进视口（initialData.scrollToContent 在异步 import 下不一定生效）
-  setTimeout(() => {
-    try {
-      a.scrollToContent(a.getSceneElements(), { fitToContent: true });
-    } catch {
-      /* 版本差异，忽略 */
-    }
-  }, 120);
+  if (import.meta.env.DEV) window.__exApi = a; // 只在开发预览里挂个把手，方便量几何
+  setTimeout(() => fitPaper(a), 120);
 }
 
 let timer = 0;
@@ -565,7 +576,11 @@ async function exportPdf() {
   }
 }
 
+window.addEventListener('blur', unpeek);
+
 onBeforeUnmount(() => {
+  window.removeEventListener('blur', unpeek);
+  unpeek();
   clearTimeout(timer);
   if (pending) void saveNow();
 });
@@ -576,10 +591,11 @@ load();
 <template>
   <div class="single bv2">
     <!-- 素材：点一个块 / 一张板就放到纸上（表格类是 3 倍像素的图，其它是原生对象） -->
-    <aside class="board-drawer bv2-drawer">
+    <aside class="board-drawer bv2-drawer" :class="{ 'is-closed': !drawerOpen }" @mouseleave="unpeek">
       <div class="board-drawer-top">
         <div class="board-drawer-t">
           素材<span class="board-drawer-n">{{ busyKeys.size ? '放上去中…' : exps.length + ' 条记录' }}</span>
+          <button class="bv2-dtoggle" title="收起素材栏（画布更宽）" @click="toggleDrawer">‹</button>
         </div>
         <div class="searchbox bd-q">
           <Icon name="search" :size="12" />
@@ -643,23 +659,22 @@ load();
       </div>
     </Teleport>
 
-    <div class="inner bv2-inner">
-      <header class="page-head bv2-head">
-        <div class="bv2-head-main">
-          <h1 class="page-title">{{ board ? board.title : '排版板' }}</h1>
-          <p v-if="skipped" class="page-desc">还有 {{ skipped }} 个表格类块没搬过来（先在旧画布上摆）</p>
-        </div>
-        <span class="spacer" />
+    <div class="bv2-stage">
+      <!-- 顶部那一条只放 Excalidraw 的工具（它靠 CSS 从画布里浮上来），右边浮一排板级操作 -->
+      <div class="bv2-tools" />
+      <div class="bv2-fbar">
+        <span class="bv2-title" :title="board ? board.title : ''">{{ board ? board.title : '排版板' }}</span>
         <span class="bv2-saved">{{ saving ? '保存中…' : '已保存' }}</span>
         <button v-if="deletedBox" class="btn btn-sm btn-ghost" @click="restoreDeleted">恢复上次内容</button>
+        <button class="btn btn-sm btn-ghost" :disabled="!!downloading" @click="exportPng">存图</button>
         <button class="btn btn-sm" :disabled="!!downloading" @click="exportPdf">
           <Icon name="download" :size="12" /> 导出 PDF
         </button>
-        <button class="btn btn-sm btn-ghost" :disabled="!!downloading" @click="exportPng">存图</button>
         <button class="btn btn-sm btn-ghost" title="打开旧画布（HTML 版）" @click="router.push(`/b-old/${route.params.id}`)">
           <Icon name="arrow-left" :size="12" /> 旧画布
         </button>
-      </header>
+      </div>
+      <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
       <div v-if="loading" class="cmp-empty">读取中…</div>
       <div v-else class="bv2-canvas">
         <div v-if="failed" class="bv2-fail">
@@ -675,20 +690,51 @@ load();
 
 <style scoped>
 .bv2 { display: flex; align-items: stretch; height: 100%; padding: 0; overflow: hidden; }
-.bv2-drawer { flex: 0 0 250px; }
+.bv2-drawer { flex: 0 0 250px; flex-shrink: 0; }
 .bv2 .bd-chip.is-busy { background: var(--accent-soft); color: var(--accent-ink); }
 .bv2 .bd-thumb:disabled, .bv2 .bd-chip:disabled { opacity: 0.55; cursor: default; }
+/* 整个内容区就是画布：只有顶上一条 46px 给工具用，其余全给纸 */
+.bv2-stage { position: relative; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+/* 素材栏收起：画布拿满整条宽度，左边留一个小小的展开把手 */
+.bv2-drawer { position: relative; transition: flex-basis 0.16s ease; }
+.bv2-drawer.is-closed { flex-basis: 0; width: 0; border-right: 0; padding: 0; overflow: hidden; }
+.bv2-dtoggle {
+  margin-left: auto; border: 0; background: none; color: var(--ink-4); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 0 2px;
+}
+.bv2-dtoggle:hover { color: var(--ink-2); }
+.bv2-dopen {
+  position: absolute; left: 6px; top: 14px; z-index: 7;
+  width: 20px; height: 20px; border: 0; border-radius: 4px;
+  background: #fff; box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12);
+  color: var(--ink-3); cursor: pointer; font-size: 13px; line-height: 1;
+}
+.bv2-tools { flex: 0 0 auto; height: 46px; }
+.bv2-fbar {
+  position: absolute; top: 0; right: 10px; z-index: 6;
+  display: flex; align-items: center; gap: 6px; height: 46px;
+}
+.bv2-title {
+  max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--serif); font-size: 14px; color: var(--ink-2); margin-right: 4px;
+}
 .bv2-fail {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 8px; padding: 24px;
   background: var(--canvas); text-align: center; font-size: 12.5px; color: var(--ink-2);
 }
 .bv2-fail-hint { color: var(--ink-4); font-size: 11.5px; }
-.bv2-inner { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: 26px 28px 16px; max-width: none; }
-.bv2-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 50px; flex: 0 0 auto; }
-.bv2-head-main { min-width: 0; }
-.bv2-saved { font-size: 10.5px; color: var(--ink-4); margin-right: 8px; }
+.bv2-saved { font-size: 10.5px; color: var(--ink-4); margin-right: 2px; }
 .bv2-canvas { flex: 1 1 auto; min-height: 0; overflow: visible; }
+/* 窗口窄的时候：板名让位、工具按钮缩一圈，别跟右边那排操作叠在一起 */
+@media (max-width: 1460px) {
+  .bv2-title { display: none; }
+  .bv2-canvas :deep(.excalidraw) { --lg-button-size: 30px; --default-button-size: 30px; }
+}
+@media (max-width: 1240px) {
+  .bv2-canvas :deep(.excalidraw) { --lg-button-size: 26px; --default-button-size: 26px; }
+  .bv2-saved { display: none; }
+}
 
 /* ---- 画布上只留一排工具：汉堡菜单、素材库、缩放/撤销/帮助、下面那行提示全藏掉 ---- */
 .bv2-canvas :deep(.App-menu_top__left),
@@ -697,7 +743,7 @@ load();
 .bv2-canvas :deep(.HintViewer),
 .bv2-canvas :deep(.disable-zen-mode) { display: none !important; }
 
-/* 工具条从纸面上挪到画布上方那一条（.bv2-head 留了 50px 的空，正好放它）。
+/* 工具条从纸面上挪到画布上方那一条（.bv2-tools 46px，正好放它）。
    根节点默认 overflow:hidden，会把这排工具裁掉 —— 放开才能浮出去 */
 .bv2-canvas :deep(.excalidraw) { overflow: visible; }
 .bv2-canvas :deep(.FixedSideContainer_side_top) { top: -46px; left: 0; right: 0; bottom: auto; height: auto; }
