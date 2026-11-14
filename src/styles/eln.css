@@ -9583,3 +9583,11 @@ body.is-board-dragging { cursor: grabbing; }
 /* 工具条常驻占位：选中前后高度一致，纸张不会因为多一行而重新缩放（看着像「纸上下跳」） */
 .board-tools-bar { flex: 0 0 auto; min-height: 30px; }
 .board-tools { margin-top: 0; }
+
+/* 编辑区：内容没超出时不许滚（is-fit，见 EditorView 的 updateEditorFit）；
+   没溢出时 Safari 仍会「橡皮筋」上下弹一下，`overscroll-behavior: contain` 把它按住，
+   也别让它把滚动传给外面的容器 */
+.editor { overscroll-behavior: contain; }
+/* 放得下的时候把那 120px 呼吸位也收掉：万一哪天判定没跟上，也只会多出一点空白，
+   不会让人往下滚一大段空页（用户报的「没超出页面但还是会滚动」就是滚进了这段 padding） */
+.editor.is-fit { padding-bottom: 24px; }

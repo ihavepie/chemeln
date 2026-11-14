@@ -524,19 +524,36 @@ watch(
  * 所以量一下「内容 + 顶距」够不够放，够就把这个容器的 overflow 关掉。
  */
 const editorFits = ref(false);
+/**
+ * 量「内容真实底边」而不是 `scrollHeight - padding`：`.editor` 底部那 120px 是给长内容垫底的，
+ * 用 scrollHeight 算会把它当成内容，于是「纸明明没超出一屏」也判成放不下（用户报过
+ * 「这边没超出页面但还是会滚动」——实测 1435 高的窗口里内容底 1286，is-fit 却是 false，
+ * 因为量到了落盘前的那一版，之后就没人再量了）。
+ */
 function updateEditorFit() {
   const el = editorEl.value;
   if (!el) return;
-  const pad = parseFloat(getComputedStyle(el).paddingBottom) || 0;
-  editorFits.value = el.scrollHeight - pad <= el.clientHeight + 1;
+  const inner = el.querySelector('.editor-inner');
+  if (!inner) return;
+  const top = el.getBoundingClientRect().top;
+  const bottom = inner.getBoundingClientRect().bottom - top + el.scrollTop;
+  editorFits.value = bottom + 24 <= el.clientHeight;
 }
 let fitRO = null;
+let fitTimers = [];
+/** 内容会异步长（反应式画完、谱图载入、字体回来），量一次不够——补几拍再量 */
+function scheduleFit() {
+  updateEditorFit();
+  requestAnimationFrame(updateEditorFit);
+  for (const t of fitTimers) clearTimeout(t);
+  fitTimers = [setTimeout(updateEditorFit, 250), setTimeout(updateEditorFit, 900)];
+}
 
 /** 窄屏（手机）走只读精简页，桌面版式完全不渲染 */
 const isPhone = ref(typeof window !== 'undefined' && window.innerWidth <= 820);
 function onResize() {
   isPhone.value = window.innerWidth <= 820;
-  updateEditorFit();
+  scheduleFit();
 }
 
 onMounted(async () => {
@@ -552,19 +569,27 @@ onMounted(async () => {
   document.addEventListener('keydown', onParallelKey);
   // 等这一帧渲染完再量纸面位置
   requestAnimationFrame(updateRail);
-  requestAnimationFrame(updateEditorFit);
+  requestAnimationFrame(scheduleFit);
   // 纸的高度随内容变（画反应式、加附件、翻页、切块）→ 用 ResizeObserver 跟着重量，
   // 别在每处都手动调一次
   if (typeof ResizeObserver !== 'undefined') {
-    fitRO = new ResizeObserver(() => updateEditorFit());
+    fitRO = new ResizeObserver(() => scheduleFit());
     const watchInner = () => {
       const inner = editorEl.value && editorEl.value.querySelector('.editor-inner');
       fitRO.disconnect();
-      if (inner) fitRO.observe(inner);
-      updateEditorFit();
+      if (inner) {
+        fitRO.observe(inner);
+        const sheet = inner.querySelector('.sheet');
+        if (sheet) fitRO.observe(sheet);
+      }
+      scheduleFit();
     };
     watchInner();
     watch([() => !!exp.value, page, () => liveScheme.value], () => nextTick(watchInner), { flush: 'post' });
+    // 谱图 / 反应式图是异步载入的：图一到位就重量一次（`load` 不冒泡，得用捕获）
+    const onImgLoad = () => scheduleFit();
+    if (editorEl.value) editorEl.value.addEventListener('load', onImgLoad, true);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleFit).catch(() => {});
   }
 });
 /** 现在能翻的几页（文献 / 附件两页在设置里关掉后就不参与左右翻页） */
@@ -620,6 +645,8 @@ function onParallelKey(ev) {
 
 onBeforeUnmount(() => {
   if (fitRO) fitRO.disconnect();
+  for (const t of fitTimers) clearTimeout(t);
+  fitTimers = [];
   window.removeEventListener('resize', onResize);
   window.removeEventListener('resize', updateRail);
   document.removeEventListener('paste', onPaste);

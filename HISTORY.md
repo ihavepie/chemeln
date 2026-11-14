@@ -261,3 +261,8 @@
   ② **工具条一出现纸会缩一下**：选中块时底部 `.board-tools` 才渲染，stage 高度变了 → `fit()` 重算 zoom → 纸张「跳」一档。现在外面包一层 `.board-tools-bar { min-height: 30px }` 常驻占位，工具条在不在高度都一样。
   `.board-stage` 默认 `overflow: hidden; align-items: center`；**只有钉住「100%」时** `is-pinned` 才 `overflow:auto; align-items:flex-start`，让纸自己在 stage 里滚，窗口照旧不动。
   验证（WKWebView，1280×820 与 1400×900 两种窗口）：`document.scrollHeight == clientHeight`、`.single` 也不可滚、stage 无内滚；纸张可视尺寸正好等于 stage 减 16px 留白；点「100%」→ document 仍不可滚、stage `1123/621` 内部可滚、zoom=1；点回「适应窗口」再拖 +60/+30px → `30mm,30mm → 59mm,44.5mm` 且落库 `x=590 y=445`；选中块前后 `zoom=0.521149` 一分不差（纸不跳）。
+- **记录页「没超出页面但还是会滚动」（用户截图 /e/121）**：`is-fit` 的判断一直没生效。根因两条：
+  ① 判据错：原来量 `scrollHeight − paddingBottom`，而 `.editor` 底部有 **120px** 呼吸位，`scrollHeight` 是含这段 padding 的 —— 只要内容底 + 120 超过了可视高度，`scrollHeight − 120` 就把空白当内容算，判成「放不下」；于是**内容明明装得下，还能往下滚进那 120px 空白**。
+  ② 量的时机错：只在挂载 + 窗口 resize + `[exp, page, liveScheme]` 变化时量，谱图 / 反应式图 / 字体异步到位后就不再重量（实测 1435 高的窗口里内容底 1286，`is-fit` 却是 false）。
+  改法：`updateEditorFit()` 改成量 **`.editor-inner` 的真实底边 + 24px** 与 `clientHeight` 比；`scheduleFit()` 立即量 + 下一帧 + 250ms + 900ms 各补一拍；`ResizeObserver` 同时盯 `.editor-inner` 和 `.sheet`；监听容器的 `load`（捕获，图片）和 `document.fonts.ready`；`.editor` 加 `overscroll-behavior: contain`；`is-fit` 时顺便把 120px 呼吸位收成 24px。
+  验证（WKWebView 三档窗口，把量测值直接画在页面上截图）：**1600×1300** → `class="editor is-fit"`、内容底 1219 + 24 ≤ 1300、`scrollTop=400` 设不动（**滚不动 ✓**）；**2196×1435** → `is-fit=true`、内容底 1286、可滚=false；**1280×820** → 内容底 1202 > 820，`class="editor"`（无 is-fit）、`scrollTop=400` 生效 —— 该滚的时候照旧滚，没滚坏。
