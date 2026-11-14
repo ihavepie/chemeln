@@ -310,7 +310,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
         还没有用过的试剂。在记录页的投料表里填几行，这里就会自动攒出来。
       </div>
 
-      <div v-else class="rl-card">
+      <div v-else class="page-card rl-card">
         <div class="rl-sum">
           {{ items.length }} 个试剂（输入过的都留着）· 当前在用 {{ liveCount }} 个 · 固体 {{ solidCount }} 个
           <span v-if="pendingCount">· 待核对 {{ pendingCount }} 个</span>

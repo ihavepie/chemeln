@@ -111,6 +111,15 @@ body {
    `--docw` 由 lib/panesize.js 写进 :root，默认 980px */
 .single > .inner { position: relative; max-width: var(--docw, 980px); margin: 0 auto; }
 
+/* 页面级白卡：纯列表类的页面（回收站 / 排版板列表 / 试剂库…）把内容收进一张卡，
+   跟排版板画布那张卡同一套质感（圆角 10 + 1px 极淡描边 + 轻投影）。 */
+.page-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(20, 18, 14, 0.05);
+  padding: 14px 16px;
+}
+
 /* -------------------------------------------------------------- rail */
 
 .brand {

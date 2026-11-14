@@ -107,9 +107,9 @@ async function clearAll() {
       </header>
 
       <div v-if="loading" class="trash-empty">读取中…</div>
-      <div v-else-if="!items.length" class="trash-empty">回收站为空。</div>
+      <div v-else-if="!items.length" class="page-card trash-card"><div class="trash-empty">回收站为空。</div></div>
 
-      <template v-else>
+      <div v-else class="page-card trash-card">
         <div class="trash-sum">
           {{ items.length }} 条 · 实验 {{ counts.experiment }} 条 · 化合物 {{ counts.compound }} 个
         </div>
@@ -123,7 +123,7 @@ async function clearAll() {
             <button class="btn btn-sm btn-ghost" @click="purge(t)">彻底删除</button>
           </div>
         </div>
-      </template>
+      </div>
     </div>
   </div>
 </template>

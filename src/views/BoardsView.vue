@@ -70,17 +70,19 @@ const when = (ts) => String(ts || '').replace('T', ' ').slice(0, 16);
       </header>
 
       <div v-if="loading" class="cmp-empty">读取中…</div>
-      <div v-else-if="!items.length" class="cmp-empty">
+      <div v-else-if="!items.length" class="page-card"><div class="cmp-empty">
         还没有排版板。点右上「新建排版板」，从左边挑几块摆上去试试。
-      </div>
+      </div></div>
 
-      <div v-else class="board-list">
+      <div v-else class="page-card board-card">
+        <div class="board-list">
         <div v-for="b in items" :key="b.id" class="board-row" @click="router.push(`/b/${b.id}`)">
           <span class="board-row-title">{{ b.title || '（未命名）' }}</span>
           <span class="board-row-meta">{{ b.count }} 块素材</span>
           <span class="board-row-meta">{{ when(b.updated_at) }}</span>
           <span v-if="b.project" class="board-row-proj">{{ b.project }}</span>
           <button class="board-row-del" title="删掉这张板" @click.stop="del(b)"><Icon name="x" :size="10" /></button>
+        </div>
         </div>
       </div>
     </div>
