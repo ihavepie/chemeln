@@ -17,8 +17,11 @@ export function collectCss() {
     }
     for (const rule of rules) {
       // 用 rule.media 判断而不是 CSSRule.MEDIA_RULE 常量（后者已废弃，不同浏览器不一定有）
-      if (rule.media && /print/i.test(rule.media.mediaText) && rule.cssRules) {
-        for (const inner of rule.cssRules) print.push(inner.cssText);
+      // 用 rule.media 判断而不是 CSSRule.MEDIA_RULE 常量（后者已废弃，不同浏览器不一定有）；
+      // 类型上 CSSRule 没有 media / cssRules，收窄成 CSSMediaRule 再读
+      const media = /** @type {CSSMediaRule} */ (rule);
+      if (media.media && /print/i.test(media.media.mediaText) && media.cssRules) {
+        for (const inner of media.cssRules) print.push(inner.cssText);
       } else {
         top.push(rule.cssText);
       }

@@ -12,7 +12,13 @@ import { savedLabel } from './ui.js';
  * - touch():      手动标记一下（比如改了 payload 读不到的东西）
  * - flush():      立刻存（离开页面前、锁定前）
  */
-export function useAutosave(payload, save, { delay = 850, enabled = () => true, onError, keep = 20 } = {}) {
+/**
+ * @param {() => any} payload 快照来源（读一遍所有会影响保存的响应式字段）
+ * @param {(data: any) => Promise<any>} save
+ * @param {{ delay?: number, enabled?: () => boolean, onError?: (e: any) => void, keep?: number }} [opts]
+ */
+export function useAutosave(payload, save, opts = {}) {
+  const { delay = 850, enabled = () => true, onError, keep = 20 } = opts;
   const state = ref(savedLabel());
   const dirty = ref(false);
   let timer = null;

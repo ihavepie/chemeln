@@ -19,3 +19,5 @@ jobs:
       # 测试只用到 src/lib 里的纯函数（会 import vue），不需要 openchemlib / indigo 的 wasm
       - run: npm ci
       - run: npm run check
+      # 纯 JS 的类型检查（checkJs）：只当检查器用，不引入 TS 写法
+      - run: npm run check:types

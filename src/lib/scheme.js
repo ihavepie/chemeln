@@ -263,9 +263,11 @@ async function molSvg(smiles, id, molfile = '') {
  * 拼一张完整的反应式 SVG。**支持多段**（两步反应：A →(条件1) B →(条件2) C）：
  * 每段自己有反应物 / 产物 / 箭头上下那几行字；上一段的产物要是正好是这一段的底物
  * （同一个化合物），只画一次、当中间那道桥。
- * @param {object[]} o.stages 每段 `{reactants, reactantIds, reactantVers, product, productId, productVer, productLabel, above, below}`
+ * @param {object} o
+ * @param {object[]} [o.stages] 每段 `{reactants, reactantIds, reactantVers, product, productId, productVer, productLabel, above, below}`
  * @param {boolean} [o.background] 铺一层白底（存成附件 / 打印时要用）；
  *   直接贴在纸面上看（比如筛选表表头那张）就传 false，不然纸面会多出一块白方块。
+ * @param {'auto'|'single'|'wrap'} [o.fmt] 箭头上那行条件怎么排（设置页 06）
  */
 export async function composeChainSvg({ stages = [], background = true, fmt = 'auto' } = {}) {
   const GAP = 14;          // 结构之间的一般间距（用户要「宽松一点，但不要太散」）
@@ -302,6 +304,7 @@ export async function composeChainSvg({ stages = [], background = true, fmt = 'a
   const widest = (lines) => Math.max(0, ...lines.map((t) => textW(lineText(t))));
 
   // ② 排成一串节点：结构 / 加号 / 箭头 / 产物名
+  /** @type {any[]} */
   const nodes = [];
   let prevKey = ''; // 上一段的产物：下一段里跟它同一个的底物不再画一次
   for (let si = 0; si < stages.length; si++) {

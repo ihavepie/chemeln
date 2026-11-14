@@ -39,7 +39,11 @@ export async function nameInfo(name) {
  * PubChem：有 CID 就直接进化合物页，没有就拿 CAS / 名称 / SMILES 去搜。
  * 这样链接**不用等这次会话查过**也一直有用（刷新、别人接手都一样）。
  */
-export function pubchemUrl({ cid, cas, name, smiles } = {}) {
+/**
+ * @param {{cid?: string|number|null, cas?: string|string[]|null, name?: string|null, smiles?: string|null}} [info]
+ */
+export function pubchemUrl(info = {}) {
+  const { cid, cas, name, smiles } = info;
   if (cid) return `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`;
   const key = (Array.isArray(cas) ? cas[0] : cas) || name || smiles;
   return key ? `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(key)}` : '';
@@ -55,7 +59,9 @@ export function chemicalBookUrl(info) {
  * NIST Chemistry WebBook：谱图（IR / MS）和热力学数据最全的免费站。
  * **只认 CAS 的 ID 形式**（`ID=C104870`，即 C + 去掉横线的 CAS）；没有 CAS 就用 Name= 查。
  */
-export function nistUrl({ cas, name } = {}) {
+/** @param {{cas?: string|string[]|null, name?: string|null}} [info] */
+export function nistUrl(info = {}) {
+  const { cas, name } = info;
   const c = (Array.isArray(cas) ? cas[0] : cas) || '';
   if (c) return `https://webbook.nist.gov/cgi/cbook.cgi?ID=C${c.replace(/-/g, '')}&Units=SI`;
   const n = String(name || '').trim();
@@ -63,13 +69,17 @@ export function nistUrl({ cas, name } = {}) {
 }
 
 /** CAS Common Chemistry（免费）：给标准名 / 同义词 / CAS，按 CAS 或名称搜 */
-export function casCommonUrl({ cas, name } = {}) {
+/** @param {{cas?: string|string[]|null, name?: string|null}} [info] */
+export function casCommonUrl(info = {}) {
+  const { cas, name } = info;
   const key = (Array.isArray(cas) ? cas[0] : cas) || String(name || '').trim();
   return key ? `https://commonchemistry.cas.org/results?q=${encodeURIComponent(key)}` : '';
 }
 
 /** TCI（日本老牌试剂）：只认 CAS，能直接落到搜索结果页（实测 104-87-0 → 找到 2 个结果） */
-export function tciUrl({ cas } = {}) {
+/** @param {{cas?: string|string[]|null}} [info] */
+export function tciUrl(info = {}) {
+  const { cas } = info;
   const key = (Array.isArray(cas) ? cas[0] : cas) || '';
   return key ? `https://www.tcichemicals.com/CN/zh/search/?text=${encodeURIComponent(key)}` : '';
 }

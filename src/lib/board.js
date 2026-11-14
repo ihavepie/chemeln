@@ -260,7 +260,16 @@ export function itemHtml(it, exp, ctx) {
 }
 
 /** 导 PDF：一张固定尺寸的白纸 + 绝对定位的素材（单位 mm，跟屏幕上完全一致） */
-export function boardHtml(items, page = PAGE.a4p, expOf = () => null, ctx = null) {
+/**
+ * 整块板 → 一页 HTML（导 PDF / 长图用；屏幕那边是 Vue 自己渲染的，但**内容都来自 itemHtml**）。
+ * `expOf` 写成带参签名是有原因的：不写的话 tsc 会把它推成「零参函数」，
+ * 下面 `expOf(it)` 全被报「Expected 0 arguments」。
+ * @param {any[]} items
+ * @param {{w:number,h:number}} [page]
+ * @param {(it:any)=>any} [expOf]
+ * @param {any} [ctx]
+ */
+export function boardHtml(items, page = PAGE.a4p, expOf = (/** @type {any} */ it) => null, ctx = null) {
   const blocks = (items || [])
     .filter((it) => it && it.type)
     .map(

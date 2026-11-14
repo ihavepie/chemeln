@@ -475,3 +475,15 @@
   1. 形状一开始渲染成 3px 高的细条：`itemHtml` 外面还套着一层 `.bd-body`，`height:100%` 的百分比落到 auto 上就没高度了 → 给 `.bd-body` 加 `height:100%`（其余块高度本来就是 auto，不受影响）。
   2. `BOARD_CSS` 整个是 **JS 模板字符串**，我在注释里写了反引号把字符串截断了 → 构建报 rollup 解析错误。**这段 CSS 里不能出现反引号**（注释也不行），已经写进注释里提醒。
 - 验证：临时板（新建 → 加一根箭头 → 加一个方框 → 再加一根箭头，切成蓝色 / 加粗 / 反向）截图确认三种形态都对，`items_json` 里也落了 `color/thick/dir`；测完把临时板删掉（库里只剩用户自己那块 #16），`docw` 也写回原来的 1240。
+## 2026-11-14 C：JSDoc + `tsc --checkJs`（只当检查器，不写 TypeScript）
+
+- **装什么**：`typescript@5.9.3`（devDependency）。**别用 latest（7.x，Go 版 tsgo）**：同一个 `tsconfig` 在 7.0.2 上报的错误和 5.9 不一致，先用稳定版。
+- **配置**：`tsconfig.json` → `allowJs + checkJs + noEmit`，`include: ["src/lib/**/*.js", "src/shims-vue.d.ts"]`，`strict: false`、`noImplicitAny: false`（目标是先抓 `null.x` / 传错参数，不是逼人写类型）。
+  `src/shims-vue.d.ts` 只是给 `.vue` 模块一个 `DefineComponent` 的声明，否则 `router.js` 里那 13 个 `import X from './views/X.vue'` 全是「找不到模块」。
+- **一开始 126 条错，最后 0 条**。绝大多数是同一个病根：**「解构默认值的参数」被推成窄类型**——
+  `function f({ a = 1, b } = {})` 里 tsc 会把参数推成 `{a?: number}`（丢掉没默认值的 `b`），于是每处传 `{b}` 都报「不允许的属性」。
+  项目里 `request` / `confirm` / `prompt` / `confirmLines` / `createPointerSort` / `pubchemUrl` / `nistUrl` / `casCommonUrl` / `tciUrl` / `useAutosave` / `composeChainSvg` 全是这个写法，加起来 100+ 条。
+  改法统一成「参数收 `opts`，再在函数体里解构」，并补 `@param {…}`（这样调用处也能得到提示）——**运行行为一字不变**。
+- 剩下几十条是零碎的真问题/类型收窄：`CSSRule` 上读 `media`（收窄成 `CSSMediaRule`）、`cloneNode` 返回 `Node`、`Element.dataset`（收窄成 `HTMLElement`）、`segBoxDist` 的元组参数、`boardHtml` 的 `expOf` 被推成零参函数、`scheme.js` 里 JSDoc 写成 `@param {object[]} o.stages`（必须先声明 `o`）、`chemdraw.js` 里「先建数组后补属性」（`groups[].box/paths`）。
+- **接进 CI**：`.github/workflows/check.yml` 里 `npm ci → npm run check → npm run check:types`。
+- 验证：`npm run check:types` **0 error**；`npm run check` 58 条仍全绿；`npm run build` 通过；`/list` 上点「新建分类」→ ElMessageBox.prompt 正常弹出（`feedback.js` 三个函数都改了签名，这是最容易写坏的地方）。

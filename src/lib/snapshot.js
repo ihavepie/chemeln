@@ -32,7 +32,7 @@ function buildSheets() {
   const sheets = [...document.querySelectorAll('.editor .sheet')];
   const out = [];
   for (const sheet of sheets) {
-    const clone = sheet.cloneNode(true);
+    const clone = /** @type {HTMLElement} */ (sheet.cloneNode(true));
     clone.classList.remove('is-hidden');
     clone.removeAttribute('style');
     syncFields(sheet, clone);

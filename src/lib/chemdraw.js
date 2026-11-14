@@ -117,6 +117,8 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
     if (line) line.items.push(u);
     else lines.push({ y: u.y, items: [u] });
   }
+  /** @type {any[]} */
+  /** @type {{items: any[], maxX: number, ys: number[], line: any, box?: any, paths?: string[]}[]} */
   const groups = [];
   for (const L of lines) {
     L.items.sort((a, b) => a.x - b.x);
@@ -409,6 +411,10 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
   if (!(K > 1.02)) return src;
 
   // 点到矩形距离（判断标签会不会压到键线）
+  /**
+   * @param {any} seg 一条线段 `[x1,y1,x2,y2]`
+   * @param {number[]} box 目标矩形 `[x0,y0,x1,y1]`
+   */
   const segBoxDist = ([ax, ay, bx, by], box) => {
     const [x0, y0, x1, y1] = box;
     const cl = (v, a, b) => Math.min(Math.max(v, a), b);
@@ -447,9 +453,12 @@ export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
     let bestP = [cx, by];
     let bestClear = -Infinity;
     for (const [ax, ay] of cands) {
+      /** @type {[number, number, number, number]} */
       const box = [
-        Math.min(ax + (bx0 - ax) * K, ax), Math.min(ay + (by0 - ay) * K, ay),
-        Math.max(ax + (bx1 - ax) * K, ax), Math.max(ay + (by - ay) * K, ay),
+        Math.min(ax + (bx0 - ax) * K, ax),
+        Math.min(ay + (by0 - ay) * K, ay),
+        Math.max(ax + (bx1 - ax) * K, ax),
+        Math.max(ay + (by - ay) * K, ay),
       ];
       let clear = Infinity;
       for (const s of segs) clear = Math.min(clear, segBoxDist(s, box));
@@ -610,7 +619,8 @@ function glyphGroups(svg) {
       }
     }
   }
-  for (const g of groups) {
+  for (const g0 of groups) {
+    const g = /** @type {any} */ (g0);
     const lastW = (glyphs.get(g.items[g.items.length - 1].id) || { w: cap * 0.6 }).w;
     const xs = g.items.map((i) => i.x);
     const bx0 = Math.min(...xs);
@@ -620,7 +630,7 @@ function glyphGroups(svg) {
     // 每个字的轮廓数据：跟别的渲染里同名字符完全一样，可以用来认字
     g.paths = g.items.map((i) => glyphs.get(i.id)?.d || '');
   }
-  return groups;
+  return /** @type {any[]} */ (groups);
 }
 
 /**

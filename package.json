@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "serve": "node server/index.js",
     "check": "node --test test/*.test.js",
-    "check:pages": "node scripts/check-pages.mjs"
+    "check:pages": "node scripts/check-pages.mjs",
+    "check:types": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "element-plus": "^2.8.8",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.9.3",
     "vite": "^6.0.3"
   }
 }

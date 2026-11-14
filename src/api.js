@@ -1,6 +1,16 @@
 /** 后端接口：路径和参数跟 v1 完全一致。 */
 
-async function request(path, { method = 'GET', body, keepalive = false } = {}) {
+/**
+ * 所有请求都走这里。
+ * `@param` 写全是有用的：不写的话 tsc 会把 opts 的类型推成默认值 `{}` 那一套，
+ * 于是每一处 `{ body }` 都被报「不允许的属性」（一开 checkJs 就 100+ 条这种噪音）。
+ * @param {string} path
+ * @param {{ method?: string, body?: any, keepalive?: boolean }} [opts]
+ * @returns {Promise<any>}
+ */
+async function request(path, opts = {}) {
+  const { method = 'GET', body, keepalive = false } = opts;
+  /** @type {RequestInit} */
   const init = { method, headers: {} };
   if (keepalive) init.keepalive = true;   // 关页面时补推（页面已经没了，请求还得走完）
   if (body !== undefined) {
@@ -39,7 +49,7 @@ export const api = {
   ocrPhoto: (body) => request('/api/ocr', { method: 'POST', body }),
 
   /* 结构信息查询：服务端去问 PubChem（带本地缓存），smiles / inchikey / q 三选一 */
-  lookup: ({ smiles, inchikey, q } = {}) => {
+  lookup: (/** @type {{smiles?: string, inchikey?: string, q?: string}} */ { smiles, inchikey, q } = {}) => {
     const p = new URLSearchParams();
     if (smiles) p.set('smiles', smiles);
     else if (inchikey) p.set('inchikey', inchikey);

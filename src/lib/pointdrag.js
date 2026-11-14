@@ -32,7 +32,20 @@ export function clickAfterDrag() {
   return Date.now() - lastDropAt < 300;
 }
 
-export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCancel } = {}) {
+/**
+ * 回调的真实签名（照引用处的调用写，别猜）：
+ *   onStart(id)                       开始拖
+ *   onTarget(id, groupKey, gapAt)     落点变了（每帧可能触发，调用方自己判重）
+ *   onDrop(id, groupKey, gapAt)       松手
+ *   onCancel()                        取消
+ * @param {{ name?: string,
+ *           onStart?: (id: any) => void,
+ *           onTarget?: (id: any, groupKey: string, gapAt: number) => void,
+ *           onDrop?: (id: any, groupKey: string, gapAt: number) => void,
+ *           onCancel?: () => void }} [opts]
+ */
+export function createPointerSort(opts = {}) {
+  const { name = '?', onStart, onTarget, onDrop, onCancel } = opts;
   let st = null;
   let ghost = null;      // 跟着光标走的那张虚影卡
   let raf = 0;           // 虚影的位置更新、边缘自动滚动都放在这一帧里做
@@ -180,9 +193,10 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     const cards = [];
     document.querySelectorAll('[data-drag-card]').forEach((el) => {
       const r = el.getBoundingClientRect();
+      const card = /** @type {HTMLElement} */ (el);
       cards.push({
-        groupKey: el.dataset.dragGroup,
-        idx: Number(el.dataset.dragIndex),
+        groupKey: card.dataset.dragGroup,
+        idx: Number(card.dataset.dragIndex),
         l: r.left,
         t: r.top,
         w: r.width,
@@ -192,7 +206,8 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     const groups = [];
     document.querySelectorAll('[data-drag-group][data-drag-count]').forEach((el) => {
       const r = el.getBoundingClientRect();
-      groups.push({ groupKey: el.dataset.dragGroup, count: Number(el.dataset.dragCount), l: r.left, t: r.top, w: r.width, h: r.height });
+      const g = /** @type {HTMLElement} */ (el);
+      groups.push({ groupKey: g.dataset.dragGroup, count: Number(g.dataset.dragCount), l: r.left, t: r.top, w: r.width, h: r.height });
     });
     // 小的先试：`.exp-stack` 比整个列表容器小，落在组员行上要算「这一摞的后面」
     groups.sort((a, b) => a.w * a.h - b.w * b.h);
@@ -252,7 +267,7 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
     if (st && st.snap) return null;   // 有快照就以快照为准，别混着 elementFromPoint
     const el = document.elementFromPoint(x, y);
     if (!el) return null;
-    const card = el.closest('[data-drag-card]');
+    const card = /** @type {HTMLElement} */ (el.closest('[data-drag-card]'));
     if (card && card.dataset.dragGroup !== undefined) {
       const groupKey = card.dataset.dragGroup;
       const idx = Number(card.dataset.dragIndex);
@@ -265,12 +280,13 @@ export function createPointerSort({ name = '?', onStart, onTarget, onDrop, onCan
       const after = Math.abs(dx) >= Math.abs(dy) ? dx > 0 : dy > 0;
       return { groupKey, gapAt: idx + (after ? 1 : 0) };
     }
-    const group = el.closest('[data-drag-group][data-drag-count]');
+    const group = /** @type {HTMLElement} */ (el.closest('[data-drag-group][data-drag-count]'));
     if (group) {
       const gk = group.dataset.dragGroup;
       const cards = [...group.querySelectorAll('[data-drag-card]')].map((n) => {
+        const nc = /** @type {HTMLElement} */ (n);
         const r = n.getBoundingClientRect();
-        return { groupKey: n.dataset.dragGroup, idx: Number(n.dataset.dragIndex), l: r.left, t: r.top, w: r.width, h: r.height };
+        return { groupKey: nc.dataset.dragGroup, idx: Number(nc.dataset.dragIndex), l: r.left, t: r.top, w: r.width, h: r.height };
       });
       return { groupKey: gk, gapAt: gapInGroup(cards, gk, x, y) };
     }

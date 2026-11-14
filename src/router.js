@@ -55,5 +55,5 @@ export const router = createRouter({
 router.beforeEach((to) => {
   if (typeof window === 'undefined') return true;
   if (window.innerWidth > 820) return true;
-  return PHONE_ALLOWED.includes(to.name) ? true : { name: 'mobile' };
+  return PHONE_ALLOWED.includes(String(to.name)) ? true : { name: 'mobile' };
 });

@@ -1,0 +1,18 @@
+{
+  "// 为什么这么配": "不引入 TypeScript 写法，只用 tsc 当「检查器」扫 JS（checkJs）。目标是抓住 null.x / 参数传错 / 拼错属性名这类在运行时才炸、而且炸得很难看的错误。",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/lib/**/*.js", "src/shims-vue.d.ts"]
+}

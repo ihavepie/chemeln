@@ -27,7 +27,9 @@ export function toast(message, kind = 'ok', duration = 2600) {
 }
 
 /** 确认框，返回 true / false（替代 v1 的 modal({danger:true}) 那条路） */
-export async function confirm({ title, body = '', confirmText = '确定', cancelText = '取消', danger = false } = {}) {
+/** @param {{ title?: string, body?: string, confirmText?: string, cancelText?: string, danger?: boolean }} [opts] */
+export async function confirm(opts = {}) {
+  const { title, body = '', confirmText = '确定', cancelText = '取消', danger = false } = opts;
   try {
     await ElMessageBox.confirm(body, title, {
       confirmButtonText: confirmText,
@@ -48,7 +50,9 @@ export async function confirm({ title, body = '', confirmText = '确定', cancel
  * 多行清单确认框（`confirm` 的 body 是纯文本，换行会被吃掉，列清单没法看）。
  * `lines` 一行一条，`hint` 是底部那句灰色说明；内容都转义过，塞用户数据也不会破坏标签。
  */
-export async function confirmLines({ title, lines = [], hint = '', confirmText = '确定', cancelText = '取消', danger = false } = {}) {
+/** @param {{ title?: string, lines?: string[], hint?: string, confirmText?: string, cancelText?: string, danger?: boolean }} [opts] */
+export async function confirmLines(opts = {}) {
+  const { title, lines = [], hint = '', confirmText = '确定', cancelText = '取消', danger = false } = opts;
   const esc = (v) =>
     String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const html =
@@ -72,7 +76,9 @@ export async function confirmLines({ title, lines = [], hint = '', confirmText =
 }
 
 /** 单行输入框，返回输入内容（取消返回 null）；allowEmpty 时空输入返回 ''，用来清空某格 */
-export async function prompt({ title, placeholder = '', value = '', confirmText = '确定', allowEmpty = false } = {}) {
+/** @param {{ title?: string, placeholder?: string, value?: string, confirmText?: string, allowEmpty?: boolean }} [opts] */
+export async function prompt(opts = {}) {
+  const { title, placeholder = '', value = '', confirmText = '确定', allowEmpty = false } = opts;
   try {
     const r = await ElMessageBox.prompt('', title, {
       confirmButtonText: confirmText,
