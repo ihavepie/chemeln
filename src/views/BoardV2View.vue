@@ -642,69 +642,8 @@ let timer = 0;
 let pending = null;
 function onChange(payload) {
   pending = payload;
-  const st = (payload && payload.appState) || {};
-  const ids = st.selectedElementIds || {};
-  selCount.value = Object.keys(ids).filter(Boolean).length;
-  if (!selCount.value) styleOpen.value = false;
   clearTimeout(timer);
   timer = setTimeout(saveNow, 800);
-}
-
-/* ---------------- 样式面板（自己做的，桌面/手机版 UI 下都在） ----------------
-   Excalidraw 只在「手机版」UI 的底栏里给调色板；窗口一宽就没有入口了，
-   所以这里自己做一排：描边色 / 填充色 / 线宽 / 线型 / 透明度 / 层级。 */
-const selCount = ref(0);
-const styleOpen = ref(false);
-const STROKES = ['#1c1b19', '#a8471f', '#8d8b84', '#2f6b4f', '#1f6c9f', '#9f2f2d'];
-const FILLS = [
-  { c: 'transparent', t: '透明' },
-  { c: '#f7e7de', t: '浅橙' },
-  { c: '#eceef1', t: '浅灰' },
-  { c: '#e4eee6', t: '浅绿' },
-  { c: '#e3ecf5', t: '浅蓝' },
-  { c: '#f6e6e4', t: '浅红' },
-];
-const STYLE_PRESETS = [
-  { v: 'solid', t: '实线' },
-  { v: 'dashed', t: '虚线' },
-  { v: 'dotted', t: '点线' },
-];
-
-function selectedElements() {
-  if (!exApi) return [];
-  const ids = exApi.getAppState().selectedElementIds || {};
-  return exApi.getSceneElements().filter((e) => ids[e.id]);
-}
-
-/** 给选中的元素打补丁（版本号要动，不然 Excalidraw 不重画） */
-function patchSelection(patch) {
-  if (!exApi) return;
-  const ids = exApi.getAppState().selectedElementIds || {};
-  const touch = (e) => {
-    const { id, ...rest } = patch;
-    void id;
-    return { ...e, ...rest, version: (e.version || 1) + 1, versionNonce: Math.floor(Math.random() * 1e9) };
-  };
-  const els = exApi.getSceneElements().map((e) => (ids[e.id] ? touch(e) : e));
-  exApi.updateScene({ elements: els, captureUpdate: 'IMMEDIATELY' });
-}
-
-/** 选中元素的共同值（面板上打勾用）；选中的东西不一致就返回 null */
-function commonOf(key) {
-  const picked = selectedElements();
-  if (!picked.length) return null;
-  const first = picked[0][key];
-  return picked.every((e) => e[key] === first) ? first : null;
-}
-
-function moveLayer(toTop) {
-  if (!exApi) return;
-  const ids = exApi.getAppState().selectedElementIds || {};
-  const all = exApi.getSceneElements();
-  const picked = all.filter((e) => ids[e.id]);
-  const rest = all.filter((e) => !ids[e.id]);
-  const els = toTop ? [...rest, ...picked] : [...picked, ...rest];
-  exApi.updateScene({ elements: els, captureUpdate: 'IMMEDIATELY' });
 }
 
 async function saveNow() {
@@ -899,13 +838,6 @@ load();
           <button v-if="deletedBox" class="btn btn-sm btn-ghost" @click="restoreDeleted">恢复上次内容</button>
           <button
             class="btn btn-sm btn-ghost"
-            :class="{ 'is-on': styleOpen }"
-            :disabled="!selCount"
-            :title="selCount ? '改选中图形的颜色 / 线型 / 透明度 / 层级' : '先选中一个图形'"
-            @click="styleOpen = !styleOpen"
-          >样式{{ selCount ? `（${selCount}）` : '' }}</button>
-          <button
-            class="btn btn-sm btn-ghost"
             :title="sketch ? '现在是手绘风：点一下恢复规整线（没选中图形时会把整张板一起压平）' : '现在是规整线：点一下切成手绘风（有选中就只改选中的）'"
             @click="toggleSketch"
           >手绘{{ sketch ? '：开' : '：关' }}</button>
@@ -914,56 +846,6 @@ load();
             <Icon name="download" :size="12" /> 导出 PDF
           </button>
         </div>
-        <div v-if="styleOpen && selCount" class="bv2-style" @mousedown.stop @click.stop>
-          <div class="bv2-style-row">
-            <span class="bv2-style-t">描边</span>
-            <button
-              v-for="c in STROKES"
-              :key="c"
-              class="bv2-sw"
-              :class="{ 'is-on': commonOf('strokeColor') === c }"
-              :style="{ background: c }"
-              :title="c"
-              @click="patchSelection({ strokeColor: c })"
-            />
-          </div>
-          <div class="bv2-style-row">
-            <span class="bv2-style-t">填充</span>
-            <button
-              v-for="f in FILLS"
-              :key="f.c"
-              class="bv2-sw is-fill"
-              :class="{ 'is-on': commonOf('backgroundColor') === f.c, 'is-none': f.c === 'transparent' }"
-              :style="{ background: f.c === 'transparent' ? '#fff' : f.c }"
-              :title="f.t"
-              @click="patchSelection({ backgroundColor: f.c })"
-            />
-          </div>
-          <div class="bv2-style-row">
-            <span class="bv2-style-t">线宽</span>
-            <button v-for="w in [1, 2, 4]" :key="w" class="bv2-tx" :class="{ 'is-on': commonOf('strokeWidth') === w }" @click="patchSelection({ strokeWidth: w })">{{ w }}</button>
-          </div>
-          <div class="bv2-style-row">
-            <span class="bv2-style-t">线型</span>
-            <button
-              v-for="p in STYLE_PRESETS"
-              :key="p.v"
-              class="bv2-tx"
-              :class="{ 'is-on': commonOf('strokeStyle') === p.v }"
-              @click="patchSelection({ strokeStyle: p.v })"
-            >{{ p.t }}</button>
-          </div>
-          <div class="bv2-style-row">
-            <span class="bv2-style-t">透明</span>
-            <button v-for="o in [100, 60, 30]" :key="o" class="bv2-tx" :class="{ 'is-on': commonOf('opacity') === o }" @click="patchSelection({ opacity: o })">{{ o }}</button>
-          </div>
-          <div class="bv2-style-row">
-            <span class="bv2-style-t">层级</span>
-            <button class="bv2-tx" @click="moveLayer(true)">置顶</button>
-            <button class="bv2-tx" @click="moveLayer(false)">置底</button>
-          </div>
-        </div>
-
         <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
         <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
       </div>
@@ -1014,26 +896,6 @@ load();
   position: absolute; top: 6px; right: 10px; z-index: 6;
   display: flex; align-items: center; gap: 6px; height: 38px;
 }
-.bv2-style {
-  position: absolute; top: 50px; right: 10px; z-index: 8;
-  background: #fff; border-radius: 8px; padding: 8px 10px;
-  box-shadow: 0 6px 18px rgba(20, 18, 14, 0.14), 0 0 0 1px var(--line);
-  display: flex; flex-direction: column; gap: 7px; font-size: 11px;
-}
-.bv2-style-row { display: flex; align-items: center; gap: 6px; }
-.bv2-style-t { width: 28px; color: var(--ink-4); flex: 0 0 auto; }
-.bv2-sw {
-  width: 16px; height: 16px; padding: 0; border-radius: 50%; cursor: pointer;
-  border: 1px solid rgba(20, 18, 14, 0.14);
-}
-.bv2-sw.is-fill.is-none { box-shadow: inset 0 0 0 1px #e2ded5; }
-.bv2-sw.is-on { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent); }
-.bv2-tx {
-  height: 22px; min-width: 26px; padding: 0 6px; border-radius: 5px; cursor: pointer;
-  border: 1px solid var(--line-2); background: #fff; color: var(--ink-3); font-size: 11px;
-}
-.bv2-tx:hover { border-color: var(--ink-4); color: var(--ink); }
-.bv2-tx.is-on { border-color: var(--accent); color: var(--accent-ink); background: #fdf7f3; }
 .bv2-title {
   max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--serif); font-size: 14px; color: var(--ink-2); margin-right: 4px;
@@ -1049,27 +911,7 @@ load();
 .bv2-canvas.is-fitted { opacity: 1; transition: opacity 140ms ease; }
 /* 窗口窄的时候：板名让位、工具按钮缩一圈，别跟右边那排操作叠在一起 */
 @media (max-width: 1460px) {
-  .bv2-style {
-  position: absolute; top: 50px; right: 10px; z-index: 8;
-  background: #fff; border-radius: 8px; padding: 8px 10px;
-  box-shadow: 0 6px 18px rgba(20, 18, 14, 0.14), 0 0 0 1px var(--line);
-  display: flex; flex-direction: column; gap: 7px; font-size: 11px;
-}
-.bv2-style-row { display: flex; align-items: center; gap: 6px; }
-.bv2-style-t { width: 28px; color: var(--ink-4); flex: 0 0 auto; }
-.bv2-sw {
-  width: 16px; height: 16px; padding: 0; border-radius: 50%; cursor: pointer;
-  border: 1px solid rgba(20, 18, 14, 0.14);
-}
-.bv2-sw.is-fill.is-none { box-shadow: inset 0 0 0 1px #e2ded5; }
-.bv2-sw.is-on { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent); }
-.bv2-tx {
-  height: 22px; min-width: 26px; padding: 0 6px; border-radius: 5px; cursor: pointer;
-  border: 1px solid var(--line-2); background: #fff; color: var(--ink-3); font-size: 11px;
-}
-.bv2-tx:hover { border-color: var(--ink-4); color: var(--ink); }
-.bv2-tx.is-on { border-color: var(--accent); color: var(--accent-ink); background: #fdf7f3; }
-.bv2-title { display: none; }
+  .bv2-title { display: none; }
   .bv2-canvas :deep(.excalidraw) { --lg-button-size: 30px; --default-button-size: 30px; }
 }
 @media (max-width: 1240px) {
@@ -1077,8 +919,10 @@ load();
   .bv2-saved { display: none; }
 }
 
-/* ---- 画布上只留一排工具：汉堡菜单、素材库、缩放/撤销/帮助、下面那行提示全藏掉 ---- */
-.bv2-canvas :deep(.App-menu_top__left),
+/* ---- 画布上只留工具 + 汉堡菜单；素材库 / 缩放撤销 / 提示藏掉 ----
+   汉堡菜单（左上角 ☰）要留着：**原生样式面板**（画布背景 / 描边 / 填充 / 线宽 / 线型 / 透明度 / 图层）在它里面，
+   这是宽窗口下唯一能改颜色的入口（窄窗口另有一条底栏调色板）。 */
+.bv2-canvas :deep(.App-menu_top__left) { display: flex !important; }
 .bv2-canvas :deep(.layer-ui__wrapper__top-right),
 .bv2-canvas :deep(.layer-ui__wrapper__footer),
 .bv2-canvas :deep(.HintViewer),
