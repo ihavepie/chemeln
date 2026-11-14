@@ -189,7 +189,7 @@ export const api = {
   /** 页面设置（视图 / 显示哪几块 / 列宽…）：整张推上去，服务端按 key 的时间戳合并 */
   saveUiPrefs: (prefs, { keepalive = false } = {}) =>
     request('/api/uiprefs', { method: 'PUT', body: { prefs }, keepalive }),
-  reagentsVerify: (name, force = false) => request('/api/reagents/verify', { method: 'POST', body: { name, force } }),
+  reagentsVerify: (name, force = false, role = '') => request('/api/reagents/verify', { method: 'POST', body: { name, force, role } }),
   // 全部核对：一次喂一批（服务端挑「没核过、MW 空着」的，或者给 names），返回还剩几个没核
   reagentsVerifyAll: (payload = {}) => request('/api/reagents/verify-all', { method: 'POST', body: payload }),
   /** 自定义检索站点（试剂库「查无」时列出来的外部库） */

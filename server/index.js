@@ -5122,18 +5122,43 @@ async function verifyReagent(name, opts = {}) {
   // 旧值只有「一位小数」的精度（280.4 → 界面显示成 280.40）时，用算出来更细的替换；
   // 手填的两位小数（280.43）不动，空值就补上
   const coarse = prevMw === null || Math.round(prevMw * 100) % 10 === 0;
-  db.prepare(
-    `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density),
-            checked_at = ?, check_state = ?, updated_at = ?, solid = ? WHERE key = ?`
-  ).run(
-    !manual.has('mw') && mw != null && coarse ? mw : null,
-    manual.has('density') || solidFlag === true ? null : density,
-    ts,
-    found ? 'ok' : 'miss',
-    ts,
-    solidFlag === null ? (row && row.solid ? 1 : 0) : solidFlag ? 1 : 0,
-    key
-  );
+  if (!row) {
+    // 库里还没有这个名字（典型：条件组「变量」那几行里的配体 / 催化剂，它们不进投料表）。
+    // 查到了就**落一条进试剂库**——下次打这个名字 MW / 密度直接带出来，不用再联网；
+    // 查不到就不落，免得试剂库里堆一堆空条目。
+    if (!found) {
+      return { name: label, key, ok: false, state: 'miss', source: (info && info.source) || 'pubchem', mw: null };
+    }
+    db.prepare(
+      `INSERT INTO reagent_lib(key, name, role, mw, density, created_at, updated_at, checked_at, check_state, manual, solid)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+    ).run(
+      key,
+      label,
+      str(opts.role).slice(0, 20),
+      mw,
+      solidFlag === true ? null : density,
+      ts,
+      ts,
+      ts,
+      'ok',
+      '',
+      solidFlag ? 1 : 0
+    );
+  } else {
+    db.prepare(
+      `UPDATE reagent_lib SET mw = COALESCE(?, mw), density = COALESCE(?, density),
+              checked_at = ?, check_state = ?, updated_at = ?, solid = ? WHERE key = ?`
+    ).run(
+      !manual.has('mw') && mw != null && coarse ? mw : null,
+      manual.has('density') || solidFlag === true ? null : density,
+      ts,
+      found ? 'ok' : 'miss',
+      ts,
+      solidFlag === null ? (row && row.solid ? 1 : 0) : solidFlag ? 1 : 0,
+      key
+    );
+  }
   return {
     name: label,
     key,
@@ -5198,7 +5223,7 @@ route('POST', '/api/reagents/verify', async (req, res) => {
   const body = await readJson(req);
   const name = str(body.name).trim();
   if (!name) throw new HttpError(400, '要带 name');
-  ok(res, await verifyReagent(name, { force: !!body.force }));
+  ok(res, await verifyReagent(name, { force: !!body.force, role: str(body.role) }));
 });
 
 /* 自定义「检索站点」：用户自己加的化学数据库，试剂库里「查无」时一起列出来。

@@ -164,20 +164,24 @@ function varPlaceholder(v) {
  * 一行「变量」的分子量 / 当量 / mmol / 用量。
  * 只有「一个变量槽」时才算得出来（多个槽一行里混着几样东西，数字没意义，就写 —）。
  */
+/** 本地（化合物库 → 试剂库）按名字找分子量；都没有就 null（交给联网查） */
+function mwOfName(name0) {
+  const name = String(name0 || '').trim().toLowerCase();
+  if (!name) return null;
+  const cmp = compoundDict().find((x) => String(x.name || '').trim().toLowerCase() === name || String(x.code || '').trim().toLowerCase() === name);
+  if (cmp && cmp.mw != null) return Number(cmp.mw);
+  const d = reagentDict().find((x) => String(x.name || '').trim().toLowerCase() === name);
+  return d && d.mw != null ? Number(d.mw) : null;
+}
+
 function varInfo(c) {
   const empty = { mw: null, mmol: null, amount: '—' };
   const slot = condVars.value[0] || null;
   // 温度 / 时间 / 气氛这类字段变量没有分子量、当量、用量可言（用户点名要分开）
   if (!slot || !slot.role) return empty;
-  const name = String(c.vars?.[slot.ph] || '').trim().toLowerCase();
+  const name = String(c.vars?.[slot.ph] || '').trim();
   if (!name) return empty;
-  let mw = null;
-  const cmp = compoundDict().find((x) => String(x.name || '').trim().toLowerCase() === name || String(x.code || '').trim().toLowerCase() === name);
-  if (cmp && cmp.mw != null) mw = Number(cmp.mw);
-  if (mw == null) {
-    const d = reagentDict().find((x) => String(x.name || '').trim().toLowerCase() === name);
-    if (d && d.mw != null) mw = Number(d.mw);
-  }
+  const mw = mwOfName(name);
   const eq = eqNum(c.varEq?.[slot.ph]);
   const base = num(reagent.base) || 0;
   const mmol = eq != null && base ? round(base * eq, 4) : null;
@@ -185,6 +189,58 @@ function varInfo(c) {
   if (mw != null && mmol != null) amount = amountText(derive({ role: '试剂', mw, mmol, density: null, conc: null })) || '—';
   return { mw, mmol, amount };
 }
+/**
+ * 变量行里的试剂名（RuPhos / Dcpf 这种）**不在投料表里**，所以保存时不会进试剂库，
+ * 本地也就查不到分子量。这里拿名字去问一次（PubChem → OPSIN → Wikidata，服务端带缓存），
+ * 查到的**落一条进试剂库**（`/api/reagents/verify` 里没这条就插入），下次打这个名字直接带出 MW。
+ * 状态按名字记：busy / ok / miss（查不到还可以点一下强制重查）。
+ */
+const varLook = reactive({});
+const varLookBusy = (name) => varLook[String(name || '').trim().toLowerCase()] === 'busy';
+function varLookState(name) {
+  const key = String(name || '').trim().toLowerCase();
+  if (!key) return '';
+  if (varLook[key]) return varLook[key];
+  return mwOfName(key) != null ? 'ok' : '';
+}
+/** 变量行「说明」那格里那颗小按钮上写什么 */
+function varLookLabel(name) {
+  const st = varLook[String(name || '').trim().toLowerCase()];
+  if (!name) return '';
+  if (st === 'busy') return '查中…';
+  if (st === 'miss') return '查不到';
+  if (st === 'err') return '重查';
+  return '查 MW';
+}
+function varLookTitle(name) {
+  const st = varLook[String(name || '').trim().toLowerCase()];
+  if (st === 'miss') return 'PubChem / OPSIN / Wikidata 都没这一条：点一下重查，或者照文献手填分子量';
+  if (st === 'err') return '刚才没连上（或服务没开），点一下重查';
+  return '按名字去库里查分子量；查到会记进试剂库，下次打这个名字就自动带出来';
+}
+
+async function lookupVarName(name0, { force = false, role = '' } = {}) {
+  const name = String(name0 || '').trim();
+  if (!name) return;
+  const key = name.toLowerCase();
+  if (varLook[key] === 'busy') return;
+  if (!force && mwOfName(name) != null) {
+    varLook[key] = 'ok';
+    return;
+  }
+  varLook[key] = 'busy';
+  try {
+    const r = await api.reagentsVerify(name, force, role);
+    varLook[key] = r && r.ok ? 'ok' : r && r.state === 'error' ? 'err' : 'miss';
+    if (r && r.ok) {
+      await loadBoot();          // 试剂库多了这一条，bootstrap 里那份字典要重读
+      notify();
+    }
+  } catch (e) {
+    varLook[key] = 'err';
+  }
+}
+
 /** 变量行（连下标 / 算好的数一起给模板）；`isMol` = 这一槽是「试剂类」，才显示 MW / 当量 / mmol / 用量 */
 const varRows = computed(() => {
   const slot = condVars.value[0] || null;
@@ -198,6 +254,8 @@ const varRows = computed(() => {
     info: isMol ? varInfo(c) : { mw: null, mmol: null, amount: '—' },
   }));
 });
+
+
 /** 结果块里那一行「这个条件改了什么」 */
 function condWhat(c) {
   const parts = [];
@@ -229,6 +287,24 @@ const condVars = computed(() => {
 const FIELD_VAR_LABEL = { temperature: 'T', duration: 't', atmosphere: 'atm', concentration: 'c' };
 /** 字段变量那一行合并成一格时要写的字（写「变的是哪样」） */
 const FIELD_VAR_NAME = { temperature: '反应温度', duration: '时间节点', atmosphere: '气氛 / 容器', concentration: '浓度' };
+
+/** 输入停下来就自己查一次（只在本地确实没有 MW 时发请求） */
+let varLookTimer = 0;
+watch(
+  () => varRows.value.filter((r) => r.isMol).map((r) => `${r.ph}\u0000${r.c.vars?.[r.ph] || ''}`),
+  (list) => {
+    clearTimeout(varLookTimer);
+    varLookTimer = setTimeout(() => {
+      for (const one of list) {
+        const [ph, val] = String(one).split('\u0000');
+        if (String(val || '').trim().length < 2) continue;
+        if (mwOfName(val) != null) continue;
+        const slot = condVars.value.find((v) => v.ph === ph);
+        void lookupVarName(val, { role: slot ? slot.role : '' });
+      }
+    }, 900);
+  }
+);
 
 /** 试剂行被标成变量（组分菜单里点的）：把字段变量和别的试剂行的变量收掉 */
 /**
@@ -2423,7 +2499,21 @@ const openAttachment = (id) => {
                   </td>
                   <td v-if="row.isMol" class="n var-mmol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</td>
                   <td v-if="row.isMol" class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">{{ row.info.amount }}</td>
-                  <td v-if="row.isMol" class="var-note-cell" />
+                  <td v-if="row.isMol" class="var-note-cell">
+                    <!-- 变量行里的试剂名不在投料表里，本地往往没分子量：给一颗「查 MW」，
+                         查到的东西会落进试剂库（下次自动带出）。有 MW 了就不显示。 -->
+                    <button
+                      v-if="row.c.vars?.[row.ph] && mwOfName(row.c.vars?.[row.ph]) == null"
+                      type="button"
+                      class="var-look noprint"
+                      :class="`is-${varLookState(row.c.vars?.[row.ph]) || 'idle'}`"
+                      :disabled="exp.locked || varLookBusy(row.c.vars?.[row.ph])"
+                      :title="varLookTitle(row.c.vars?.[row.ph])"
+                      @click.stop="lookupVarName(row.c.vars?.[row.ph], { force: true, role: condVars[0]?.role || '' })"
+                    >
+                      {{ varLookLabel(row.c.vars?.[row.ph]) }}
+                    </button>
+                  </td>
                   <td class="noprint">
                     <button v-if="!exp.locked" type="button" class="cond-x" title="删掉这个变量" @click="removeCond(row.i)">×</button>
                   </td>

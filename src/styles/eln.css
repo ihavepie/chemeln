@@ -9680,3 +9680,19 @@ body.is-board-dragging { cursor: grabbing; }
   .sheet .sec-tlc .tlc-shot.has-cap img { height: 104px !important; }
   .sheet .sec-shots .tlc-shot img { height: 120px !important; }
 }
+
+/* ---------- 变量行里那颗「查 MW」 ----------
+   条件组「变量」那几行（RuPhos / Dcpf 这种配体）不进投料表，本地常常没有分子量，
+   所以要能就地查一次；查到的会写进试剂库，下次打这个名字直接带出来。
+   小、靠右、hover 才给底色——跟表里其他小按钮一个调子。 */
+.var-note-cell { text-align: right; padding-right: 4px !important; line-height: 1; }
+.var-look {
+  border: 0; background: transparent; font: inherit; font-size: 9.5px; line-height: 1.1;
+  letter-spacing: 0.02em; color: var(--ink-4); padding: 0 3px; border-radius: 3px; cursor: pointer;
+}
+.var-look:hover { background: #f1efeb; color: var(--ink-2); }
+.var-look.is-busy { color: var(--ink-4); cursor: default; }
+.var-look.is-ok { color: var(--ink-4); }
+.var-look.is-miss { color: var(--bad); }
+.var-look.is-err { color: var(--accent-ink); }
+.var-look:disabled { opacity: 0.6; }
