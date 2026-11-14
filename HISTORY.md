@@ -256,3 +256,8 @@
   ③ 拖起来给 `will-change: transform`，`body` 挂 `is-board-dragging`（grabbing 光标）；
   ④ **吸附有参考线了**：4.5mm 内吸到左/中/右时，页面里画一根 0.28mm 的强调色竖线（`guideAt`），不再是「莫名其妙跳一下」；缩放（拖右下角）同样走 rAF + 直接写 `style.width`。
   验证（临时板 + 真实鼠标序列）：拖动中 `left` 保持 30mm 不动、`transform(64.3mm, 32.2mm)` 跟手、`will-change=transform`、`body.is-board-dragging`；吸到中线时 transform 46.1mm、参考线在 105mm；松手后 `left=74mm`（正好中线）、transform 与 willChange 清空、`items.x=740` 落库；负方向拖 -170px → -91.1mm，数值都对得上 `px × 2.646 / zoom`。
+- **纸张会上下滑动（用户：「你把页面滑动的问题彻底解决一下，就是纸张会上下滑动」）**：根因有两层。
+  ① **整页本来就能滚**：`.single` 是滚动容器（`overflow-y:auto` + 底部 100px 呼吸位），而画布高度是**硬算的** `calc(100vh - 250px)` —— 两者对不上，纸张连带整页上下滚。现在排版板单独一套锁死的布局：`.board-single { overflow: hidden; padding-bottom: 16px }`，`.inner` 变成 `flex column` + `height:100%`，`.board-wrap` / `.board-stage` 用 `flex:1 1 auto; min-height:0` **吃掉剩余高度**，`fit()` 按 stage 的**真实高度**算 zoom → 纸永远刚好装下、外层一点都滚不了。
+  ② **工具条一出现纸会缩一下**：选中块时底部 `.board-tools` 才渲染，stage 高度变了 → `fit()` 重算 zoom → 纸张「跳」一档。现在外面包一层 `.board-tools-bar { min-height: 30px }` 常驻占位，工具条在不在高度都一样。
+  `.board-stage` 默认 `overflow: hidden; align-items: center`；**只有钉住「100%」时** `is-pinned` 才 `overflow:auto; align-items:flex-start`，让纸自己在 stage 里滚，窗口照旧不动。
+  验证（WKWebView，1280×820 与 1400×900 两种窗口）：`document.scrollHeight == clientHeight`、`.single` 也不可滚、stage 无内滚；纸张可视尺寸正好等于 stage 减 16px 留白；点「100%」→ document 仍不可滚、stage `1123/621` 内部可滚、zoom=1；点回「适应窗口」再拖 +60/+30px → `30mm,30mm → 59mm,44.5mm` 且落库 `x=590 y=445`；选中块前后 `zoom=0.521149` 一分不差（纸不跳）。

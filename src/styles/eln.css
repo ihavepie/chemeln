@@ -9566,3 +9566,20 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 body.is-board-dragging { cursor: grabbing; }
 .board-guide { position: absolute; pointer-events: none; background: rgba(168, 71, 31, 0.32); }
 .board-guide.is-v { top: 0; bottom: 0; width: 0.28mm; }
+
+/* ---------- 排版板整页不滚：纸张必须一屏装得下 ----------
+   以前 `.single` 自带 `overflow-y:auto` + 100px 下留白，画布高度又是 `100vh - 250px` 硬算的，
+   结果纸张连带整页能上下滚（用户：「纸张会上下滑动」）。现在改成：外层不滚，画布用 flex 吃掉
+   剩余高度，`fit()` 按**真实高度**算 zoom，纸永远刚好装下；只有钉住「100%」时纸自己在 stage 里滚。 */
+.board-single { overflow: hidden; padding-bottom: 16px; }
+.board-single > .inner { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.board-single .board-head { flex: 0 0 auto; }
+.board-single .board-wrap { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.board-single .board-drawer { height: 100%; min-height: 0; }
+.board-single .board-stage { flex: 1 1 auto; height: 100%; min-height: 0; }
+.board-single .board-tools { flex: 0 0 auto; }
+.board-stage { overflow: hidden; align-items: center; }
+.board-stage.is-pinned { overflow: auto; align-items: flex-start; }
+/* 工具条常驻占位：选中前后高度一致，纸张不会因为多一行而重新缩放（看着像「纸上下跳」） */
+.board-tools-bar { flex: 0 0 auto; min-height: 30px; }
+.board-tools { margin-top: 0; }

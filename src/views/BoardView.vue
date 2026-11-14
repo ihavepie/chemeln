@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
         </aside>
 
         <!-- 画布：一张 A4，靠 zoom 缩进可视区，纸里全是 mm 单位 -->
-        <div ref="stageEl" class="board-stage" @mousedown.self="sel = ''">
+        <div ref="stageEl" class="board-stage" :class="{ 'is-pinned': pinned }" @mousedown.self="sel = ''">
           <div ref="pageEl" class="bd-page board-page" :style="{ width: mm(pageSize.w), height: mm(pageSize.h), zoom }" @mousedown.self="sel = ''">
             <div
               v-for="it in items"
@@ -515,7 +515,9 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="selItem" class="board-tools">
+      <!-- 工具条占位固定：选中/取消时版面不动，纸张不会因为多出一行而重新缩放 -->
+      <div class="board-tools-bar">
+        <div v-if="selItem" class="board-tools">
         <span class="board-tools-name">
           {{ selItem.type === 'tlc' ? selItem.code || 'TLC'
             : selItem.type === 'text' ? '文字'
@@ -526,7 +528,8 @@ onBeforeUnmount(() => {
         <button class="board-tool" @click="raise(selItem, 'bottom')">置底</button>
         <button class="board-tool" @click="center(selItem)">居中</button>
         <button class="board-tool" @click="duplicate(selItem)">复制</button>
-        <button class="board-tool is-danger" @click="removeItem(selItem)">删除</button>
+          <button class="board-tool is-danger" @click="removeItem(selItem)">删除</button>
+        </div>
       </div>
     </div>
   </div>
