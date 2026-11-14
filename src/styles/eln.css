@@ -718,6 +718,10 @@ body {
   color: transparent;
   transition: color 140ms var(--ease), background 140ms var(--ease);
 }
+/* 光标用系统那两种「单向箭头」：纸左边 ←、右边 →，一眼看出往哪边翻（比手型更像翻页）。
+   Safari / Chrome 都认，且不用自造 cursor 图（自造的在 WKWebView 里能不能出来没法截图验证）。 */
+.edge-flip.is-l { cursor: w-resize; }
+.edge-flip.is-r { cursor: e-resize; }
 .edge-flip.is-off { cursor: default; }
 /* 箭头做成一颗很小的圆按钮、平时完全看不见，移上去才慢慢浮出来 —— 比整条缝盖一层底色柔和得多 */
 .edge-arrow {
