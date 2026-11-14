@@ -2086,14 +2086,23 @@ route('PUT', '/api/quick', async (req, res) => {
   const body = await readJson(req);
   const field = str(body.field).trim();
   if (!QUICK_FIELDS.has(field)) return fail(res, 400, '不认识的字段');
+  // `full: true` = 这一份是**完整列表**（内置那几条也在里面，删过的就不在了），
+  // 存 `quickFull:<字段>`，读的时候它优先于「内置 + 自己加的」；`items: null` = 删掉这份，
+  // 回到内置那几条（设置页的「恢复默认」就是它）。
+  const full = body.full === true;
+  const key = `${full ? 'quickFull' : 'quick'}:${field}`;
+  if (body.items === null) {
+    db.prepare('DELETE FROM settings WHERE key = ?').run(key);
+    return ok(res, { field, items: null, full });
+  }
   const items = (Array.isArray(body.items) ? body.items : [])
     .map((x) => str(x).trim().slice(0, 40))
     .filter(Boolean)
     .slice(0, 60);
   const uniq = [...new Set(items)];
-  if (uniq.length) setSetting(`quick:${field}`, JSON.stringify(uniq));
-  else db.prepare('DELETE FROM settings WHERE key = ?').run(`quick:${field}`);
-  ok(res, { field, items: uniq });
+  // 完整列表**允许空**（用户把这一行都删光了），所以空数组也照存；只有 null 才是删掉这一份
+  setSetting(key, JSON.stringify(uniq));
+  ok(res, { field, items: uniq, full });
 });
 
 /* --- 分类（自己建的文件夹；实验、化合物各一套，互不相干） --- */

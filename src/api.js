@@ -185,7 +185,8 @@ export const api = {
     request(`/api/groups${project ? `?project=${encodeURIComponent(project)}` : ''}`).then((d) => d),
   /** 核对一个试剂：服务端拿名字重查 PubChem / OPSIN / Wikidata，把 MW / 密度写回试剂库 */
   /** 条件行「常用选项」里自己加的那几条（存服务端 settings，跟着 data/ 一起备份） */
-  saveQuick: (field, items) => request('/api/quick', { method: 'PUT', body: { field, items } }),
+  /** items = null → 删掉这一份（`full` 时回到「内置那几条」） */
+  saveQuick: (field, items, full = false) => request('/api/quick', { method: 'PUT', body: { field, items, full } }),
   /** 页面设置（视图 / 显示哪几块 / 列宽…）：整张推上去，服务端按 key 的时间戳合并 */
   saveUiPrefs: (prefs, { keepalive = false } = {}) =>
     request('/api/uiprefs', { method: 'PUT', body: { prefs }, keepalive }),

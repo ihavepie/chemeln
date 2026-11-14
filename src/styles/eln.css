@@ -8645,12 +8645,6 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   gap: 5px;
   min-width: 0;
 }
-.quick-chips .qchip.is-builtin {
-  color: var(--ink-3);
-  background: transparent;
-  border-color: #eeeceb;
-  cursor: default;
-}
 .quick-chips .qchip.is-own {
   display: inline-flex;
   align-items: center;
@@ -9696,3 +9690,11 @@ body.is-board-dragging { cursor: grabbing; }
 .var-look.is-miss { color: var(--bad); }
 .var-look.is-err { color: var(--accent-ink); }
 .var-look:disabled { opacity: 0.6; }
+
+/* ---------- 设置页 07「常用选项」：内置的也能删了 ----------
+   一行的完整列表就是界面上这一串（不再区分「内置 / 自己加的」），所以「恢复默认」要单独一颗小字。 */
+.quick-reset {
+  border: 0; background: transparent; font: inherit; font-size: 10px;
+  color: var(--ink-4); padding: 1px 4px; border-radius: 3px; cursor: pointer;
+}
+.quick-reset:hover { background: #f1efeb; color: var(--ink-2); }

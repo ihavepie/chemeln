@@ -1,6 +1,7 @@
 import { reactive } from 'vue';
 import { api } from './api.js';
 import { onUiMerged, uiGet, uiMerge, uiSetIfChanged } from './lib/uiprefs.js';
+import { QUICK } from './lib/ui.js';
 import { setAmountDecimals, setVolumeDecimals } from './lib/reagent.js';
 
 /** 当前课题存在 localStorage：刷新页面还留在同一个「空间」里。
@@ -224,6 +225,30 @@ export const quickExtra = (field) => {
   } catch {
     return [];
   }
+};
+
+/**
+ * 这一行**完整**的常用选项。
+ * 改过（`quickFull:<字段>` 存在）就照那份来 —— 内置那几条也在里面，删掉的已经不在；
+ * 没改过就是「内置 + 以前自己加的」。`null` = 没改过（设置页据此显示「恢复默认」）。
+ */
+export const quickFull = (field) => {
+  const raw = store.boot?.settings?.[`quickFull:${field}`];
+  if (raw == null || raw === '') return null;
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.map(String).filter(Boolean) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const quickList = (field) => {
+  const full = quickFull(field);
+  if (full) return full;
+  const out = [...(QUICK[`f-${field}`] || [])];
+  for (const v of quickExtra(field)) if (!out.includes(v)) out.push(v);
+  return out;
 };
 
 /** 自己记录本里用过的试剂（名字 / MW / 浓度），服务端从历史行汇总好的 */

@@ -21,8 +21,7 @@ import {
 } from '../lib/sheetprefs.js';
 import { amountDecimals, setAmountDecimals, setVolumeDecimals, volumeDecimals } from '../lib/reagent.js';
 import { uiSetIfChanged } from '../lib/uiprefs.js';
-import { loadBoot, setProject, settings, store, allCategories, addCategory, quickExtra } from '../store.js';
-import { QUICK } from '../lib/ui.js';
+import { loadBoot, setProject, settings, store, allCategories, addCategory, quickFull, quickList } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import DocGrip from '../components/DocGrip.vue';
 
@@ -353,12 +352,12 @@ const QUICK_ROWS = [
   { key: 'apparatus', label: '装置 / 器皿' },
   { key: 'light', label: '光照 / 波长' },
 ];
-const quickBuiltin = (key) => QUICK[`f-${key}`] || [];
-const quickOwn = (key) => quickExtra(key);
+const quickItems = (key) => quickList(key);
+const quickCustomized = (key) => quickFull(key) != null;
 
 async function saveQuickList(key, items) {
   try {
-    await api.saveQuick(key, items);
+    await api.saveQuick(key, items, true);
     await loadBoot();
     return true;
   } catch (e) {
@@ -375,24 +374,35 @@ async function addQuick(f) {
   });
   const value = String(v || '').trim();
   if (!value) return;
-  if (quickBuiltin(f.key).includes(value) || quickOwn(f.key).includes(value)) {
+  if (quickItems(f.key).includes(value)) {
     toast(`「${value}」本来就在里面`);
     return;
   }
-  if (await saveQuickList(f.key, [...quickOwn(f.key), value])) toast(`「${value}」加好了`);
+  if (await saveQuickList(f.key, [...quickItems(f.key), value])) toast(`「${value}」加好了`);
 }
 
 async function delQuick(key, value) {
-  if (await saveQuickList(key, quickOwn(key).filter((x) => x !== value))) toast(`去掉了「${value}」`);
+  if (await saveQuickList(key, quickItems(key).filter((x) => x !== value))) toast(`去掉了「${value}」`);
 }
 
-/** 自己加的那几条按顺序排在刻度条 / 胶囊后面，所以顺序就是这里挪出来的 */
+/** 顺序就是刻度条 / 胶囊里的顺序，整份列表一起挪 */
 async function moveQuick(key, i, dir) {
-  const list = [...quickOwn(key)];
+  const list = [...quickItems(key)];
   const j = i + dir;
   if (j < 0 || j >= list.length) return;
   [list[i], list[j]] = [list[j], list[i]];
   await saveQuickList(key, list);
+}
+
+/** 恢复默认：删掉这一份完整列表，回到内置那几条（外加以前自己加的） */
+async function resetQuick(f) {
+  try {
+    await api.saveQuick(f.key, null, true);
+    await loadBoot();
+    toast(`「${f.label}」回到默认那几条`);
+  } catch (e) {
+    toast(e.message || '没恢复成', 'err');
+  }
 }
 
 /** 改名会连带把记录、化合物、编号前缀、课题级设置一起搬过去 */
@@ -813,22 +823,30 @@ async function removeProject(p) {
       <section class="card">
         <div class="card-head"><h2 class="card-title"><span class="n">07</span>常用选项</h2></div>
         <p class="card-note">
-          条件行那几个下拉里「＋ 自定义」加的值都在这儿，两边同一份（存在记录本里，跟着 data/ 一起备份）。内置的那几条删不掉，自己加的用 <b>‹</b> <b>›</b> 调顺序。
+          条件行那几个下拉里「＋ 自定义」加的值都在这儿，两边同一份（存在记录本里，跟着 data/ 一起备份）。
+          <b>内置的那几条也能删、也能用 ‹ › 挪位置</b>——动过之后这一行就照你排的顺序来；
+          「恢复默认」回到内置那几条（动过之后才出现）。
         </p>
         <div class="quick-rows">
           <div v-for="f in QUICK_ROWS" :key="f.key" class="quick-row">
             <span class="quick-lbl">{{ f.label }}</span>
             <span class="quick-chips">
-              <span v-for="v in quickBuiltin(f.key)" :key="`b-${v}`" class="qchip is-builtin">{{ v }}</span>
-              <span v-for="(v, i) in quickOwn(f.key)" :key="`o-${v}`" class="qchip is-own">
+              <span v-for="(v, i) in quickItems(f.key)" :key="`q-${v}`" class="qchip is-own">
                 {{ v }}
                 <span class="qchip-acts">
                   <button type="button" title="往前挪一格" :disabled="i === 0" @click="moveQuick(f.key, i, -1)">‹</button>
-                  <button type="button" title="往后挪一格" :disabled="i === quickOwn(f.key).length - 1" @click="moveQuick(f.key, i, 1)">›</button>
+                  <button type="button" title="往后挪一格" :disabled="i === quickItems(f.key).length - 1" @click="moveQuick(f.key, i, 1)">›</button>
                   <button type="button" class="is-del" title="删掉这条" @click="delQuick(f.key, v)">×</button>
                 </span>
               </span>
               <button type="button" class="qchip is-add" @click="addQuick(f)">＋ 添加</button>
+              <button
+                v-if="quickCustomized(f.key)"
+                type="button"
+                class="quick-reset"
+                title="回到内置那几条"
+                @click="resetQuick(f)"
+              >恢复默认</button>
             </span>
           </div>
         </div>

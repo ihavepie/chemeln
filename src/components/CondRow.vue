@@ -4,7 +4,7 @@ import Icon from './Icon.vue';
 import RulerPick from './RulerPick.vue';
 import { QUICK } from '../lib/ui.js';
 import { api } from '../api.js';
-import { loadBoot, quickExtra } from '../store.js';
+import { loadBoot, quickList } from '../store.js';
 import { prompt, toast } from '../lib/feedback.js';
 import { markPopupOpen, ignoreOutsideClick } from '../lib/popguard.js';
 
@@ -41,14 +41,8 @@ const RULER_KEYS = new Set(['temperature', 'duration']);
 const isRuler = (key) => RULER_KEYS.has(key);
 
 const builtin = (key) => QUICK[`f-${key}`] || [];
-/** 下拉里列什么：内置那几条 + 自己加的（去重，自己加的在后面） */
-const optionsFor = (key) => {
-  const own = quickExtra(key);
-  const out = [...builtin(key)];
-  for (const v of own) if (!out.includes(v)) out.push(v);
-  return out;
-};
-const isOwn = (key, v) => !builtin(key).includes(v) && quickExtra(key).includes(v);
+/** 下拉里列什么：整份列表（内置 + 自己加的，删过/挪过就照用户存的那份） */
+const optionsFor = (key) => quickList(key);
 
 /** 把这个格子当前填的值加进「常用选项」；空着就先问他填什么 */
 async function addOption(f) {
@@ -60,8 +54,8 @@ async function addOption(f) {
   });
   if (!v) return;
   try {
-    const items = [...quickExtra(f.key), v];
-    await api.saveQuick(f.key, items);
+    const items = [...quickList(f.key), v];
+    await api.saveQuick(f.key, [...new Set(items)], true);
     await loadBoot();
     props.model[f.key] = v;
     notify();
@@ -72,11 +66,10 @@ async function addOption(f) {
   }
 }
 
-/** 从「常用选项」里删掉一条（只删自己加的，内置那几条删不掉） */
+/** 从「常用选项」里删掉一条（内置的也能删：存的是整份列表） */
 async function delOption(f, v) {
-  if (!isOwn(f.key, v)) return;
   try {
-    await api.saveQuick(f.key, quickExtra(f.key).filter((x) => x !== v));
+    await api.saveQuick(f.key, quickList(f.key).filter((x) => x !== v), true);
     await loadBoot();
     toast(`已经从常用选项里去掉「${v}」`);
   } catch (e) {
@@ -253,15 +246,13 @@ onBeforeUnmount(() => {
               v-for="v in optionsFor(f.key)"
               :key="v"
               type="button"
-              class="qchip"
-              :class="{ 'is-own': isOwn(f.key, v) }"
+              class="qchip is-own"
               :aria-selected="String(model[f.key] || '') === v"
               @click="pick(f.key, v)"
             >
               {{ v }}
-              <!-- 自己加的那几条：鼠标移上来露出 ×，点它就删掉（内置的没有） -->
+              <!-- 每条都能删（内置的也一样：存的是整份列表），鼠标移上来露出 × -->
               <span
-                v-if="isOwn(f.key, v)"
                 class="qchip-x"
                 role="button"
                 title="从常用选项里去掉"
