@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import ExpPick from '../components/ExpPick.vue';
+import DocGrip from '../components/DocGrip.vue';
 import { api } from '../api.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { downloadBlob } from '../lib/print.js';
@@ -11,6 +12,7 @@ import {
   MIN_W,
   BLOCKS,
   MM_PER_PX,
+  SHAPE_COLORS,
   pxPerUnit,
   snapX as snapXTo,
   unitsPerPx as unitsPerPxOf,
@@ -222,6 +224,29 @@ function addConcl() {
   push({ id: uid(), type: 'block', block: 'concl', text: '双击写结论', x, y, w });
 }
 
+/** 箭头 / 方框：不动记录数据，纯粹是画布上画示意图用的 */
+async function addShape(shape) {
+  const w = shape === 'arrow' ? 1500 : 1400;
+  const h = shape === 'arrow' ? 200 : 600;
+  const { x, y } = nextPos(w);
+  await push({ id: uid(), type: 'shape', shape, x, y, w, h, color: SHAPE_COLORS[0].v });
+  syncCursor();
+}
+
+/** 改颜色 / 粗细 / 箭头方向（就地改，靠防抖自动存） */
+function setShapeColor(it, v) {
+  it.color = v;
+  touch();
+}
+function toggleThick(it) {
+  it.thick = it.thick ? 0 : 1;
+  touch();
+}
+function flipShape(it) {
+  it.dir = it.dir === 'left' ? 'right' : 'left';
+  touch();
+}
+
 async function addText() {
   const w = 1200;
   const { x, y } = nextPos(w);
@@ -317,7 +342,7 @@ async function editCaption(it) {
 
 /* ---------------- 拖 / 缩放（rAF + 直接改 transform，别每帧走响应式） ---------------- */
 
-const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, moved: false, nx: 0, ny: 0, nw: 0 });
+const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, oh: 0, moved: false, nx: 0, ny: 0, nw: 0, nh: 0 });
 /** 吸附时把那根参考线画出来（单位：画布单位；null = 不画） */
 const guideAt = reactive({ x: null, y: null });
 /* 吸附半径 / 落点算法在 `lib/board.js`（`SNAP` / `snapX`），这里只管画参考线 */
@@ -337,7 +362,7 @@ function startDrag(ev, it, mode) {
   sel.value = it.id;
   // grip 的 mousedown 挂在 span 上，要往上找那块
   dragEl = ev.currentTarget?.closest?.('.board-item') || null;
-  Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, moved: false, nx: it.x, ny: it.y, nw: it.w });
+  Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, oh: it.h || 0, moved: false, nx: it.x, ny: it.y, nw: it.w, nh: it.h || 0 });
   guideAt.x = null;
   guideAt.y = null;
   window.addEventListener('mousemove', onMove);
@@ -369,6 +394,11 @@ function applyMove() {
   if (drag.mode === 'size') {
     drag.nw = Math.round(clamp(drag.ow + dx, MIN_W, pageSize.value.w - it.x));
     dragEl.style.width = mm(drag.nw);
+    // 形状（箭头 / 方框）右下角那格拉的是「宽 + 高」，别的块只有宽
+    if (it.type === 'shape') {
+      drag.nh = Math.round(clamp((drag.oh || it.h || 400) + dy, 100, Math.max(120, pageSize.value.h - it.y - 40)));
+      dragEl.style.height = mm(drag.nh);
+    }
     return;
   }
   const nx = Math.round(clamp(drag.ox + dx, 0, pageSize.value.w - it.w));
@@ -390,7 +420,9 @@ function endDrag() {
   if (it && dragEl && drag.moved) {
     if (drag.mode === 'size') {
       it.w = drag.nw;
+      if (it.type === 'shape' && drag.nh) it.h = drag.nh;
       dragEl.style.width = '';
+      dragEl.style.height = '';
     } else {
       // 先把新位置写进 inline style，再摘 transform：否则会有一帧闪回原位
       dragEl.style.left = mm(drag.nx);
@@ -507,6 +539,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="single board-single">
     <div class="inner board-inner">
+      <!-- 内容区宽度可拖（跟工作台 / 筛选表一个抓手）：板子含抽屉，太窄就挤 -->
+      <DocGrip />
       <header class="page-head board-head">
         <div class="board-head-main">
           <input v-if="board" v-model="board.title" class="board-title" spellcheck="false" title="改板名" />
@@ -559,6 +593,12 @@ onBeforeUnmount(() => {
           <div class="bd-rec-chips board-addrow">
             <button class="btn btn-sm btn-ghost" @click="addText"><Icon name="plus" :size="12" /> 文字</button>
             <button class="btn btn-sm btn-ghost" @click="addConcl"><Icon name="plus" :size="12" /> 结论</button>
+            <button class="btn btn-sm btn-ghost" title="画一根箭头（示意流程用）" @click="addShape('arrow')">
+              <Icon name="plus" :size="12" /> 箭头
+            </button>
+            <button class="btn btn-sm btn-ghost" title="画一个方框（圈一组东西用）" @click="addShape('box')">
+              <Icon name="plus" :size="12" /> 方框
+            </button>
           </div>
         </aside>
 
@@ -571,7 +611,7 @@ onBeforeUnmount(() => {
               class="bd-item board-item"
               :data-id="it.id"
               :class="{ 'is-sel': sel === it.id }"
-              :style="{ left: mm(it.x), top: mm(it.y), width: mm(it.w), zIndex: it.z || 1 }"
+              :style="{ left: mm(it.x), top: mm(it.y), width: mm(it.w), ...(it.type === 'shape' ? { height: mm(it.h || 400) } : {}), zIndex: it.z || 1 }"
               @mousedown="startDrag($event, it, 'move')"
               @dblclick="editCaption(it)"
             >
@@ -590,8 +630,28 @@ onBeforeUnmount(() => {
         <span class="board-tools-name">
           {{ selItem.type === 'tlc' ? selItem.code || 'TLC'
             : selItem.type === 'text' ? '文字'
+            : selItem.type === 'shape' ? (selItem.shape === 'box' ? '方框' : '箭头')
             : (BLOCKS.find((b) => b.key === (selItem.block || 'react')) || {}).label || '块' }}
         </span>
+        <!-- 形状：颜色 / 粗细 / 箭头方向 -->
+        <template v-if="selItem.type === 'shape'">
+          <span class="board-swatches">
+            <button
+              v-for="c in SHAPE_COLORS"
+              :key="c.key"
+              type="button"
+              class="board-swatch"
+              :class="{ 'is-on': (selItem.color || SHAPE_COLORS[0].v) === c.v }"
+              :style="{ '--c': c.v }"
+              :title="c.label"
+              @click="setShapeColor(selItem, c.v)"
+            />
+          </span>
+          <button class="board-tool" @click="toggleThick(selItem)">{{ selItem.thick ? '细一点' : '粗一点' }}</button>
+          <button v-if="selItem.shape !== 'box'" class="board-tool" @click="flipShape(selItem)">
+            {{ selItem.dir === 'left' ? '→ 向右' : '← 向左' }}
+          </button>
+        </template>
         <button class="board-tool" @click="editCaption(selItem)">{{ selItem.type === 'text' ? '改文字' : '图注' }}</button>
         <button class="board-tool" @click="raise(selItem, 'top')">置顶</button>
         <button class="board-tool" @click="raise(selItem, 'bottom')">置底</button>

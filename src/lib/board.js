@@ -222,11 +222,32 @@ function compareHtml(it, ctx) {
   return `<table class="bd-tb bd-cmp"><thead><tr><th>编号</th>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
+/**
+ * 画布上能画的形状：箭头（左右）/ 方框（带圆角）。
+ * 颜色只给这几档——板子最后要打印 / 贴进汇报，颜色一多就不像实验记录里的示意图了。
+ */
+export const SHAPE_COLORS = [
+  { key: 'ink', label: '墨', v: '#1c1b19' },
+  { key: 'accent', label: '强调', v: '#a8471f' },
+  { key: 'grey', label: '灰', v: '#8d8b84' },
+  { key: 'green', label: '绿', v: '#2f7d4f' },
+  { key: 'blue', label: '蓝', v: '#2b6cb0' },
+  { key: 'red', label: '红', v: '#b4362c' },
+];
+
 /** 一块素材 → HTML（图注统一挂在最下面） */
 export function itemHtml(it, exp, ctx) {
   if (!it) return '';
   const cap = String(it.caption || '').trim() ? `<div class="bd-cap">${esc(it.caption)}</div>` : '';
   if (it.type === 'tlc') return `<img src="/api/files/${it.ref}" alt="">${cap}`;
+  // 形状：箭头 / 方框。尺寸走外面那层 `.bd-item` 的 mm 宽高，这里铺满 + 一个颜色变量。
+  if (it.type === 'shape') {
+    const color = it.color || SHAPE_COLORS[0].v;
+    const thick = it.thick ? ' is-thick' : '';
+    if (it.shape === 'box') return `<div class="bd-shape bd-box${thick}" style="--sc:${esc(color)}"></div>${cap}`;
+    const dir = it.dir === 'left' ? 'is-l' : 'is-r';
+    return `<div class="bd-shape bd-arrow ${dir}${thick}" style="--sc:${esc(color)}"><i class="ln"></i><i class="hd"></i></div>${cap}`;
+  }
   if (it.type === 'text') return `<div class="bd-text">${esc(it.text)}</div>${cap}`;
   // scheme 是老数据（现在统一成 block: react）
   const kind = it.type === 'scheme' ? 'react' : it.block;
@@ -244,7 +265,9 @@ export function boardHtml(items, page = PAGE.a4p, expOf = () => null, ctx = null
     .filter((it) => it && it.type)
     .map(
       (it) =>
-        `<div class="bd-item" style="left:${(it.x / 10).toFixed(2)}mm;top:${(it.y / 10).toFixed(2)}mm;width:${(it.w / 10).toFixed(2)}mm">` +
+        `<div class="bd-item" style="left:${(it.x / 10).toFixed(2)}mm;top:${(it.y / 10).toFixed(2)}mm;width:${(it.w / 10).toFixed(2)}mm${
+          it.type === 'shape' ? `;height:${((it.h || 400) / 10).toFixed(2)}mm` : ''
+        }">` +
         `${itemHtml(it, expOf(it), ctx)}</div>`
     );
   return `<div class="bd-page" style="width:${page.w / 10}mm;height:${page.h / 10}mm">${blocks.join('')}</div>`;
@@ -259,6 +282,26 @@ export const BOARD_CSS = `
 .bd-cap { margin-top: 1.4mm; font-size: 7.5pt; line-height: 1.35; color: #4a4740;
   text-align: center; word-break: break-word; }
 .bd-text { font-size: 9.5pt; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+/* 画布上的形状：箭头 / 方框。线宽用 mm，跟纸上的字一样是「印刷单位」，
+   所以屏幕上缩小看和导出 PDF 一样粗细。 */
+/* .bd-body 是 itemHtml 外面那层，不给它高度的话 height:100% 的百分比会落到 auto 上，
+   形状就只剩一条线（踩过：方框渲染成 3px 高的细条）。注意别在这段 CSS 里写反引号——
+   它整个是 JS 模板字符串。 */
+.bd-body { height: 100%; }
+.bd-shape { box-sizing: border-box; width: 100%; height: 100%; }
+.bd-box { border: 0.45mm solid var(--sc, #1c1b19); border-radius: 1.4mm; }
+.bd-box.is-thick { border-width: 0.9mm; }
+.bd-arrow { display: flex; align-items: center; }
+.bd-arrow.is-l { flex-direction: row-reverse; }
+.bd-arrow .ln { flex: 1 1 auto; border-top: 0.55mm solid var(--sc, #1c1b19); }
+.bd-arrow .hd { flex: 0 0 auto; width: 0; height: 0;
+  border-top: 1.6mm solid transparent; border-bottom: 1.6mm solid transparent; }
+.bd-arrow.is-r .hd { border-left: 3mm solid var(--sc, #1c1b19); }
+.bd-arrow.is-l .hd { border-right: 3mm solid var(--sc, #1c1b19); }
+.bd-arrow.is-thick .ln { border-top-width: 1.1mm; }
+.bd-arrow.is-thick .hd { border-top-width: 2.6mm; border-bottom-width: 2.6mm; }
+.bd-arrow.is-thick.is-r .hd { border-left-width: 4.4mm; }
+.bd-arrow.is-thick.is-l .hd { border-right-width: 4.4mm; }
 .bd-h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 11.5pt; line-height: 1.35; }
 .bd-h2 { font-family: "SF Mono", Menlo, monospace; font-size: 7pt; letter-spacing: 0.1em; color: #a09c93;
   margin-bottom: 1.2mm; }

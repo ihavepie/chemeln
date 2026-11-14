@@ -2170,3 +2170,16 @@ body.is-board-dragging { cursor: grabbing; }
 /* 跳过去之后闪一下，让人知道落在哪一行 */
 @keyframes setFlash { 0%, 55% { background: var(--accent-soft); } 100% { background: transparent; } }
 .is-flash { animation: setFlash 1.4s ease; border-radius: 6px; }
+
+/* ---------- 排版板：形状的颜色 / 粗细（工具条上那一排色块） ----------
+   六档颜色照板上能用的：墨 / 强调 / 灰 / 绿 / 蓝 / 红。色块本身就是 <button>，
+   当前那档套一圈 accent 的环——板子是「纸上画示意图」，所以不用色板弹窗。 */
+.board-swatches { display: inline-flex; align-items: center; gap: 3px; margin: 0 4px; }
+.board-swatch {
+  width: 15px; height: 15px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--c); cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(20, 18, 14, 0.12);
+  transition: transform 120ms var(--ease);
+}
+.board-swatch:hover { transform: scale(1.12); }
+.board-swatch.is-on { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent); }
