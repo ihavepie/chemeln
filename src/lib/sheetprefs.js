@@ -161,8 +161,27 @@ export function setTlcMax(v) {
   uiSetIfChanged(TLCN_KEY, n);
 }
 
+/* ---------- 反应式上那行条件怎么排 ----------
+   `auto`（默认）：先单行，一行太长就退回两行；`single`：永远单行；`wrap`：最多两行。
+   全局一个数，不分记录类型（同一本子里图的长相要一致）。 */
+export const SCHEME_FMT_OPTS = [
+  { key: 'auto', label: '自动', hint: '先单行；一行太长（>430px）就退回两行' },
+  { key: 'single', label: '单行', hint: '永远一行，箭头跟着字变长' },
+  { key: 'wrap', label: '两行', hint: '最多两行，箭头短、结构大' },
+];
+const SCHEME_FMT_KEY = 'schemeFmt';
+const normFmt = (v) => (SCHEME_FMT_OPTS.some((o) => o.key === v) ? v : 'auto');
+export const sheetSchemeFmt = reactive({ fmt: normFmt(uiGet(SCHEME_FMT_KEY, 'auto')) });
+export function setSchemeFmt(v) {
+  const fmt = normFmt(v);
+  if (sheetSchemeFmt.fmt === fmt) return;
+  sheetSchemeFmt.fmt = fmt;
+  uiSetIfChanged(SCHEME_FMT_KEY, fmt);
+}
+
 // 开机时从服务器合并下来的更"新"的那份：重读当前这一套
 onUiMerged(() => {
   useSheetBlocks(activeKind);
   sheetTlcMax.n = normTlcN(uiGet(TLCN_KEY, 1));
+  sheetSchemeFmt.fmt = normFmt(uiGet(SCHEME_FMT_KEY, 'auto'));
 });

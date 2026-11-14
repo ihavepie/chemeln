@@ -25,7 +25,7 @@ import SyncConflicts from '../components/SyncConflicts.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
-import { sheetFx, sheetPrefs, sheetTlcMax, useSheetBlocks } from '../lib/sheetprefs.js';
+import { sheetFx, sheetPrefs, sheetTlcMax, sheetSchemeFmt, useSheetBlocks } from '../lib/sheetprefs.js';
 import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
@@ -1164,6 +1164,7 @@ const SCHEME_SIG_VERSION = 'v13';  // 改了出图规则就加一，让旧缓存
 const liveSig = computed(() =>
   SCHEME_SIG_VERSION +
   JSON.stringify({
+    sf: sheetSchemeFmt.fmt,
     // 变量（投料行的占位符 + 字段变量）也要进 sig：标了变量箭头就写 [L]/[T]，缓存得跟着失效
     r: (reagent.rows || []).map((r) => [r.role || '', r.name || '', String(r.eq ?? ''), r.compound_id ?? '', r.variable || '']),
     fv: (fieldVars.value || []).map((v) => v.key).join(','),
@@ -1360,6 +1361,7 @@ async function drawLive() {
     const svg = await composeChainSvg({
       stages,
       background: false,     // 直接贴在纸面上，别垫一块白方块
+      fmt: sheetSchemeFmt.fmt,   // 箭头上那行条件的排版格式（设置页 06）
     });
     if (exp.value?.id !== id) return;   // 等的时候切到别的记录了：这份丢掉
     liveScheme.value = svg;
@@ -1462,7 +1464,7 @@ async function schemeFromTable() {
       const pp = await prevParts(prevExp.value.id);
       if (pp && pp.reactants.length) stages2.unshift(stage2(pp));
     }
-    svg = await composeChainSvg({ stages: stages2 });
+    svg = await composeChainSvg({ stages: stages2, fmt: sheetSchemeFmt.fmt });
   } catch (e) {
     return toast(e.message || '反应式没拼出来', 'err');
   }

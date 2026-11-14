@@ -237,11 +237,13 @@ async function molSvg(smiles, id, molfile = '') {
  * @param {boolean} [o.background] 铺一层白底（存成附件 / 打印时要用）；
  *   直接贴在纸面上看（比如筛选表表头那张）就传 false，不然纸面会多出一块白方块。
  */
-export async function composeChainSvg({ stages = [], background = true } = {}) {
+export async function composeChainSvg({ stages = [], background = true, fmt = 'auto' } = {}) {
   const GAP = 14;          // 结构之间的一般间距（用户要「宽松一点，但不要太散」）
   const PLUS = 18;         // 加号的宽度
   const ARROW_MIN = 110;   // 箭头最短多长；实际长度按上下最长那行字来（够写条件就行，别拉太长）
-  const MAX_ARROW = 680;      // 只当「极端长」的兜底：超过它才折两行
+  const MAX_ARROW = 680;      // `wrap` 格式下折行时的总预算（一行 = 340）
+  const AUTO_SINGLE_MAX = 430; // `auto`：单行那行字超过这个宽度就退回两行（再宽结构就太小了）
+  const FMT = ['auto', 'single', 'wrap'].includes(fmt) ? fmt : 'auto';
   const CAP_SIZE = 15;     // 箭头上下的条件字号（跟结构式里的原子标签差不多大）
   const MAX_LINE_W = 250;  // 条件先折行（单行最多 ~250px，最多 2 行），再拿折完最宽的那行算箭头长度
   const LINE_H = 20;
@@ -277,10 +279,14 @@ export async function composeChainSvg({ stages = [], background = true } = {}) {
   let prevKey = ''; // 上一段的产物：下一段里跟它同一个的底物不再画一次
   for (let si = 0; si < stages.length; si++) {
     const st = stages[si] || {};
-    // 箭头上**一行写完**（用户：「条件单行」）：箭头自己跟着长，条件永远不会画出箭头外；
-    // 只有极端长（> MAX_ARROW）才折两行兜底，不然一张图会被拉得极宽、贴到纸上字全变小
-    let above = caps(st.above, 1, 1e6);
-    if (widest(above) > MAX_ARROW) above = caps(st.above, 2, Math.round(MAX_ARROW / 2));
+    // 箭头上那行条件按**格式**排（设置页 06 里选，默认 `auto`）：
+    //   single —— 永远一行，箭头跟着字长（条件不会画出箭头外）；
+    //   wrap   —— 最多两行（每行 340），箭头短、结构大；
+    //   auto   —— 先按单行排，**一行太长就退回两行**（再宽整张图会被拉长、结构被缩小）。
+    const oneLine = () => caps(st.above, 1, 1e6);
+    const twoLine = () => caps(st.above, 2, Math.round(MAX_ARROW / 2));
+    let above = FMT === 'wrap' ? twoLine() : oneLine();
+    if (FMT === 'auto' && widest(above) > AUTO_SINGLE_MAX) above = twoLine();
     const below = caps(st.below, 2, MAX_LINE_W);
     const capW = Math.max(widest(above), widest(below));
     // 线长 = 字宽 + 50：两头各留 25px，字稳稳落在箭头里面（画出来那根线就是 arrowLen 那么长）

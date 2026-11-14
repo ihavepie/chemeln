@@ -6,6 +6,7 @@ import ExpPick from '../components/ExpPick.vue';
 import { entriesFromPicked } from '../lib/screenEntries.js';
 import ScreeningTable from '../components/ScreeningTable.vue';
 import { api } from '../api.js';
+import { sheetSchemeFmt } from '../lib/sheetprefs.js';
 import { store } from '../store.js';
 import { round } from '../lib/reagent.js';
 import { toast } from '../lib/feedback.js';
@@ -71,6 +72,7 @@ async function buildSchemes() {
         above: parts.above,
         below: parts.below,
         background: false,
+        fmt: sheetSchemeFmt.fmt,
       });
       schemes.value = { ...schemes.value, [t.id]: out[t.id] };
     } catch {

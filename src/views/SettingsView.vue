@@ -12,6 +12,9 @@ import {
   sheetTlcMax,
   setTlcMax,
   TLC_N_OPTS,
+  sheetSchemeFmt,
+  setSchemeFmt,
+  SCHEME_FMT_OPTS,
   useSheetBlocks,
   currentSheetKind,
   sheetFx,
@@ -769,6 +772,23 @@ async function removeProject(p) {
             <span v-if="!sheetPrefs[f.group]" class="sheet-fx-note">所在那一块关着</span>
           </label>
 
+          <div class="sheet-fx-row is-static">
+            <span class="sheet-fx-name">反应式 · 箭头上那行条件</span>
+            <span class="sheet-fx-chips">
+              <button
+                v-for="o in SCHEME_FMT_OPTS"
+                :key="o.key"
+                type="button"
+                class="qchip"
+                :class="{ 'is-on': sheetSchemeFmt.fmt === o.key }"
+                :title="o.hint || ''"
+                @click="setSchemeFmt(o.key)"
+              >
+                {{ o.label }}
+              </button>
+            </span>
+            <span class="sheet-fx-sub">{{ SCHEME_FMT_OPTS.find((o) => o.key === sheetSchemeFmt.fmt)?.hint || '' }}</span>
+          </div>
           <div class="sheet-fx-row is-static">
             <span class="sheet-fx-name">结果表最右那格 · 一次摆几张板</span>
             <span class="sheet-fx-chips">

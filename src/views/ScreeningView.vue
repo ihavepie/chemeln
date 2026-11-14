@@ -6,6 +6,7 @@ import AppModal from '../components/AppModal.vue';
 import ExpPick from '../components/ExpPick.vue';
 import ScreeningTable from '../components/ScreeningTable.vue';
 import { api } from '../api.js';
+import { sheetSchemeFmt } from '../lib/sheetprefs.js';
 import { prompt, toast, confirm } from '../lib/feedback.js';
 import { SOURCES } from '../lib/sctfields.js';
 import { schemeParts } from '../lib/expScheme.js';
@@ -76,6 +77,7 @@ async function buildStandard() {
       above: parts.above,
       below: parts.below,
       background: false,
+      fmt: sheetSchemeFmt.fmt,
     });
     // 换表途中旧表的结果别糊到新表上
     if (rows.value[0]?.exp === base) stdSvg.value = svg;
