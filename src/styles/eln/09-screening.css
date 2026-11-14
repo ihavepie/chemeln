@@ -418,9 +418,9 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 /* 状态：一个字符标记（✓ 已核对 / ? 待核对 / ! 查不到）——小尺寸下比圆点好认 */
 .rl-dot {
   flex: 0 0 auto;
-  width: 13px; height: 13px; padding: 0; border: 0; border-radius: 3px; cursor: pointer;
+  width: 16px; height: 16px; padding: 0; border: 0; border-radius: 4px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
-  font-family: var(--mono); font-size: 11px; font-weight: 700; line-height: 1;
+  font-family: var(--mono); font-size: 14px; font-weight: 700; line-height: 1;
   background: transparent; color: #b8791a;      /* 待核对：橙 */
 }
 .rl-dot:hover:not(:disabled) { background: rgba(184, 121, 26, 0.12); }
@@ -436,8 +436,8 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 }
 .rl-legend-i { display: inline-flex; align-items: center; gap: 4px; }
 .rl-legend-dot {
-  font-family: var(--mono); font-size: 11px; font-weight: 700; font-style: normal;
-  display: inline-block; width: 11px; text-align: center; color: #b8791a;
+  font-family: var(--mono); font-size: 13px; font-weight: 700; font-style: normal;
+  display: inline-block; width: 13px; text-align: center; color: #b8791a;
 }
 .rl-legend-dot.is-done { color: #2f7d4f; }
 .rl-legend-dot.is-miss { color: #c0392f; }
