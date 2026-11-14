@@ -9773,6 +9773,15 @@ body.is-board-dragging { cursor: grabbing; }
 .set-hit:hover { background: #f1efeb; }
 .set-hit-l { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
 .set-hit-m { font-size: 10px; color: var(--ink-4); }
+/* 当前模块下面的子功能（用户：「还有就是子功能快速选择」）：缩进一小格、字号再小一号，
+   点一下就地滚到那一节，省掉「先切模块再往下翻」。窄屏胶囊排不下，直接不显示。 */
+.set-sub {
+  display: block; width: 100%; border: 0; background: transparent; font: inherit;
+  font-size: 11.5px; line-height: 1.45; color: var(--ink-3); text-align: left;
+  padding: 5px 8px 5px 26px; border-radius: 6px; cursor: pointer;
+}
+.set-sub:hover { background: #f3f1ec; color: var(--ink); }
+@media (max-width: 900px) { .set-sub { display: none; } }
 .set-hit-empty { margin: 6px 4px; font-size: 11.5px; line-height: 1.6; color: var(--ink-4); }
 /* 跳过去之后闪一下，让人知道落在哪一行 */
 @keyframes setFlash { 0%, 55% { background: var(--accent-soft); } 100% { background: transparent; } }

@@ -379,6 +379,40 @@ const SET_SEARCH = [
   { m: 'page', label: '投料表「用量」小数位', kw: 'decimal 小数 位 质量 体积', anchor: 'set-decimals' },
   { m: 'page', label: '常用选项（温度 / 时间 / 气氛 / 装置 / 光照）', kw: 'quick 下拉 候选 温度 时间 气氛 装置 光照', anchor: 'set-quick' },
 ];
+/* 每个模块的**子功能**（用户：「还有就是子功能快速选择」）：当前模块在侧栏里展开这几条，
+   点一下就滚到那一节 + 闪一下——不用先切模块再往下翻。只列真有锚点的。 */
+const SET_SUBS = {
+  book: [
+    { label: '标题 / 编号前缀 / 记录人', anchor: 'set-book-basic' },
+    { label: '手机 / 局域网访问', anchor: 'set-lan' },
+    { label: '瓶子标签二维码地址', anchor: 'set-qr' },
+  ],
+  data: [
+    { label: '数据目录', anchor: 'set-datadir' },
+    { label: '备份 / 还原', anchor: 'set-backup' },
+  ],
+  ui: [
+    { label: '快捷键', anchor: 'set-keys' },
+    { label: '书签悬停预览', anchor: 'set-peek' },
+  ],
+  page: [
+    { label: 'A4 上显示哪几块', anchor: 'set-blocks' },
+    { label: '块里的功能', anchor: 'set-fx' },
+    { label: '反应式条件格式', anchor: 'set-scheme' },
+    { label: '挂几张板', anchor: 'set-tlc-n' },
+    { label: '用量小数位', anchor: 'set-decimals' },
+    { label: '常用选项', anchor: 'set-quick' },
+  ],
+};
+/** 滚到某个锚点 + 闪一下（搜索命中和子功能共用） */
+function jumpTo(anchor) {
+  const el = anchor ? document.getElementById(anchor) : null;
+  if (!el) return;
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.add('is-flash');
+  setTimeout(() => el.classList.remove('is-flash'), 1400);
+}
+
 const q = ref('');
 const modLabel = (key) => (SET_MODS.find((m) => m.key === key) || {}).label || '';
 const hits = computed(() => {
@@ -393,11 +427,7 @@ async function goHit(hit) {
   }
   q.value = '';
   await nextTick();
-  const el = hit.anchor ? document.getElementById(hit.anchor) : null;
-  if (!el) return;
-  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  el.classList.add('is-flash');
-  setTimeout(() => el.classList.remove('is-flash'), 1400);
+  jumpTo(hit.anchor);
 }
 
 /* ---- 记录页显示：按记录类型各一套（和 `lib/sheetprefs.js` 的键一致）---- */
@@ -561,18 +591,28 @@ async function removeProject(p) {
       </div>
       <div class="listpane-body set-pane-body">
         <template v-if="!q.trim()">
-          <button
-            v-for="m in SET_MODS"
-            :key="m.key"
-            type="button"
-            class="set-mod"
-            :class="{ 'is-on': mod === m.key }"
-            :aria-current="mod === m.key ? 'page' : undefined"
-            @click="pickMod(m.key)"
-          >
-            <span class="set-mod-n">{{ m.n }}</span>
-            <span class="set-mod-l">{{ m.label }}</span>
-          </button>
+          <template v-for="m in SET_MODS" :key="m.key">
+            <button
+              type="button"
+              class="set-mod"
+              :class="{ 'is-on': mod === m.key }"
+              :aria-current="mod === m.key ? 'page' : undefined"
+              @click="pickMod(m.key)"
+            >
+              <span class="set-mod-n">{{ m.n }}</span>
+              <span class="set-mod-l">{{ m.label }}</span>
+            </button>
+            <!-- 当前模块的子功能就地展开：点一下直接滚到那一节 -->
+            <button
+              v-for="sb in mod === m.key ? SET_SUBS[m.key] || [] : []"
+              :key="`${m.key}-${sb.anchor}`"
+              type="button"
+              class="set-sub"
+              @click="jumpTo(sb.anchor)"
+            >
+              {{ sb.label }}
+            </button>
+          </template>
         </template>
         <template v-else>
           <button v-for="hit in hits" :key="`${hit.m}-${hit.label}`" type="button" class="set-hit" @click="goHit(hit)">
@@ -601,12 +641,12 @@ async function removeProject(p) {
           以下各项可按「{{ store.project }}」单独设置，留空则沿用全局值。标题即课题名称，修改后将同步重命名该课题及其名下记录。
         </p>
         <p class="hint" v-else>此处为全局默认值。每个课题可单独覆盖：在侧栏切换到该课题后进入本页修改。课题的标题即其名称。</p>
-        <div class="grid-2" :class="{ 'mt12': true }">
+        <div id="set-book-basic" class="grid-2" :class="{ 'mt12': true }">
           <div class="field"><label>{{ store.project ? '标题（= 课题名）' : '标题' }}</label><input class="input" v-model="form.lab_heading" :placeholder="ph.lab_heading" /></div>
           <div class="field"><label>编号前缀</label><input class="input num" v-model="form.code_prefix" :placeholder="ph.code_prefix" /></div>
           <div class="field"><label>记录人</label><input class="input" v-model="form.owner_name" :placeholder="ph.owner_name" /></div>
           <div class="field"><label>课题组</label><input class="input" v-model="form.group_name" :placeholder="ph.group_name" /></div>
-          <div class="field" style="grid-column: 1/-1">
+          <div id="set-lan" class="field" style="grid-column: 1/-1">
             <label>手机 / 局域网访问</label>
             <label class="check-row">
               <input type="checkbox" v-model="form.lan_access" />
@@ -618,7 +658,7 @@ async function removeProject(p) {
               <b>改完要重启服务</b>才生效（<span class="mono">node server/index.js</span>）；只在自己信得过的网络里开。
             </p>
           </div>
-          <div class="field" style="grid-column: 1/-1">
+          <div id="set-qr" class="field" style="grid-column: 1/-1">
             <label>瓶子标签的二维码地址</label>
             <input class="input mono" v-model="form.label_base_url" :placeholder="ph.label_base_url" />
             <p class="hint mt8">
@@ -635,7 +675,7 @@ async function removeProject(p) {
 
       <section v-if="mod === 'data'" class="card">
         <div class="card-head"><h2 class="card-title">数据与备份</h2></div>
-        <div class="field">
+        <div id="set-datadir" class="field">
           <label>数据目录</label>
           <div class="input mono" style="background: #fafaf8; color: var(--ink-2); user-select: all">{{ store.boot?.dataDir }}</div>
         </div>
@@ -643,7 +683,7 @@ async function removeProject(p) {
           全部记录由 <span class="mono">eln.db</span>（结构化数据）与 <span class="mono">attachments/</span>（谱图等原始文件）组成。
           将该目录纳入 iCloud 或时间机器的备份范围，即等于自动备份。
         </p>
-        <div class="row mt16">
+        <div id="set-backup" class="row mt16">
           <button class="btn" @click="openLink('/api/backup')"><Icon name="download" :size="13" /> 下载完整备份 .zip</button>
           <button class="btn" @click="openLink(exportLink)"><Icon name="download" :size="13" /> {{ store.project ? `导出「${store.project}」` : '全部导出为 Markdown' }}</button>
         </div>
@@ -792,7 +832,7 @@ async function removeProject(p) {
 
       </section>
 
-      <section v-if="mod === 'ui'" class="card">
+      <section v-if="mod === 'ui'" id="set-keys" class="card">
         <div class="card-head"><h2 class="card-title">快捷键</h2></div>
         <div class="row" style="gap: 24px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
           <span><kbd>Enter</kbd> 确认本格</span>
@@ -810,7 +850,7 @@ async function removeProject(p) {
         </div>
       </section>
 
-      <section v-if="mod === 'ui'" class="card">
+      <section v-if="mod === 'ui'" id="set-peek" class="card">
         <div class="card-head"><h2 class="card-title">书签悬停预览</h2></div>
         <p class="card-note">实验页纸面左边那排平行书签，鼠标停上去会浮一张预览卡。这里决定卡片上显示哪些块（每天都读浏览器里的缓存，同时存进记录本、换浏览器也还在）。</p>
         <div class="row" style="gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
