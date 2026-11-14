@@ -2154,6 +2154,7 @@ kbd {
 .sheet .res-table .r-mass { width: 92px; }
 .sheet .res-table .r-yield { width: 78px; }
 .sheet .res-table .r-dr { width: 96px; }
+.sheet .res-table .r-tlc { width: 40px; }
 .sheet .res-table .r-del { width: 26px; }
 /* 投料表 MW 格右侧的「按名字重查」：平时很淡，免得和数字抢眼睛 */
 .rtable .name-cell { position: relative; }
@@ -2542,6 +2543,7 @@ kbd {
   .sheet .res-table .r-mass { width: 78px; }
   .sheet .res-table .r-yield { width: 66px; }
   .sheet .res-table .r-dr { width: 78px; }
+  .sheet .res-table .r-tlc { width: 36px; }
 
   .sheet .rtable .c-role { width: 72px; }
   .sheet .rtable .c-mw { width: 70px; }
@@ -9592,31 +9594,23 @@ body.is-board-dragging { cursor: grabbing; }
    不会让人往下滚一大段空页（用户报的「没超出页面但还是会滚动」就是滚进了这段 padding） */
 .editor.is-fit { padding-bottom: 24px; }
 
-/* ---------- 结果块里的「TLC 判断」一行（小反应只看板子时的第一层结果） ---------- */
-.res-tlc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-.tlc-verdicts { display: flex; gap: 4px; flex-wrap: wrap; }
-.tv-chip {
-  border: 1px solid var(--line-2); background: #fff; border-radius: 999px;
-  padding: 2px 9px; font: inherit; font-size: 11px; color: var(--ink-2); cursor: pointer;
+/* ---------- 结果表最右那格：板图缩略（不占新一行；点开看大图，多张时右上角「换」） ---------- */
+.res-tlc-th { text-align: center !important; }
+.res-tlc-cell { padding: 1px 2px !important; }
+.tlc-mini { position: relative; display: flex; justify-content: center; }
+.tlc-mini-btn { border: 0; background: transparent; padding: 0; line-height: 0; cursor: zoom-in; }
+.tlc-mini-btn img {
+  height: 26px; width: auto; max-width: 34px; object-fit: contain;
+  border-radius: 2px; background: #fbfaf7; box-shadow: 0 0 0 1px var(--line-2);
 }
-.tv-chip:hover { border-color: var(--ink-4); color: var(--ink); }
-.tv-chip.on { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); }
-.tv-chip:disabled { opacity: 0.55; cursor: default; }
-.tlc-ref { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.tlc-ref-btn {
-  display: inline-flex; align-items: center; gap: 6px; max-width: 210px;
-  padding: 2px 7px 2px 2px; border: 1px solid var(--line-2); border-radius: 5px;
-  background: #fff; cursor: zoom-in; font: inherit; font-size: 10.5px; color: var(--ink-3);
+.tlc-mini-btn:hover img { box-shadow: 0 0 0 1px var(--ink-4); }
+.tlc-mini-swap {
+  position: absolute; right: -3px; bottom: -4px; opacity: 0; transition: opacity 0.12s;
+  border: 1px solid var(--line-2); background: #fff; border-radius: 3px; cursor: pointer;
+  font: inherit; font-size: 9px; line-height: 1; padding: 1px 3px; color: var(--ink-3);
 }
-.tlc-ref-btn:hover { border-color: var(--ink-4); color: var(--ink); }
-.tlc-ref-btn img { height: 22px; width: auto; max-width: 34px; object-fit: contain; border-radius: 2px; background: #fbfaf7; }
-.tlc-ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tlc-ref-swap {
-  border: 0; background: transparent; font: inherit; font-size: 10.5px;
-  color: var(--ink-3); cursor: pointer; padding: 2px 4px; border-radius: 4px;
-}
-.tlc-ref-swap:hover { background: #f1efeb; color: var(--ink); }
-.tlc-ref-empty { margin-left: auto; font-size: 10.5px; color: var(--ink-4); }
+.tlc-mini:hover .tlc-mini-swap { opacity: 1; }
+.tlc-mini-swap:hover { border-color: var(--ink-4); color: var(--ink); }
 .tlc-pick { display: flex; flex-wrap: wrap; gap: 8px; }
 .tlc-pick-opt {
   display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px;

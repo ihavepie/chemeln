@@ -53,14 +53,12 @@ export const SHEET_FX = [
     label: '计产率',
     hint: '取消 = 只记质量和选择性（原料 / 粗产物 / 中间体这种不称产率的）',
   },
-  { key: 'sel', group: 'result', label: '选择性测定那行（ee / 方法 / 柱子 / tR）' },
   { key: 'check', group: 'reagents', label: '说明格的「核对」（查 MW / 密度 / 固体）' },
 ];
 const FX_KEYS = SHEET_FX.map((f) => f.key);
 /** 某一类的默认：只有「原料」默认不记产率（以前是写死在 ResultBlock 里的） */
 export const fxDefaultsFor = (kind) => ({
   yield: normKind(kind) !== '原料',
-  sel: true,
   check: true,
 });
 /** 当前这一套的功能开关（设置页改它，记录页读它） */

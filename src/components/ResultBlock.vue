@@ -6,7 +6,6 @@ import { compoundDict } from '../store.js';
 import { api } from '../api.js';
 import { num, round, yieldInfo } from '../lib/reagent.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { TLC_VERDICTS } from '../lib/ui.js';
 import FilePreview from './FilePreview.vue';
 
 const props = defineProps({
@@ -18,8 +17,6 @@ const props = defineProps({
   kind: { type: String, default: '' },
   /** 这一类的默认：计产率吗（设置页 06 里按记录类型各记一套） */
   yieldDefault: { type: Boolean, default: true },
-  /** 「选择性测定」那行要不要出现（同一套设置里的开关） */
-  showSel: { type: Boolean, default: true },
   /**
    * 多步记录：每一步自己的结果（产物 / MW / 质量 / 产率 / 选择性）。
    * **最后一步就是这条记录本身**——列表、筛选表、导出读的都是记录那几格，
@@ -35,12 +32,17 @@ const picking = ref(false);
 const shot = ref(null); // 点开的大图（TLC 板子）
 const pickShot = ref(false); // 「换一张板」的小弹层
 
-/** 结果区引用的那张板：优先用记录里明确引用的，只有一张时就默认那张 */
+/** 结果表最右那格挂的那张板：明确引用过的优先；没选过就默认最新一张（不占一行） */
 const refShot = computed(() => {
   const id = Number(props.model.tlc_shot_id);
   const hit = id ? props.tlc.find((a) => Number(a.id) === id) : null;
-  return hit || (props.tlc.length === 1 ? props.tlc[0] : null);
+  if (hit) return hit;
+  // 没引用过就默认最新一张（id 最大）：reduce 的种子是 null，别直接读 a.id
+  return props.tlc.reduce((a, b) => (!a || Number(b.id) > Number(a.id) ? b : a), null);
 });
+function openShot(a) {
+  shot.value = { src: `/api/files/${a.id}`, name: a.original_name || 'TLC' };
+}
 
 function chooseShot(a) {
   if (props.locked) return;
@@ -83,13 +85,6 @@ const noYield = computed(
 );
 /** 多步记录不给那种「整条不计产率」的开关：哪一步没算产率就把那格空着 */
 const showNoYieldBtn = computed(() => !multi.value && !kindNoYield.value);
-
-/** TLC 判断：点一下设档，再点一次取消（没看清就空着） */
-function setVerdict(v) {
-  if (props.locked) return;
-  props.model.tlc_verdict = props.model.tlc_verdict === v ? '' : v;
-  props.notify();
-}
 
 function toggleNoYield() {
   if (props.locked) return;
@@ -211,7 +206,7 @@ function onYieldInput(ev, r) {
     <table class="rtable res-table" :class="{ 'is-multi': multi }">
       <colgroup>
         <col v-if="multi" class="r-step" />
-        <col class="r-name" /><col v-if="!multi" class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col v-if="!multi" class="r-dr" /><col class="r-del" />
+        <col class="r-name" /><col v-if="!multi" class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col v-if="!multi" class="r-dr" /><col v-if="tlc.length" class="r-tlc" /><col class="r-del" />
       </colgroup>
       <thead>
         <tr>
@@ -239,6 +234,7 @@ function onYieldInput(ev, r) {
             >
           </th>
           <th v-if="!multi" class="n">dr / ee</th>
+          <th v-if="tlc.length" class="res-tlc-th">TLC</th>
           <th />
         </tr>
       </thead>
@@ -285,12 +281,33 @@ function onYieldInput(ev, r) {
               class="n"
               inputmode="decimal"
               :value="r.last && noYield ? '' : (r.rm.yield_pct ?? '')"
-              :placeholder="r.last && noYield ? '—' : multi ? '' : (model.tlc_verdict && !r.rm.yield_pct ? '待测' : '自动')"
+              :placeholder="r.last && noYield ? '—' : multi ? '' : '自动'"
               :disabled="locked || (r.last && noYield)"
               @input="onYieldInput($event, r)"
             />
           </td>
           <td v-if="!multi"><input class="n" :value="r.rm.dr_ee" placeholder="> 20:1" :disabled="locked" @input="r.rm.dr_ee = $event.target.value; notify()" @change="notify()" /></td>
+          <td v-if="tlc.length" class="res-tlc-cell">
+            <div v-if="refShot && (r.last || !multi)" class="tlc-mini">
+              <button
+                type="button"
+                class="tlc-mini-btn"
+                :title="(refShot.original_name || 'TLC') + ' · 点开看大图'"
+                @click="openShot(refShot)"
+              >
+                <img :src="'/api/files/' + refShot.id" alt="TLC" loading="lazy" />
+              </button>
+              <button
+                v-if="tlc.length > 1 && !locked"
+                type="button"
+                class="tlc-mini-swap noprint"
+                title="换一张板"
+                @click.stop="pickShot = true"
+              >
+                换
+              </button>
+            </div>
+          </td>
           <td class="del-cell">
             <button v-if="!locked" type="button" class="row-del noprint" title="清空这行结果" @click.stop="clearResult(r)"><Icon name="x" :size="10" /></button>
           </td>
@@ -309,62 +326,6 @@ function onYieldInput(ev, r) {
         <input class="n" :value="model.dr_ee" placeholder="> 20:1" :disabled="locked" @input="model.dr_ee = $event.target.value; notify()" @change="notify()" />
       </label>
     </div>
-    <!-- TLC 判断：小反应筛条件时先看板子，产率过几天才称 —— 这一行是排在产率前面的一层结果 -->
-    <div class="res-tlc">
-      <span class="sel-cap">TLC 判断</span>
-      <div class="tlc-verdicts">
-        <button
-          v-for="v in TLC_VERDICTS"
-          :key="v"
-          type="button"
-          class="tv-chip"
-          :class="{ on: model.tlc_verdict === v }"
-          :disabled="locked"
-          @click="setVerdict(v)"
-        >
-          {{ v }}
-        </button>
-      </div>
-      <!-- 结果区只挂一个「板图」引用（不在纸上铺一排行）：点缩略看大图，多张时右边能换 -->
-      <div v-if="refShot" class="tlc-ref">
-        <button
-          type="button"
-          class="tlc-ref-btn"
-          title="点开看大图"
-          @click="shot = { src: `/api/files/${refShot.id}`, name: refShot.original_name || 'TLC' }"
-        >
-          <img :src="`/api/files/${refShot.id}`" :alt="refShot.original_name || 'TLC'" loading="lazy" />
-          <span class="tlc-ref-name">{{ refShot.original_name || '板图' }}</span>
-        </button>
-        <button v-if="tlc.length > 1 && !locked" type="button" class="tlc-ref-swap" title="换一张板" @click="pickShot = true">
-          换
-        </button>
-      </div>
-      <span v-else-if="tlc.length > 1" class="tlc-ref-empty">有 {{ tlc.length }} 张板，
-        <button v-if="!locked" type="button" class="tlc-ref-swap" @click="pickShot = true">选一张</button>
-      </span>
-    </div>
-
-    <div v-if="showSel" class="res-sel">
-      <span class="sel-cap">选择性测定</span>
-      <label class="sel-f">
-        <span>ee / %</span>
-        <input class="n" inputmode="decimal" :value="model.ee_pct ?? ''" placeholder="92" :disabled="locked" @input="onNumInput($event, model, 'ee_pct')" />
-      </label>
-      <label class="sel-f">
-        <span>方式</span>
-        <input :value="model.sel_method" placeholder="HPLC" :disabled="locked" @input="model.sel_method = $event.target.value; notify()" @change="notify()" />
-      </label>
-      <label class="sel-f sel-wide">
-        <span>手性柱 / 流动相</span>
-        <input :value="model.sel_condition" placeholder="Chiralpak IA，n-hexane/i-PrOH = 90:10，1.0 mL/min" :disabled="locked" @input="model.sel_condition = $event.target.value; notify()" @change="notify()" />
-      </label>
-      <label class="sel-f">
-        <span>tR / min</span>
-        <input :value="model.sel_rt" placeholder="12.4 / 14.1" :disabled="locked" @input="model.sel_rt = $event.target.value; notify()" @change="notify()" />
-      </label>
-    </div>
-
     <!-- 多步记录不再重复这行「理论产量」：每一步的质量 / 产率在表里都有；
          但「称到的比理论还多」那种异常还是要报 -->
     <div v-if="info.theo && (!multi || info.over)" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>

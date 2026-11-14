@@ -2438,7 +2438,7 @@ const openAttachment = (id) => {
             :model="fields"
             :steps="reagent.steps"
             :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind"
-            :yield-default="sheetFx.yield" :show-sel="sheetFx.sel" :tlc="tlcShots"
+            :yield-default="sheetFx.yield" :tlc="tlcShots"
             @open-compound="(id) => router.push(`/compounds/${id}`)"
           >
             <template #conds>
