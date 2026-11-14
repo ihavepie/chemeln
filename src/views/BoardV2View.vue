@@ -36,6 +36,23 @@ const saving = ref(false);
 const fitted = ref(false);
 /** 载入时顺手把几对「图 + 图注」编了组：ready 之后存一次（不然下次又散着） */
 const groupedOnLoad = ref(0);
+/** 原生样式侧栏开着没有（☰ 切换） */
+const panelOpen = ref(false);
+const hasSel = ref(false);
+function togglePanel() {
+  if (!exApi) return;
+  // 原生面板只对「选中的图形」有意义：什么都没选时点它只会开一个空面板，给个提示
+  if (!hasSel.value) {
+    toast('先选中一个图形，再点这里改颜色 / 线宽 / 线型', 'ok', 2200);
+    return;
+  }
+  try {
+    const now = exApi.toggleSidebar({ name: 'default', force: !panelOpen.value });
+    panelOpen.value = typeof now === 'boolean' ? now : !panelOpen.value;
+  } catch {
+    panelOpen.value = !panelOpen.value;
+  }
+}
 /** 手绘风开关：Excalidraw 在窄容器（手机版 UI）里没有「线条样式」那个入口，这里自己给一个 */
 const sketch = ref(false);
 function applySketch(on) {
@@ -642,6 +659,8 @@ let timer = 0;
 let pending = null;
 function onChange(payload) {
   pending = payload;
+  const ids = ((payload && payload.appState) || {}).selectedElementIds || {};
+  hasSel.value = Object.keys(ids).length > 0;
   clearTimeout(timer);
   timer = setTimeout(saveNow, 800);
 }
@@ -846,6 +865,12 @@ load();
             <Icon name="download" :size="12" /> 导出 PDF
           </button>
         </div>
+        <button
+          class="bv2-menu"
+          :class="{ 'is-on': panelOpen }"
+          title="样式：颜色 / 线宽 / 线型 / 透明度 / 图层（Excalidraw 原生面板）"
+          @click="togglePanel"
+        >☰</button>
         <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
         <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
       </div>
@@ -944,7 +969,17 @@ load();
 }
 .bv2-canvas :deep(.App-bottom-bar .Island) { width: auto; }
 .bv2-canvas :deep(.App-bottom-bar > *) { pointer-events: auto; }
-.bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 8px; right: 8px; bottom: auto; height: auto; }
+.bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 46px; right: 8px; bottom: auto; height: auto; }
+/* 左上角那颗 ☰：和工具条并排（工具条给它让出 38px） */
+.bv2-menu {
+  position: absolute; left: 8px; top: 8px; z-index: 7;
+  width: 32px; height: 32px; padding: 0; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--line-2); background: #fff; color: var(--ink-2);
+  font-size: 15px; line-height: 1;
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.06);
+}
+.bv2-menu:hover { color: var(--ink); border-color: var(--ink-4); }
+.bv2-menu.is-on { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
 .bv2-canvas :deep(.App-menu_top) { display: flex; justify-content: flex-start; gap: 0; }
 .bv2-canvas :deep(.shapes-section) { justify-content: flex-start; }
 </style>
