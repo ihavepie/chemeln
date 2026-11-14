@@ -32,6 +32,14 @@ const props = defineProps({
   showDrEe: { type: Boolean, default: true },
   /** 最右那格挂几张板（**0 = 不挂这一列**，1–3 张） */
   tlcMax: { type: Number, default: 1 },
+  /**
+   * 一次筛好几个候选时的那几行（`EditorView` 的 `conds`）。**≥2 个才接管这张表**：
+   * 产物是共同的 → 提到表格上面一行；表里一行一个候选，质量填了自动算产率，
+   * 记录级的 `yield_pct` 取候选里**最高**那个（筛配体就是看最好的，筛选表 / 卡片墙读它）。
+   */
+  cands: { type: Array, default: () => [] },
+  /** 把候选那行左边写什么交出去（`condWhat`：`[L] RuPhos · 20%`） */
+  candLabel: { type: Function, default: null },
 });
 const emit = defineEmits(['open-compound', 'refresh']);
 
@@ -65,6 +73,67 @@ const picked = ref(null);
 const pickTarget = ref(null);
 
 const multi = computed(() => Array.isArray(props.steps) && props.steps.length > 1);
+/**
+ * 候选行模式（一次筛好几个条件）：**≥2 个候选**才接管——一个候选都没有、或者只有一条的时候
+ * 还是老样子（一行产物）。多步记录不走这条路（一步一行优先）。
+ * 这一套里「质量 → 产率」是每行各算各的：理论产量 = `base_mmol × 产物 MW`，跟投料表同一个式子。
+ */
+const candMode = computed(() => !multi.value && props.cands.length >= 2);
+/** 每个候选「产率是不是手填过」：手填过就不再自动覆盖（和单行那套的约定一致） */
+const candTyped = reactive({});
+function candInfo(c) {
+  return yieldInfo({
+    base_mmol: baseMmol.value,
+    product_mw: props.model.product_mw,
+    product_mass: c.mass,
+    yield_pct: c.yield_pct,
+  });
+}
+function candIsTyped(c, i) {
+  const k = `c${i}`;
+  if (!(k in candTyped)) candTyped[k] = num(c.yield_pct) !== null;
+  return candTyped[k];
+}
+/** 记录级产率 = 候选里最高的（筛选表 / 卡片墙只看这一个数） */
+function rollup() {
+  const vals = props.cands.map((c) => num(c.yield_pct)).filter((v) => v !== null && v >= 0);
+  props.model.yield_pct = vals.length ? round(Math.max(...vals), 1) : '';
+}
+const maxYield = computed(() => {
+  const vals = props.cands.map((c) => num(c.yield_pct)).filter((v) => v !== null && v >= 0);
+  return vals.length ? Math.max(...vals) : null;
+});
+function syncCand(c, i) {
+  if (candIsTyped(c, i)) return;
+  const inf = candInfo(c);
+  if (inf.calc === null || inf.over) return;
+  c.yield_pct = round(inf.calc, 1);
+}
+function onCandMass(ev, c, i) {
+  applyNumeric(ev.target, '');
+  c.mass = ev.target.value;
+  syncCand(c, i);
+  rollup();
+  props.notify();
+}
+function onCandYield(ev, c, i) {
+  applyNumeric(ev.target, '');
+  c.yield_pct = ev.target.value;
+  candTyped[`c${i}`] = num(c.yield_pct) !== null;
+  rollup();
+  props.notify();
+}
+function clearCand(c, i) {
+  if (props.locked) return;
+  c.mass = '';
+  c.yield_pct = null;
+  c.sel = '';
+  c.note = '';
+  candTyped[`c${i}`] = false;
+  rollup();
+  props.notify();
+}
+
 /** 一行结果：`{i, label, rm, last}`；单步记录就一行、直接绑记录本身 */
 const rows = computed(() => {
   const list = props.steps || [];
@@ -211,13 +280,72 @@ function onYieldInput(ev, r) {
     <div class="block-head">
       <span class="lbl">结果</span>
       <span v-if="multi" class="lbl-note">一步一行</span>
+      <span v-else-if="candMode" class="lbl-note">一行一个候选</span>
     </div>
-    <table class="rtable res-table" :class="{ 'is-multi': multi }">
-      <colgroup>
+    <!-- 候选模式下产物是共同的：名称 / 性状 / MW 提到表格上面一行，表里只放每个候选的数 -->
+    <div v-if="candMode" class="res-shared">
+      <div class="pick-wrap res-prod">
+        <span v-if="linkedOf(model)" class="prod-link">
+          <span
+            class="cmp-tag"
+            :title="linkedOf(model).name"
+            @click="emit('open-compound', linkedOf(model).id)"
+            >{{ linkedOf(model).code || linkedOf(model).name }}</span
+          >
+          <button v-if="!locked" class="cmp-unlink noprint" title="解除关联" @click.stop="unlink({ rm: model })"><Icon name="x" :size="9" /></button>
+        </span>
+        <span v-else class="prod-slot" />
+        <input
+          :value="model.product_name"
+          placeholder="产物名称"
+          :disabled="locked"
+          @input="model.product_name = $event.target.value; notify()"
+          @change="notify()"
+        />
+        <button v-if="!locked && !linkedOf(model)" type="button" class="pick-btn noprint" title="从化合物库选" @click="openPicker(null)">
+          <Icon name="molecule" :size="12" />
+        </button>
+      </div>
+      <label v-if="showAppear" class="sel-f">
+        <span>性状</span>
+        <input :value="model.appearance" placeholder="白色固体" :disabled="locked" @input="model.appearance = $event.target.value; notify()" @change="notify()" />
+      </label>
+      <label class="sel-f">
+        <span>MW</span>
+        <input class="n" inputmode="decimal" :value="model.product_mw ?? ''" placeholder="自动" :disabled="locked" @input="onNumInput($event, model, 'product_mw')" />
+      </label>
+      <span class="res-shared-info">
+        <template v-if="info.theo">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template>
+        <template v-if="maxYield !== null">　·　最高 <b>{{ round(maxYield, 1) }}%</b>（{{ cands.length }} 个候选）</template>
+      </span>
+    </div>
+    <table class="rtable res-table" :class="{ 'is-multi': multi, 'is-cand': candMode }">
+      <!-- 候选模式：条件 | 质量 | 产率 | dr·ee | 备注 | TLC（产物那几格挪到上面一行了） -->
+      <colgroup v-if="candMode">
+        <col />
+        <col class="r-mass" />
+        <col class="r-yield" />
+        <col v-if="showDrEe" class="r-dr" />
+        <col class="r-cnote" />
+        <col v-if="hasTlcCol" :style="{ width: tlcColW }" />
+        <col class="r-del" />
+      </colgroup>
+      <colgroup v-else>
         <col v-if="multi" class="r-step" />
         <col class="r-name" /><col v-if="!multi && showAppear" class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col v-if="!multi && showDrEe" class="r-dr" /><col v-if="hasTlcCol" class="r-tlc" :style="{ width: tlcColW }" /><col class="r-del" />
       </colgroup>
-      <thead>
+      <thead v-if="candMode">
+        <tr>
+          <th>条件</th>
+          <th class="n">质量 / g</th>
+          <th class="n">产率 / %</th>
+          <th v-if="showDrEe" class="n">dr / ee</th>
+          <th>备注</th>
+          <th v-if="hasTlcCol" class="res-tlc-th">TLC</th>
+          <th />
+        </tr>
+      </thead>
+      <thead v-else>
         <tr>
           <th v-if="multi" />
           <th class="r-name">产物名称</th><th v-if="!multi && showAppear">性状</th><th class="n">产物 MW</th>
@@ -248,6 +376,48 @@ function onYieldInput(ev, r) {
         </tr>
       </thead>
       <tbody>
+        <!-- 一行一个候选：序号 + 条件名 / 质量（填了就自动算产率）/ dr·ee / 备注 -->
+        <template v-if="candMode">
+          <tr v-for="(c, i) in cands" :key="`c${i}`" class="rt-cand">
+            <td class="res-cand-cell">
+              <span class="cand-n mono">{{ i + 1 }}</span>
+              <span class="cand-what" :title="candLabel ? candLabel(c) : ''">{{ candLabel ? candLabel(c) : '' }}</span>
+            </td>
+            <td>
+              <input class="n" inputmode="decimal" :value="c.mass ?? ''" placeholder="—" :disabled="locked" @input="onCandMass($event, c, i)" @change="notify()" />
+            </td>
+            <td>
+              <input class="n" inputmode="decimal" :value="c.yield_pct ?? ''" placeholder="自动" :disabled="locked" @input="onCandYield($event, c, i)" />
+            </td>
+            <td v-if="showDrEe">
+              <input class="n" :value="c.sel" placeholder="> 20:1" :disabled="locked" @input="c.sel = $event.target.value; notify()" @change="notify()" />
+            </td>
+            <td>
+              <input :value="c.note" placeholder="—" :disabled="locked" @input="c.note = $event.target.value; notify()" @change="notify()" />
+            </td>
+            <td v-if="hasTlcCol && i === 0" class="res-tlc-cell" :rowspan="cands.length">
+              <div v-if="refShots.length" class="tlc-mini">
+                <button
+                  v-for="s2 in refShots"
+                  :key="s2.id"
+                  type="button"
+                  class="tlc-mini-btn"
+                  :title="(s2.original_name || 'TLC') + ' · 点开看大图'"
+                  @click="openShot(s2)"
+                >
+                  <img :src="'/api/files/' + s2.id" alt="TLC" loading="lazy" />
+                </button>
+                <button v-if="tlc.length > 1 && !locked" type="button" class="tlc-mini-swap noprint" title="换哪几张挂在结果里" @click.stop="pickShot = true">
+                  换
+                </button>
+              </div>
+            </td>
+            <td class="del-cell">
+              <button v-if="!locked" type="button" class="row-del noprint" title="清空这个候选的结果" @click.stop="clearCand(c, i)"><Icon name="x" :size="10" /></button>
+            </td>
+          </tr>
+        </template>
+        <template v-else>
         <tr v-for="r in rows" :key="rowKey(r)">
           <td v-if="multi" class="res-step-cell">{{ r.label }}</td>
           <td>
@@ -323,6 +493,7 @@ function onYieldInput(ev, r) {
             <button v-if="!locked" type="button" class="row-del noprint" title="清空这行结果" @click.stop="clearResult(r)"><Icon name="x" :size="10" /></button>
           </td>
         </tr>
+        </template>
       </tbody>
     </table>
     <!-- 多步记录：性状 / 选择性是**最终产物**的属性，挪到表下面一行，别跟每一步的数字挤在一张表里 -->
@@ -339,7 +510,7 @@ function onYieldInput(ev, r) {
     </div>
     <!-- 多步记录不再重复这行「理论产量」：每一步的质量 / 产率在表里都有；
          但「称到的比理论还多」那种异常还是要报 -->
-    <div v-if="info.theo && (!multi || info.over)" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>
+    <div v-if="!candMode && info.theo && (!multi || info.over)" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>
       <template v-else-if="info.calc !== null">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　实测产率 <b>{{ round(info.calc, 1) }}%</b></template><template v-else>理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template></div>
 
     <FilePreview
@@ -390,7 +561,5 @@ function onYieldInput(ev, r) {
       <div class="hint" style="margin-top: 10px">选中后将带入名称与分子量，本实验亦与该化合物建立关联。</div>
     </AppModal>
 
-    <!-- 一次筛好几个条件时，每个条件的产率 / 选择性放在这里（变量在投料表下面） -->
-    <slot name="conds" />
   </section>
 </template>

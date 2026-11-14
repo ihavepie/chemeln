@@ -338,7 +338,7 @@ function onReagentVarToggled(slot) {
   const name = String(row?.name || '').trim();
   if (name && !conds.value.some((c) => String(c.vars?.[slot] || '').trim() === name)) {
     const eq = String(row?.eq ?? '').trim();
-    conds.value.unshift({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name }, varEq: eq ? { [slot]: eq } : {} });
+    conds.value.unshift({ label: '', yield_pct: null, mass: '', sel: '', note: '', vars: { [slot]: name }, varEq: eq ? { [slot]: eq } : {} });
   }
   if (dropped.length) toast(`一次只筛一样：变量换成 [${slot}]，已经收掉 ${dropped.map((x) => `[${x}]`).join(' ')}`, 'info', 2800);
   notify();
@@ -431,6 +431,7 @@ function fill(e) {
   fieldVars.value = (Array.isArray(e.field_vars) ? e.field_vars : []).map((v) => ({ key: v.key, label: v.label || v.key }));
   conds.value = (Array.isArray(e.conds) ? e.conds : []).map((c) => ({
     label: c.label || '',
+    mass: c.mass ?? '',            // 质量 / g：一行一个候选之后，产率由它算（跟投料表一个式子）
     yield_pct: c.yield_pct ?? null,
     sel: c.sel || '',
     note: c.note || '',
@@ -814,12 +815,14 @@ function payload() {
       (c) =>
         String(c.label || '').trim() ||
         c.yield_pct != null ||
+        String(c.mass ?? '').trim() ||
         String(c.sel || '').trim() ||
         String(c.note || '').trim() ||
         Object.values(c.vars || {}).some((v) => String(v || '').trim())
     )
     .map((c) => ({
       label: c.label || '',
+      mass: c.mass ?? '',
       yield_pct: c.yield_pct ?? null,
       sel: c.sel || '',
       note: c.note || '',
@@ -853,7 +856,7 @@ function collapseVarRows() {
     const name = String(r.name || '').trim();
     if (name) {
       const has = conds.value.some((c) => String((c.vars || {})[slot] || '').trim() === name);
-      if (!has) conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name }, varEq: {} });
+      if (!has) conds.value.push({ label: '', yield_pct: null, mass: '', sel: '', note: '', vars: { [slot]: name }, varEq: {} });
     }
     drop.push(r);
   }
@@ -867,7 +870,7 @@ function collapseVarRows() {
 }
 
 function addCond() {
-  conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: {}, varEq: {} });
+  conds.value.push({ label: '', yield_pct: null, mass: '', sel: '', note: '', vars: {}, varEq: {} });
   notify();
 }
 function removeCond(i) {
@@ -1393,7 +1396,7 @@ function promoteVarCandidate({ slot, name }) {
   if (!key || !val) return;
   const has = conds.value.some((c) => String((c.vars || {})[key] || '').trim() === val);
   if (!has) {
-    conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [key]: val } });
+    conds.value.push({ label: '', yield_pct: null, mass: '', sel: '', note: '', vars: { [key]: val } });
     notify();
     toast(`已作为候选加进条件组：[${key}] = ${val}`, 'ok');
   }
@@ -1414,7 +1417,7 @@ function syncVarCandidates() {
     for (const name of names) {
       const has = conds.value.some((c) => String((c.vars || {})[slot] || '').trim() === name);
       if (has) continue;
-      conds.value.push({ label: '', yield_pct: null, sel: '', note: '', vars: { [slot]: name }, varEq: {} });
+      conds.value.push({ label: '', yield_pct: null, mass: '', sel: '', note: '', vars: { [slot]: name }, varEq: {} });
       added = true;
     }
   }
@@ -2543,63 +2546,11 @@ const openAttachment = (id) => {
             :yield-default="sheetFx.yield" :tlc="tlcShots" :exp-id="exp.id"
             :show-appear="sheetFx.resAppear" :show-dr-ee="sheetFx.resDrEe"
             :tlc-max="sheetTlcMax.n"
+            :cands="conds"
+            :cand-label="condWhat"
             @refresh="refreshAttachments"
             @open-compound="(id) => router.push(`/compounds/${id}`)"
           >
-            <template #conds>
-              <!-- 一次筛好几个条件时，每个条件的产率 / 选择性 / 备注放在这里（变量在投料表下面）。
-                   用户圈出来说「两行占位符看着像复制了一份」→ 收成一张小表：表头只写一遍，
-                   占位符统一成「—」，跟上面结果表同一套 `.rtable` 排法。 -->
-              <div v-if="conds.length && sheetPrefs.conds" class="condres">
-                <div class="condres-head">
-                  <span class="lbl">各条件结果</span>
-                  <span class="lbl-note">一行一个候选</span>
-                </div>
-                <table class="rtable condres-table">
-                  <colgroup>
-                    <col class="cr-n" />
-                    <col />
-                    <col class="cr-y" />
-                    <col class="cr-sel" />
-                    <col class="cr-note" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th />
-                      <th>条件</th>
-                      <th class="n">产率 / %</th>
-                      <th>选择性</th>
-                      <th>备注</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(c, i) in conds" :key="`r${i}`">
-                      <td class="cr-n mono">{{ i + 1 }}</td>
-                      <td class="cr-what" :title="condWhat(c)">{{ condWhat(c) }}</td>
-                      <td>
-                        <input
-                          v-model="c.yield_pct"
-                          class="n"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="1"
-                          :disabled="exp.locked"
-                          placeholder="—"
-                          @input="notify()"
-                        />
-                      </td>
-                      <td>
-                        <input v-model="c.sel" :disabled="exp.locked" placeholder="—" @input="notify()" />
-                      </td>
-                      <td>
-                        <input v-model="c.note" :disabled="exp.locked" placeholder="选填" @input="notify()" />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </template>
           </ResultBlock>
 
 

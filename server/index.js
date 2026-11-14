@@ -270,6 +270,7 @@ function normalizeConds(list) {
     const y = numOrNull(o.yield_pct);
     return {
       label: str(o.label).slice(0, 200),                 // 「−40 °C」「LDA 1.2 eq」「DCM 代替 THF」
+      mass: str(o.mass).slice(0, 40),                    // 这个候选称到的质量 / g（产率由它算）
       yield_pct: y === null ? null : Math.max(0, Math.min(100, Math.round(y * 10) / 10)),
       sel: str(o.sel).slice(0, 60),                      // 「94:6」「99% ee」这种，手填
       note: str(o.note).slice(0, 200),
@@ -277,7 +278,7 @@ function normalizeConds(list) {
       varEq: normalizeCondVars(o.varEq, 24),   // 「筛当量」：这个候选用自己的当量（空 = 用投料表的标准当量）
     };
   }).filter(
-    (c) => c.label || c.yield_pct !== null || c.sel || c.note || Object.keys(c.vars).length || Object.keys(c.varEq).length
+    (c) => c.label || c.mass || c.yield_pct !== null || c.sel || c.note || Object.keys(c.vars).length || Object.keys(c.varEq).length
   );
 }
 

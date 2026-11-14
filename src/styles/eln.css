@@ -8187,34 +8187,42 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .sheet .rtable tr.rt-var .cond-in { font-size: 12.5px; }
 .sheet .rtable tr.rt-var .cond-eq { text-align: right; }
 
-/* 结果块里的「各条件结果」：变量在投料表下面，数字在这儿。
-   用户圈出来问「这两行怎么办」——原来的 flex 排法把「产率 / 选择性 / 备注」三组标签
-   在每行重复一遍，两行都空着时满屏是一样的占位字（`94:6 / 99% ee`），看着像复制了一份数据。
-   现在收成一张 `.rtable` 小表：表头只写一次，一行一个候选，占位符统一成「—」。 */
-.condres { margin-top: 9px; padding-top: 7px; border-top: 1px dotted var(--line-2); }
-.condres-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; }
-.condres-head .lbl { letter-spacing: 0.12em; }
-.condres-table { table-layout: fixed; }
-.condres-table th { padding-bottom: 4px; }
-.condres-table .cr-n { width: 18px; }
-.condres-table .cr-y { width: 54px; }
-.condres-table .cr-sel { width: 108px; }
-.condres-table .cr-note { width: 126px; }
-.condres-table td { padding: 2px 4px; }
-/* 条件那格：一条候选可能有几样变量（`[L] RuPhos · 20%`），长了就省略、悬停看全 */
-.condres-table .cr-what {
+/* 结果块：一次筛好几个候选时的那张表（用户：「直接合并这两个」——不再单独挂一张「各条件结果」）。
+   产物是共同的，名字 / 性状 / MW 提到表格上面一行（`.res-shared`），表里一行一个候选：
+   条件 | 质量 / g | 产率 / % | dr·ee | 备注 | TLC。质量填了按「base_mmol × 产物 MW」自动算产率，
+   `yield_pct` 与投料表同一套规矩（手填过就不再自动覆盖）。 */
+.res-shared {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.res-shared .res-prod { flex: 1 1 220px; min-width: 150px; }
+.res-shared .res-prod input { font-size: 12.5px; color: var(--ink); }
+.res-shared .sel-f { flex: 0 0 auto; gap: 6px; }
+.res-shared .sel-f input { width: 84px; }
+.res-shared .sel-f input.n { width: 56px; }
+.res-shared-info { flex: 0 1 auto; font-size: 11px; color: var(--ink-3); }
+.res-shared-info b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
+/* 候选那行的第一格：序号（跟投料表 Entry 1/2 对得上）+ 条件 */
+.res-cand-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.res-cand-cell .cand-n { flex: 0 0 auto; font-size: 9.5px; color: var(--ink-4); }
+.res-cand-cell .cand-what {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 11.5px;
   color: var(--ink-1);
-  max-width: 0;
 }
-.condres-table .cr-n { font-size: 10px; color: var(--ink-4); }
-.condres-table input { padding: 3px 6px; }
-.condres-table input::placeholder { color: var(--ink-4); }
-.condres-table input[type='number'] { -moz-appearance: textfield; }
-.condres-table input[type='number']::-webkit-outer-spin-button,
-.condres-table input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.res-table.is-cand .r-mass { width: 64px; }
+.res-table.is-cand .r-yield { width: 64px; }
+.res-table.is-cand .r-dr { width: 78px; }
+.res-table.is-cand .r-cnote { width: 96px; }
 
 
 /* 合计行右下角那句算式（「苄基氨基环丁酮：0.2 mmol × 433.57 = 0.0867 g」）不再常显——
