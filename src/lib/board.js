@@ -325,7 +325,10 @@ export const BOARD_CSS = `
 .bd-page { position: relative; overflow: hidden; background: #fff; color: #1c1b19;
   font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
 .bd-item { position: absolute; }
-.bd-item img { display: block; width: 100%; height: auto; }
+.bd-item img { display: block; width: 100%; height: auto;
+  /* **别让浏览器接管拖拽**：<img> 默认是可以原生的 drag，一按住就起 HTML5 拖放，
+     mousemove / mouseup 全被吞掉，照片块就拖不动了（箭头 / 方块没这问题）。 */
+  -webkit-user-drag: none; user-select: none; }
 .bd-cap { margin-top: 1.4mm; font-size: 7.5pt; line-height: 1.35; color: #4a4740;
   text-align: center; word-break: break-word; }
 .bd-text { font-size: 9.5pt; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }

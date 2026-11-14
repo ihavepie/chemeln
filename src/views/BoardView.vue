@@ -344,7 +344,8 @@ function onDrawDown(ev) {
   ev.stopPropagation();
   const p = pointAt(ev);
   Object.assign(draw, { on: true, kind: tool.value, x0: p.x, y0: p.y, x1: p.x, y1: p.y, moved: false });
-  if (draw.kind === 'arrow' || draw.kind === 'box') draft.value = shapeFrom(draw);
+  // 草稿等到真的动了才画：按下就画会先闪一个「默认大小」的箭头，看着像不跟手
+  draft.value = null;
   window.addEventListener('mousemove', onDrawMove);
   window.addEventListener('mouseup', endDraw);
 }
@@ -1239,7 +1240,14 @@ onBeforeUnmount(() => {
       <div v-if="!board" class="cmp-empty">读取中…</div>
       <div v-else class="board-wrap">
         <!-- 画布：一张 A4，靠 zoom 缩进可视区，纸里全是 mm 单位 -->
-        <div ref="stageEl" class="board-stage" :class="{ 'is-pinned': pinned }" @mousedown.self="clearSel">
+        <div
+          ref="stageEl"
+          class="board-stage"
+          :class="{ 'is-pinned': pinned }"
+          @mousedown.self="clearSel"
+          @dragstart.prevent
+          @drop.prevent
+        >
           <div
             ref="pageEl"
             class="bd-page board-page"
