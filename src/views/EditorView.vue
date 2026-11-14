@@ -38,6 +38,7 @@ import { preloadSchemeLib } from '../lib/scheme.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../lib/snapshot.js';
 import { peekPrefs } from '../lib/peek.js';
+import { onUiMerged, uiGet } from '../lib/uiprefs.js';
 import { composeChainSvg } from '../lib/scheme.js';
 import { analyzeSmiles, svgToFile } from '../lib/chem.js';
 
@@ -47,6 +48,20 @@ const router = useRouter();
 const exp = ref(null);
 const error = ref('');
 const page = ref(1);
+/**
+ * 「切记录时停在同一页」（设置页 04 界面里那个开关，存 `uiprefs` 的 `pageKeep`，默认开）。
+ * 用户：「假设你在第二页，切换实验的话就也到对应的第二页，然后如果没有第 X 页的话就默认第一页。」
+ * 哪几页存在是**看设置**的：文献（3）要 `sheetPrefs.lit`，附件（4）要 `sheetPrefs.attachments`，
+ * 第 1 / 2 页永远有。
+ */
+const keepPage = ref(uiGet('pageKeep', true) !== false);
+onUiMerged(() => {
+  keepPage.value = uiGet('pageKeep', true) !== false;
+});
+/** 这一页现在存不存在（不存在的就退回第 1 页）。`pageTabs` 在下面定义，这里只声明不执行 */
+function pageExists(p) {
+  return pageTabs.value.includes(Number(p));
+}
 /* 第 3 页（文献）有没有内容：没内容时打印 / 存 PDF 不带这一页，不留一张白纸 */
 const litHasContent = computed(
   () =>
@@ -586,8 +601,9 @@ watch(
     }
     moreMenu.value = false;
     statusMenu.value = false;
-    // 正停在附件那一屏（在看谱图），切记录就接着看那条的附件；否则按 URL / 回第 1 页
-    if (!(page.value === 3 && sheetPrefs.attachments)) page.value = String(route.query.p) === '2' ? 2 : 1;
+    // 停在同一页切过去（设置里可以关）；那条记录没有这一页（文献 / 附件被关掉）就回第 1 页
+    const want = keepPage.value ? Number(page.value) || 1 : 0;
+    page.value = want && pageExists(want) ? want : String(route.query.p) === '2' ? 2 : 1;
     await load();
     // 切完弹一个气泡通知（只在这条记录是从别处切过来时提示，第一次打开不提示）
     if (exp.value?.code) toast(`已切换到 ${exp.value.code}`, 'info', 1800);

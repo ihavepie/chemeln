@@ -403,6 +403,7 @@ const SET_SEARCH = [
   { m: 'cats', label: '新建分类 / 拖动排序', kw: 'new category 拖' },
   { m: 'ui', label: '快捷键', kw: 'keyboard shortcut 快捷键' },
   { m: 'ui', label: '书签悬停预览', kw: 'peek 书签 预览' },
+  { m: 'ui', label: '切记录时停在同一页', kw: 'page keep 翻页 第2页 续页 切记录' },
   { m: 'page', label: 'A4 上显示哪几块（按记录类型）', kw: 'blocks 版式 块 显示', anchor: 'set-blocks' },
   { m: 'page', label: '块里的功能（计产率 / 核对 / 结果表列）', kw: 'fx 产率 核对 性状 dr ee', anchor: 'set-fx' },
   { m: 'page', label: '反应式 · 箭头上那行条件（自动 / 单行 / 两行）', kw: 'scheme 反应式 条件 格式', anchor: 'set-scheme' },
@@ -425,6 +426,7 @@ const SET_SUBS = {
   ui: [
     { label: '快捷键', anchor: 'set-keys' },
     { label: '书签悬停预览', anchor: 'set-peek' },
+    { label: '切记录时停在同一页', anchor: 'set-pagekeep' },
   ],
   page: [
     { label: 'A4 上显示哪几块', anchor: 'set-blocks' },
@@ -602,6 +604,17 @@ async function removeProject(p) {
   } catch (e) {
     toast(e.message, 'err');
   }
+}
+
+/* ---- 切记录时停在同一页（`uiprefs` 的 `pageKeep`，默认开）----
+   用户：「假设你在第二页，切换实验的话就也到对应的第二页，如果没有第 X 页就默认第一页」。 */
+const keepPage = ref(uiGet('pageKeep', true) !== false);
+onUiMerged(() => {
+  keepPage.value = uiGet('pageKeep', true) !== false;
+});
+function setKeepPage(v) {
+  keepPage.value = !!v;
+  uiSetIfChanged('pageKeep', !!v);
 }
 
 /* ---- 分类与化合物不再有「跨课题共用」开关 ---- */
@@ -904,6 +917,17 @@ async function removeProject(p) {
             {{ label }}
           </label>
         </div>
+      </section>
+
+      <section v-if="mod === 'ui'" id="set-pagekeep" class="card">
+        <div class="card-head"><h2 class="card-title">切换记录</h2></div>
+        <p class="card-note">
+          在纸上翻到第 2 页（或文献 / 附件）时切到另一条实验，是接着看同一页，还是每次都从第 1 页开始。选「接着看」时，那条记录没有这一页（文献 / 附件在「记录页」里关掉了）就自动回第 1 页。
+        </p>
+        <label class="check-row">
+          <input type="checkbox" :checked="keepPage" @change="setKeepPage($event.target.checked)" />
+          <span>切记录时停在同一页</span>
+        </label>
       </section>
 
       <section v-if="mod === 'page'" class="card">

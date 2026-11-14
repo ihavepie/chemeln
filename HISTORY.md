@@ -388,3 +388,8 @@
   同时把行松开：`.res-table.is-cand tbody td` 上下 padding 3 → 5px，行高 27 → 36px；列宽 56 / auto / 62 / 62 / 78 / 92。
   **坑**：列宽写 CSS 改不动 —— `.sheet .res-table:not(.is-multi) .r-mass`（4 个类）优先级压过 `.res-table.is-cand .r-mass`（3 个类），所以候选模式的宽度现在**直接内联写在 `<colgroup>` 的 `<col style>` 上**（以后动这几列去改模板，别去 CSS 里找）。
   量过：第 1 页 1030（预算 1106），打印仍 2 页。
+- **切记录时停在同一页（用户：「假设你在第二页，切换实验的话就也到对应的第二页，如果没有第 X 页的话就默认第一页，然后这个设计也放在模块那边可以更改」）**。
+  以前 `route.params.id` 的 watcher 里是 `page.value = query.p === '2' ? 2 : 1`，所以从第 2 页点另一条实验就被弹回主记录页（第 1 页）。（还有一行 `page === 3 && sheetPrefs.attachments` 的老特例，是「附件」还排在第 3 页那个年代的残留，现在附件已经是第 4 页，那行等于死了。）
+  现在：`keepPage`（`uiprefs` 的 `pageKeep`，默认 **开**）→ 切记录时 `pageExists(当前页)` 就留着，否则按 URL / 回第 1 页。`pageExists()` 读 `pageTabs`：**1 / 2 永远有**，3（文献）要 `sheetPrefs.lit`、4（附件）要 `sheetPrefs.attachments` —— 也就是说「第 X 页不存在」在现在的版式里只有一种情况：那一页在设置里关掉了。
+  设置入口：**设置页 04 界面 → 新增一张「切换记录」卡**（`id="set-pagekeep"`，一个勾「切记录时停在同一页」+ 一句说明），同时进了 `SET_SUBS.ui`（侧栏子项）和 `SET_SEARCH`（搜「翻页 / 第2页 / 续页 / 切记录」都能命中）。服务端白名单 `UI_PREF_KEY_RE` 加了 `pageKeep`（**改完重启服务**）。
+  验证（WKWebView + 真接口）：`/e/206` 点「第 2 页」→ 切到 SJ-2-11 → 仍停在「第 2 页 · 续页」（截图里 `aria-selected` 在第 2 页那颗上），同时弹「已切换到 SJ-2-11」；把 `pageKeep` 写成 `false` 再走一遍 → 回到「第 1 页 · 主记录」。测完写回 `true`。
