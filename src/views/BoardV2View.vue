@@ -934,8 +934,14 @@ load();
    右边一排「素材库 / 锁 / 手」和左下角的汉堡菜单 —— 全藏掉，只留工具条 */
 .bv2-canvas :deep(.mobile-misc-tools-container) { display: none !important; }
 .bv2-canvas :deep(.main-menu-trigger) { display: none !important; }
-/* 手机版底部那条（汉堡 + 撤销/重做）也不要：撤销用 ⌘Z，画面留干净 */
-.bv2-canvas :deep(.App-bottom-bar) { display: none !important; }
+/* 手机版底部那条：**留着**——选中图形后 Excalidraw 把「颜色 / 填充 / 线宽 / 层次」那些样式控件放在这 */
+.bv2-canvas :deep(.App-bottom-bar) {
+  position: absolute; left: 0; right: 0; bottom: 10px; top: auto;
+  width: auto; height: auto; pointer-events: none;
+  display: flex; justify-content: center; padding: 0;
+}
+.bv2-canvas :deep(.App-bottom-bar .Island) { width: auto; }
+.bv2-canvas :deep(.App-bottom-bar > *) { pointer-events: auto; }
 .bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 8px; right: 8px; bottom: auto; height: auto; }
 .bv2-canvas :deep(.App-menu_top) { display: flex; justify-content: flex-start; gap: 0; }
 .bv2-canvas :deep(.shapes-section) { justify-content: flex-start; }

@@ -1,3 +1,5 @@
+- **排版板：把 Excalidraw 原生的「样式框」放回来**（用户：「能把原生那个框弄出来吗，还要调整颜色什么的」）。
+  窄容器下 Excalidraw 用「手机版」UI，**调色板 / 线宽 / 边框样式 / 线条风格（含手绘）/ 边角 / 透明度 / 图层 / 对齐**全在那条 `.App-bottom-bar` 的 🎨 里——之前为了干净把整条藏了，所以根本改不了颜色。现在把这条放回来，改成**卡片底部居中的浮条**（`left/right:0; bottom:10px; justify-content:center`，`.App-bottom-bar .Island { width:auto }`），`.main-menu-trigger`（汉堡）继续藏。点 🎨 就弹出样式面板，背景色、描边、图层升降都在里面。
 - **排版板：图注和图片编组 + 去手绘风**（用户：「图注最好和图片绑定一起移动」「不要手绘风格…或者把那个调整按钮弄出来」）。
   ① **图注跟图编成一组**（Excalidraw 的 `groupIds`，不是箭头那种绑定）：新插 TLC、老板子迁移都成组；**已散开的老图注**载入时按「左边缘对齐 ±8px + 在图正下方 28px 内 + 双方都没编过组」自动配上（⇧⌘G 可拆）。
   ② **默认不要手绘**：`initialData.appState` 里 `currentItemRoughness: 0` + `strokeStyle/fillStyle: solid`；载入时把老元素里 `roughness > 0` 的压成 0。
