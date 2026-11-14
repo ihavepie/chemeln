@@ -398,3 +398,7 @@
   ② **顶上 `‹` `›` 两颗翻页箭头**（`.pg-arrow`，贴在页签两边；`prevPageNum` / `nextPageNum` 读 `pageTabs`，到头的方向 `disabled` 置灰）。跟 ←/→ 同一个口径、同一套「到头就停」，翻完滚回顶部。
   ③ **键盘 ←→ 翻页 / ↑↓ 切平行实验照旧保留**（用户明确说「键盘快捷还是留着」）。滚轮切换走 `router.push`，所以 `pageKeep` 照样生效（第 2 页滚走还停在第 2 页）。
   验证（WKWebView + 真接口）：`/e/206` 点 `›` → 到「第 2 页 · 续页」、`‹` 变可用；`.editor` 滚到底再发 3 个 `wheel`（80/90/100）→ 切到 SJ-2-7 并弹「已切换到 SJ-2-7」；把 `scrollSwitch` 写成 `false` 再滚 → 不动（只到底部滚动）。测完写回 `true`。服务端白名单加了 `scrollSwitch`（**改完重启服务**）。
+- **换记录的平缓动画（用户：「鼠标滚动切换的话，需要有个平缓动画，在侧边栏和纸页面」）**。两处一起动：
+  ① **纸面**：`animatePaper(dir)` 给 `.editor-inner` 挂 300ms 的 keyframes —— `.paper-in-down`（往下滚 / 往下切）从 `translateY(14px)` + `opacity 0` 浮上来，`.paper-in-up` 反过来。用 `classList.remove` → `void offsetWidth`（强制重排）→ `add` 才重放得出来（光靠 Vue 切 class 会被批处理掉）；300ms 后摘掉并 `updateRail()` 重新量平行书签（书签是 Teleport 到 body、按纸面位置钉的，动画期间会偏 14px）。方向由 `navDir` 记：滚轮（`down ? 1 : -1`）和 ↑↓ 都会写它，点左栏卡片就沿用上一次的方向。`prefers-reduced-motion: reduce` 时整个不做（CSS 里也补了 `@media` 兜一层），打印介质里 `animation: none`。
+  ② **侧边栏**：`ExpListPane` 里 watch `route.params.id`，`nextTick` 后延迟 60ms 找 `.exp-card[aria-current="true"]`（平行组用 `.exp-stack.is-active`）`scrollIntoView({block:'nearest', behavior:'smooth'})` —— `nearest` 的意思是已经在视野里就不动，只把跑到外面的那条拉回来，不会每次都弹一下。
+  验证（WKWebView）：从 `/e/206` 滚到底再发 wheel → 切到 SJ-2-7，探针在切换后 1.6s 内反复读到 `editor-inner paper-in-down`（说明动画真的挂上了），1.4s 后读回来只剩 `editor-inner`（class 有摘掉）；同一次切换左栏也跟着滚到了 `SJ-2-7` 那张卡片。

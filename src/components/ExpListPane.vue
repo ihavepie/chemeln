@@ -22,6 +22,24 @@ onMounted(() => {
   if (!store.items.length) void loadList();
 });
 
+/** 换了记录就把那条卡片平缓地滚进视野（用户：「鼠标滚动切换的话，需要有个平缓动画，在侧边栏和纸页面」）。
+    `block:'nearest'` = 已经在视野里就不动，只把跑到外面的那条拉回来；平行组用卡片堆那张。 */
+let followTimer = 0;
+watch(
+  () => route.params.id,
+  async (id) => {
+    if (!id) return;
+    clearTimeout(followTimer);
+    await nextTick();
+    followTimer = window.setTimeout(() => {
+      const el =
+        document.querySelector('.listpane .exp-card[aria-current="true"]') ||
+        document.querySelector('.listpane .exp-stack.is-active');
+      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }, 60);
+  }
+);
+
 watch(q, (v) => {
   store.filters.q = v;
   clearTimeout(timer);

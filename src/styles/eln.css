@@ -724,6 +724,26 @@ body {
 }
 .pg-arrow:hover:not(:disabled) { background: #f1efeb; color: var(--ink); }
 .pg-arrow:disabled { color: var(--ink-4); opacity: 0.45; cursor: default; }
+/* 换记录时纸面平缓进来（方向跟手势走）：只做 opacity + 一点点位移，不抢戏，
+   也不影响打印（打印时没有这个 class，介质切换本来也不放动画） */
+@keyframes paperInDown {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes paperInUp {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: none; }
+}
+.editor-inner.paper-in-down { animation: paperInDown 300ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.editor-inner.paper-in-up { animation: paperInUp 300ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .editor-inner.paper-in-down,
+  .editor-inner.paper-in-up { animation: none; }
+}
+@media print {
+  .editor-inner.paper-in-down,
+  .editor-inner.paper-in-up { animation: none; }
+}
 .editor-bar .cat-pick-wrap { flex: 0 0 auto; }
 .editor-bar .cat-pick-wrap .cat-trigger { width: auto; min-width: 76px; max-width: 148px; }
 .editor-bar .cat-pick-wrap .cat-trigger-label { flex: 0 1 auto; }

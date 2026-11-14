@@ -610,6 +610,7 @@ watch(
     // 换了记录就当翻到新的一页：滚回顶部，不然停在上一页看到的位置很像「没切换」
     await nextTick();
     editorEl.value?.scrollTo({ top: 0 });
+    animatePaper();
   }
 );
 
@@ -739,6 +740,30 @@ let wheelLock = 0;
 const WHEEL_TRIGGER = 140;   // 累计这么多像素才算一次「故意再滚」
 const WHEEL_IDLE = 380;      // 手停这么久就重新累计
 const WHEEL_COOLDOWN = 700;  // 切完这么长时间内不再切
+/**
+ * 换记录时纸面「平缓进来」：方向跟手势走（往下滚 / ↓ / 点下面那条 = 从下往上浮，反之亦然）。
+ * 直接给 `.editor-inner` 挂一个 300ms 的 keyframes，`offsetWidth` 强制重排让动画重放；
+ * 动画完把 class 摘掉、重新量一次平行书签的位置（书签是 Teleport 到 body、按纸面位置钉住的）。
+ * 系统开了「减少动态效果」就只换内容、不做动画。
+ */
+let paperTimer = 0;
+let navDir = 1;
+const reducedMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+function animatePaper(dir = navDir, ms = 300) {
+  if (reducedMotion) return;
+  const root = editorEl.value?.querySelector('.editor-inner');
+  if (!root) return;
+  const cls = dir < 0 ? 'paper-in-up' : 'paper-in-down';
+  root.classList.remove('paper-in-down', 'paper-in-up');
+  void root.offsetWidth;
+  root.classList.add(cls);
+  clearTimeout(paperTimer);
+  paperTimer = window.setTimeout(() => {
+    root.classList.remove(cls);
+    updateRail();
+  }, ms);
+}
+
 /** 上下一条：按左栏列表的顺序走，当前这条不在列表里（被筛掉）才退回平行组 */
 function neighborExp(step) {
   const id = Number(exp.value?.id);
@@ -771,6 +796,7 @@ function onWheel(ev) {
   wheelAcc += ev.deltaY;
   if (Math.abs(wheelAcc) < WHEEL_TRIGGER) return;
   wheelAcc = 0;
+  navDir = down ? 1 : -1;
   const next = neighborExp(down ? 1 : -1);
   if (!next) return;                       // 到头就停，不绕回
   wheelLock = now + WHEEL_COOLDOWN;
@@ -809,9 +835,11 @@ function onParallelKey(ev) {
   if (arrowBusy(ev)) return;
   const i = siblings.value.findIndex((s) => String(s.id) === String(exp.value?.id));
   if (i < 0) return;
-  const next = siblings.value[ev.key === 'ArrowUp' ? i - 1 : i + 1];
+  const dir = ev.key === 'ArrowUp' ? -1 : 1;
+  const next = siblings.value[i + dir];
   if (!next) return;
   ev.preventDefault();
+  navDir = dir;
   router.push(`/e/${next.id}`);
 }
 
