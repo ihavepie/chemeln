@@ -23,7 +23,7 @@ import {
   SHEET_KINDS,
 } from '../lib/sheetprefs.js';
 import { amountDecimals, setAmountDecimals, setVolumeDecimals, volumeDecimals } from '../lib/reagent.js';
-import { uiSetIfChanged } from '../lib/uiprefs.js';
+import { onUiMerged, uiGet, uiSetIfChanged } from '../lib/uiprefs.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickFull, quickList } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import DocGrip from '../components/DocGrip.vue';
@@ -336,6 +336,26 @@ function pickDecimals(which, v) {
   uiSetIfChanged('reagentPrec', v);
 }
 
+/* ---- 二级侧边栏：把设置分成 5 块，一块一块看（用户：「设置这边开始有点复杂了」）----
+   编号沿用卡片上那 01–07（模块顺序就按编号排），当前停在哪一块记在 `uiprefs` 的 `setMod`，
+   下次进来还是那一块。 */
+const SET_MODS = [
+  { key: 'book', n: '01', label: '记录本', desc: '记录本信息：标题、编号前缀、记录人、局域网访问、瓶签二维码地址。' },
+  { key: 'data', n: '02', label: '数据与备份', desc: '数据目录、备份与还原（整个 data/ 拷走就是完整备份）。' },
+  { key: 'cats', n: '03', label: '课题与分类', desc: '课题清单与分类树：改名、编号前缀、删除、拖动排序。' },
+  { key: 'ui', n: '04', label: '界面', desc: '快捷键与书签悬停预览（这些是这台机器上的界面偏好）。' },
+  { key: 'page', n: '05', label: '记录页', desc: 'A4 上显示哪几块、块里的功能、反应式排版与常用选项。' },
+];
+const mod = ref(uiGet('setMod', 'book'));
+// 开机合并是异步的（bootstrap 回来比打开页面晚一拍）：合并完再对一次，免得停在默认那块
+onUiMerged(() => { mod.value = String(uiGet('setMod', 'book') || 'book'); });
+const curMod = computed(() => SET_MODS.find((m) => m.key === mod.value) || SET_MODS[0]);
+function pickMod(key) {
+  if (mod.value === key) return;
+  mod.value = key;
+  uiSetIfChanged('setMod', key);
+}
+
 /* ---- 记录页显示：按记录类型各一套（和 `lib/sheetprefs.js` 的键一致）---- */
 const editKind = ref(currentSheetKind());
 if (editKind.value !== currentSheetKind()) useSheetBlocks(editKind.value);
@@ -489,13 +509,29 @@ async function removeProject(p) {
       <DocGrip />
       <header class="page-head">
         <h1 class="page-title">设置</h1>
-        <p class="page-desc">记录本的所有数据都在本机一个目录里，随时可以整个拷走。</p>
+        <p class="page-desc">{{ curMod.desc }}</p>
       </header>
 
-      <section class="card">
+      <div class="set-wrap">
+        <nav class="set-nav" aria-label="设置分类">
+          <button
+            v-for="m in SET_MODS"
+            :key="m.key"
+            type="button"
+            class="set-nav-item"
+            :class="{ 'is-on': mod === m.key }"
+            :aria-current="mod === m.key ? 'page' : undefined"
+            @click="pickMod(m.key)"
+          >
+            <span class="set-nav-n">{{ m.n }}</span>{{ m.label }}
+          </button>
+        </nav>
+        <div class="set-body">
+
+      <section v-if="mod === 'book'" class="card">
         <div class="card-head">
           <h2 class="card-title">
-            <span class="n">01</span>记录本信息<span v-if="store.project" class="title-sub">· {{ store.project }}</span>
+            记录本信息<span v-if="store.project" class="title-sub">· {{ store.project }}</span>
           </h2>
         </div>
         <p class="hint" v-if="store.project">
@@ -534,8 +570,8 @@ async function removeProject(p) {
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-head"><h2 class="card-title"><span class="n">02</span>数据与备份</h2></div>
+      <section v-if="mod === 'data'" class="card">
+        <div class="card-head"><h2 class="card-title">数据与备份</h2></div>
         <div class="field">
           <label>数据目录</label>
           <div class="input mono" style="background: #fafaf8; color: var(--ink-2); user-select: all">{{ store.boot?.dataDir }}</div>
@@ -550,9 +586,9 @@ async function removeProject(p) {
         </div>
       </section>
 
-      <section class="card">
+      <section v-if="mod === 'cats'" class="card">
         <div class="card-head">
-          <h2 class="card-title"><span class="n">03</span>课题与分类</h2>
+          <h2 class="card-title">课题与分类</h2>
           <span class="spacer" />
           <span class="newcat-target">新建到 {{ targetLabel }}</span>
           <button class="btn btn-sm btn-ghost" @click="newProject"><Icon name="plus" :size="11" /> 课题</button>
@@ -693,8 +729,8 @@ async function removeProject(p) {
 
       </section>
 
-      <section class="card">
-        <div class="card-head"><h2 class="card-title"><span class="n">04</span>快捷键</h2></div>
+      <section v-if="mod === 'ui'" class="card">
+        <div class="card-head"><h2 class="card-title">快捷键</h2></div>
         <div class="row" style="gap: 24px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
           <span><kbd>Enter</kbd> 确认本格</span>
           <span><kbd>Tab</kbd> 移至下一格</span>
@@ -711,8 +747,8 @@ async function removeProject(p) {
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-head"><h2 class="card-title"><span class="n">05</span>书签悬停预览</h2></div>
+      <section v-if="mod === 'ui'" class="card">
+        <div class="card-head"><h2 class="card-title">书签悬停预览</h2></div>
         <p class="card-note">实验页纸面左边那排平行书签，鼠标停上去会浮一张预览卡。这里决定卡片上显示哪些块（每天都读浏览器里的缓存，同时存进记录本、换浏览器也还在）。</p>
         <div class="row" style="gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
           <label v-for="(label, key) in PEEK_LABELS" :key="key" style="display: flex; align-items: center; gap: 6px; cursor: pointer">
@@ -722,9 +758,9 @@ async function removeProject(p) {
         </div>
       </section>
 
-      <section class="card">
+      <section v-if="mod === 'page'" class="card">
         <div class="card-head">
-          <h2 class="card-title"><span class="n">06</span>记录页显示</h2>
+          <h2 class="card-title">记录页显示</h2>
           <span class="spacer" />
           <button class="btn btn-sm btn-ghost" @click="showAllSheetBlocks()">全部显示</button>
         </div>
@@ -840,8 +876,8 @@ async function removeProject(p) {
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-head"><h2 class="card-title"><span class="n">07</span>常用选项</h2></div>
+      <section v-if="mod === 'page'" class="card">
+        <div class="card-head"><h2 class="card-title">常用选项</h2></div>
         <p class="card-note">
           条件行那几个下拉里「＋ 自定义」加的值都在这儿，两边同一份（存在记录本里，跟着 data/ 一起备份）。
           <b>内置的那几条也能删、也能用 ‹ › 挪位置</b>——动过之后这一行就照你排的顺序来；
@@ -871,6 +907,9 @@ async function removeProject(p) {
           </div>
         </div>
       </section>
+
+        </div>
+      </div>
 
       <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上</p>
     </div>
