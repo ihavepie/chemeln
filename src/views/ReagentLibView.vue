@@ -8,6 +8,9 @@ import { confirm, prompt, toast } from '../lib/feedback.js';
 import { variantText } from '../lib/reagent.js';
 import { LOOKUP_SITES, nameInfo } from '../lib/lookup.js';
 import { ctxMenu, openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
+import { setPageMenu } from '../lib/pagemenu.js';
+import { onBeforeUnmount, reactive } from 'vue';
+import { router } from '../router.js';
 
 // 自定义检索站点（设置里加的）：url 模板里 {name} 换成试剂名
 const customSites = ref([]);
@@ -25,6 +28,10 @@ const extSites = (name) => {
 
 /** 名称 → { cid, cas }（跟「核对」抓取是同一条链路：/api/lookup?q=），按名字缓存 */
 const idCache = new Map();
+/** 给模板用的同一份结果（异步解析完就地出现链接） */
+const idsMap = reactive({});
+const SITE_SHORT = { pubchem: 'PubChem', chemicalbook: 'CB', nist: 'NIST', tci: 'TCI', cas: 'CAS' };
+
 async function idsOf(name) {
   if (idCache.has(name)) return idCache.get(name);
   let ids = { name };
@@ -35,7 +42,36 @@ async function idsOf(name) {
     /* 查不到就只按名字搜 */
   }
   idCache.set(name, ids);
+  idsMap[name] = ids;
   return ids;
+}
+
+/** 这一行能用的外部库链接（短名 + 直达地址）；没解析出来就空 */
+function sitesForRow(it) {
+  const ids = idsMap[it.name];
+  if (!ids) return [];
+  return LOOKUP_SITES.map((s) => ({ key: s.key, label: SITE_SHORT[s.key] || s.label, href: s.url(ids) })).filter((x) => x.href);
+}
+
+/** 后台把当前列表里的试剂逐个解析（限 3 个并发，别把网络打满） */
+let idsRun = false;
+async function fillIds() {
+  if (idsRun) return;
+  idsRun = true;
+  const names = shown.value.map((x) => x.name).filter((n) => !idCache.has(n));
+  const queue = names.slice();
+  const worker = async () => {
+    while (queue.length) {
+      const n = queue.shift();
+      try {
+        await idsOf(n);
+      } catch {
+        /* 查不到就算了，链接那一列留空 */
+      }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  idsRun = false;
 }
 
 function openUrl(href) {
@@ -86,6 +122,28 @@ function rowMenu(ev, it) {
     // 菜单是响应式的：替换掉 items 就会就地刷新（人可能已经关掉了，也没关系）
     ctxMenu.items = items;
   });
+}
+
+/** 本页的空白处右键：试剂库自己的那几件事，其余交给通用菜单 */
+function pageMenuHere(ev) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'reload', label: '刷新试剂库' },
+      { key: 'checkAll', label: pendingCount.value ? `全部核对（${pendingCount.value}）` : '全部核对' },
+      { key: 'sites', label: '检索站点…' },
+      CTX_SEP,
+      { key: 'lib', label: '实验记录', icon: 'file' },
+      { key: 'settings', label: '设置', icon: 'settings' },
+    ],
+    async (key) => {
+      if (key === 'reload') return load();
+      if (key === 'checkAll') return verifyAll();
+      if (key === 'sites') return openSites();
+      if (key === 'lib') return router.push('/list');
+      if (key === 'settings') return router.push('/settings');
+    }
+  );
 }
 
 async function openSites() {
@@ -260,11 +318,17 @@ async function loadSites() {
   }
 }
 
+let offPageMenu = null;
 onMounted(() => {
-  void load();
+  void load().then(() => void fillIds());
   void loadSites();
+  offPageMenu = setPageMenu(pageMenuHere);
+});
+onBeforeUnmount(() => {
+  if (offPageMenu) offPageMenu();
 });
 watch(() => store.project, load);
+watch(shown, () => void fillIds());
 
 /** 改试剂名：所有记录里的这个名字会一起改（不然下次保存又长回旧名字） */
 async function renameEntry(it) {
@@ -394,6 +458,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
             <col class="rl-c-num" />
             <col class="rl-c-num" />
             <col class="rl-c-when" />
+            <col class="rl-c-links" />
             <col class="rl-c-state" />
             <col class="rl-c-more" />
           </colgroup>
@@ -407,6 +472,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <th class="n">次数</th>
               <th class="n">在用</th>
               <th class="n">最近使用</th>
+              <th class="n">外部库</th>
               <th class="n">状态</th>
               <th />
             </tr>
@@ -451,15 +517,31 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 <template v-else>—</template>
               </td>
               <td class="n mono">
-                <template v-if="it.per_mmol_g">{{ gPer(it) }}</template>
-                <template v-if="it.per_mmol_ul"> · {{ ulPer(it) }}</template>
-                <template v-if="!it.per_mmol_g && !it.per_mmol_ul">—</template>
+                <span v-if="it.per_mmol_g" class="rl-per">{{ gPer(it) }}</span>
+                <span v-if="it.per_mmol_ul" class="rl-per">{{ ulPer(it) }}</span>
+                <span v-if="!it.per_mmol_g && !it.per_mmol_ul">—</span>
               </td>
               <td class="n mono">{{ it.used }}</td>
               <td class="n mono" :class="{ 'rl-zero': !it.live }">{{ it.live }}</td>
               <td class="n mono rl-last">
                 {{ it.lastCode || '' }}
                 <span v-if="it.lastAt" class="rl-date">{{ it.lastAt }}</span>
+              </td>
+              <td class="n">
+                <!-- 外部库：用解析出来的 CID / CAS 拼的直达链接（鼠标停上去看是哪个库） -->
+                <span class="rl-links">
+                  <a
+                    v-for="l in sitesForRow(it)"
+                    :key="l.key"
+                    class="rl-link"
+                    :href="l.href"
+                    target="_blank"
+                    rel="noopener"
+                    :title="`在 ${l.label} 打开`"
+                    @click.stop
+                  >{{ l.label }}</a>
+                  <span v-if="!sitesForRow(it).length" class="rl-link is-idle">…</span>
+                </span>
               </td>
               <td class="n">
                 <!-- 状态胶囊：点一下就是核对（没查过）/ 重核（查过）；查不到时旁边给一个站外入口 -->

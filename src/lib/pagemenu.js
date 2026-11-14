@@ -8,7 +8,22 @@ import { prompt, toast } from './feedback.js';
  * 卡片、组头、列表行自己有菜单（它们会先 preventDefault + stopPropagation），轮不到这里。
  * 输入框里、以及选了一段文字时**不接管**——那里要复制粘贴，交给系统。
  */
+/**
+ * 页面可以把自己那份「空白处右键」接管过去（挂了就优先用它的，卸载时自动解除）。
+ * 返回一个解除函数，页面在 onBeforeUnmount 里调一下。
+ * 处理器返回 `false` = 这一次不接管，落回通用菜单。
+ */
+let pageOverride = null;
+export function setPageMenu(handler) {
+  pageOverride = handler;
+  return () => {
+    if (pageOverride === handler) pageOverride = null;
+  };
+}
+
 export function openPageMenu(ev) {
+  if (pageOverride && pageOverride(ev) !== false) return;
+
   const onCompounds = router.currentRoute.value.path.startsWith('/c');
   // 「新建」这类会落数据的动作**收进子菜单、放最底下**：右键十次有九次是想刷新或跳页，
   // 一打开就顶着「新建实验」太容易点错（用户报过）。
