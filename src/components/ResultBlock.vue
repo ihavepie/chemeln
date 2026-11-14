@@ -313,12 +313,15 @@ function onYieldInput(ev, r) {
     </div>
     <table class="rtable res-table" :class="{ 'is-multi': multi, 'is-cand': candMode }">
       <!-- 候选模式：条件 | 质量 | 产率 | dr·ee | 备注 | TLC（产物那几格挪到上面一行了） -->
+      <!-- 宽度直接写在 `<col>` 上：单行那套的 `.sheet .res-table:not(.is-multi) .r-mass`（4 个类）
+           优先级压过这边，靠 CSS 改不动，内联才稳 -->
       <colgroup v-if="candMode">
+        <col style="width: 56px" />
         <col />
-        <col class="r-mass" />
-        <col class="r-yield" />
-        <col v-if="showDrEe" class="r-dr" />
-        <col class="r-cnote" />
+        <col style="width: 62px" />
+        <col style="width: 62px" />
+        <col v-if="showDrEe" style="width: 78px" />
+        <col style="width: 92px" />
         <col v-if="hasTlcCol" :style="{ width: tlcColW }" />
         <col class="r-del" />
       </colgroup>
@@ -328,6 +331,7 @@ function onYieldInput(ev, r) {
       </colgroup>
       <thead v-if="candMode">
         <tr>
+          <th />
           <th>条件</th>
           <th class="n">质量 / g</th>
           <th class="n">产率 / %</th>
@@ -371,10 +375,8 @@ function onYieldInput(ev, r) {
         <!-- 一行一个候选：序号 + 条件名 / 质量（填了就自动算产率）/ dr·ee / 备注 -->
         <template v-if="candMode">
           <tr v-for="(c, i) in cands" :key="`c${i}`" class="rt-cand">
-            <td class="res-cand-cell">
-              <span class="cand-n mono">{{ i + 1 }}</span>
-              <span class="cand-what" :title="candLabel ? candLabel(c) : ''">{{ candLabel ? candLabel(c) : '' }}</span>
-            </td>
+            <td class="cand-entry">Entry {{ i + 1 }}</td>
+            <td class="cand-what-cell" :title="candLabel ? candLabel(c) : ''">{{ candLabel ? candLabel(c) : '' }}</td>
             <td>
               <input class="n" inputmode="decimal" :value="c.mass ?? ''" placeholder="—" :disabled="locked" @input="onCandMass($event, c, i)" @change="notify()" />
             </td>

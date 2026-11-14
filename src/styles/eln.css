@@ -8226,22 +8226,25 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
 .res-shared .sel-f input.n { width: 60px; }
 .res-shared-info { flex: 0 1 auto; font-size: 10.5px; color: var(--ink-3); }
 .res-shared-info b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
-/* 候选那行的第一格：序号（跟投料表 Entry 1/2 对得上）+ 条件 */
-.res-cand-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.res-cand-cell .cand-n { flex: 0 0 auto; font-size: 9.5px; color: var(--ink-4); }
-.res-cand-cell .cand-what {
-  flex: 1 1 auto;
-  min-width: 0;
+/* 候选行：左边单独一格「Entry 1」（跟投料表那几行同一个写法，`var-idx-cell` 那套），
+   条件写在右边一格，两格分开才不挤（用户：「就还是 entry，然后不要太挤」）。 */
+.res-table.is-cand .cand-entry {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.res-table.is-cand .cand-what-cell {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
-  color: var(--ink-1);
+  font-size: 12px;
+  color: var(--ink);
 }
-.res-table.is-cand .r-mass { width: 64px; }
-.res-table.is-cand .r-yield { width: 64px; }
-.res-table.is-cand .r-dr { width: 78px; }
-.res-table.is-cand .r-cnote { width: 96px; }
+/* 两行之间松开一点（原来 3px 上下、看着像挤在一起） */
+.res-table.is-cand tbody td { padding-top: 5px; padding-bottom: 5px; }
+/* 列宽写在 `ResultBlock` 的 `<colgroup style>` 里（那边的 `.sheet .res-table:not(.is-multi)` 优先级更高） */
 
 
 /* 合计行右下角那句算式（「苄基氨基环丁酮：0.2 mmol × 433.57 = 0.0867 g」）不再常显——
