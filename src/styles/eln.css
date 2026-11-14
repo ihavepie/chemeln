@@ -704,6 +704,26 @@ body {
 .cat-pick-wrap { position: relative; flex: 1; min-width: 0; }
 
 /* 工具栏里用：宽度跟着名字走，不撑满；收缩时文字不塌 */
+/* 翻页箭头：贴在页签两边，小小的、没有底色（用户：鼠标点比记快捷键省事，但快捷键留着） */
+.pg-arrow {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.pg-arrow:hover:not(:disabled) { background: #f1efeb; color: var(--ink); }
+.pg-arrow:disabled { color: var(--ink-4); opacity: 0.45; cursor: default; }
 .editor-bar .cat-pick-wrap { flex: 0 0 auto; }
 .editor-bar .cat-pick-wrap .cat-trigger { width: auto; min-width: 76px; max-width: 148px; }
 .editor-bar .cat-pick-wrap .cat-trigger-label { flex: 0 1 auto; }

@@ -725,6 +725,83 @@ function onPageKey(ev) {
   void nextTick(() => editorEl.value?.scrollTo({ top: 0 }));
 }
 
+/** 滚到头再滚 = 切记录（设置页 04 的 `scrollSwitch`，默认开）。
+    用户：「滚动切换记录」「鼠标加键盘有点麻烦，但键盘快捷还是留着」。
+    纸面本来就放得下（不需要滚）时，竖向滚轮没有别的用处，就直接算切换；
+    放不下的时候要先自己滚到底，再往下**多滚 140px** 才切，免得看着看着被弹走。 */
+const scrollSwitch = ref(uiGet('scrollSwitch', true) !== false);
+onUiMerged(() => {
+  scrollSwitch.value = uiGet('scrollSwitch', true) !== false;
+});
+let wheelAcc = 0;
+let wheelLast = 0;
+let wheelLock = 0;
+const WHEEL_TRIGGER = 140;   // 累计这么多像素才算一次「故意再滚」
+const WHEEL_IDLE = 380;      // 手停这么久就重新累计
+const WHEEL_COOLDOWN = 700;  // 切完这么长时间内不再切
+/** 上下一条：按左栏列表的顺序走，当前这条不在列表里（被筛掉）才退回平行组 */
+function neighborExp(step) {
+  const id = Number(exp.value?.id);
+  const items = Array.isArray(store.items) ? store.items : [];
+  const i = items.findIndex((x) => Number(x.id) === id);
+  if (i >= 0) return items[i + step] || null;
+  const j = siblings.value.findIndex((x) => Number(x.id) === id);
+  return j >= 0 ? siblings.value[j + step] || null : null;
+}
+function onWheel(ev) {
+  if (!scrollSwitch.value) return;
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;   // 缩放 / 系统手势不接管
+  if (arrowBusy(ev)) return;
+  const el = editorEl.value;
+  if (!el || !exp.value) return;
+  const down = ev.deltaY > 0;
+  if (!ev.deltaY) return;
+  const stuck = down ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2 : el.scrollTop <= 1;
+  if (!stuck) {
+    wheelAcc = 0;
+    return;
+  }
+  const now = Date.now();
+  if (now - wheelLast > WHEEL_IDLE) wheelAcc = 0;
+  wheelLast = now;
+  if (now < wheelLock) {
+    wheelAcc = 0;
+    return;
+  }
+  wheelAcc += ev.deltaY;
+  if (Math.abs(wheelAcc) < WHEEL_TRIGGER) return;
+  wheelAcc = 0;
+  const next = neighborExp(down ? 1 : -1);
+  if (!next) return;                       // 到头就停，不绕回
+  wheelLock = now + WHEEL_COOLDOWN;
+  router.push(`/e/${next.id}`);
+}
+onMounted(() => {
+  // 滚轮要 passive 才不挡纸面正常滚动；这里只读 scrollTop、不改布局
+  editorEl.value?.addEventListener('wheel', onWheel, { passive: true });
+});
+onBeforeUnmount(() => {
+  editorEl.value?.removeEventListener('wheel', onWheel);
+});
+
+/** 顶上那两颗翻页箭头（← / → 的鼠标版）：到头的方向置灰，跟键盘一样不绕回 */
+const prevPageNum = computed(() => {
+  const tabs = pageTabs.value;
+  const i = tabs.indexOf(Number(page.value));
+  return i > 0 ? tabs[i - 1] : null;
+});
+const nextPageNum = computed(() => {
+  const tabs = pageTabs.value;
+  const i = tabs.indexOf(Number(page.value));
+  return i >= 0 && i < tabs.length - 1 ? tabs[i + 1] : null;
+});
+function flipPage(dir) {
+  const t = dir > 0 ? nextPageNum.value : prevPageNum.value;
+  if (t == null) return;
+  page.value = t;
+  void nextTick(() => editorEl.value?.scrollTo({ top: 0 }));
+}
+
 /** 键盘 ↑/↓ 在这组平行实验里上下切（哪一页都能切，跟左右翻页互不干扰） */
 function onParallelKey(ev) {
   if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
@@ -2183,6 +2260,17 @@ const openAttachment = (id) => {
 
       <div v-if="exp" class="editor-bar">
         <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">{{ exp.code }}</span>
+        <!-- 翻页箭头（键盘 ←/→ 的鼠标版）：到头就置灰，跟键盘一样不绕回 -->
+        <button
+          class="pg-arrow noprint"
+          type="button"
+          :disabled="prevPageNum == null"
+          title="上一页（←）"
+          aria-label="上一页"
+          @click="flipPage(-1)"
+        >
+          ‹
+        </button>
         <div class="page-tabs noprint" role="tablist">
           <button class="ptab" :aria-selected="page === 1 ? 'true' : 'false'" title="← → 翻页，↑ ↓ 切平行实验" @click="page = 1">第 1 页 · 主记录</button>
           <button class="ptab" :aria-selected="page === 2 ? 'true' : 'false'" title="← → 翻页，↑ ↓ 切平行实验" @click="page = 2">第 2 页 · 续页</button>
@@ -2205,6 +2293,16 @@ const openAttachment = (id) => {
             附件 · {{ (exp.attachments || []).length }}
           </button>
         </div>
+        <button
+          class="pg-arrow noprint"
+          type="button"
+          :disabled="nextPageNum == null"
+          title="下一页（→）"
+          aria-label="下一页"
+          @click="flipPage(1)"
+        >
+          ›
+        </button>
         <CatPick
           class="toolbar-cat"
           :value="fields.category_id == null || fields.category_id === '' ? '' : String(fields.category_id)"

@@ -616,6 +616,15 @@ function setKeepPage(v) {
   keepPage.value = !!v;
   uiSetIfChanged('pageKeep', !!v);
 }
+/** 滚到头再滚 = 切上/下一条记录（`scrollSwitch`，默认开） */
+const scrollSwitch = ref(uiGet('scrollSwitch', true) !== false);
+onUiMerged(() => {
+  scrollSwitch.value = uiGet('scrollSwitch', true) !== false;
+});
+function setScrollSwitch(v) {
+  scrollSwitch.value = !!v;
+  uiSetIfChanged('scrollSwitch', !!v);
+}
 
 /* ---- 分类与化合物不再有「跨课题共用」开关 ---- */
 /* 两者都严格按课题归属；project = '' 就是「共用课题」，在「全部课题」下新建的东西落进去。 */
@@ -928,6 +937,13 @@ function setKeepPage(v) {
           <input type="checkbox" :checked="keepPage" @change="setKeepPage($event.target.checked)" />
           <span>切记录时停在同一页</span>
         </label>
+        <label class="check-row mt8">
+          <input type="checkbox" :checked="scrollSwitch" @change="setScrollSwitch($event.target.checked)" />
+          <span>滚到头再滚就切上 / 下一条</span>
+        </label>
+        <p class="hint mt8">
+          纸面放得下不用滚的时候，竖向滚轮直接算切换；放不下时先滚到底，再往下多滚一点才切（防误触，700ms 内只切一次）。「上 / 下一条」按左栏列表的顺序；到头就停。
+        </p>
       </section>
 
       <section v-if="mod === 'page'" class="card">
