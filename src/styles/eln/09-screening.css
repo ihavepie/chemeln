@@ -394,37 +394,40 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
   font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
   color: var(--tone, var(--ink));
 }
-.rl-role-txt[data-tone='sub'] { --tone: #4a1c0c; }
-.rl-role-txt[data-tone='base'] { --tone: #0f3f60; }
-.rl-role-txt[data-tone='acid'] { --tone: #0a4348; }
-.rl-role-txt[data-tone='cat'] { --tone: #3d2259; }
-.rl-role-txt[data-tone='lig'] { --tone: #12422b; }
-.rl-role-txt[data-tone='sol'] { --tone: #57564f; }
-.rl-role-txt[data-tone='add'] { --tone: #553900; }
-.rl-role-txt[data-tone='ox'] { --tone: #6f1b19; }
-.rl-role-txt[data-tone='red'] { --tone: #6f2709; }
+.rl-role-txt[data-tone='sub'] { --tone: #7c3315; }
+.rl-role-txt[data-tone='base'] { --tone: #1f6c9f; }
+.rl-role-txt[data-tone='acid'] { --tone: #1b6e73; }
+.rl-role-txt[data-tone='cat'] { --tone: #6b4d8f; }
+.rl-role-txt[data-tone='lig'] { --tone: #2f6b4f; }
+.rl-role-txt[data-tone='sol'] { --tone: #8d8b84; }
+.rl-role-txt[data-tone='add'] { --tone: #8a5f00; }
+.rl-role-txt[data-tone='ox'] { --tone: #9f2f2d; }
+.rl-role-txt[data-tone='red'] { --tone: #a8471f; }
 /* 固 / 液：一个小圈（点一下切换，只影响「按密度折体积」） */
 .rl-solid {
-  display: inline-block; margin-left: 5px; vertical-align: middle;
-  height: 16px; min-width: 16px; padding: 0 3px; border-radius: 4px;
-  border: 1px solid #d6d2c8; background: #fff;
-  font-size: 10px; line-height: 14px; text-align: center; color: var(--ink-3); cursor: pointer;
+  display: inline-block; margin-left: 6px; vertical-align: middle;
+  height: 19px; min-width: 19px; padding: 0 4px; border-radius: 5px;
+  border: 1px solid #bdb9ae; background: #fff;
+  font-size: 11.5px; font-weight: 600; line-height: 17px; text-align: center;
+  color: var(--ink-2); cursor: pointer;
 }
-.rl-solid:hover { border-color: var(--ink-3); color: var(--ink); }
-/* 固体：深底白字（不用再眯眼看小圆圈里那一个笔画） */
-.rl-solid.is-solid { border-color: #3f3b34; background: #3f3b34; color: #fff; }
+.rl-solid:hover { border-color: var(--ink-2); color: var(--ink); }
+/* 固体：深底白字，远看就分得出 */
+.rl-solid.is-solid { border-color: #2f2b26; background: #2f2b26; color: #fff; }
 /* 状态：一个圆点（灰=已核对，橙=待核对，红=查不到；查询中转淡） */
+/* 状态：一个字符标记（✓ 已核对 / ? 待核对 / ! 查不到）——小尺寸下比圆点好认 */
 .rl-dot {
   flex: 0 0 auto;
-  width: 8px; height: 8px; padding: 0; border-radius: 50%; cursor: pointer;
-  border: 0; display: inline-block;
-  background: #c08a2e;           /* 待核对：橙 */
+  width: 13px; height: 13px; padding: 0; border: 0; border-radius: 3px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; font-weight: 700; line-height: 1;
+  background: transparent; color: #b8791a;      /* 待核对：橙 */
 }
-.rl-dot:hover:not(:disabled) { box-shadow: 0 0 0 2px rgba(168, 71, 31, 0.18); }
-.rl-dot.is-done { background: #6f9a63; }  /* 已核对：绿（一眼跟「待核对」分开） */
-.rl-dot.is-done:hover:not(:disabled) { box-shadow: 0 0 0 2px rgba(111, 154, 99, 0.22); }
-.rl-dot.is-miss { background: #c0392f; }  /* 查不到：红 */
-.rl-dot.is-miss:hover:not(:disabled) { box-shadow: 0 0 0 2px rgba(192, 57, 47, 0.2); }
+.rl-dot:hover:not(:disabled) { background: rgba(184, 121, 26, 0.12); }
+.rl-dot.is-done { color: #2f7d4f; }             /* 已核对：绿 */
+.rl-dot.is-done:hover:not(:disabled) { background: rgba(47, 125, 79, 0.12); }
+.rl-dot.is-miss { color: #c0392f; }             /* 查不到：红 */
+.rl-dot.is-miss:hover:not(:disabled) { background: rgba(192, 57, 47, 0.12); }
 .rl-dot.is-busy, .rl-dot.is-run:disabled { opacity: 0.45; cursor: default; }
 /* 图注（名字前面那个点是什么意思） */
 .rl-legend {
@@ -432,9 +435,12 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
   display: inline-flex; align-items: center; gap: 10px;
 }
 .rl-legend-i { display: inline-flex; align-items: center; gap: 4px; }
-.rl-legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #c08a2e; }
-.rl-legend-dot.is-done { background: #6f9a63; }
-.rl-legend-dot.is-miss { background: #c0392f; }
+.rl-legend-dot {
+  font-family: var(--mono); font-size: 11px; font-weight: 700; font-style: normal;
+  display: inline-block; width: 11px; text-align: center; color: #b8791a;
+}
+.rl-legend-dot.is-done { color: #2f7d4f; }
+.rl-legend-dot.is-miss { color: #c0392f; }
 /* 外部库那一列：小链接，鼠标停才浮出下划线 */
 .rl-c-links { width: 118px; }
 .rl-links { line-height: 1.6; }

@@ -448,9 +448,9 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
           <span v-if="q.trim()">· 筛出 {{ shown.length }} 个</span>
           <!-- 图注：名字前面那个点是什么意思 -->
           <span class="rl-legend">
-            <span class="rl-legend-i"><i class="rl-legend-dot is-done" />已核对</span>
-            <span class="rl-legend-i"><i class="rl-legend-dot is-todo" />待核对</span>
-            <span class="rl-legend-i"><i class="rl-legend-dot is-miss" />查不到</span>
+            <span class="rl-legend-i"><i class="rl-legend-dot is-done">✓</i>已核对</span>
+            <span class="rl-legend-i"><i class="rl-legend-dot is-todo">?</i>待核对</span>
+            <span class="rl-legend-i"><i class="rl-legend-dot is-miss">!</i>查不到</span>
           </span>
         </div>
 
@@ -497,7 +497,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                     :disabled="checking === it.name || allRun"
                     :title="checking === it.name ? '查询中…' : it.checkState === 'miss' ? '查不到（三个库都没有）：点一下重查' : it.checkedAt ? '已核对：点一下重查' : '待核对：点一下按 PubChem / OPSIN 查'"
                     @click.stop="verify(it)"
-                  />
+                  >{{ it.checkState === 'miss' ? '!' : it.checkedAt ? '✓' : '?' }}</button>
                   <span class="rl-nm">{{ it.name }}</span>
                   <button
                     v-if="it.checkState === 'miss'"
