@@ -1,0 +1,204 @@
+/* ================================================================
+   打印 / 存为 PDF
+   ================================================================ */
+
+@media print {
+  /* 图注印成纯文字，不要输入框的下划线 */
+  .tlc-cap { border: none !important; background: transparent !important; color: #444 !important; }
+
+  @page { size: A4; margin: 16mm 15mm; }
+
+  html, body { background: #fff !important; }
+
+  .rail,
+  .listpane,
+  .editor-bar,
+  .menu-wrap,
+  .chips,
+  .dropzone,
+  .att-tools,
+  .noprint,
+  .rtable .del,
+  .stable .rowdel,
+  .editor-bar button,
+  #toast,
+  #modal { display: none !important; }
+
+  .app { display: block !important; height: auto !important; overflow: visible !important; }
+  .workspace, .panes { display: block !important; overflow: visible !important; height: auto !important; }
+  .editor { overflow: visible !important; padding: 0 !important; background: #fff !important; }
+  .editor-inner { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+
+  .sheet {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .sheet-text,
+  .cond-row input,
+  .res-table input,
+  .sheet-meta input,
+  .sheet-meta select,
+  .sheet-title,
+  .rtable input,
+  .rtable select,
+  .scheme-slot { border: none !important; background: transparent !important; }
+
+  .sheet-text {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    resize: none !important;
+    box-shadow: none !important;
+  }
+
+  .scheme-slot {
+    min-height: 88px;
+    border: 1px solid #d8d8d8 !important;
+    border-style: solid !important;
+  }
+  .scheme-slot img { max-height: 210px; padding: 0; }
+
+  .sheet-meta input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { display: none !important; -webkit-appearance: none; }
+
+  .scale-input input,
+  .rtable-foot .hint { border: none !important; background: transparent !important; }
+
+  /* 两页都打出来，第 2 页另起一页 */
+  .sheet.is-hidden { display: block !important; }
+  .sheet + .sheet { break-before: page; }
+  .tlc-shot { break-inside: avoid; }
+  .tlc-strip { min-height: 0; }
+  .tlc-strip[data-state="has"] .tlc-empty { display: none !important; }
+  .sheet .scheme-slot { height: 120px; min-height: 120px; }
+  .sheet .rtable .rtable-add { display: none !important; }
+  .sheet #rtable colgroup col:last-child { width: 0 !important; }
+  .sheet .rtable colgroup col.c-grip { width: 0 !important; }
+  .sheet #rtable th:last-child,
+  .sheet #rtable td:last-child { padding: 0 !important; }
+
+  /* 拖动列：宽度收成 0，但不能 display:none —— 那会让整行少一格，列全部错位 */
+  .sheet .rtable .grip-cell { padding: 0 !important; border: none !important; }
+  .sheet .rtable .grip { display: none !important; }
+
+  /* 步骤标题：打印时变成一行实心小标题，续加 / 后处理都留在纸上 */
+  .sheet .rtable .step-caret,
+  .sheet .rtable .step-del { display: none !important; }
+  .sheet .rtable th { background: transparent !important; }
+  /* 纸上组分就是普通文字，不画小框 */
+  .sheet .rtable .role-wrap { border-color: transparent !important; background: transparent !important; padding: 0 !important; }
+  .sheet .rtable .role-caret { display: none !important; }
+  .sheet .rtable tr.step-head td {
+    background: transparent !important;
+    border-top: 1.5px solid #c9c6bd !important;
+    border-bottom: 1px solid #e8e5dd !important;
+    padding: 7px 0 3px !important;
+  }
+
+  .sheet .rtable tr.step-head:first-child td { border-top: none !important; }
+  .sheet .rtable .step-line { min-height: 0 !important; gap: 4px; }
+  /* 空着的「之后」不印出来，纸上不留孤零零的标签 */
+  .sheet .rtable .step-after-line.is-empty { display: none !important; }
+
+  .sheet .rtable .step-after-line input.step-after { font-size: 10.5px; }
+  .sheet .rtable .step-tag.is-empty { display: none !important; }
+  /* 纸上把化合物编号印成纯文字，别像个标签贴纸 */
+  .sheet .pick-wrap .cmp-tag { border: none !important; padding: 0 2px !important; }
+  /* 组分列换成输入框后，打印要留够两个字的宽度，不然「底物」会被裁掉 */
+  .sheet .rtable .c-role { width: 64px !important; }
+  .sheet .rtable td.role-cell { padding-left: 4px !important; }
+  .sheet .rtable td.role-cell input { padding: 2px 2px !important; font-size: 11px !important; }
+  .sheet .rtable .step-line-after { margin-top: 1px; }
+  /* 压一点行高，两页纸的记录别被 TLC 挤到第三页 */
+  .sheet .rtable input,
+  .sheet .rtable select { padding: 2px 6px !important; line-height: 1.3 !important; }
+  .sheet .scheme-slot { height: 112px; min-height: 112px; }
+  .sheet .tlc-shot,
+  .sheet .tlc-empty { height: 116px; }
+  .sheet .rtable .step-no { color: #17181a !important; font-weight: 600; }
+  .sheet .rtable .step-label,
+  .sheet .rtable .step-cond,
+  .sheet .rtable .step-after { border: none !important; font-size: 11px; }
+  .sheet .rtable .step-tag { color: #8d8b84 !important; }
+  .sheet .rtable td.amount-td::after { display: none !important; }
+  .sheet .rtable tr.rtable-total td {
+    border-top: 1px solid #dcdcd7 !important;
+    padding: 3px 0 !important;
+  }
+  .sheet .rtable .totals { font-size: 9.5px; }
+  .scale-inline input { border: none !important; }
+
+  .sec { break-inside: auto; }
+  .sec-title { break-after: avoid; }
+  .sheet-meta, .scheme-block, .cond-row, .res-row, .rtable tr { break-inside: avoid; }
+
+  /* 打印时不要出现表单提示文字和下拉箭头 */
+  input::placeholder,
+  textarea::placeholder { color: transparent !important; }
+  .rtable select, .sheet-meta select { appearance: none !important; -webkit-appearance: none !important; }
+  .rtable select { background-image: none !important; }
+
+  a { color: inherit !important; text-decoration: none !important; }
+}
+
+/* ------------------------------------------------------------ motion */
+
+[data-anim] {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 520ms var(--ease), transform 520ms var(--ease);
+  transition-delay: calc(var(--i, 0) * 45ms);
+}
+
+[data-anim].in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-anim] { opacity: 1; transform: none; transition: none; }
+  * { animation: none !important; }
+}
+
+/* ------------------------------------------------------------- misc */
+
+.divider { height: 1px; background: var(--line); margin: 16px 0; }
+
+.row { display: flex; align-items: center; gap: 8px; }
+.row.wrap { flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.mt8 { margin-top: 8px; }
+.mt12 { margin-top: 12px; }
+.mt16 { margin-top: 16px; }
+.mt24 { margin-top: 24px; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--ink-3); }
+.center { text-align: center; }
+
+.linkish {
+  color: var(--accent-ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: #d9c3b6;
+}
+
+.linkish:hover { text-decoration-color: var(--accent); }
+
+.danger-zone {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+@media (max-width: 1180px) {
+  :root { --rail: 176px; }
+  .panes { --panes-w: 292px; }
+  .editor-inner { padding: 24px 26px 0; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+

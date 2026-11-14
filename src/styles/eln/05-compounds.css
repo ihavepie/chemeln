@@ -1,0 +1,367 @@
+/* ================================================================
+   化合物库
+   ================================================================ */
+
+/* 列表头的新建按钮 */
+.searchbox .cmp-new {
+  position: absolute;
+  right: 4px;
+  border: none;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 5px;
+  display: flex;
+  transition: color 130ms, background 130ms;
+}
+
+.searchbox .cmp-new:hover { color: var(--ink); background: #f1efeb; }
+
+.cmp-card .exp-title { font-family: var(--sans); }
+
+/* 顶部：结构式 + 字段 */
+.cmp-top {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 16px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid var(--line-2);
+  margin-bottom: 14px;
+}
+
+.cmp-structure {
+  width: 148px;
+  height: 148px;
+  border: 1px dashed var(--line-2);
+  border-radius: 6px;
+  background: #fcfcfb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 140ms;
+}
+
+.cmp-structure:hover { border-color: var(--ink-4); }
+/* 结构图留一圈呼吸：只限不放大过头（图片顶到虚线框上会显得「放太大了」），
+   小分子按自身尺寸显示、大分子等比缩进来，都不超过框的 86% */
+.cmp-structure img { max-width: 86%; max-height: 86%; object-fit: contain; mix-blend-mode: multiply; }
+
+.cmp-structure-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-4);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+
+.cmp-fields {
+  display: grid;
+  /* 四列等宽：每格是「标签 + 值」一整个字段，所以别把列写得一大一小
+     （以前写死 88/84px 的是小格子，分子式 C29H29NO5S、CAS 2231932-21-9 这种会被截掉） */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 10px;
+  align-content: start;
+}
+
+.c-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.c-field.wide { grid-column: span 3; }
+/* 整行一格：HRMS / IR / 旋光 / SMILES 这类长文本 */
+.c-field.full { grid-column: 1 / -1; }
+/* 两格宽：性状这种「一句话」的，独占一行太浪费（用户嫌太长） */
+.c-field.half { grid-column: span 2; }
+
+.c-field > span {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.c-field input,
+.c-field select {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  padding: 3px 5px;
+  outline: none;
+  transition: background 130ms;
+}
+
+.c-field input:focus,
+.c-field select:focus { background: #f6f5f1; }
+.c-field input::placeholder { color: var(--ink-4); }
+.c-field input.n { font-family: var(--mono); font-size: 12px; }
+.c-field select { appearance: none; -webkit-appearance: none; cursor: pointer; font-size: 12px; }
+
+/* 核磁三块 */
+.c-area { display: block; margin-top: 8px; }
+
+.c-area > span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+  margin-bottom: 2px;
+}
+
+.sheet .c-area .sheet-text { width: 100%; }
+
+/* TLC 的 Rf */
+.rf-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+  flex: none;
+}
+
+.rf-input {
+  width: 46px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+  text-align: right;
+  padding: 1px 4px;
+}
+
+.rf-input:focus { outline: none; background: #f6f5f1; }
+
+/* 产物名称右侧的「从化合物库选」 */
+.product-name-label { position: relative; }
+
+.pick-wrap { display: flex; align-items: center; gap: 3px; }
+.pick-wrap input { width: auto; flex: 1; min-width: 0; }
+
+.pick-wrap .pick-btn {
+  position: static;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color 130ms, border-color 130ms, background 130ms;
+}
+
+.pick-wrap .pick-btn:hover { color: var(--ink); border-color: var(--ink-4); background: #fafaf8; }
+.pick-wrap .pick-btn:disabled { opacity: 0.4; }
+.pick-wrap .pick-btn.is-hidden { display: none; }
+
+.pick-wrap .prod-link {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+
+/* 关联的化合物：一个小胶囊，点开档案 */
+.pick-wrap .cmp-tag {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--accent-ink);
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 120ms, background 120ms;
+}
+
+.pick-wrap .cmp-tag:hover { border-color: var(--ink-4); background: #fafaf8; }
+
+.pick-wrap .cmp-unlink {
+  border: none;
+  background: none;
+  color: var(--ink-4);
+  cursor: pointer;
+  padding: 1px;
+  display: flex;
+  border-radius: 3px;
+  opacity: 0.45;
+  transition: opacity 120ms, color 120ms;
+}
+
+.pick-wrap .prod-link:hover .cmp-unlink { opacity: 1; }
+.pick-wrap .cmp-unlink:hover { color: var(--bad); }
+
+/* 产物关联条 */
+.res-link {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  min-height: 0;
+}
+
+.res-link:empty { display: none; }
+
+.res-link .lbl {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+}
+
+/* 投料行来自化合物库时不再画小圆点（结构靠点一下名称格看） */
+
+/* 瓶子标签（只在打印时出现） */
+.label-sheet { display: none; }
+
+@media print {
+  body.printing-label .app,
+  body.printing-label #toast,
+  body.printing-label #modal { display: none !important; }
+
+  body.printing-label .label-sheet {
+    display: block !important;
+    padding: 8mm 0;
+  }
+
+  /* 单张打出来的标签整体缩到 70%：100×46mm 的版式印成约 70×32mm，
+     版式本身（结构式/二维码/字号比例）不动，改这一个数就能调大小 */
+  body.printing-label .label-sheet .label {
+    transform: scale(0.7);
+    transform-origin: top center;
+  }
+
+  .label {
+    width: 100mm;
+    height: 46mm;
+    border: 1px solid #d8d8d3;
+    border-radius: 2mm;
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+    padding: 3mm;
+    margin: 0 auto;
+    break-inside: avoid;
+  }
+
+  /* 结构式：贴瓶子上一眼认化合物 */
+  .label-struct {
+    width: 26mm;
+    height: 26mm;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .label-struct img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+  }
+
+  .label-text { flex: 1; min-width: 0; }
+
+  .label-qr { width: 24mm; height: 24mm; flex: none; }
+
+  .label-text { display: flex; flex-direction: column; gap: 1mm; min-width: 0; }
+
+  .label-code {
+    font-family: var(--mono);
+    font-size: 15pt;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #17181a;
+    line-height: 1.1;
+  }
+
+  .label-name {
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: #17181a;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .label-formula {
+    font-family: var(--mono);
+    font-size: 10pt;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #17181a;
+    line-height: 1.2;
+  }
+
+  .label-meta {
+    font-family: var(--mono);
+    font-size: 6.5pt;
+    color: #5c5b57;
+    line-height: 1.3;
+  }
+
+  .label-meta.dim { color: #8d8b84; }
+}
+
+/* ================================================================
+   字号：纸面上的字整体上调一档（只影响屏幕，打印另有紧凑规则）
+   ================================================================ */
+
+@media screen {
+  .sheet .rtable th { font-size: 10px; padding: 5px 7px; }
+  .sheet .rtable input,
+  .sheet .rtable select { font-size: 12.5px; }
+  .sheet .rtable input.n { font-size: 12.5px; }
+  .sheet .rtable .role-cell input { font-size: 12.5px; }
+  .sheet .rtable input.note-cell { font-size: 12px; }
+
+  .sheet .step-no { font-size: 11.5px; }
+  .sheet .step-label { font-size: 13px; }
+  .sheet .step-cond,
+  .sheet .step-after { font-size: 12px; }
+  .sheet .step-tag { font-size: 9.5px; }
+
+  .sheet .totals { font-size: 11.5px; }
+  .sheet .calc-hint { font-size: 10.5px; }
+  .sheet .block-head .lbl { font-size: 10px; }
+  .sheet .block-head .hint { font-size: 11.5px; }
+  .sheet .res-note { font-size: 12px; }
+  .sheet .hint { font-size: 12px; }
+  .sheet .sheet-text { font-size: 13.5px; }
+  .sheet .sheet-text.mono { font-size: 12.5px; }
+  .sheet .sheet-meta th,
+  .sheet .sheet-meta td { font-size: 10px; }
+  .sheet .sheet-meta input,
+  .sheet .sheet-meta select { font-size: 13px; }
+  .sheet .sheet-runner { font-size: 10px; }
+  .sheet .sec-title { font-size: 15.5px; }
+  .sheet .cond-row label > span,
+  .sheet .cond-row span { font-size: 9.5px; }
+  .sheet .cond-row input { font-size: 13px; }
+  .sheet .res-table th { font-size: 10px; }
+  .sheet .res-link,
+  .sheet .linked { font-size: 11.5px; }
+  .sheet .tlc-note { font-size: 12px; }
+  .sheet .rf-wrap { font-size: 10px; }
+  .sheet .rf-input { font-size: 12px; }
+  .sheet .scale-inline { font-size: 10.5px; }
+  .sheet .scale-inline input { font-size: 13px; }
+  .sheet .step-after-line input.step-after::placeholder { color: #c9c7bf; }
+}
+

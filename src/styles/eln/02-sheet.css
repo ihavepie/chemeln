@@ -1,0 +1,548 @@
+/* ================================================================
+   记录本页面（纸张版式）
+   ================================================================ */
+
+.editor-inner { max-width: 900px; padding: 22px 30px 70px; }
+
+.sheet {
+  max-width: 840px;
+  margin: 0 auto;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  padding: 40px 44px 46px;
+  box-shadow: 0 1px 1px rgba(20, 18, 14, 0.03), 0 16px 40px rgba(20, 18, 14, 0.045);
+}
+
+/* 页眉细线 */
+.sheet-runner {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 6px;
+  margin-bottom: 22px;
+}
+
+.runner-code {
+  border: none;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--accent-ink);
+  text-align: right;
+  width: 128px;
+  outline: none;
+  padding: 0 0 1px;
+  border-bottom: 1px solid transparent;
+  text-transform: none;
+}
+
+.runner-code:hover { border-bottom-color: var(--line-2); }
+.runner-code:focus { border-bottom-color: var(--accent); }
+
+/* 标题 */
+.sheet-title {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--serif);
+  font-size: 25px;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  padding: 0 0 2px;
+  margin-bottom: 18px;
+  outline: none;
+}
+
+.sheet-title::placeholder { color: var(--ink-4); }
+/* 抬头：大标题写实验目的，反应类型挂在它右边（表头那格的位置让出来了） */
+.sheet-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.sheet-headline .sheet-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+/* 大标题右边那颗「描述 / 目的」：小一号、灰一点，跟实验名分开 */
+.sheet-desc {
+  /* 描述可以长（「基于 XX 的尝试」）：给它 34% 的宽度（最多 380px），标题让一点出来 */
+  flex: 0 0 auto;
+  width: 34%;
+  max-width: 380px;
+  min-width: 160px;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: right;
+  outline: none;
+  padding: 0;
+}
+.sheet-desc::placeholder { color: var(--ink-4); }
+.sheet-desc:focus { background: #f8f7f2; }
+/* 反应类型的候选（常用几个，点一下填进去；照样可以自己敲） */
+.rxn-wrap { position: relative; flex: 0 0 auto; }
+.rxn-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  min-width: 104px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  padding: 4px;
+  z-index: 70;
+  box-shadow: 0 10px 26px rgba(20, 18, 14, 0.1);
+}
+.rxn-opt {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-2);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rxn-opt:hover { background: #f4f2ee; color: var(--ink); }
+.rxn-opt.is-on { color: var(--accent-ink); }
+.rxn-opt.is-clear { color: var(--ink-4); }
+
+/* 抬头表格 */
+.sheet-meta {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-bottom: 22px;
+  font-size: 12.5px;
+}
+
+.sheet-meta th,
+.sheet-meta td {
+  border: 1px solid var(--line-2);
+  padding: 5px 9px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.sheet-meta th {
+  background: #fbfbf9;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sheet-meta td { width: auto; }
+.sheet-meta .ro { color: var(--ink-2); font-size: 12.5px; }
+
+.sheet-meta input,
+.sheet-meta select {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink);
+  padding: 0;
+  outline: none;
+}
+
+.sheet-meta select { appearance: none; cursor: pointer; }
+.sheet-meta input::placeholder { color: var(--ink-4); }
+.sheet-meta input.mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+}
+
+/* 反应式 */
+.scheme-block { margin-bottom: 24px; }
+
+.scheme-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.scheme-head .lbl,
+.field-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+.field-label { display: block; margin: 14px 0 4px; }
+
+.scheme-slot {
+  position: relative;
+  border: 1px solid var(--line-2);
+  background: #fdfdfc;
+  border-radius: 5px;
+  height: auto;
+  min-height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px;
+  background: #fcfcfb;
+  cursor: pointer;
+  transition: border-color 150ms var(--ease), background 150ms var(--ease);
+}
+
+.scheme-slot:hover { border-color: var(--ink-4); background: #fbfaf8; }
+.scheme-slot:focus-within { border-color: var(--accent); }
+.scheme-slot.has { border-style: solid; background: var(--paper); padding: 0; overflow: hidden; }
+
+/* 反应式图按格子宽度铺满：以前 height:100% + object-fit:contain，框只有 132px 高，
+   反应式又是宽图，结果被高度掐住、宽度只用了一半（用户说「有点小」）。
+   现在宽度吃满、高度按比例长，格子自己跟着变高。 */
+.scheme-slot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 240px;   /* 再高就把第 1 页顶得太长了（用户说「高度太高」） */
+  object-fit: contain;
+  padding: 0;
+}
+
+.scheme-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
+
+.scheme-tip button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-ink);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: #d9c3b6;
+}
+
+.scheme-tip {
+  padding: 0 14px 12px;
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.scheme-slot.has { flex-direction: column; justify-content: center; }
+
+.scheme-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.scheme-x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+  border-radius: 4px;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 130ms, color 130ms;
+}
+
+.scheme-slot:hover .scheme-x { opacity: 1; }
+.scheme-x:hover { color: var(--bad); }
+
+/* 分节 */
+.sec {
+  margin-bottom: 22px;
+  padding-bottom: 4px;
+}
+
+.sec-title {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line-2);
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.sec-title .num {
+  font-size: 12px;
+  color: var(--accent);
+  min-width: 14px;
+}
+
+.sec-title .hint { margin-left: auto; font-size: 10.5px; }
+
+.sheet-text {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink);
+  padding: 2px 0;
+  outline: none;
+  resize: vertical;
+  min-height: 30px;
+  transition: background 140ms var(--ease);
+}
+
+.sheet-text.mono { font-family: var(--mono); font-size: 12px; line-height: 1.75; letter-spacing: 0.005em; }
+.sheet-text::placeholder { color: var(--ink-4); }
+.sheet-text:focus { background: #fcfcfb; box-shadow: 0 0 0 6px #fcfcfb; }
+
+/* 条件条 */
+.cond-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0 20px;
+  margin-bottom: 16px;
+}
+
+.cond-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 3px;
+  min-width: 0;
+  border-bottom: 1px solid transparent;
+  transition: border-color 150ms var(--ease);
+}
+
+.cond-row label:focus-within { border-bottom-color: var(--line-2); }
+
+.cond-row span {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+}
+
+.cond-row input {
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink);
+  outline: none;
+  padding: 0;
+  width: 100%;
+}
+
+.cond-row input::placeholder { color: var(--ink-4); }
+
+/* 结果条 */
+/* 结果：和投料表同款的小表（表头 + 一行值），不再是六个散落的字段 */
+.sheet .res-table { margin-top: 2px; }
+
+.sheet .res-table .r-appear { width: 15%; }
+.sheet .res-table .r-mw { width: 82px; }
+.sheet .res-table .r-mass { width: 92px; }
+.sheet .res-table .r-yield { width: 78px; }
+.sheet .res-table .r-dr { width: 96px; }
+.sheet .res-table .r-tlc { width: 40px; }
+.sheet .res-table .r-del { width: 26px; }
+/* 投料表 MW 格右侧的「按名字重查」：平时很淡，免得和数字抢眼睛 */
+.rtable .name-cell { position: relative; }
+/* 右侧留出放大镜的位置，长名字别压在图标上 */
+.rtable .name-cell input { padding-right: 22px; }
+/* 试剂名右侧的「去 PubChem 查」：平时几乎看不见，hover 才显形，不抢正文 */
+/* 名称格右边的小按钮：常用的「从化合物库选一个」（六边形，平时就露着，用户之前圈出来问
+   「要不要明显一点」）贴右；PubChem 那颗让到左边一格、鼠标进这一行才露 */
+.name-browse {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 19px; height: 19px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: #9e978a;
+  cursor: pointer; padding: 0; opacity: 0.7; transition: opacity .12s, color .12s;
+}
+.rtable tr:hover .name-browse, .name-browse:focus-visible { opacity: 1; color: #6f665c; }
+.name-browse:hover { color: #6f665c; background: #f1ece4; }
+.name-lookup {
+  position: absolute; right: 23px; top: 50%; transform: translateY(-50%);
+  width: 19px; height: 19px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: #9e978a;
+  cursor: pointer; padding: 0; opacity: 0; transition: opacity .12s, color .12s;
+}
+/* PubChem 那颗平时不摆出来（MW 本来就是按名字自动查的，重查走「说明」格里的核对浮层），
+   鼠标进这一行才露——平时只有一颗明确的「库」按钮 */
+.rtable tr:hover .name-lookup, .name-lookup:focus-visible { opacity: 1; color: #6f665c; }
+.name-lookup:hover { color: #6f665c; background: #f1ece4; }
+/* 这个名字 PubChem 里没有（自造缩写 / 金属配合物）：右上角一个小暖点，
+   不弹提示、不挡录数据，鼠标移上去才解释「手填 MW 就会记住」 */
+.name-lookup.is-miss { opacity: 1; color: #b9ad96; }
+.name-lookup.is-miss::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+/* 结果行右侧的清空按钮 / 产率表头的「不计」开关：默认很淡，不抢正文 */
+.sheet .res-table .del-cell { padding: 1px 2px !important; }
+.row-del {
+  width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: transparent; color: #c8c4bb; border-radius: 4px; cursor: pointer; padding: 0;
+}
+.row-del:hover { color: #b4442e; background: #f6ece9; }
+.del-cell:empty { width: 0; }
+.th-with-btn { display: inline-flex; align-items: center; gap: 4px; }
+.th-mini {
+  border: 0; background: transparent; color: #bdb8ae; font: inherit; font-size: 10px; line-height: 1;
+  padding: 1px 3px; border-radius: 4px; cursor: pointer;
+}
+.th-mini:hover { color: #8a7f72; background: #f1ece4; }
+.th-mini.on { color: #8a5a3a; background: #f3e7dc; }
+
+.sheet .res-table td { padding: 1px 3px; }
+.sheet .res-table th.n { text-align: right; }
+
+.res-note:empty { display: none; }
+
+.res-note {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 7px 0 2px;
+  min-height: 15px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.res-note.warn { color: var(--warn); }
+.res-note.warn b { color: var(--warn); }
+
+.res-note b {
+  color: var(--ink-2);
+  font-weight: 500;
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+/* 附录 / 页脚 */
+.sec-att { margin-bottom: 8px; }
+
+.linked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.linked .lbl {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+
+.sheet-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.sheet-foot .hint { font-size: 10.5px; }
+
+/* 纸页内的投料表更紧凑 */
+.sheet .rtable { margin-top: 2px; }
+.sheet .rtable th { font-size: 9px; }
+.sheet .rtable td { padding: 3px 0; }
+.sheet .rtable input, .sheet .rtable select {
+  font-size: 11.5px;
+  padding: 4px 6px;
+  line-height: 1.3;
+}
+.sheet .rtable input.n { font-size: 11.5px; padding: 4px 6px; }
+.sheet .rtable .role-cell input { font-size: 11.5px; }
+.sheet .rtable td.role-cell { padding-left: 6px; }
+
+/* 组分框：带边框的小控件，点右边箭头出菜单 */
+.sheet .rtable .role-wrap {
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: #fdfdfb;
+  padding: 0 1px 0 2px;
+  transition: border-color 120ms, background 120ms;
+}
+
+.sheet .rtable .role-wrap:hover { border-color: var(--ink-4); }
+.sheet .rtable tr[data-tone]:not([data-tone="plain"]) .role-wrap { border-color: var(--tone); background: #fff; }
+
+.sheet .rtable .role-cell input {
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+}
+
+/* 每行左侧一道 2px 竖线，颜色跟组分文字一致 —— 颜色编码更明显 */
+/* 每组组分一套颜色：--tone 用于框线，--tone-ink 用于文字 */
+.sheet .rtable tr[data-tone] { --tone: var(--line-2); --tone-ink: var(--ink-2); }
+.sheet .rtable tr[data-tone="sub"] { --tone: #7c3315; --tone-ink: #7c3315; }
+.sheet .rtable tr[data-tone="base"] { --tone: #1f6c9f; --tone-ink: #1f6c9f; }
+/* 酸：青绿（跟「碱」的蓝、「配体」的墨绿都错开） */
+.sheet .rtable tr[data-tone="acid"] { --tone: #1b6e73; --tone-ink: #1b6e73; }
+.sheet .rtable tr[data-tone="cat"] { --tone: #6b4d8f; --tone-ink: #6b4d8f; }
+.sheet .rtable tr[data-tone="lig"] { --tone: #2f6b4f; --tone-ink: #2f6b4f; }
+.sheet .rtable tr[data-tone="sol"] { --tone: #8d8b84; --tone-ink: #8d8b84; }
+.sheet .rtable tr[data-tone="add"] { --tone: #8a5f00; --tone-ink: #8a5f00; }
+.sheet .rtable tr[data-tone="ox"] { --tone: #9f2f2d; --tone-ink: #9f2f2d; }
+.sheet .rtable tr[data-tone="red"] { --tone: #a8471f; --tone-ink: #a8471f; }
+
+
+.sheet .rtable-foot { padding-top: 8px; margin-top: 8px; }
+

@@ -15,6 +15,19 @@ const qr = require('./qr');
 const { experimentToMarkdown, screeningToMarkdown, screeningToCsv, CELL_CATEGORY } = require('./export');
 
 const { db, DATA_DIR, ATTACH_DIR, COMPOUND_DIR, allSettings, getSetting, setSetting, nextCode, logEvent, logEdit, historyFor, variantKey } = store;
+// 纯清洗层单拎出去（`server/lib/normalize.js`）：不碰 db / 请求，所以能单独测
+const {
+  str,
+  numOrNull,
+  safeName,
+  normalizeCondVars,
+  parseConds,
+  normalizeConds,
+  FIELD_VARS,
+  FIELD_VAR_LABEL,
+  normalizeFieldVars,
+  parseFieldVars,
+} = require('./lib/normalize');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 // 第三方静态资源（Ketcher 结构画板等）：不放进 public/，因为每次 build 都会清空它
@@ -78,19 +91,6 @@ async function readJson(req) {
   }
 }
 
-const str = (v, fallback = '') => (v === null || v === undefined ? fallback : String(v));
-const numOrNull = (v) => {
-  if (v === null || v === undefined || v === '') return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-
-/** 文件名保干净：去掉路径分隔符与控制字符，保留扩展名。 */
-function safeName(name) {
-  const base = path.basename(String(name || 'file')).replace(/[\u0000-\u001f]/g, '');
-  const cleaned = base.replace(/[/\\:*?"<>|]/g, '_').replace(/^\.+/, '_');
-  return cleaned.slice(0, 120) || 'file';
-}
 
 function uniquePath(dir, name) {
   const ext = path.extname(name);
@@ -215,73 +215,6 @@ function normalizeEntries(body) {
 }
 
 /** 能当「变量」的字段（白名单：这几个才有一致的字面语义） */
-const FIELD_VARS = new Set(['temperature', 'duration', 'atmosphere', 'concentration']);
-/** 字段默认占位符 */
-const FIELD_VAR_LABEL = { temperature: 'T', duration: 't', atmosphere: 'atm', concentration: 'M' };
-
-/** `field_vars_json` → `[{key,label}]`（只认白名单，label 缺就给默认） */
-function normalizeFieldVars(list) {
-  if (!Array.isArray(list)) return null;
-  const out = [];
-  for (const one of list.slice(0, 6)) {
-    const key = str(one && typeof one === 'object' ? one.key : one);
-    if (!FIELD_VARS.has(key) || out.some((x) => x.key === key)) continue;
-    const label = str(one && one.label).slice(0, 8) || FIELD_VAR_LABEL[key] || key;
-    out.push({ key, label });
-  }
-  return out;
-}
-
-function parseFieldVars(text) {
-  try {
-    const list = JSON.parse(String(text || '[]'));
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
-/** 条件组里每条条件的「变量取值」：`{L:'XPhos', T:'−40 °C'}`（键短、值短，别塞大段文字） */
-function normalizeCondVars(obj, maxLen = 120) {
-  if (!obj || typeof obj !== 'object') return {};
-  const out = {};
-  for (const [k, v] of Object.entries(obj).slice(0, 6)) {
-    const key = str(k).slice(0, 8);
-    const val = str(v).slice(0, maxLen);
-    if (key && val) out[key] = val;
-  }
-  return out;
-}
-
-/** `conds_json` → 数组（坏数据当空） */
-function parseConds(text) {
-  try {
-    const list = JSON.parse(String(text || '[]'));
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
-function normalizeConds(list) {
-  if (!Array.isArray(list)) return null;
-  return list.slice(0, 60).map((c) => {
-    const o = c && typeof c === 'object' ? c : {};
-    const y = numOrNull(o.yield_pct);
-    return {
-      label: str(o.label).slice(0, 200),                 // 「−40 °C」「LDA 1.2 eq」「DCM 代替 THF」
-      mass: str(o.mass).slice(0, 40),                    // 这个候选称到的质量 / g（产率由它算）
-      yield_pct: y === null ? null : Math.max(0, Math.min(100, Math.round(y * 10) / 10)),
-      sel: str(o.sel).slice(0, 60),                      // 「94:6」「99% ee」这种，手填
-      note: str(o.note).slice(0, 200),
-      vars: normalizeCondVars(o.vars),   // 每个变量的取值（L / T / t…）
-      varEq: normalizeCondVars(o.varEq, 24),   // 「筛当量」：这个候选用自己的当量（空 = 用投料表的标准当量）
-    };
-  }).filter(
-    (c) => c.label || c.mass || c.yield_pct !== null || c.sel || c.note || Object.keys(c.vars).length || Object.keys(c.varEq).length
-  );
-}
-
 function normalizeExperiment(input) {
   const out = {};
   for (const key of EXP_COLUMNS) {

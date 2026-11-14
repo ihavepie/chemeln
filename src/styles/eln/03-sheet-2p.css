@@ -1,0 +1,830 @@
+/* ================================================================
+   双页版式（第 1 页 主记录 / 第 2 页 续页）
+   ================================================================ */
+
+.page-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 14px;
+  background: #eae8e3;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.ptab {
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms var(--ease), color 140ms var(--ease);
+}
+
+.ptab:hover { color: var(--ink); }
+
+.ptab[aria-selected="true"] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.06);
+}
+
+.sheet.is-hidden { display: none; }
+
+/* 页内小节头（第 1 页用，不带中文序号） */
+.block-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line-2);
+}
+.block-head .spacer { flex: 1; }
+
+.block-head .lbl {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.sec-tight { margin-bottom: 16px; }
+
+/* ---------- 快速选择器 ---------- */
+
+.qwrap { position: relative; display: flex; align-items: center; gap: 1px; }
+.qwrap > input { flex: 1; min-width: 0; }
+
+.qcaret {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--ink-4);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  border-radius: 3px;
+  transition: color 130ms, background 130ms;
+}
+
+.qcaret:hover { color: var(--ink-2); background: #f1efeb; }
+
+/* 选择器面板（组分 / 条件 / 时间刻度…）：一律不许选字——按住胶囊的时候
+   一选字就把 click 变成拖选，点了像没反应 */
+.qmenu { user-select: none; -webkit-user-select: none; }
+
+.qmenu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: -2px;
+  z-index: 60;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 7px;
+  box-shadow: 0 12px 30px rgba(20, 18, 14, 0.1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  width: max-content;
+  max-width: 300px;
+}
+
+.qmenu[hidden] { display: none; }
+
+.qchip {
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+  border-radius: 5px;
+  padding: 4px 9px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 130ms var(--ease);
+}
+
+.qchip:hover { border-color: var(--ink-4); color: var(--ink); }
+.qchip[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* ---------- 状态胶囊 ---------- */
+
+.status-cell { overflow: visible; }
+
+.status-wrap { position: relative; display: inline-flex; }
+
+.status-chip {
+  border: 1px solid transparent;
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  background: #f1efeb;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: filter 140ms var(--ease);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.status-chip:hover { filter: brightness(0.97); }
+
+.status-chip.tone-ok { background: var(--ok-soft); color: var(--ok); }
+.status-chip.tone-info { background: var(--info-soft); color: var(--info); }
+.status-chip.tone-warn { background: var(--warn-soft); color: var(--warn); }
+.status-chip.tone-bad { background: var(--bad-soft); color: var(--bad); }
+.status-chip.tone-accent { background: var(--accent-soft); color: var(--accent-ink); }
+
+.status-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 118px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  padding: 4px;
+  z-index: 70;
+  box-shadow: 0 10px 26px rgba(20, 18, 14, 0.1);
+}
+
+.status-menu[hidden] { display: none; }
+
+.status-opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.status-opt:hover { background: #f4f2ee; color: var(--ink); }
+
+.status-opt .dot { width: 7px; height: 7px; border-radius: 99px; background: currentColor; flex: none; }
+.status-opt.tone-ok .dot { background: var(--ok); }
+.status-opt.tone-info .dot { background: var(--info); }
+.status-opt.tone-warn .dot { background: var(--warn); }
+.status-opt.tone-bad .dot { background: var(--bad); }
+.status-opt.tone-accent .dot { background: var(--accent); }
+
+/* 日期快速设为今天 */
+.date-cell { display: flex; align-items: center; gap: 3px; }
+.date-cell input { flex: 1; min-width: 0; }
+
+.mini {
+  flex: none;
+  border: none;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+.mini:hover { background: #f1efeb; color: var(--ink-2); }
+
+/* ---------- 投料表：加框，读起来像记录本里的表格 ---------- */
+
+.sheet .rtable {
+  margin-top: 2px;
+  border: 1px solid var(--line-2);
+}
+
+/* 列宽：窄窗口下自动收窄，别把试剂名挤没 */
+.sheet .rtable .c-grip { width: 15px; }
+.sheet .rtable .c-role { width: 80px; }
+.sheet .rtable .c-mw { width: 76px; }
+.sheet .rtable .c-eq { width: 52px; }
+.sheet .rtable .c-mmol { width: 62px; }
+.sheet .rtable .c-amt { width: 84px; }
+.sheet .rtable .c-note { width: 96px; }
+.sheet .rtable .c-del { width: 24px; }
+
+@media (max-width: 1260px) {
+  /* 结果表在窄窗口也收一收，别把产物名挤没 */
+  .sheet .res-table .r-appear { width: 12%; }
+  .sheet .res-table .r-mw { width: 70px; }
+  .sheet .res-table .r-mass { width: 78px; }
+  .sheet .res-table .r-yield { width: 66px; }
+  .sheet .res-table .r-dr { width: 78px; }
+  .sheet .res-table .r-tlc { width: 36px; }
+
+  .sheet .rtable .c-role { width: 72px; }
+  .sheet .rtable .c-mw { width: 70px; }
+  .sheet .rtable .c-eq { width: 44px; }
+  .sheet .rtable .c-mmol { width: 52px; }
+  .sheet .rtable .c-amt { width: 78px; }
+  .sheet .rtable .c-note { width: 14%; }
+  .sheet .rtable .c-del { width: 18px; }
+}
+
+.sheet .rtable th {
+  font-size: 9px;
+  padding: 6px 7px;
+  background: #f0eee6;
+  border-bottom: 1px solid #ddd9cf;
+  border-right: none;
+}
+
+.sheet .rtable td {
+  padding: 0 3px;
+  border: none;
+}
+
+/* 单元格里的输入框按块级排，不然基线会额外撑出一行 */
+.sheet .rtable td > input,
+.sheet .rtable td .role-wrap input { display: block; }
+
+/* 点进某一格时，底色铺满整个格子（不是输入框那一小条） */
+.sheet .rtable td:focus-within { background: #f2f1ea; }
+
+.sheet #rtable td:last-child { border-bottom: none; }
+
+/* 表格最前一列：拖动把手 */
+.sheet .rtable .grip-cell {
+  padding: 0;
+  width: 15px;
+  border: none;
+}
+
+.sheet .rtable .grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  color: var(--ink-4);
+  cursor: grab;
+  opacity: 0.22;
+  transition: opacity 120ms;
+}
+
+.sheet .rtable tbody tr.reag-row:hover .grip { opacity: 1; }
+.sheet .rtable .grip:active { cursor: grabbing; }
+.sheet .rtable .grip .i { transform: rotate(90deg); }
+
+.sheet .rtable tr.is-dragging { opacity: 0.35; }
+
+.sheet .rtable tr.drop-before td { box-shadow: inset 0 2px 0 var(--accent); }
+.sheet .rtable tr.drop-after td { box-shadow: inset 0 -2px 0 var(--accent); }
+.sheet .rtable tr.step-head.drop-on td { background: var(--accent-soft); }
+.sheet .rtable tr.step-head.drop-on .step-no { color: var(--accent-ink); }
+
+/* 步骤头：第 N 步 + 条件，和表头同一层浅底，和白色数据行区分开 */
+.sheet .rtable tr.step-head td {
+  padding: 0;
+  background: #f8f6f0;
+  border-top: 1px solid var(--line-2);
+  border-bottom: 1px solid #e9e6dd;
+}
+
+/* 第一段紧接表头，不要double线 */
+.sheet .rtable tr.step-head:first-child td { border-top: none; }
+
+.sheet .rtable tr.step-head + tr.reag-row td { border-top: none; }
+
+
+/* 段落之间留白：上一段末尾 → 分隔线 → 步骤标题，各留一点空隙 */
+/* 步骤标题占满整行、贴左；下面的投料行自然缩进一格，读起来是「步骤 › 组分」 */
+.step-head .step-cell { padding: 0 !important; }
+.sheet .rtable tr.step-head:first-child .step-cell { padding-top: 0 !important; }
+
+/* 「之后」：和「条件」同一套写法（小标签 + 正文），缩进对齐投料行，
+   读起来是这一步的下一步操作，而不是一行备注 */
+.sheet input:focus,
+.sheet select:focus,
+.sheet textarea:focus { outline: none; }
+
+/* 「之后」：标签左缘对齐「第 1 步」，整体贴左、只留一点 margin */
+/* 「条件 / 之后」和标题同一行，按比例分宽度 */
+/* 步骤行东西变多了（条件/之后/加料/搅拌/起止）：显式分两行，别把「起/止」挤到纸外 */
+.step-head .step-line { gap: 6px; }
+.step-head .step-line-sub { margin-top: 2px; }
+.step-head .step-line-sub .step-tag { width: 22px; }
+.step-head .step-time { flex: 0 0 auto; }
+.step-head .step-label { flex: 1.15; }
+.step-head .step-cond { flex: 1; }
+.step-head .step-after { flex: 0.9; }
+
+.step-after-line input.step-after {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-2);
+  padding: 1px 2px;
+  outline: none;
+}
+
+.step-after-line input.step-after::placeholder { color: var(--ink-4); }
+.step-after-line input.step-after:focus { background: #f7f6f2; border-radius: 3px; }
+
+.step-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 18px;
+}
+
+
+.step-caret {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-right: -1px;
+  color: var(--ink-4);
+  cursor: pointer;
+  display: flex;
+  transform: rotate(90deg);
+  transition: transform 160ms var(--ease), color 130ms;
+}
+
+.step-caret:hover { color: var(--ink-2); }
+.is-collapsed .step-caret { transform: rotate(0deg); }
+
+.step-no {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.step-label,
+.step-cond,
+.step-after {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  padding: 1px 2px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 130ms;
+}
+
+.step-label {
+  font-size: 12px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.step-cond,
+.step-after {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.step-label::placeholder,
+.step-cond::placeholder,
+.step-after::placeholder { color: var(--ink-4); }
+
+.step-label:focus,
+.step-cond:focus,
+.step-after:focus { border-bottom-color: var(--line-2); outline: none; }
+
+.step-tag {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+  width: 26px;
+  flex: none;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.step-spacer { flex: 1; }
+
+.step-del,
+.step-add {
+  border: none;
+  background: none;
+  color: var(--ink-4);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  opacity: 0.22;
+  transition: opacity 120ms, color 120ms;
+}
+
+.step-head:hover .step-del,
+.step-head:hover .step-add { opacity: 1; }
+
+.step-del:hover { color: var(--bad); background: var(--bad-soft); }
+.step-add:hover { color: var(--ink); background: #f4f2ee; }
+
+/* 用量列：固体称量 / 液体量取，一眼分得开 */
+.sheet .rtable td.amount-td { position: relative; }
+
+/* 用量后面原来有个小圆点（实心=固体、空心=液体），但单位已经写了 g / mL，
+   这个点只是重复信息、还挤着数字，去掉。 */
+
+.sheet .rtable td.amount-td[data-kind="solid"] input.amount-cell { font-weight: 600; }
+
+/* 备注列：像写在纸边的批注，平时不抢眼 */
+.sheet .rtable input.note-cell {
+  font-size: 11px;
+  color: var(--ink-2);
+  letter-spacing: 0.01em;
+}
+
+.sheet .rtable input.note-cell::placeholder { color: #c9c8c2; }
+
+/* 行间没有横线了，备注那列也不留竖线，免得孤零零一条 */
+.sheet .rtable td.note-td,
+.sheet .rtable th:nth-child(8) { border-left: none; }
+
+.sheet .rtable td.note-td { padding-right: 2px; padding-left: 4px; }
+
+/* 表尾合计 */
+.sheet .rtable tr.rtable-total td {
+  border: none;
+  border-top: 1px solid #e4e1d8;
+  padding: 8px 7px 4px;
+}
+
+.foot-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.calc-hint {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 160ms var(--ease);
+}
+
+.calc-hint.on { opacity: 1; }
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.totals .tot-lbl {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  margin-right: 2px;
+}
+
+.totals .tot-sep { color: var(--ink-4); }
+
+.sheet .rtable tr.rtable-add td {
+  border: none;
+  padding: 0 7px 5px;
+}
+
+.add-cell {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.add-cell .spacer { flex: 1; }
+
+/* 表头右侧的反应规模 */
+.scale-inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.scale-inline input {
+  width: 62px;
+  border: none;
+  border-bottom: 1px solid var(--line-2);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  text-align: right;
+  padding: 1px 2px;
+}
+
+.scale-inline input:focus { outline: none; border-bottom-color: var(--ink-3); }
+.scale-inline input::placeholder { color: var(--ink-4); }
+.scale-inline .unit { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
+
+/* hover 计算式 */
+
+
+/* 套用配方的选择列表 */
+.recipe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: -4px -4px 0;
+}
+
+.recipe-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: var(--sans);
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+.recipe-opt:hover { background: var(--canvas); }
+.recipe-opt.is-on { border-color: var(--ink); background: var(--bone); }
+
+.recipe-code { font-size: 10px; color: var(--ink-3); letter-spacing: 0.04em; }
+.recipe-title { font-size: 12.5px; color: var(--ink); flex: 1; min-width: 0; }
+.recipe-meta { font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+
+/* 表内「添加试剂」行 */
+.sheet .rtable tfoot td {
+  border: none;
+  padding: 5px 7px 6px;
+  background: transparent;
+}
+
+.add-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color 130ms, background 130ms;
+}
+
+.add-row:hover { color: var(--ink); background: #f4f2ee; }
+
+/* 组分那一列是可直接打的文字，不是下拉 */
+.sheet .rtable td.role-cell input,
+.sheet .rtable td select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  padding: 3px 6px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  width: 100%;
+}
+
+.sheet .rtable td select:hover { color: var(--ink); }
+.sheet .rtable tbody tr:last-child td { border-bottom: none; }
+
+/* 组分格：输入框 + 小箭头；点开自绘的浅色列表（原生下拉在深色系统下是黑块） */
+.sheet .rtable .role-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sheet .rtable td.role-cell .role-wrap input {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet .rtable .role-caret {
+  border: none;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 2px 3px;
+  display: flex;
+  opacity: 1;
+  transition: color 120ms, background 120ms;
+  border-radius: 3px;
+}
+
+.sheet .rtable .role-caret:hover { color: var(--ink); background: #f2f0e9; }
+/* 箭头那颗按钮点得到的地方再宽一点（原来只有 11px 图标那么大，边上 1–2px 就点空了） */
+.sheet .rtable .role-caret { padding: 3px 4px; margin-right: -1px; user-select: none; }
+
+/* 组分选择：和「反应温度」那类选择器一样的胶囊面板 */
+.sheet .rtable .role-menu { min-width: 196px; max-width: 268px; }
+/* 胶囊按行撑满：菜单里不留「看着是菜单、点了却没反应」的空档（用户报过「有时候点不生效」）；
+   胶囊之间的 4px 缝点下去会落到菜单底色上，那条走 closeRoleMenu，也有反应 */
+.sheet .rtable .role-menu .qchip {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  padding: 4px 8px;
+}
+.sheet .rtable .role-menu { gap: 4px; }
+
+
+
+/* 底物行不再铺底色（原来和表头一个颜色，看着像第二行表头）；
+   只在「组分」那一栏把字标成强调色，一眼认出是基准行 */
+/* 基准行只加粗；颜色一律由 data-tone 决定，改了组分颜色才会跟着变 */
+.sheet .rtable tr.base .role-cell input { font-weight: 600; }
+
+/* 组分文字用 --tone-ink */
+.sheet .rtable tr[data-tone] .role-input { color: var(--tone-ink); }
+.sheet .rtable tr[data-tone="sub"] .role-input { font-weight: 600; }
+
+/* 胶囊：框线和文字同色；hover 和选中的效果也都用这个色 */
+.qchip[data-tone] {
+  --tone: var(--ink-2);
+  border-color: var(--tone);
+  color: var(--tone);
+}
+
+.qchip[data-tone="sub"] { --tone: #7c3315; }
+.qchip[data-tone="base"] { --tone: #1f6c9f; }
+.qchip[data-tone="acid"] { --tone: #1b6e73; }
+.qchip[data-tone="cat"] { --tone: #6b4d8f; }
+.qchip[data-tone="lig"] { --tone: #2f6b4f; }
+.qchip[data-tone="sol"] { --tone: #8d8b84; }
+.qchip[data-tone="add"] { --tone: #8a5f00; }
+.qchip[data-tone="ox"] { --tone: #9f2f2d; }
+.qchip[data-tone="red"] { --tone: #a8471f; }
+
+.qchip[data-tone]:hover {
+  border-color: var(--tone);
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 10%, #fff);
+}
+
+.qchip[data-tone][aria-selected="true"] {
+  background: var(--tone);
+  border-color: var(--tone);
+  color: #fff;
+}
+
+/* 原生 datalist 的黑三角太抢眼，去掉（列表仍会在输入时出现） */
+.sheet .rtable input::-webkit-calendar-picker-indicator { display: none; opacity: 0; }
+
+.sheet .rtable input.mw-cell { color: var(--ink-3); }
+.sheet .rtable input.mw-cell:focus { color: var(--ink); }
+.sheet .rtable input.amount-cell { font-weight: 500; }
+
+.sheet .rtable .del {
+  border: none;
+  background: none;
+  color: var(--ink-4);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  opacity: 0.22;
+  transition: opacity 120ms, color 120ms;
+}
+
+.sheet .rtable tbody tr:hover .del { opacity: 1; }
+.sheet .rtable .del:hover { color: var(--bad); background: var(--bad-soft); }
+
+/* ---------- TLC ---------- */
+
+.tlc-note {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  outline: none;
+  padding: 0;
+}
+
+.tlc-note::placeholder { color: var(--ink-4); }
+
+.tlc-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 0;
+}
+
+.tlc-shot {
+  position: relative;
+  margin: 0;
+  width: 92px;
+  height: 132px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fcfcfb;
+}
+
+.tlc-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: zoom-in;
+}
+
+.tlc-x {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+  border-radius: 3px;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 1px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 130ms, color 130ms;
+}
+
+.tlc-shot:hover .tlc-x { opacity: 1; }
+.tlc-x:hover { color: var(--bad); }
+
+.tlc-empty {
+  width: 92px;
+  height: 132px;
+  border: 1px dashed var(--line-2);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--ink-4);
+  cursor: pointer;
+  background: #fcfcfb;
+  transition: border-color 150ms var(--ease), background 150ms var(--ease);
+}
+
+.tlc-empty:hover { border-color: var(--ink-4); background: #faf9f7; color: var(--ink-3); }
+.tlc-empty .plus { font-family: var(--mono); font-size: 17px; line-height: 1; color: var(--ink-4); }
+.tlc-empty .cap { font-size: 9.5px; letter-spacing: 0.05em; }
+
+/* 分类选择弹窗 */
+.cat-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cat-opt {
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+  border-radius: 6px;
+  padding: 6px 11px;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 140ms var(--ease);
+}
+
+.cat-opt:hover { border-color: var(--ink-4); color: var(--ink); }
+.cat-opt[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+

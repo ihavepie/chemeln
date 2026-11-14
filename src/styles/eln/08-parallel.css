@@ -1,0 +1,1107 @@
+/* ================================================================
+   平行组书签（编辑页）：从纸面左侧「凸出去」的一排纸签
+   —— 重复实验 / 控制变量实验共用一条 group_id；当前这条抽出来一点（更宽、纸白），
+      鼠标悬停在上面会浮出一张预览卡（不切记录也能看一眼），点下去才切过去。
+      只有 ≥2 条时出现；打印不出现；窄窗口（<1100px）收起，入口仍在 ⋯ 菜单。
+   ================================================================ */
+.sheet { position: relative; }
+
+/* 浮层版：位置由 JS 算好写进 left/top/width（固定站在纸面左边的缝里）。 */
+/* 位置全部由 JS 算好写进 left/top/width（导航排不能越过编辑区边界，
+   否则窄窗口会压在中栏列表的卡片上），所以这里不再自己平移。 */
+.pgroup--float {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+}
+/* 编号那行画在**纸面自己的左边距**里（`left: calc(100% + 6px)` 就是纸的起点），
+   不占中栏列表那侧那 20 多 px 的缝，所以窗口窄也不会压到列表卡片。 */
+/* 靠右时短杠左端贴齐、编号挪到短杠**右边**，方向全部镜像过来 */
+/* 缝太窄（<130px）时把编号改画进**纸面自己的左边距**里（A4 有 44px），
+   只写编号、不写变化——那一段留给悬停预览卡。 */
+.pgroup--float.is-inline .pgroup-lbl {
+  right: auto;
+  left: calc(100% + 7px);
+  flex-direction: row;
+  opacity: 0.8;
+}
+.pgroup--float.is-inline .pgroup-var { display: none; }
+
+
+/* 一枚书签 = 一根**小短杠**（照 DSH 的 turn 导航那排 mark）：
+   12~22px 宽、2px 高、圆角，右侧贴着纸面对齐；不用卡片、不写字。
+   当前这条最宽最黑，悬停放大一档；编号什么的挪进原生 title / 悬停预览卡里。 */
+.pgroup-tab,
+.pgroup-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 22px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+.pgroup-tab::before {
+  content: '';
+  display: block;
+  /* 长度按产率（JS 写 --tick-w，14–22px）：完成的那条越长越好 */
+  width: var(--tick-w, 14px);
+  height: 2px;
+  border-radius: 2px;
+  background: #ddd7c6;
+  transition: width 0.14s, background 0.14s;
+}
+/* 悬停时从短杠往纸边拉一条 6px 的发丝线：明确「这排指的是这张纸」 */
+.pgroup-tab::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -6px;
+  width: 6px;
+  height: 1px;
+  background: var(--line-2);
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+.pgroup-tab:hover::after { opacity: 1; }
+/* 组员多于 6 条：行距压到 12px，别让这排长到屏幕外 */
+.pgroup--float.is-dense .pgroup-tab,
+.pgroup--float.is-dense .pgroup-add { height: 10px; }
+/* 状态用短杠的底色说：进行中偏暖、已完成偏绿、失败偏红……当前那条仍然是墨色最重。
+   颜色由全局 tone 色（跟状态小圆点同一套）混进纸色，淡而不脏；不支持 color-mix 的老
+   Safari 直接退回上面的灰色，依然是能用的。 */
+.pgroup-tab[data-tone='warn']::before { background: color-mix(in oklab, var(--warn) 52%, #e8e3d6); }
+.pgroup-tab[data-tone='ok']::before { background: color-mix(in oklab, var(--ok) 50%, #e8e3d6); }
+.pgroup-tab[data-tone='info']::before { background: color-mix(in oklab, var(--info) 50%, #e8e3d6); }
+.pgroup-tab[data-tone='bad']::before { background: color-mix(in oklab, var(--bad) 50%, #e8e3d6); }
+.pgroup-tab[data-tone='accent']::before { background: color-mix(in oklab, var(--accent) 48%, #e8e3d6); }
+.pgroup-tab:hover::before { width: 20px; background: var(--ink-4); }
+/* 当前这条：最长最黑（跟 DSH 的 markActive 一个路数） */
+.pgroup-tab.is-on::before { width: 22px; height: 2.5px; background: var(--ink); }
+
+/* 短杠旁边那一行小字 = 记录编号，写在**纸面自己的左边距**里（短杠右侧 7px）。
+   为什么写在纸内而不是外侧那条缝里：悬停预览卡是在缝里往左弹的，写缝里会被盖住。
+   详细条件 / 结果一律走预览卡，这里只留编号（淡淡的，当前那条深一档）。 */
+.pgroup-lbl {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 8.5px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--ink-4);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 0.14s, color 0.14s;
+}
+.pgroup-tab:hover .pgroup-lbl { opacity: 1; color: var(--ink-2); }
+.pgroup-tab.is-on .pgroup-lbl { opacity: 1; color: var(--ink-3); }
+
+/* 预览卡右侧的小箭头：指向正在悬停的那根短杠（--arrow-y 由 JS 按短杠中线写） */
+.pgroup-peek-float::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: var(--arrow-y, 24px);
+  width: 9px;
+  height: 9px;
+  background: var(--paper);
+  border-radius: 1.5px;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* 悬停预览卡：挂到 body 上、定位在书签外侧（左边），只是看，不参与点击，也不压纸面 */
+/* 书签悬停预览卡：照 DSH 那个 turn 预览的样子——无边框、圆角 10、只有一层柔和投影，
+   一行粗体提要 + 最多三行灰字摘要，出现时淡入并往右推 4px。 */
+/* 照 DSH 的 turn 预览卡（TurnNavigator 的 .preview）：宽 min(300)、
+   **最高 100px 就截断**、padding 10/12、圆角 10、不描边、只有一层柔投影，
+   卡片自己不带小箭头（DSH 也没有）。 */
+.pgroup-peek-float {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  max-height: 100px;
+  overflow: hidden;
+  background: var(--paper);
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(20, 18, 14, 0.1), 0 1px 3px rgba(20, 18, 14, 0.06);
+  color: var(--ink-3);
+  font-family: var(--sans, system-ui, sans-serif);
+  text-align: left;
+  animation: peek-in 0.12s ease-out;
+}
+@keyframes peek-in {
+  from { opacity: 0; transform: translateX(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.pgroup-add {
+  justify-content: flex-end;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-4);
+  padding-right: 3px;
+}
+.pgroup-add:hover { color: var(--accent-ink); }
+
+/* 窄一点的窗口：整排收起（入口在 ⋯ 菜单） */
+@media (max-width: 1100px) {
+  .pgroup { display: none; }
+}
+
+/* ================================================================
+   中栏列表里的「平行组」卡片堆：同 group_id 的重复 / 控制变量实验合成一张，
+   后面露出两层纸边，组员用编号小签直接点进去。
+   ================================================================ */
+/* 一摞占的间距跟单张卡片一样，统一由 .exp-stack 自己给：
+   以前这里是 1px，收起时靠面子卡片自己的 12px 外边距漏出来看着正常，
+   展开后最后一行组员就贴着下一张卡片了（用户报的「太近了」） */
+.exp-stack { position: relative; margin-bottom: 12px; }
+
+/* 后面那两层纸边：只露 3px 和 6px */
+/* 下面压着两张纸：跟卡片墙一个做法，**往右上方斜着错开**（不是变小居中），
+   各带一道淡投影，看着像一摞纸被摊开一点。 */
+/* 垫纸只跟着「面子那张卡片」（.stack-top），不跟着展开出来的组员行 */
+.stack-top { position: relative; }
+.stack-top::before,
+.stack-top::after {
+  content: '';
+  position: absolute;
+  /* 跟卡片一样大，往右上方错开（上面那一截可以突出来） */
+  inset: 0;
+  border-radius: var(--r);
+  pointer-events: none;
+}
+.stack-top::before {
+  background: #faf8f1;
+  transform: translate(8px, -8px);
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
+}
+.stack-top::after {
+  background: #fdfcf7;
+  transform: translate(4px, -4px);
+  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
+}
+
+.exp-card.is-stack {
+  position: relative;
+  background: var(--paper);
+  border-radius: var(--r);
+  padding: 10px 11px 8px;
+  z-index: 1;
+  /* 面子这张卡片不出自己的下边距：一摞对外的间距由 .exp-stack 统一给，
+     不然收起 / 展开两种状态靠外边距塌陷凑出来的距离不一样 */
+  margin-bottom: 0;
+  /* 自己也要往上落一点影子，压在下面那张纸上的层次才出来 */
+  box-shadow:
+    0 -2px 6px -3px rgba(20, 18, 14, 0.1),
+    0 1px 2px rgba(20, 18, 14, 0.04),
+    0 6px 14px -9px rgba(20, 18, 14, 0.16);
+}
+.exp-card.is-stack:hover {
+  box-shadow:
+    0 -2px 6px -3px rgba(20, 18, 14, 0.12),
+    0 2px 4px rgba(20, 18, 14, 0.05),
+    0 10px 20px -10px rgba(20, 18, 14, 0.22);
+}
+.exp-stack.is-active .exp-card.is-stack {
+  background: #fcf7f4;
+  box-shadow:
+    0 -2px 6px -3px rgba(20, 18, 14, 0.1),
+    0 10px 22px -10px rgba(20, 18, 14, 0.22);
+}
+
+.stack-badge {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+  background: #f8f0e9;
+  border-radius: 999px;
+  padding: 1px 6px;
+  /* 千万别让它被 flex 挤成竖排（「平 / 行 / ×3」三行那种） */
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* 卡片墙上的「平行 ×N」：钉在缩略图右上角，不占下面那行 */
+.grid-thumb .stack-badge.is-corner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 5px;
+  font-size: 8px;
+  line-height: 1.6;
+  background: rgba(248, 240, 233, 0.92);
+}
+
+/* 组员小签：一条一句编号 + 产率，点了直接跳那条 */
+.stack-codes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dotted var(--line-2);
+}
+
+.stack-chip,
+.stack-more {
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background: #f4f2ee;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.stack-chip:hover { background: #ece9e2; color: var(--ink-2); }
+.stack-chip.is-on { background: var(--paper); border-color: var(--ink-4); color: var(--accent-ink); }
+
+/* 展开/收起：放卡片右上角日期后面，小签那一行只留小签 */
+.stack-more {
+  margin-left: 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--ink-4);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.stack-more:hover { color: var(--accent-ink); border-color: var(--line-2); }
+
+/* 展开后的组员行：比普通卡片矮一档，左边缩进一点，看得出从属于上面那堆 */
+/* 平行组：卡片堆上的「重复 ×N / N 种条件」，组员行上的「改：溶剂」 */
+.stack-kind { color: var(--ink-4); font-size: 9px; }
+.stack-variant {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--accent-ink);
+  background: #f8f0e9;
+  border-radius: 999px;
+  padding: 0 5px;
+}
+
+/* 平行组：只差规模的组员，标一句「1 → 5 mmol」（不算改条件） */
+.stack-scale { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
+/* 组员行上的「化学类型」（记录表头那格手填的标签，比如「改当量」）：只做标记，不参与差异 */
+.stack-rxn { font-size: 9px; color: var(--ink-4); letter-spacing: 0.02em; }
+/* 变体标签不再折成「改 N 项」：改了什么单独占一行，一条一项、各自一颗小标签 */
+.member-diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 5px;
+  margin-top: 6px;
+}
+.member-diff-item {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 16px;
+  color: var(--accent-ink);
+  background: #f8f0e9;
+  border-radius: 999px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+/* 反应类型做成跟状态一样的胶囊（暖色，不是灰的；灰色的小签在纸面上像「禁用」） */
+.tag.is-rxn {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 1px 6px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+/* 组员行顶栏那几颗小东西都不许被挤扁（「改当量」曾经被压成竖排） */
+.exp-card.is-member .top > * { flex: 0 0 auto; }
+.exp-card.is-member .exp-date { margin-left: auto; }
+
+/* 平行组：小签 / 书签上的状态点（颜色跟状态标签同一套 tone） */
+.stack-dot,
+.pgroup-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: 1px;
+  background: var(--ink-4);
+}
+/* 颜色直接取全局的 tone 变量，跟状态标签、下拉里的小圆点保持一套 */
+.stack-dot.tone-warn, .pgroup-dot.tone-warn { background: var(--warn); }
+.stack-dot.tone-ok, .pgroup-dot.tone-ok { background: var(--ok); }
+.stack-dot.tone-info, .pgroup-dot.tone-info { background: var(--info); }
+.stack-dot.tone-bad, .pgroup-dot.tone-bad { background: var(--bad); }
+.stack-dot.tone-accent, .pgroup-dot.tone-accent { background: var(--accent); }
+
+/* 小签里的三段（编号 / 状态 / 产率）用间距隔开，不靠空格，免得被模板吃掉 */
+.stack-chip .chip-code { margin-left: 2px; }
+.stack-chip .chip-status { margin-left: 5px; color: var(--ink-4); }
+.stack-chip .chip-yield { margin-left: 5px; }
+.stack-chip.is-on .chip-status { color: var(--accent-ink); opacity: 0.8; }
+
+/* 悬停预览卡：差异那一条要跳出来，常规信息退到后面 */
+.pgroup-peek-flag {
+  margin: 6px 0 4px;
+  padding: 3px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.pgroup-peek-flag.is-diff {
+  background: #fbf1e9;
+  color: var(--accent-ink);
+}
+.pgroup-peek-flag.is-same {
+  background: #f2f5f0;
+  color: #40573c;
+}
+/* 规模 / 溶剂用量：数字用等宽、加重，一眼看到 */
+.pgroup-peek-scale {
+  margin-top: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  letter-spacing: 0.02em;
+}
+.pgroup-peek-scale b { font-weight: 600; color: var(--ink); }
+
+/* 平行组展开后的组员行：只靠留白分行，不加框线；标题单独一行。
+   行与行之间 6px + 行内 9px 内边距（用户嫌 2px 太挤）；再散就成了「薄薄几行漂在大空隙里」。 */
+.stack-members {
+  /* 贴着自己的面子卡片近一点（8px < 卡片之间 12px），看得出组员在「这一摞里面」；
+     组员整体对这一摞外面不吃自己的下边距，下面那条 12px 由 .exp-stack 给 */
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid #eceae2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.exp-card.is-member {
+  padding: 9px 9px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  margin-bottom: 0;
+  box-shadow: none;          /* 组员行是纸堆里的行，不能有自己的投影 */
+}
+/* 点过的行会留下浏览器默认焦点环（一圈黑框），这里按掉；键盘走 tab 时用底部细线提示 */
+.exp-card.is-member:focus { outline: none; }
+.exp-card.is-member:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--line-2); }
+.exp-card.is-member:hover { background: #f2f0ec; }
+/* 当前那条不该被 hover 底色盖掉 */
+.exp-card.is-member[aria-current="true"]:hover { background: #fcf7f4; }
+/* 选中的组员行跟别的卡片一样「稍微变色」（用户要的），只是不带自己的投影 */
+.exp-card.is-member[aria-current="true"] { background: #fcf7f4; box-shadow: none; }
+.exp-card.is-member[aria-current="true"] .exp-code { color: var(--accent-ink); }
+/* 一摞展开着的时候，当前态挪到具体那条组员行上（面子卡不再套虚线，不然一摞里两圈）：
+   从书签切过来时，选中框要落在「到底是哪条子实验」上 */
+.exp-card.is-member[aria-current="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(168, 71, 31, 0.45);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.exp-card.is-member .top { gap: 6px; margin-bottom: 5px; }
+.exp-card.is-member .exp-title {
+  font-size: 12px;
+  line-height: 1.3;
+  margin-bottom: 0;
+  color: var(--ink-2);
+  -webkit-line-clamp: 1;
+}
+/* 日期顶到右边（跟上面那张卡片一样占满整行），产率接在日期后面 */
+.exp-card.is-member .exp-date { margin-left: auto; }
+.member-yield {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ok);
+}
+
+/* ================================================================
+   平行书签的悬停预览卡：一行粗体提要 + 最多三行灰字摘要
+   （跟 DSH 的 turn 预览一个路数：不分区、不描边、不铺底色，超长就截断）
+   ================================================================ */
+.pgroup-peek-float .peek-line {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+.pgroup-peek-float .peek-body {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-3);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* ================================================================
+   卡片墙上的平行组：一摞纸。
+   同一个 group_id 的实验只占一格（面子 = 正在看的那条），后面露两层纸边；
+   点开是面子那条，其余的在左栏卡片堆 / 纸外书签里切。
+   ================================================================ */
+.grid-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 底下压着两张纸：不描边，靠「比顶张窄一点 + 抬起来一点 + 各自的淡投影」叠出来，
+   看起来是一摞纸，而不是两条描边的空框 */
+.grid-stack::before,
+.grid-stack::after {
+  content: '';
+  position: absolute;
+  /* 跟卡片一样大，**往右上方错开**：整张纸的边缘都能看出来（上边和右边露一截），
+     用户明确要求「上面可以突出来」，不要为了齐平把纸截成半截 */
+  inset: 0;
+  border-radius: var(--r);
+  pointer-events: none;
+}
+/* 白纸才看得出「斜着叠」：画布是 #f5f4f1，纸色差太小就只剩一道灰影。
+   两张纸各自带一道影子 + 顶张上方再落一道，三层才数得清；
+   错开量别太大（11 / 5.5），再大就成一摞砖了。 */
+.grid-stack::before {
+  background: #faf8f1;
+  transform: translate(13px, -13px);
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.1), 0 6px 14px -6px rgba(20, 18, 14, 0.24);
+}
+.grid-stack::after {
+  background: #fdfcf7;
+  transform: translate(6.5px, -6.5px);
+  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12), 0 4px 10px -5px rgba(20, 18, 14, 0.16);
+}
+
+/* 卡片本身撑满这一格（.card-grid.is-even 让同一行的卡片等高）；
+   上面那张要在自己上方也落一点影子，压着的两张纸才有「叠起来」的层次 */
+.grid-stack .grid-card {
+  flex: 1 1 auto;
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 2px 5px -2px rgba(20, 18, 14, 0.12),
+    0 1px 2px rgba(20, 18, 14, 0.04),
+    0 10px 22px -8px rgba(20, 18, 14, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.grid-stack.is-dragging { opacity: 0.45; }
+
+/* ================================================================
+   打开记录时的「读取中」骨架（EditorView 首屏）。
+   只在这张纸的位置放一张空白纸 + 几道浅条：接口回来前版面不塌，
+   点开记录不会再整片空白闪一下。高度按 A4 比例给，内容出现时不跳。
+   ================================================================ */
+.sheet-loading {
+  pointer-events: none;
+  aspect-ratio: 210 / 297;
+}
+.sk-line {
+  display: block;
+  height: 9px;
+  border-radius: 2px;
+  background: #f0efea;
+}
+.sk-line.sk-h { height: 15px; background: #ebeae4; }
+.sk-line + .sk-line { margin-top: 10px; }
+
+
+/* ================================================================
+   工作台的全局搜索（一次搜实验 + 化合物，分两组列出来）
+   输入框直接复用中栏那个 .searchbox；结果复用 .recent-list / .recent-row
+   ================================================================ */
+.dash-search { margin-bottom: 22px; }
+.dash-search .searchbox input { padding-top: 8px; padding-bottom: 8px; }
+.dash-group { margin-top: 14px; }
+.dash-sub {
+  margin: 0 0 7px;
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
+.dash-sub .mono { color: var(--ink-4); margin-left: 3px; }
+
+/* ================================================================
+   附件就地预览（FilePreview）：图片铺开、PDF 用浏览器自带阅读器、
+   文本类放等宽区。高度按视口算，弹窗不会把页面顶出屏幕。
+   ================================================================ */
+.fp {
+  background: #faf9f6;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  max-height: calc(100vh - 300px);
+  overflow: auto;
+}
+.fp-img { max-width: 100%; max-height: calc(100vh - 320px); object-fit: contain; }
+.fp-pdf { width: 100%; height: calc(100vh - 320px); border: none; background: #fff; }
+.fp-text {
+  margin: 0;
+  width: 100%;
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.fp-other { text-align: center; padding: 26px 10px; }
+.fp-ext {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f2f1ec;
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.fp-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+
+/* ================================================================
+   画结构式弹窗（SketcherModal）：iframe 里跑 JSME，高度按视口给
+   ================================================================ */
+.sk { position: relative; height: min(62vh, 560px); border-radius: 6px; overflow: hidden; background: #faf9f6; }
+.sk-frame { width: 100%; height: 100%; border: none; display: block; }
+.sk-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--ink-3);
+  background: #faf9f6;
+}
+.sk-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+
+/* 化合物页「结构式」格子下面的小工具行（画结构式） */
+/* .cmp-top 是「缩略图 | 字段」两栏：左栏只放缩略图 + 下面那行按钮，别再塞第三个平级子元素
+   （塞过：自动布局把 .cmp-fields 挤到第二行 148px 的窄格里，整块字段挤成一团） */
+.cmp-top { align-items: start; }
+.cmp-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 148px;
+}
+/* 「画结构式」+ PubChem / ChemicalBook：竖着排在缩略图下面，宽度就是缩略图那么宽 */
+.cmp-structure-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  width: 100%;
+}
+/* 外部查询：左栏只有 148px，一律竖排（横排一换行就参差不齐）；上面一行小标题说明这是干什么的 */
+.cmp-lookup-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.cmp-lookup-cap {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  margin-top: 2px;
+}
+/* 物性（密度 / 沸点 / 闪点 / 溶解度）：贴在表头区块下面单独一行，缩略图那栏放不下 */
+.cmp-props {
+  margin: -6px 0 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+/* 结构信息查询（PubChem）：画板里查出来的一行 + 化合物页那两个跳转链接 */
+.sk-info {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: #f8f7f2;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.sk-info-name { color: var(--ink); font-weight: 600; }
+.sk-info-cas { font-size: 12px; color: var(--accent-ink); }
+.sk-info-sub { font-size: 12px; color: var(--ink-3); }
+.sk-info a { font-size: 12px; color: var(--accent-ink); text-decoration: none; }
+.sk-info a:hover { text-decoration: underline; }
+/* 结构式下面那两个「去外面查」的链接：是动作、不是装饰，所以比说明文字深一档、不换行 */
+.cmp-lookup-link {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 1px dotted var(--line-2);
+}
+.cmp-lookup-link:hover { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
+
+/* 画板信息条里的物性（熔点 / 密度 / 沸点）：比名称那行淡一点，太窄时直接不显示 */
+.sk-info-props { color: var(--ink-4); }
+@media (max-width: 900px) {
+  .sk-info-props { display: none; }
+}
+
+/* SMILES 那格：会换行的文本域（长 SMILES 一眼能看全），标签行右边放「复制」 */
+.c-field-head { display: flex; align-items: center; gap: 8px; }
+.c-field-head .mini-copy,
+.mini-copy {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.mini-copy:hover { color: var(--accent-ink); text-decoration: underline; }
+.smi-text {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+  padding: 3px 5px;
+  resize: none;
+  outline: none;
+  word-break: break-all;
+  white-space: pre-wrap;
+  min-height: 34px;
+}
+.smi-text:focus { background: #f6f5f1; }
+.smi-text::placeholder { color: var(--ink-4); }
+
+/* SMILES 平时就是一行（点一下复制），够长就省略号；点「改」才换成 .smi-text 输入框 */
+.smi-line {
+  display: block;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: copy;
+}
+.smi-line:hover { background: #f6f5f1; border-color: var(--line-2); }
+.smi-line.is-empty { color: var(--ink-4); cursor: default; font-family: var(--sans); }
+.smi-line.is-empty:hover { background: none; border-color: transparent; }
+
+/* 读图结果面板：一行一条，能点的（猜出展开剂 / Rf）标出来 */
+.ocr-list { display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow-y: auto; }
+.ocr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: #faf9f5;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ocr-row:hover { background: #f4f2ec; border-color: var(--line-2); }
+.ocr-row.is-pick { background: #fcf7f4; }
+.ocr-tag {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+}
+
+/* ── 右键菜单（`ContextMenu.vue` + `lib/rowmenu.js`） ──
+   列表卡片 / 卡片墙上右键弹出来的那一小块：纸白 + 极淡描边，跟下拉菜单同一个调子。
+   位置由组件按鼠标算好内联写进来，这里只管长相。 */
+.ctx-menu {
+  position: fixed;
+  z-index: 2100;
+  min-width: 150px;
+  max-width: 250px;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--paper);
+  border: none;
+  border-radius: 8px;
+  /* 不描边，靠一道发丝环 + 很轻的影子托住；鼠标旁边的小浮层，不该像弹了个窗 */
+  box-shadow: 0 0 0 0.5px rgba(20, 18, 14, 0.08), 0 6px 18px rgba(20, 18, 14, 0.06);
+}
+
+.ctx-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 7px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--ink-2);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ctx-opt:hover { background: #f5f3ee; color: var(--ink); }
+.ctx-opt:focus-visible { outline: none; background: #f2f0ea; }
+.ctx-opt .ctx-icon { flex: none; color: var(--ink-4); }
+.ctx-opt:hover .ctx-icon { color: var(--ink-3); }
+.ctx-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.ctx-hint { flex: none; font-family: var(--mono); font-size: 9.5px; color: var(--ink-4); }
+.ctx-opt.is-danger { color: var(--bad); }
+.ctx-opt.is-danger .ctx-icon { color: #c58b8a; }
+.ctx-opt.is-danger:hover { background: var(--bad-soft); color: var(--bad); }
+.ctx-sep { height: 1px; margin: 2px 2px; background: #f1f0ec; }
+
+/* 锁定的记录：编号后面一枚小锁（原来 meta 里那句「已锁定」改用图标，不占那行地方） */
+.exp-lock {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--accent);
+}
+.exp-lock .i { display: block; }
+
+/* 右键菜单的小节标题 / 子菜单箭头 / 子菜单那一层 */
+.ctx-head {
+  padding: 4px 8px 2px;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.ctx-caret { flex: none; margin-left: 2px; color: var(--ink-4); font-size: 12px; line-height: 1; }
+.ctx-menu.is-sub { z-index: 2101; min-width: 132px; }
+
+/* 记录页表头：关掉「温度 / 湿度」时补一个占位的空单元格，
+   不然那一行只剩 4 格，右边会缺一块没有边框的白洞 */
+.sheet-meta td.meta-fill {
+  border: none;
+  background: var(--paper);
+}
+
+/* 设置页 06「记录页显示」：一堆勾选框，排成两列 */
+.sheet-blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.sheet-blocks label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+/* 「产物是库里的哪个化合物」列表：每条前面挂一张结构式缩略图（没有结构图就给个分子图标） */
+.recipe-thumb {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink-4);
+}
+.recipe-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* 化合物「类型」的自绘下拉（`KindPick.vue`）：触发器长得跟旁边那些格子一样，
+   弹出来的菜单跟「分类」下拉同一套（.cat-menu），不用系统 select 的蓝底菜单 */
+.kind-pick { position: relative; min-width: 0; }
+
+.kind-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 130ms;
+}
+
+.kind-trigger:hover { background: #f8f7f3; }
+.kind-trigger:focus-visible { outline: none; background: #f6f5f1; }
+.kind-trigger:disabled { cursor: default; color: var(--ink-3); }
+.kind-text { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kind-trigger .i { flex: none; color: var(--ink-4); }
+
+.kind-menu {
+  top: calc(100% + 2px);
+  left: 0;
+  width: max-content;
+  min-width: 132px;
+  max-width: 220px;
+  /* 11 个类型一共 ~290px，干脆不设高度上限：多高就多高，不要滚动条 */
+  max-height: none;
+  overflow: visible;
+}
+
+/* 所有「分类 / 类型 / 课题」那类自绘下拉：**一律单列、横向不要滚**。
+   `.qmenu` 的 flex-wrap: wrap 撞上 max-height 会把菜单折成第二列，
+   看上去就是「被切了一半、还能横向拖」（用户报过两次）。 */
+.qmenu.cat-menu {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  overflow-x: hidden;
+}
+.qmenu.cat-menu .cat-menu-opt { flex: 0 0 auto; }
+
+/* 下拉菜单不要出现滚动条（分类特别多时仍然能用滚轮滚，只是不画那道杠） */
+.qmenu.cat-menu,
+.kind-menu {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.qmenu.cat-menu::-webkit-scrollbar,
+.kind-menu::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* 反应式「跟随投料表」：inline SVG 居中显示。
+   以前高度写死 220px（怕刷新后先空一下再出图会顶来顶去），结果图只有 150px 高，
+   上下各空一截（用户圈出来让压缩）。现在**盒子跟着图的高度走**——缓存命中时首帧就有图，
+   不会有跳动；第一次画的极少数情况由外层 `.scheme-slot` 的 min-height 兜着，只跳几十像素。 */
+.scheme-live {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scheme-live > div { width: 100%; display: flex; align-items: center; justify-content: center; }
+.scheme-live svg { display: block; width: 100%; height: auto; max-height: 240px; }
+/* 以前是 `max-height:190px + width:auto`：高度先撞顶，图就只有格子宽的 80%，左右各留一条白
+   （用户：「左右间距空白不要太大，不缩成一小块」）。现在宽度吃满、高度按比例，240px 才封顶。 */
+@media print { .scheme-live svg { max-height: 190px; } }  /* 打印这块保持原样，别动「恒 2 页」 */
+
+/* 反应式格子右上角的「画反应式」按钮：字号跟着这一带走，别把标签挤歪 */
+.scheme-head { align-items: center; }
+.scheme-head .spacer { flex: 1; }
+.scheme-head .btn-sm { padding: 2px 8px; }
+
+/* 历史弹窗里每格的「改回去」：平时淡、hover 才明显，别抢「改前 → 改后」的注意力 */
+.hist-changes .chg-restore {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.45;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.hist-changes .chg:hover .chg-restore { opacity: 1; }
+.hist-changes .chg-restore:hover { color: var(--accent-ink); }
+.hist-changes .chg-restore:disabled { cursor: default; color: var(--ink-4); }
+
+/* 附件那一屏：不在记录纸上（打印 / 存 PDF 都不带），所以不画 A4 纸的感觉，当一块管理面板 */
+.sheet-att { padding: 26px 30px 40px; }
+.sheet-att .sec-att, .sheet-att .att-block { box-shadow: none; }
+.sheet-att .sheet-foot { margin-top: 22px; }
+
+/* ===== 拖动排序（2026-11）=====
+   卡片是 <button>，拖动走 `lib/pointdrag.js`（普通 mouse 事件）。
+   **这里必须显式 `-webkit-user-drag: none`**：WebKit 里只要元素被当成可原生拖拽
+   （属性或 `-webkit-user-drag: element` 任一条），真鼠标按下再拖就会起一个原生拖拽会话，
+   后续 `mousemove` 全被它吃掉——页面表现为「按着拖完全没反应」，而合成事件测起来一切正常
+   （合成事件压根不会启动原生拖拽）。踩了整整三轮，别再往回调。 */
+.grid-card,
+.exp-card,
+.cmp-card,
+.grid-thumb img,
+.grid-card img {
+  -webkit-user-drag: none;
+  cursor: grab;
+}
+.grid-card:active,
+.exp-card:active,
+.cmp-card:active { cursor: grabbing; }
+
+/* 拖着的那张淡下去；落点那张在顶上画一道强调色线（卡片之间本来有 12px 缝，线露得出来） */
+.grid-card.is-dragging,
+.exp-card.is-dragging,
+.cmp-card.is-dragging { opacity: 0.45; }
+
+.exp-card.cmp-card { position: relative; }
+
+/* 自己实现的 pointer 拖拽（不走原生 DnD）：拖的时候别选字、光标变抓手 */
+body.is-pointer-dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+body.is-pointer-dragging * { cursor: grabbing !important; }
+.exp-card.can-drag, .grid-card.can-drag { cursor: grab; }
+
+/* 中栏实验列表的拖动排序（跟化合物中栏一致）：落点一道强调色短线，拖起来的那张淡下去 */
+
+
+/* 拖着卡片的时候，空分类那一行长成够大的落点（平时还是只占组头一行，不占地方） */
+.grid-drop-line.is-armed {
+  margin-bottom: 12px;
+  padding: 12px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line-2);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* 拖动时跟着光标走的虚影卡：拿在手上的感觉。
+   不加它的版本只有「原卡淡下去 + 一道落点线」，用户说「很僵硬、没有虚影卡片」。 */
+.drag-ghost {
+  /* 必须 `!important`：中栏列表的卡片带 `cmp-card`（`.exp-card.cmp-card{position:relative}` 权重更高），
+     不用 !important 的话虚影会被顶回 `relative`、掉到页面最下面去。 */
+  position: fixed !important;
+  left: 0;
+  top: 0;
+  margin: 0 !important;
+  z-index: 9998;
+  pointer-events: none !important;
+  opacity: 0.97;
+  border-radius: var(--r);
+  transform-origin: 50% 30%;
+  box-shadow:
+    0 22px 44px rgba(24, 20, 16, 0.2),
+    0 4px 10px rgba(24, 20, 16, 0.12);
+  will-change: transform;
+}
+.drag-ghost * { pointer-events: none !important; }
+/* 虚影里的缩略图别重新播一次淡入 */
+.drag-ghost img { opacity: 1 !important; animation: none !important; }
+
+/* 被拿起来的那张原卡：**看着等于没了，但它必须还在**。
+   为什么不能 `display:none` / `visibility:hidden` / 真从 DOM 删：
+   ①按下时命中的是卡片里的缩略图，WebKit 一旦把这个目标从渲染树里拿掉，
+      就不再给页面派发后续 `mousemove` → 直接拖不动（侧边栏踩过一整个来回）；
+   ②它占着网格的格子，一删整墙就塌一格、所有卡片瞬移，落点也会跟着偏。
+   `opacity` 只影响绘制、不影响命中测试和事件，所以压到 0.02：肉眼就是一块空位。 */
+.grid-card.is-dragging,
+.exp-card.is-dragging,
+.cmp-card.is-dragging,
+.grid-stack.is-dragging {
+  opacity: 0.07;
+  box-shadow: none;
+  background: transparent;
+  outline: none;
+}
+
+/* 「拖到这一组时整组不再淡下去」这条老规则会把**正在被拖的那张**也一起还原成不透明，
+   于是它看着没被拿起来。这里把被拖的那张排除掉。 */
+.grid-page.is-dragging .grid-group.is-drop .grid-card:not(.is-dragging) { opacity: 1; }
+/* 而被拿起来的那张要**压过**上面那条（它的选择器有 4 个类，光靠 `.grid-card.is-dragging` 顶不住），
+   否则拖到自己组上时原卡又变回不透明，看着像没被拿起来。 */
+.grid-page.is-dragging .grid-group.is-drop .grid-card.is-dragging,
+.grid-page.is-dragging .grid-stack.is-dragging { opacity: 0.07; }
+/* 老规则 `.grid-page.is-dragging .grid-card { opacity:.4 }` 的权重比 `.grid-card.is-dragging` 高，
+   所以被拿起的那张在实验页上还是 0.4。这里用同前缀、多一个类的写法把它压住。 */
+.grid-page.is-dragging .grid-card.is-dragging,
+.grid-page.is-dragging .grid-stack.is-dragging,
+.listpane .exp-card.is-dragging { opacity: 0.07; }
+
+/* 中栏列表的拖动占位格：跟卡片一样高的一块虚线空位，下面的卡片真的让位
+   （以前只有一条 2px 的线，用户说「侧边栏那边没有占位」） */
+/* 中栏列表的落点：跟墙一样的**流内占位格**（虚线强调色），下面的卡片让位 + FLIP 滑动。
+   高度由组件内联给（= 被拖那张卡的真实高度）。
+   **被按下的那张卡不能隐藏**（WebKit 会掐掉它后续的 `mousemove` → 拖不动），只能压到 0.07。 */
+.listpane .list-drop-slot {
+  margin-bottom: 12px;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--r);
+  background: #fbf4ee;
+}
+
+/* 卡片墙的占位格：插在网格里、跟卡片一样大小的一格虚线位，下面的卡片真的让位。
+   它是流内的——**必须靠 `pointdrag` 的几何快照判定落点**，否则占位格一插进来卡片就移开、
+   光标底下换成另一张卡，落点会来回翻（用户报过「让位速度太快，像在左右跳动」）。
+   高度交给 grid 的行高（卡片会把行撑到卡片那么高），只有在单独成一行时才用 min-height 兜底。 */
+.drop-gap {
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--r);
+  background: #fbf4ee;
+  min-height: 150px;
+}
+.card-grid.is-even .drop-gap { min-height: 222px; }
+
+/* 表格视图（实验 / 化合物）：整行可点进去 + 行悬停 + 表头右边界拖列宽 */
+.scope-table tbody tr { cursor: pointer; }
+.scope-table tbody tr:hover td { background: #f7f5f0; }
+.scope-table tbody tr.is-picked:hover td { background: #f3efe9; }
+/* 表头右边界那一条：不拖看不见，悬停才浮出一道细线 */
+.scope-table th { position: relative; }
+.col-grip {
+  position: absolute; top: 0; right: -3px; width: 7px; height: 100%;
+  cursor: col-resize; z-index: 2; -webkit-user-drag: none;
+}
+.col-grip::after {
+  content: ''; position: absolute; top: 4px; bottom: 4px; right: 3px; width: 1px;
+  background: transparent; transition: background 120ms;
+}
+.col-grip:hover::after { background: var(--accent-ink); }
+/* 拖动中：整页保持 col-resize 光标，不然经过单元格就变回箭头 */
+body.is-col-resizing, body.is-col-resizing * { cursor: col-resize !important; user-select: none !important; }
+/* 最后一列的把手指向内侧，别顶出表格右边缘（会多一条横向滚动条） */
+.scope-table th:last-child .col-grip { right: 0; }
+

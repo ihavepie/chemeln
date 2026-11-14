@@ -1,0 +1,579 @@
+/* ================================================================
+   条件筛选页：一摞平行实验 = 一张清单
+   组头一行（组名 · 条数 · 基准 + 单变量/自动匹配小标），
+   下面一个组员一行：编号 · 「改了什么」小标（没改就是「重复 / 平行」）· 产率 · 选择性。
+   ================================================================ */
+.cx-group { margin-top: 22px; }
+.cx-group:first-of-type { margin-top: 12px; }
+.cx-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.cx-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.cx-meta { font-size: 11px; color: var(--ink-3); }
+.cx-src {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em;
+  color: var(--ink-4); border: 1px solid var(--line-2); border-radius: 3px; padding: 1px 5px;
+}
+
+.cx-list { list-style: none; margin: 0; padding: 0; }
+.cx-row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 6px 8px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--ink-2); font: inherit; text-align: left; cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+.cx-row:hover { background: #faf9f6; }
+.cx-row:last-child { border-bottom: none; }
+.cx-row.is-base { color: var(--ink-3); }
+.cx-code { flex: 0 0 auto; font-size: 12px; color: var(--ink-2); min-width: 62px; }
+.cx-row.is-base .cx-code { color: var(--ink-3); }
+.cx-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.cx-tag {
+  display: inline-block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 10px; line-height: 1.6;
+  color: var(--ink-3); background: #f5f3ee; border-radius: 3px; padding: 0 6px;
+}
+.cx-tag.is-base { background: transparent; color: var(--ink-4); padding: 0; }
+/* 改动：极淡强调色底，跟「重复 / 基准」拉开，但不要描边 */
+.cx-tag.is-diff { color: var(--accent-ink); background: #fbf2ec; }
+.cx-res, .cx-sel { flex: 0 0 auto; font-size: 11.5px; color: var(--ink-3); min-width: 52px; text-align: right; }
+.cx-sel { color: var(--ink-4); font-size: 10.5px; }
+
+/* 自动匹配那节：标题旁的「单变量 · 温度」小标 */
+.mx-var {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+  background: #faf1ec;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+/* 条件筛选清单：`.spacer` 在这个容器里也要撑开，不然产率会紧贴在「改了什么」后面 */
+.cx-head .spacer, .cx-row .spacer { flex: 1 1 auto; }
+
+/* ================================================================
+   条件筛选页顶部的「我的筛选表」+ 筛选表详情页（.sct-*）
+   ================================================================ */
+.sct-head { display: flex; align-items: baseline; gap: 9px; margin: 18px 0 8px; }
+.sct-head-title { font-size: 13.5px; font-weight: 600; color: var(--ink); margin: 0; }
+.sct-head .spacer { flex: 1 1 auto; }
+.sct-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.sct-card {
+  display: flex; flex-direction: column; gap: 2px; min-width: 170px; padding: 8px 11px;
+  text-align: left; background: #fff; border: 1px solid var(--line-2); border-radius: 7px;
+  font: inherit; color: var(--ink); cursor: pointer;
+}
+.sct-card:hover { border-color: var(--ink-4); }
+.sct-card b { font-size: 12.5px; font-weight: 600; }
+.sct-card-meta { font-size: 10.5px; color: var(--ink-3); }
+
+/* 详情页 */
+.scr-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.scr-head .spacer { flex: 1 1 auto; }
+.scr-save { font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
+.scr-del { color: var(--bad); }
+
+/* 筛选表：照文献里那种「三线表」（booktabs）——
+   顶上一条细线、表头下和表尾各一条粗线，中间**不加竖线也不加行线**，
+   基准那一行也不铺底色。正文是衬线（文献表都是 Times 那一路的数字与字母）。
+   用户贴的就是这种表，别又加回网格线 / 表格外框 / 列底色。 */
+.sct-table {
+  /* 铺满内容宽度（文献表就是占满整栏）；宽度要调就拖「列表 ↔ 纸面」那条分隔线 */
+  width: 100%;
+  border-collapse: collapse;
+  /* 照用户给的那张文献表：Times 衬线、14px、行距宽松；数字右对齐，
+     用 tabular-nums 让位数对齐。中文落到宋体（Songti）才跟 Times 一排不打架。 */
+  font-family: var(--sct-serif);
+  font-size: 14px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.sct-table th,
+.sct-table td {
+  padding: 7px 14px;
+  text-align: left;
+  vertical-align: middle;
+  border: 0;
+}
+/* 文献的规矩：顶线细（1px）、表头下那条粗（2.5px） */
+.sct-table thead th {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  vertical-align: bottom;
+  border-top: 1px solid var(--ink-2);
+  border-bottom: 2.5px solid var(--ink);
+  padding: 7px 14px 8px;
+}
+.sct-table tbody tr:last-child td { border-bottom: 2.5px solid var(--ink); }
+/* 文献表里基准行不铺底色（用户给的那张就是白的） */
+.sct-table tbody tr.is-base td { background: transparent; }
+/* 文献表里第一列的文字是**顶着最左边那条线**起的（没缩进），标题也一样——照它来 */
+.sct-table th:first-child,
+.sct-table td:first-child { padding-left: 0; }
+/* 数字列右对齐（`trace` / `<5` 这类字也贴着右边，跟文献一样） */
+.sct-table td.sct-num { text-align: right; font-size: 14px; }
+/* Entry 那一列窄、靠左，行号用衬线数字 */
+.sct-table .sct-c-entry {
+  width: 1%; text-align: left; padding-right: 22px;
+  font-size: 14px; color: var(--ink);
+}
+.sct-table tbody tr.is-base .sct-c-entry { color: var(--ink); font-weight: 600; }
+.sct-table .sct-c-x { width: 1%; }
+.sct-table .sct-c-fix { white-space: nowrap; }
+/* 编号也是正文的字（不要等宽 / 强调色那种 app 观感） */
+.sct-table .sct-c-fix .linklike { font: inherit; color: var(--ink); }
+.sct-table .sct-c-fix .linklike:hover { color: var(--accent-ink); }
+.sct-table .sct-c-fix.sct-sub { white-space: normal; min-width: 120px; max-width: 240px; }
+/* 编号后面跟的一句实验名（有才出现），别把它也做成等宽/强调色 */
+.sct-table .sct-title {
+  display: inline-block;
+  max-width: 118px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.sct-table td.is-manual { background: transparent; }
+/* 表下面那行脚注：论文里的 ᵃ 注（上标字母 + 小字衬线） */
+.sct-note {
+  margin: 9px 0 2px;
+  padding: 0;
+  font-family: var(--sct-serif);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--ink-3);
+}
+.sct-note-item { margin-right: 18px; }
+.sct-note sup {
+  font-size: 8.5px;
+  font-weight: 400;
+  color: var(--ink-3);
+  margin-right: 3px;
+  vertical-align: super;
+  line-height: 0;
+}
+/* 数字列（产率 / 选择性…）右对齐：跟文献一样数字贴着列的右边；
+   表头从列左边起头，所以表头比数字宽出一截是正常的（文献那张也一样）。 */
+.sct-table th.sct-num,
+.sct-table td.sct-num { text-align: right; width: 96px; }
+/* 长文字的列保底宽度，句子尽量不折行 */
+.sct-table .sct-wide { min-width: 200px; }
+/* 手动列（备注之类）别被数字列挤没 */
+.sct-table .sct-field.is-manual { min-width: 120px; }
+.sct-table th.sct-num .sct-th { justify-content: flex-start; }
+/* 筛选表不套卡片：论文里的表就是直接铺在纸面上的三线表（用户要的就是这个）。
+   `.sct-plain` 只是留白用的壳，别给白底 / 投影 / 圆角。 */
+.sct-plain {
+  /* 筛选表整块统一走 Times 衬线（中文落宋体，跟 Times 一排不打架） */
+  --sct-serif: 'Times New Roman', Times, 'Songti SC', 'STSong', serif;
+  padding: 0; margin-bottom: 22px; background: transparent; box-shadow: none;
+}
+/* 表标题：`表 1：条件优化`，跟文献的 `Table 1:` 一样——衬线、粗斜体编号 + 粗体标题，
+   后面跟一个上标 [a]（指向表下的脚注），压在表格顶上 */
+.sct-cap {
+  margin: 0 0 10px;
+  padding: 0;
+  font-family: var(--sct-serif);
+  font-size: 15px;
+  color: var(--ink);
+}
+/* 列表页块头也用 .sct-cap-no（那里是个 UI 小标签，别跟着变成斜体） */
+.sct-cap-no { font-weight: 600; margin-right: 0.9em; }
+.sct-cap .sct-cap-no { font-weight: 700; font-style: italic; margin-right: 0.35em; }
+.sct-cap .sct-cap-ti { font-weight: 700; }
+.sct-cap-fn {
+  font-size: 9.5px; font-weight: 400; font-style: normal;
+  color: var(--ink-3); margin-left: 2px; vertical-align: super; line-height: 0;
+}
+/* 卡里面的反应式不再单独套卡（卡片里套卡片），就一块普通内容，压在三线表顶线上面 */
+.sct-std {
+  /* 反应式居中摆在表格上方；条件就画在箭头上下，不再另起一行「Standard conditions: …」
+     （用户明确不要那行字，别加回来） */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.sct-std-scheme { display: block; }
+.sct-std > .sct-std-scheme { min-width: 0; }
+/* 条件筛选首页一页可能摊好几张表，那里的图收小一点，别把清单顶下去 */
+.sct-block .sct-std { margin: 0 0 8px; }
+.sct-block .sct-std svg { max-height: 160px; }
+.sct-std svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  /* 图里箭头上的字是 13px，自然高 230px；压到 200px 时字约 11.5px，跟表格正文差不多大，
+     再小字就比表格里的字细一号，看着像是贴上去的 */
+  max-height: 200px;
+  height: auto;
+  margin: 0;
+  /* 文献里的结构式是黑白的；彩色杂原子压在三线表上太跳，这里去色压一下（只影响这张小图） */
+  filter: grayscale(1) brightness(0.72) contrast(1.15);
+}
+
+.sct-th { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; row-gap: 1px; }
+/* 表头的脚注上标（`[b]`）：比正文字小一号、不抢眼 */
+.sct-th-fn { font-size: 9px; font-weight: 400; color: var(--ink-3); margin-left: 2px; white-space: nowrap; }
+/* 改名 / 删列只在悬停表头时露出来，平时别占地方 */
+.sct-th-acts { display: inline-flex; gap: 1px; opacity: 0; transition: opacity 0.1s; }
+.sct-table thead th:hover .sct-th-acts { opacity: 1; }
+.sct-th-label { color: var(--ink); font-size: 14px; font-weight: 700; }
+.sct-th-src {
+  font-size: 8.5px; color: var(--ink-4); line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+.sct-var-x {
+  border: 0; background: transparent; color: var(--ink-4);
+  font: inherit; font-size: 9.5px; cursor: pointer; padding: 0 1px;
+}
+.sct-var-x:hover { color: var(--ink-2); }
+.sct-var-x.is-del:hover { color: var(--bad); }
+.sct-auto { display: inline-block; white-space: nowrap; }
+/* 「相对标准条件」那种长句：跟正文一样是 14px 衬线（小一号就比别的格子虚），只稍微压灰 */
+.sct-auto.sct-wrap { white-space: normal; max-width: 380px; color: var(--ink); }
+.sct-cell {
+  width: 100%; box-sizing: border-box; padding: 3px 5px;
+  border: 1px solid transparent; border-radius: 4px; background: transparent;
+  font: inherit; font-size: 11.5px; color: var(--ink-2);
+}
+.sct-cell:hover { border-color: var(--line-2); }
+.sct-cell:focus { outline: none; border-color: var(--line-2); background: #fffdf9; }
+.sct-row-x {
+  border: 0; background: transparent; color: var(--ink-4); font-size: 13px; line-height: 1;
+  cursor: pointer; padding: 2px 4px;
+}
+.sct-row-x:hover { color: var(--bad); }
+
+/* 「加一个字段」弹窗 */
+.sct-form { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.sct-form-label { flex: 0 0 54px; font-size: 11px; color: var(--ink-3); padding-top: 7px; }
+.sct-src { display: flex; flex-wrap: wrap; gap: 5px; }
+.sct-src-chip {
+  padding: 3px 9px; border: 1px solid var(--line-2); border-radius: 999px;
+  background: #fff; color: var(--ink-2); font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.sct-src-chip:hover { border-color: var(--ink-4); }
+.sct-src-chip.is-on { border-color: var(--accent-ink); color: var(--accent-ink); background: #fdf6f2; }
+
+/* 条件筛选首页：每张筛选表就地摊开（标题行 + 三线表） */
+.sct-block { margin: 12px 0 20px; }
+.sct-block-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 2px; }
+.sct-block-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.sct-block-head .spacer { flex: 1 1 auto; }
+
+/* ================================================================
+   记录页「类型」那一格：记录类型 + 化学类型**并排**（以前上下堆着，
+   两个值一填这一行就被顶高，用户说「有点高」）。td 不能改成 flex
+   （table-cell 的盒子会塌），所以里面再套一层 .kind-inline。
+   ================================================================ */
+.sheet-meta .kind-inline { display: flex; align-items: center; gap: 6px; }
+.sheet-meta .kind-inline select,
+.sheet-meta .kind-inline input { width: auto; min-width: 0; }
+.sheet-meta .kind-inline select { flex: 0 0 auto; max-width: 78px; }
+.sheet-meta .kind-inline input { flex: 1 1 0; }
+
+/* ================================================================
+   内容区左右两条抓手指，照 DSH 的 ConversationRoot 那套做的：
+   · 判定区是**整列高、34px 宽**的透明条，内边离内容区 14px，往外铺 34px
+     （留白 48px，正好不出界）；
+   · 看得见的东西是条 **3px 宽、圆角**的小竖条，藏在判定区内侧 16px 处
+     （≈ 离内容区 31px），**纵向跟着鼠标走**，不是拉满整列；
+   · 纵向是一段渐变发光：中间 24px 实心、上下各 40px 淡出（共约 104px），
+     位置由 DocGrip 里 mousemove 写进 `--doc-grip-y`。
+   平时整条隐形（opacity 0），hover / 拖动时才浮出来。
+   ================================================================ */
+.doc-grip {
+  --doc-grip-tint: rgba(74, 66, 52, 0.3);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: 34px;
+  cursor: col-resize;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.doc-grip.is-left { right: calc(100% + 14px); }
+.doc-grip.is-right { left: calc(100% + 14px); }
+.doc-grip:hover,
+.doc-grip.is-on { opacity: 1; }
+.doc-grip::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 3px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(var(--doc-grip-y, 50%) - 52px),
+    var(--doc-grip-tint) calc(var(--doc-grip-y, 50%) - 12px),
+    var(--doc-grip-tint) calc(var(--doc-grip-y, 50%) + 12px),
+    transparent calc(var(--doc-grip-y, 50%) + 52px)
+  );
+}
+.doc-grip.is-left::after { right: 16px; }
+.doc-grip.is-right::after { left: 16px; }
+body.is-doc-resizing,
+body.is-doc-resizing * { cursor: col-resize !important; user-select: none !important; }
+/* 手机上内容本来就只有一屏宽，塞不下这两条线 */
+@media (max-width: 820px) { .doc-grip { display: none; } }
+
+/* ================================================================
+   试剂库（侧栏「试剂库」那一页）：用过的试剂的汇总表。
+   一张干净的三线感列表——不描边、行 hover 淡底，数字等宽右对齐。
+   ================================================================ */
+.rl-head { align-items: flex-end; }
+.rl-search {
+  width: 210px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 12px;
+  color: var(--ink);
+}
+.rl-search:focus { outline: none; border-color: var(--ink-4); }
+.rl-sum { margin: 4px 0 12px; font-size: 11.5px; color: var(--ink-4); }
+.rl-empty { padding: 40px 0; text-align: center; font-size: 12.5px; color: var(--ink-4); }
+.rl-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rl-table th {
+  padding: 6px 8px;
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  text-align: left;
+  border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+.rl-table th.n, .rl-table td.n { text-align: right; }
+.rl-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.rl-table tbody tr { cursor: pointer; }
+.rl-table tbody tr:hover { background: #f8f7f2; }
+.rl-name { color: var(--ink); font-weight: 500; }
+.rl-role { color: var(--ink-3); white-space: nowrap; }
+.rl-last { color: var(--ink-4); white-space: nowrap; }
+.rl-date { margin-left: 6px; color: var(--ink-4); opacity: 0.8; }
+/* 试剂库里「当前引用为 0」的条目：数字淡一点，表示这个试剂现在没记录在用 */
+.rl-table .rl-zero { color: var(--ink-4); opacity: 0.55; }
+.rl-check {
+  padding: 2px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.rl-check:hover { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
+.rl-check:disabled { opacity: 0.5; cursor: default; }
+/* 试剂库页头那颗「全部核对」：跟行尾的「核对」同一路质感，只是稍宽一点、带条数 */
+.rl-allcheck {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.rl-allcheck:hover:not(:disabled) { color: var(--accent-ink); border-color: var(--accent); background: #fdf7f3; }
+.rl-allcheck:disabled { opacity: 0.45; cursor: default; }
+/* 溶剂行那三格（MW / 当量 / mmol）留一个淡破折号，说明这里不填 */
+.sheet .rtable .sol-blank { display: block; text-align: center; color: var(--ink-4); font-size: 11px; opacity: 0.5; }
+/* 试剂库里「这个试剂用过的当量 / 用量」小签（用得最多的那颗是强调色）。
+   这排小签是「试剂的子记录」，要能一眼看清、还好点——所以做成正常大小的胶囊
+   （以前 9px 高 14px，又小又难点，用户说像小字）。 */
+.rl-nm { display: block; }
+.rl-vars { display: inline-flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.rl-var,
+.lib-var {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 19px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f4f2ee;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.rl-var.is-on,
+.lib-var.is-on { background: #f8f0e9; color: var(--accent-ink); }
+.rl-var em,
+.lib-var em { font-style: normal; opacity: 0.6; margin-left: 2px; }
+/* 标签右边留一小格给 ×（平时不占眼睛、悬停才浮出来）：填错的那种可以就地摘掉 */
+.rl-var { position: relative; padding-right: 11px; }
+.rl-var-x {
+  position: absolute;
+  right: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 13px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.rl-var:hover .rl-var-x { opacity: 0.55; }
+.rl-var-x:hover { opacity: 1 !important; color: var(--accent-ink); }
+.lib-vars { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.lib-var { cursor: pointer; transition: background 0.12s, color 0.12s, box-shadow 0.12s; }
+.lib-var:hover { background: #f8f0e9; color: var(--accent-ink); box-shadow: inset 0 0 0 1px rgba(168, 71, 31, 0.28); }
+.lib-var:active { transform: translateY(0.5px); }
+.lib-var.is-none { opacity: 0.7; }
+
+/* MW / 密度 两格可以点着改（填过的值不再被核对覆盖） */
+.rl-edit { cursor: text; border-radius: 3px; }
+.rl-edit:hover { background: #f8f7f2; box-shadow: inset 0 0 0 1px var(--line-2); }
+/* 检索站点编辑：一行「名称 + 网址模板」 */
+.site-editor { display: flex; flex-direction: column; gap: 6px; }
+.site-row { display: flex; align-items: center; gap: 6px; }
+.site-label { width: 120px; }
+.site-url { flex: 1; }
+/* 试剂库每行右侧的「改名 / 删除」：平时不占眼睛，鼠标移到这一行才浮出来 */
+.rl-acts-h { width: 72px; }
+.rl-rowacts { white-space: nowrap; opacity: 0; transition: opacity 0.12s; }
+.rl-table tbody tr:hover .rl-rowacts { opacity: 1; }
+.rl-act {
+  border: 0;
+  background: none;
+  padding: 0 3px;
+  font-size: 10px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.rl-act:hover { color: var(--accent-ink); }
+.rl-act.is-danger:hover { color: var(--bad, #b4423a); }
+/* 查不到时的外部检索入口（PubChem / ChemicalBook）：小小的链接，别做成按钮 */
+.rl-ext {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  margin-left: 6px;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--line-2);
+  white-space: nowrap;
+}
+.rl-ext:hover { color: var(--accent-ink); border-bottom-color: var(--accent); }
+/* 核过了、三个库都没有：写「查无」并压淡，跟「还没查过」的一横区分开 */
+.rl-miss { color: var(--ink-4); opacity: 0.7; font-size: 11px; letter-spacing: 0.02em; }
+
+/* 「从试剂库选」弹窗：一列可点的行（名字 / 组分 / 1 mmol 折多少 g 或 µL） */
+.lib-search {
+  width: 100%;
+  height: 30px;
+  margin-bottom: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 12px;
+}
+.lib-search:focus { outline: none; border-color: var(--ink-4); }
+.lib-empty { padding: 22px 0; text-align: center; font-size: 12px; color: var(--ink-4); }
+.lib-list { max-height: 46vh; overflow-y: auto; }
+.lib-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.lib-row:hover { background: #f8f7f2; }
+.lib-name { color: var(--ink); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-role { flex: 0 0 auto; color: var(--ink-4); font-size: 11px; }
+.lib-meta { flex: 0 0 auto; color: var(--ink-3); font-size: 11px; }
+
+/* ================================================================
+   TLC 图不裁切（用户报「这边的图片还是有点截断」）
+   原来 92×132（化合物页 76×104）的方框配 object-fit: cover，板子是 74×167 这种
+   薄长比例，cover 会把上下各切掉四成——底部的基准线和顶部的展开前沿都没了。
+   现在改成「高度定、宽度跟原图比例」，一排图顶上对齐，一像素都不裁。
+   照片那一条（.sec-shots）本来就是 contain，不动。
+   ================================================================ */
+.sec-tlc .tlc-strip,
+.cmp-sheet .tlc-strip { align-items: flex-start; }
+.sec-tlc .tlc-shot { width: auto; height: 150px; flex: 0 0 auto; }
+.cmp-sheet .tlc-shot { width: auto; height: 120px; flex: 0 0 auto; }
+.sec-tlc .tlc-shot img,
+.cmp-sheet .tlc-shot img { width: auto; height: 100%; max-width: 240px; object-fit: contain; }
+/* 空位跟板子的宽度对齐（板子 0.45–0.5 的宽高比，放 150 高就是 70 出头宽） */
+.sec-tlc .tlc-empty { width: 72px; height: 150px; flex: 0 0 auto; }
+
+@media print {
+  /* 纸面上矮一点，一页装得下 */
+  .sec-tlc .tlc-shot { height: 140px; }
+  .sec-tlc .tlc-empty { height: 140px; }
+  .cmp-sheet .tlc-shot,
+  .cmp-sheet .tlc-empty { height: 104px; }
+}
+
+/* ================================================================
+   中栏列表按分类分段（「全部分类」时）
+   分类名本身就是拖放落点：把卡片拖到别的分类那一段里 = 换分类。
+   ================================================================ */
+.list-cat { display: block; }
+.list-cat + .list-cat { margin-top: 6px; }
+.list-cat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 4px 5px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  cursor: default;   /* 左键不再跳转，右键才是菜单 */
+  user-select: none;
+}
+.list-cat-row:hover .list-cat-head { color: var(--ink); }
+.list-cat-name { font-family: var(--mono); }
+.list-cat-count { font-family: var(--mono); font-size: 9.5px; color: var(--ink-4); }
+/* 空分类：一行淡淡的提示，拖东西过来时这一行会变高，别只有 20px 的落区 */
+.list-cat-blank {
+  display: none;
+  margin: 0 0 4px;
+  padding: 5px 8px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  text-align: center;
+  transition: border-color 130ms var(--ease), color 130ms var(--ease), background 130ms var(--ease);
+}
+body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; align-items: center; justify-content: center; }
+.list-cat.is-drop-target .list-cat-head { color: var(--accent-ink); }
+.list-cat.is-drop-target .list-cat-blank { border-color: var(--accent); color: var(--accent-ink); background: #fbf4ee; }
+

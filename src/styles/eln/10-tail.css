@@ -1,0 +1,2172 @@
+/* ================================================================
+   手机端（≤820px）补几处图片
+   - 反应式：记录页那张「按投料表画的」只在 scheme_cache 里，是把内联 SVG 贴进
+     `.phone-struct-svg`（跟附件图同一个白底框），要让它自己按宽度缩放；
+   - TLC：板子又高又窄，铺满宽度会顶出一整屏，改成限高居中。
+   ================================================================ */
+.phone-struct-svg { padding: 10px 8px; }
+.phone-struct-svg svg { display: block; width: 100%; height: auto; }
+.phone-spectra.is-tlc img {
+  width: auto;
+  max-width: 100%;
+  max-height: 58vh;
+  margin: 0 auto;
+  display: block;
+}
+
+/* 预览弹窗里的图片：框跟着图走（小图别再留一大片灰底），大图仍夹在视口里 */
+.fp.is-image {
+  width: fit-content;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px;
+  margin: 0 auto;
+  max-width: 100%;
+}
+.fp.is-image .fp-img { display: block; margin: 0 auto; }
+/* 窄弹窗（图小、框跟着小）时文件名那一行别把按钮挤成两行：省略号收尾 */
+.fp-foot > .hint:first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 卡片墙：反应式缩略图**整张显示、不裁**（用户明确否掉了裁剪式：「有种截断的感觉」）。
+   图的画布已经收到 2.3–2.7:1（见 scheme.js 的折行 / 箭头封顶），按卡宽铺开约 70–75px 高；
+   想再大只能靠加宽卡片或点开看，别用 cover 切——切掉的是产物和条件。 */
+.grid-thumb.is-scheme { padding: 0; }
+.grid-thumb.is-scheme img {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--r) var(--r) 0 0;
+}
+/* 反应式卡片上那枚「平行 ×N」压在图上：底衬一块纸白，别让线条透过去 */
+.grid-thumb.is-scheme .stack-badge.is-corner { background: rgba(255, 255, 255, 0.92); }
+
+/* 卡片墙：悬停 400ms 浮出的「大图」（反应式看清用）。
+   浮层是 Teleport 到 body 的 fixed 层（`.editor` 的 overflow 会裁掉它），
+   `pointer-events: none` 保证它不会把鼠标从卡片上抢走、闪个不停。 */
+.scheme-peek {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+  padding: 10px 12px 8px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(60, 45, 30, 0.16), 0 2px 6px rgba(60, 45, 30, 0.08);
+  animation: scheme-peek-in 0.14s ease-out;
+}
+.scheme-peek img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: contain;
+}
+.scheme-peek-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  min-width: 0;
+}
+.scheme-peek-code { font-family: var(--mono, ui-monospace); color: var(--ink-2); flex: 0 0 auto; }
+.scheme-peek-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes scheme-peek-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 手机端列表：平行组的胶囊（基准 / 重复 / 改了什么）——
+   跟桌面中栏组员行同一套文案（`lib/expDiff.js`），只是字号放大一档、允许换行。 */
+.phone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.phone-chips .member-diff-item {
+  font-size: 10.5px;
+  line-height: 19px;
+  padding: 0 7px;
+}
+/* 「基准」是同一套条件的锚点，别用强调色；「重复」比基准更淡 */
+.phone-chips .member-diff-item.is-base {
+  color: var(--ink-2);
+  background: #f2f0ea;
+}
+.phone-chips .member-diff-item.is-repeat {
+  color: var(--ink-3);
+  background: #f5f3ee;
+}
+
+/* 手机端（`#/m`）的实验列表：把桌面中栏那套纸卡片搬过来。
+   容器给一层 bone 底，卡片才是「白卡浮在上面」的亚克力感（纯白底上只剩影子、看不出卡片）。
+   刻意不加：拖拽排序 / 右键菜单 / 分类分段——手机上手指拖卡片跟滚动打架，换分类回电脑。 */
+/* 通栏（不是「面板」）：以前这里是一块 `--bone` 圆角面板，而 --bone 是 #fbfbfa（几乎白），
+   于是变成「白页面 + 近白面板 + 白卡片」，看着像卡片里面又套了一张卡（用户报「双层卡片」）。
+   现在铺满屏宽、不圆角 —— 它就是这一段的底，跟桌面中栏是同一个角色。 */
+.phone-cards {
+  background: var(--bone);
+  /* 通栏底色：靠 `.phone-cmp` 在手机模式下不再限宽（见文件末尾的 820 断点）+ 这里只抵消它的左右内边距，
+     所以从屏幕左边缘铺到右边缘。**别用 `width:100vw` / `calc(50% - 50vw)` 那套**——
+     页面一旦有 max-width（560）或滚动条，算出来的位置就偏，宽窗口下会露出一块居中矩形（踩过两次）。 */
+  margin: 0 -16px;
+  padding: 12px 16px 6px;
+  border-radius: 0;
+}
+.phone-cards .exp-card { margin-bottom: 10px; border-radius: 10px; }
+/* 手机上卡片里的字比中栏稍大一点：它在整屏宽度里，9px 的小签太抠 */
+.phone-cards .exp-code { font-size: 11.5px; }
+.phone-cards .exp-name { font-size: 15px; }
+.phone-cards .exp-desc-inline { font-size: 11.5px; }
+.phone-cards .exp-date,
+.phone-cards .exp-meta { font-size: 10.5px; }
+.phone-cards .stack-badge,
+.phone-cards .stack-chip,
+.phone-cards .stack-more { font-size: 10px; }
+.phone-cards .stack-more { padding: 2px 6px; }
+.phone-cards .member-diff-item { font-size: 10.5px; line-height: 18px; }
+.phone-cards .stack-members { margin-top: 2px; }
+/* 展开状态下卡片堆那两张垫纸别露在组员行下面（跟桌面一个规矩） */
+.phone-cards .exp-card.is-stack.is-open { margin-bottom: 0; }
+
+/* 手机端卡片是 `<a href>`（桌面中栏那边是 `<button>`）：锚点默认带下划线和链接蓝，
+   这里按纸卡片来——否则整张卡的字都挂着一条下划线（用户截图问过）。 */
+.phone-cards a.exp-card,
+.phone-cards a.exp-card:visited {
+  text-decoration: none;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 卡片里那些小签本来就不该继承下划线 */
+.phone-cards a.exp-card .tag,
+.phone-cards a.exp-card .exp-code,
+.phone-cards a.exp-card .exp-date,
+.phone-cards a.exp-card .exp-name,
+.phone-cards a.exp-card .exp-desc-inline,
+.phone-cards a.exp-card .member-diff-item { text-decoration: none; }
+
+/* ---- 手机端 UI 打磨（`#/m`）----
+   1) 分段控件（实验 / 化合物）：改成「浅色轨道 + 选中项白底浮起」，比两个描边大按钮更像一套控件；
+   2) 搜索框：从「白底 + 1px 描边」改成浅底无边框，聚焦才浮出白底和描边（iOS 上更干净）；
+   3) 卡片堆的「展开 ▾」做成小胶囊，跟卡片上的其它小签同一族。 */
+.phone-seg {
+  gap: 2px;
+  padding: 3px;
+  margin: 12px 0 10px;
+  background: #f2f1ec;
+  border-radius: 11px;
+}
+.phone-seg button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink-3);
+  font-size: 13.5px;
+  transition: background 140ms var(--ease), color 140ms var(--ease), box-shadow 140ms var(--ease);
+}
+.phone-seg button.on {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: transparent;
+  box-shadow:
+    0 1px 2px rgba(20, 18, 14, 0.06),
+    0 6px 14px -10px rgba(20, 18, 14, 0.3);
+}
+.phone-search {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: #f4f3ef;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease);
+}
+.phone-search:focus {
+  outline: none;
+  background: var(--paper);
+  border-color: var(--line-2);
+}
+.phone-cards .stack-more {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f4f2ee;
+  color: var(--ink-2);
+}
+.phone-cards .exp-card.is-stack .stack-more:active { background: #ece9e2; }
+
+/* 手机端化合物卡片：左边结构缩略图、右边编号/名称/分子式——跟实验卡同一层白纸，不再用描边行 */
+.phone-cards a.exp-card.is-cmp {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.cmp-row-fig {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  object-fit: contain;
+  background: #fbfaf7;
+  border-radius: 8px;
+}
+.cmp-row-fig.is-empty { background: #fbfaf7; }
+.cmp-row-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cmp-row-body .top { display: flex; align-items: center; gap: 6px; }
+.cmp-row-body .exp-title { display: block; }
+.cmp-row-body .exp-meta { color: var(--ink-4); font-size: 10.5px; }
+
+/* 手机模式下页面容器铺满：`.phone-cmp` 的 560 上限只在窄屏以内成立，
+   在平板 / 宽窗口（592–820）里它会把内容缩成居中一栏，通栏底色就变成一块「面板」。
+   铺满之后底色能用简单的负边距贴到屏幕两边，不用跟 `100vw` / 滚动条较劲。 */
+@media (max-width: 820px) {
+  .phone-cmp { max-width: none; }
+}
+
+/* 记录页「条件组」：一次筛选批次里的 N 个条件（一行一个）。
+   刻意做得比投料表轻：只写「改了什么 + 产率 / 选择性 / 备注」，不加行线、不套卡片，
+   跟结果块是同一节（它本来就是结果的一部分）。 */
+.cond-group .sec-head { display: flex; align-items: baseline; gap: 8px; }
+.cond-count { font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
+.cond-add {
+  font-family: var(--mono); font-size: 10px; line-height: 1;
+  padding: 4px 9px; border-radius: 999px; border: 1px solid transparent;
+  background: #f4f2ee; color: var(--ink-2); cursor: pointer;
+}
+.cond-add:hover { background: #ece9e2; color: var(--ink); }
+.cond-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cond-table th {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; font-weight: 500;
+  color: var(--ink-4); text-align: left; padding: 0 4px 4px; border-bottom: 1px solid var(--line-2);
+}
+.cond-table td { padding: 2px 4px; }
+.cond-table .cond-idx { width: 22px; font-family: var(--mono); font-size: 10px; color: var(--ink-4); text-align: center; }
+.cond-table .cond-num { width: 84px; text-align: right; }
+.cond-table th.cond-num { text-align: right; }
+.cond-table .cond-del { width: 20px; }
+.cond-in {
+  width: 100%; box-sizing: border-box; border: 1px solid transparent; border-radius: 5px;
+  background: transparent; padding: 3px 5px; font: inherit; color: inherit;
+}
+.cond-in:hover { background: #f8f7f2; }
+.cond-in:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
+.cond-in.is-num { text-align: right; }
+.cond-x { border: 0; background: none; color: var(--ink-4); cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 4px; }
+.cond-x:hover { color: var(--accent); }
+.cond-hint { margin: 2px 0 0; font-size: 11px; color: var(--ink-4); }
+
+/* 筛选表：同一条记录拆出来的第几个条件（记录页「条件组」的第 N 行）——跟在编号后面，淡一点 */
+.sct-cond { font-family: var(--mono); font-size: 10px; color: var(--accent-ink); margin-left: 2px; }
+
+/* 投料表里「变量」那一行的小签（`[L]`）：标在组分格右边，点一下可以取消 */
+.reagent-var, .var-chip {
+  display: inline-flex; align-items: center;
+  font-family: var(--mono); font-size: 9.5px; line-height: 16px;
+  padding: 0 6px; border-radius: 999px;
+  color: var(--accent-ink); background: var(--accent-soft);
+  cursor: pointer; white-space: nowrap;
+}
+.var-chip { margin-left: 4px; }
+/* 菜单里那条「设为变量」单独一行的样式 */
+.role-menu .qchip.is-var { flex: 1 1 auto; }
+.role-menu .qchip.is-var[aria-selected='true'] { color: var(--accent-ink); background: var(--accent-soft); }
+
+/* 「变量」那一行：`[L]` 小签放在试剂名左边（组分格太窄，放那儿会把 Lig 挤成 L）。
+   **别在这里写 display:flex** —— td 一旦不是 table-cell，`colspan` 就不参与表格布局了，
+   变量行合并 6 列会失效（只剩自己那一列的宽度、里面的说明被挤成两行，踩过）。 */
+.rtable tr.is-var .name-cell { display: table-cell; vertical-align: middle; }
+.rtable tr.is-var .var-chip { margin-left: 0; }
+
+/* 条件组里的数字格：隐藏 number input 的上下箭头（一行条件表，箭头太吵） */
+.cond-in[type='number'] { -moz-appearance: textfield; }
+.cond-in[type='number']::-webkit-outer-spin-button,
+.cond-in[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* 条件组表头那排「变量 [L] [T]」和「＋ 温度 / ＋ 时间」按钮 */
+.cond-vars { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-4); }
+.cond-var {
+  font-family: var(--mono); font-size: 9.5px; line-height: 15px; padding: 0 6px;
+  border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink);
+}
+.cond-varbtns { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+.cond-varbtn {
+  font-family: var(--mono); font-size: 9px; line-height: 1; padding: 3px 7px;
+  border-radius: 999px; border: 1px solid var(--line-2); background: transparent;
+  color: var(--ink-4); cursor: pointer;
+}
+.cond-varbtn:hover { color: var(--ink-2); border-color: var(--ink-4); }
+.cond-varbtn.on { color: var(--accent-ink); border-color: transparent; background: var(--accent-soft); }
+
+/* 「条件」那一行里每栏的变量开关（温度 / 时间 / 气氛）：
+   平时是一颗很淡的「变量」小字，开了变成强调色的 `[T]`；顺带把输入框标成变量色，一眼看出这栏在变。 */
+.cond-table th { position: relative; }
+.cond-var-tog {
+  margin-left: 5px;
+  font-family: var(--mono); font-size: 8.5px; line-height: 1;
+  padding: 2px 5px; border-radius: 999px;
+  border: 1px solid transparent; background: transparent;
+  color: #bdb8ae; cursor: pointer; flex: 0 0 auto;
+  /* 平时就露出来一点（藏起来的话根本不知道这栏能当变量），hover 才变清楚 */
+  opacity: 0.5; transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+.cond-table th:hover .cond-var-tog,
+.cond-var-tog.on,
+.cond-var-tog:focus-visible { opacity: 1; }
+.cond-var-tog:hover { color: var(--ink-2); background: #f4f2ee; }
+.cond-var-tog.on { color: var(--accent-ink); background: var(--accent-soft); }
+/* 变量那一格填的是「标准条件」，但箭头／条件组里显示的是占位符 → 给个淡提示色 */
+.cond-cell input.is-var { color: var(--accent-ink); }
+.cond-cell input.is-var::placeholder { color: #d8c3b6; }
+
+/* 「条件」那一行并进投料表以后的样子：左边一栏写「条件」，右边五个字段横向排开。
+   标签做成格子内的小字（不再单独一条表头带），整块跟投料表同一张表、同一套边框。 */
+/* 「条件」现在是投料表**上面**的一条：左边一栏写「条件」，右边五个字段横排，
+   跟下面的投料表同宽、同一个左边缘（表格是 width:100%，这条也用 padding 对齐） */
+.cond-above {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 5px;
+}
+.cond-above-label {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.cond-above .cond-inline { flex: 1 1 auto; }
+.cond-inline {
+  display: grid;
+  /* 气氛 / 容器 和 装置 / 器皿 的标签最长，给它们宽一点；标签一律不换行 */
+  grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr;
+  gap: 3px 14px;
+}
+.cond-f { min-width: 0; }
+.cond-f-label {
+  display: flex; align-items: center; gap: 4px;
+  font-family: var(--mono); font-size: 8.5px; color: var(--ink-4); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cond-f-val { position: relative; display: flex; align-items: center; }
+.cond-f-val input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid transparent; border-radius: 4px; background: transparent;
+  padding: 2px 16px 2px 2px; font: inherit; font-size: 12.5px; color: inherit;
+}
+.cond-f-val input:hover { background: #f8f7f2; }
+.cond-f-val input:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
+.cond-f-val input.is-var { color: var(--accent-ink); }
+.cond-f-val .cond-fixed { font-size: 12.5px; color: var(--ink-3); padding-left: 2px; }
+/* 下箭头贴着格的右边（不占输入框的宽度，不然「N₂，封管」这种长值会被挤掉半截） */
+.cond-f-val .cond-caret {
+  position: absolute; right: 1px; top: 50%; transform: translateY(-50%);
+  opacity: 0.45;
+}
+.cond-f:hover .cond-caret, .cond-f:focus-within .cond-caret { opacity: 1; }
+.cond-f-val input { padding-right: 15px; }
+
+/* 记录页「类型」格：自绘下拉（原生 <select> 弹出来是系统灰底带勾的菜单，跟纸面不搭）。
+   小箭头贴在格右侧内部、无边框——跟「课题」格一个做法。 */
+.kind-wrap { position: relative; display: inline-flex; align-items: center; width: 100%; }
+.kind-wrap .kind-pick { padding-right: 16px; cursor: pointer; }
+.kind-wrap .kind-caret { position: absolute; right: 3px; color: var(--ink-4); pointer-events: none; }
+.kind-opt-menu {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 3px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  padding: 4px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 10px 26px -12px rgba(20, 18, 14, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.kind-opt-menu .rxn-opt { text-align: left; }
+
+/* 投料表变量行：「[Cat]」后面那颗「N 个候选」小签——点一下滚到条件组，
+   让「投料表留占位、候选在条件表」这件事一眼可见 */
+.var-count {
+  flex: 0 0 auto;
+  font-family: var(--mono); font-size: 9px; line-height: 15px;
+  padding: 0 6px; border-radius: 999px; border: 1px solid transparent;
+  background: transparent; color: var(--ink-4); cursor: pointer; white-space: nowrap;
+}
+.var-count:hover { background: #f4f2ee; color: var(--ink-2); }
+
+/* 变量小签上的候选数：`[Cat]×3`（点一下跳到条件组，双击取消变量） */
+.var-chip { border: 0; cursor: pointer; }
+.var-chip-n { margin-left: 3px; font-size: 9px; color: var(--ink-3); }
+
+/* 变量小签挂在「组分」格里、角色输入下面**另起一行**（试剂名那格只有 ~110px，
+   小签放那儿会把名字挤成「Pd((」）。这一行因此比其他行高一点，只有变量行会这样。 */
+.rtable .role-wrap + .var-chip { margin: 2px 0 0 0; }
+.rtable tr.is-var .role-cell { padding-top: 4px; padding-bottom: 4px; }
+
+/* 投料表里变量行的「试剂」格：只读的候选摘要（`Pd(OPiv)2 / dppe / Ni(COD)2`），
+   点一下跳条件组。具体名字不再当固定试剂显示，避免跟条件表各说一套。 */
+.var-cands {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;      /* 最多两行，第三行起省略（详细名单在下面的条件组里） */
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  line-height: 1.3;
+  cursor: pointer;
+}
+.var-cands:hover { color: var(--accent-ink); }
+
+/* 条件组每一格里「候选名 + 当量」并排：当量那格窄一点、淡一点（空着就用投料表的标准当量） */
+.cond-var-cell { display: flex; align-items: center; gap: 4px; }
+.cond-var-cell .cond-in { flex: 0 1 auto; min-width: 90px; max-width: 240px; }
+.cond-eq {
+  flex: 0 0 46px;
+  width: 46px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  padding: 3px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: right;
+}
+.cond-eq:hover { background: #f8f7f2; }
+.cond-eq:focus { outline: none; background: #f8f7f2; border-color: var(--line-2); }
+
+/* 条件组的候选名：空框点一下就出菜单（本槽已有 / 试剂库同组分 / 化合物库同类型），
+   选中顺手带上常用当量。菜单贴着输入框往下弹，页面底下放不下就往上翻。 */
+.cond-cand { position: relative; display: flex; flex: 0 1 auto; min-width: 90px; max-width: 240px; }
+.cond-cand .cond-in { width: 100%; box-sizing: border-box; }
+.condc-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -6px;
+  z-index: 70;
+  width: 236px;
+  max-height: 272px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 5px;
+  box-shadow: 0 14px 34px rgba(20, 18, 14, 0.12);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.condc-menu.is-up { top: auto; bottom: calc(100% + 4px); }
+.condc-menu::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.condc-h { padding: 6px 8px 3px; font-size: 10px; letter-spacing: 0.08em; color: var(--ink-4); }
+.condc-opt {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-1);
+  text-align: left;
+  cursor: default;
+}
+.condc-opt:hover,
+.condc-opt.is-hi { background: #f6f4ef; }
+.condc-name { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.condc-sub { margin-left: auto; flex: 0 0 auto; font-family: var(--mono); font-size: 10px; color: var(--ink-4); }
+.condc-none { margin: 0; padding: 8px; font-size: 12px; color: var(--ink-4); }
+
+/* ── 变量（条件）改成「投料表的续篇」 ──────────────────────────────────
+   用户要的是笔记本那张纸的样子：标准条件照常写投料表，换的那几样接在合计线
+   下面、用一条虚线断开，产率不混在这张表里（挪到结果块）。所以这里全部走
+   `.rtable` 的同一套格子（列宽由原表的 colgroup 给），只把字号 / 间隔压轻。 */
+.sheet .rtable tr.rt-vars-head > td { padding: 0; border: 0; }
+.vars-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px 3px;
+}
+.vars-lbl {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-4);
+  flex: 0 0 auto;
+}
+.vars-rule {
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 1px dashed var(--line-2);
+}
+.vars-hint { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-4); }
+.vars-add {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  padding: 1px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.vars-add:hover { color: var(--accent); }
+
+/* 变量行：跟上面投料行一样高，但整体淡一档（纸上是「续写」不是「又一张表」） */
+.sheet .rtable tr.rt-var > td { padding: 2px 4px; vertical-align: middle; }
+.sheet .rtable tr.rt-var + tr.rt-var > td { border-top: 1px dotted #efeee9; }
+.sheet .rtable tr.rt-var td.n { text-align: right; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.sheet .rtable tr.rt-var td.var-slot-cell { white-space: nowrap; }
+.var-slot {
+  display: inline-block;
+  margin-right: 3px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 15px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.sheet .rtable tr.rt-var td.var-name-cell { position: relative; }
+.var-vals { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.var-val-sep { color: var(--ink-4); font-size: 11px; }
+.sheet .rtable tr.rt-var .cond-in { font-size: 12.5px; }
+.sheet .rtable tr.rt-var .cond-eq { text-align: right; }
+
+/* 结果块：一次筛好几个候选时的那张表（用户：「直接合并这两个」——不再单独挂一张「各条件结果」）。
+   产物是共同的，名字 / 性状 / MW 提到表格上面一行（`.res-shared`），表里一行一个候选：
+   条件 | 质量 / g | 产率 / % | dr·ee | 备注 | TLC。质量填了按「base_mmol × 产物 MW」自动算产率，
+   `yield_pct` 与投料表同一套规矩（手填过就不再自动覆盖）。 */
+.res-shared {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin-bottom: 3px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+/* 产物名给一块宽度上限，性状 / MW 紧跟在后面（别让它们被推到纸面最右边，中间空一大片） */
+.res-shared .res-prod { flex: 0 1 210px; min-width: 110px; }
+.res-shared .res-prod input { font-size: 12.5px; }
+/* 这一行**不在 `.rtable` 里**，得自己按掉浏览器默认那个 2px 灰框 —— 第一版漏了，
+   结果产物 / 性状 / MW 三格全变成白底方框，性状和 MW 还被挤窄、字被截断（用户「css 有点没弄好」）。 */
+.res-shared input {
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink);
+  padding: 3px 5px;
+  outline: none;
+}
+.res-shared input:hover { background: #f8f7f2; }
+.res-shared input:focus { background: #f8f7f2; border-color: var(--line-2); }
+.res-shared input::placeholder { color: var(--ink-4); }
+.res-shared input.n { font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; text-align: right; }
+.res-shared .sel-f { display: inline-flex; align-items: baseline; gap: 4px; flex: 0 0 auto; }
+.res-shared .sel-f > span { font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+.res-shared .sel-f input { width: 88px; }
+.res-shared .sel-f input.n { width: 60px; }
+.res-shared-info { flex: 0 1 auto; font-size: 10.5px; color: var(--ink-3); }
+.res-shared-info b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
+/* 候选行：左边单独一格「Entry 1」（跟投料表那几行同一个写法，`var-idx-cell` 那套），
+   条件写在右边一格，两格分开才不挤（用户：「就还是 entry，然后不要太挤」）。 */
+.res-table.is-cand .cand-entry {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.res-table.is-cand .cand-what-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink);
+}
+/* 两行之间松开一点（原来 3px 上下、看着像挤在一起） */
+.res-table.is-cand tbody td { padding-top: 5px; padding-bottom: 5px; }
+/* 列宽写在 `ResultBlock` 的 `<colgroup style>` 里（那边的 `.sheet .res-table:not(.is-multi)` 优先级更高） */
+
+
+/* 合计行右下角那句算式（「苄基氨基环丁酮：0.2 mmol × 433.57 = 0.0867 g」）不再常显——
+   用户圈出来说「不应该在中间，删掉也行」。现在由模板 `v-if="focus"` 控制：
+   只有正聚焦某个格子时才出现（`.foot-line` 的 space-between 仍在，它贴着右边、不会跳行）。 */
+
+/* 抬头表格「类型」格：里面同时放记录类型（kind）和反应类型（rxn_type），
+   纸面内宽只有 ~595px，这两样必须挤在 146px 里 —— 间距收窄、kind 上限压到 72px，
+   剩下的都给右边的反应类型（`筛配体` 三个字够用）。 */
+.sheet-meta .kind-inline { gap: 4px; }
+.sheet-meta .kind-inline .kind-pick { max-width: 72px; }
+
+/* 「类型」格里两个值（记录类型 / 反应类型）之间来一道极细的虚线：
+   不然 `条件筛选 筛配体` 贴在一起像一串字。 */
+.sheet-meta .kind-inline .rxn-wrap { position: relative; padding-left: 7px; }
+.sheet-meta .kind-inline .rxn-wrap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  border-left: 1px dotted var(--line-2);
+}
+
+/* 投料表里的「变量行」现在是一整行的一句话（`[Cat] 变量 · 下面有 3 个候选`）：
+   以前小签挂在组分格下面，把这一行撑成两行；后面 MW/当量/mmol/用量 还留一排空「—」。 */
+.sheet .rtable .var-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.sheet .rtable .var-chip.is-inline { margin-left: 0; }
+.sheet .rtable .var-note-txt { font-size: 11.5px; color: var(--ink-3); }
+.sheet .rtable .var-note:hover .var-note-txt { color: var(--accent-ink); }
+
+/* 变量块的头：「变量 [Cat] ┈┈ 取消变量 ＋加变量」——变量行挪到下面以后，
+   取消变量只能在这里点（投料表里那一行已经不显示了）。 */
+.vars-head .var-slot { flex: 0 0 auto; }
+.vars-add.vars-drop { color: var(--ink-4); }
+.vars-add.vars-drop:hover { color: var(--accent); }
+
+/* 反应规模从投料表右上角挪到「条件」那一行的最后一格：标签在上、值在下，
+   跟 反应温度 / 时间节点 / 气氛 那几格同一个长相（宽度固定，剩下的给前面那五格） */
+.cond-above .cond-f-scale { flex: 0 0 118px; }
+.cond-f-scale .cond-f-val input { text-align: right; padding-right: 30px; }
+.cond-f-unit {
+  position: absolute;
+  right: 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  pointer-events: none;
+}
+.cond-f-scale .cond-f-val input::-webkit-outer-spin-button,
+.cond-f-scale .cond-f-val input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cond-f-scale .cond-f-val input { -moz-appearance: textfield; }
+
+/* 「变量」那几行跟上面投料表同一个长相（用户：“格式最好和上面差不多”），
+   第一列原来是 `[Cat]` 小签，现在换成 Entry 序号（1 / 2 / 3，跟下面「各条件结果」对得上）。 */
+.sheet .rtable tr.rt-var td.var-idx-cell {
+  text-align: right;
+  padding-right: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+.sheet .rtable tr.rt-var td.n {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  text-align: right;
+}
+.sheet .rtable tr.rt-var td.var-amt { color: var(--ink); font-weight: 600; }
+.sheet .rtable tr.rt-var td.var-amt.is-liquid { font-weight: 400; color: var(--ink-2); }
+.sheet .rtable tr.rt-var .cond-in { font-size: 12px; }
+.sheet .rtable tr.rt-var .cond-cand { min-width: 120px; }
+
+/* 条件那一行左边原来有个「条件」小字，用户说不要（内容自己会说话）——
+   去掉左边距后，第一格（反应温度）跟下面投料表的「组分」列左边缘对齐。 */
+.cond-above { padding-left: 0; padding-right: 0; }
+
+/* 变量行的 Entry 序号原来在「组分」列里右对齐（看着像缩进进去一截）——
+   改成左对齐，跟上面「变量」那两个字对齐。 */
+.sheet .rtable tr.rt-var td.var-idx-cell {
+  text-align: left;
+  padding-left: 6px;
+  padding-right: 0;
+}
+
+/* 投料表这块的抬头：下面紧跟着「条件」那一行 + 表格，所以别再拉一条满宽的线、也别留大空隙，
+   让「投料表」当这一整块的小标题（只作用于这一块，`结果` 那些 block-head 不动）。 */
+.sheet .block-head.block-head-flat {
+  border-bottom: 0;
+  margin-bottom: 1px;
+  padding-bottom: 0;
+}
+
+/* 「条件」那一行改成外头一层 6 列网格（反应温度 / 时间节点 / 气氛 / 装置 / 光照 / 反应规模），
+   CondRow 自己那个 5 列网格用 `display: contents` 摊平——这样六格间距均匀，
+   反应规模不会孤零零飘在最右边、跟「光照」之间空一大截。 */
+.cond-above {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr 0.9fr;
+  gap: 3px 14px;
+}
+.cond-above .cond-inline { display: contents; }
+
+/* 反应规模那格：数字用等宽字体（跟投料表里的 MW / mmol 一样），`mmol` 不再绝对定位、
+   而是紧跟在数字右边（同一个基线、留 3px）——以前数字右对齐 + 单位飘在右边，看着像两截。 */
+.cond-above .cond-f-scale .cond-f-val { display: flex; align-items: center; gap: 3px; }
+.cond-f-scale .cond-f-val input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cond-f-scale .cond-f-unit {
+  position: static;
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
+/* 反应规模：整体往纸面中间收一点（不贴着表格右边缘），数字和 `mmol` 之间也拉开一点 */
+.cond-above .cond-f-scale .cond-f-val { padding-right: 7px; gap: 7px; }
+
+/* 再来一点：整格从表格右边缘往里收 10px，数字和 `mmol` 之间 9px */
+.cond-above .cond-f-scale .cond-f-val { padding-right: 10px; gap: 9px; }
+
+/* 反应规模回到「投料表」那一行的右端（跟表连在一起，但不跟组分/试剂那排表头挤）：
+   标签跟 `.block-head .lbl` 一个字号，数字等宽右对齐、不画框，`mmol` 小一号、间距 6px。 */
+.sheet .block-head .scale-inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: none;
+}
+.sheet .block-head .scale-inline > span:first-child {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+}
+.sheet .block-head .scale-inline input {
+  width: 52px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  padding: 0 2px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.sheet .block-head .scale-inline input:hover { border-bottom-color: var(--line-2); }
+.sheet .block-head .scale-inline input:focus { outline: none; border-bottom-color: var(--ink-3); }
+.sheet .block-head .scale-inline .unit {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+}
+
+/* 条件行回到 5 格（反应规模搬走了） */
+.cond-above { grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr; }
+
+/* 变量行里「用不上」的那几格：跟溶剂行同一个「—」，淡淡的居中，别留空洞 */
+.sheet .rtable tr.rt-var td .var-na,
+.sheet .rtable tr.rt-var td.n { color: var(--ink-4); }
+.sheet .rtable tr.rt-var td .var-na { opacity: 0.5; }
+
+/* 变量标志再明显一档：底色不变、字加粗到大一号，边框给一道极淡的强调色 */
+.var-chip,
+.var-slot {
+  font-size: 10px;
+  line-height: 17px;
+  padding: 0 7px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(168, 71, 31, 0.22);
+}
+.cond-var-tog.on { font-weight: 600; }
+
+/* 变量胶囊再小一档（上一轮加得有点大）：字号回到 9.5px、行高 16px、字重 500，描边留着 */
+.var-chip,
+.var-slot {
+  font-size: 9.5px;
+  line-height: 16px;
+  padding: 0 6px;
+  font-weight: 500;
+}
+/* 字段变量的那一行：中间那格写「变的是哪样」（时间节点 / 反应温度），淡淡的靠左 */
+.sheet .rtable tr.rt-var td.var-what-cell {
+  font-size: 11px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+}
+/* 「Entry 1」：Entry 更淡一点、数字用 mono */
+.sheet .rtable tr.rt-var td.var-idx-cell {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 字段变量的那一行：`Entry 1 | 时间节点 [6 h]` —— 名字写在小字标签里、值跟在后面，
+   后面那几格并成一格，不再是一排「—」 */
+.sheet .rtable tr.rt-var .var-field-lbl {
+  font-size: 11px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.sheet .rtable tr.rt-var td.var-name-cell { white-space: nowrap; }
+
+/* `.var-vals` 原来是 `display: flex`：它会把 td 里的「时间节点」小标签挤到上一行。
+   换成 inline-flex —— 标签和值就能排在同一行（td 本身还是 table-cell，colspan 照旧生效）。 */
+.sheet .rtable tr.rt-var .var-vals { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; vertical-align: middle; }
+
+/* 条件行那颗「变量开关」和下面变量块头的 `[t]` 小签**尺寸统一**（以前一个是 8.5px/无内边距、
+   一个是 9.5px/有描边，看着像两种东西）。统一到 9.5px / 16px 行高 / 内边距 6px。 */
+.cond-var-tog.on {
+  font-size: 9.5px;
+  line-height: 16px;
+  padding: 0 6px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(168, 71, 31, 0.22);
+  border-radius: 999px;
+  opacity: 1;
+}
+
+/* 变量行跟普通投料行一样高：td 的上下 padding 归零（26px 一行，跟上面一致） */
+.sheet .rtable tr.rt-var > td { padding-top: 0; padding-bottom: 0; }
+
+/* 条件行的小下拉里最后那条「＋ 自定义」，以及自己加的那几条（悬停露出 × 可删） */
+.cond-menu .qchip.is-add { color: var(--ink-3); border-style: dashed; }
+.cond-menu .qchip.is-add:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.35); }
+.cond-menu .qchip.is-own { position: relative; padding-right: 16px; }
+.cond-menu .qchip .qchip-x {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ink-4);
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+}
+.cond-menu .qchip.is-own:hover .qchip-x { opacity: 1; }
+.cond-menu .qchip .qchip-x:hover { color: var(--accent); }
+
+
+
+/* 温度 / 时间的「刻度滑条」：按住往左右拖（或点某一格），松手回弹吸附。
+   不是滚轮 —— 用户要的是「点击滑动」那种：相机倍率 / 曝光补偿的刻度条。 */
+.ruler-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 75;
+  width: 232px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(20, 18, 14, 0.12);
+  padding: 8px 0 4px;
+  overflow: hidden;
+}
+.ruler-track {
+  position: relative;
+  height: 46px;
+  overflow: hidden;
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ruler-strip {
+  display: flex;
+  align-items: flex-start;
+  padding: 0 calc(50% - 28px);
+  will-change: transform;
+}
+.ruler-item {
+  flex: 0 0 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.ruler-tick {
+  width: 1px;
+  height: 8px;
+  background: var(--line-2);
+  transition: height 140ms, background 140ms;
+}
+.ruler-item.is-on .ruler-tick { height: 13px; background: var(--accent); }
+.ruler-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  transition: color 140ms;
+}
+.ruler-item.is-on .ruler-label { color: var(--accent-ink); font-weight: 600; }
+/* 中间那条指示线：刻度带从它底下滑过去 */
+.ruler-needle {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  height: 13px;
+  width: 1px;
+  margin-left: -0.5px;
+  background: transparent;
+  pointer-events: none;
+}
+/* 「＋ 自定义」原来是弹窗底部独占一整行、上面还画一道虚线，看着像多出来的一块空白
+   （用户截着这里问「这个位置要不要改一下」）。收成跟胶囊菜单**同一套语言**：
+   右下角一颗虚线小胶囊，不再另起分隔线，弹窗也就短了一截、少压投料表几行。 */
+.ruler-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 8px 0;
+}
+.ruler-add {
+  border: 1px dashed var(--line-2);
+  border-radius: 5px;
+  background: none;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color 130ms, border-color 130ms;
+}
+.ruler-add:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.35); }
+
+/* 记录页的滚动容器：滚到头别把橡皮筋传给外层（页面本身不该跟着动） */
+.editor { overscroll-behavior: contain; }
+/* 选择器（刻度滑条 / 胶囊菜单）开着时：弹窗贴着手指，页面别跑 */
+body.is-picker-open .editor { overscroll-behavior: none; }
+
+/* 条件行那几格：**单击是「出选择」，不是「打字」**，所以别显示输入用的 I 形光标（看着像能打字）。
+   注：`:focus { cursor: text }` 写了也没用 —— WebKit 在文本输入框获得焦点时自己画 I 形光标，
+   `getComputedStyle().cursor` 也照样报 `default`（实测），所以别在那儿绕。 */
+.cond-above .cond-f-val input { cursor: default; }
+
+/* 条件行的那几个值：**鼠标平时点不到输入框本身**（`pointer-events: none`）——
+   所以不会拿焦点、不会有打字的 I 形光标、也不会「闪一下光标再消失」。
+   单击由外层 `.cond-f-val` 接（开选择），双击由它 `focus()`（程序化聚焦不受影响）；
+   聚焦之后这里再把 pointer-events 放开，编辑时照样能点、能拖选文字。 */
+.cond-above .cond-f-val input { pointer-events: none; cursor: default; }
+.cond-above .cond-f-val input:focus { pointer-events: auto; cursor: text; }
+
+/* 编辑态用 class 切（`:focus` 在 WebKit 里对 pointer-events 算不准）：双击进来之后
+   才放开鼠标、才给 I 形光标，编辑时能点、能拖选文字。 */
+.cond-above .cond-f-val input.is-editing { pointer-events: auto; cursor: text; }
+
+/* 条件行的落点是**整格**（标签 + 值 + 中间那点空隙，事件挂在 `.cond-f` 上），
+   hover 给个手型，明确「这一格能点」；编辑态还是上面的 I 形光标。
+   （值那一行只有 20 来 px 高，只挂值那一行的时候稍微点偏就毫无反应，用户报过「不太灵敏」。） */
+.cond-f.is-openable { cursor: pointer; }
+
+/* ---------- 设置页 07「常用选项」 ----------
+   一行一个字段：左边小字标签，右边一串胶囊 —— 内置的淡一点、删不掉；
+   自己加的那几条 hover 才露出 ‹ › ×（位置固定占着，别让胶囊宽度跳）。 */
+.quick-rows { margin-top: 2px; }
+.quick-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px dotted var(--line-2);
+}
+.quick-row:first-child { border-top: 0; }
+.quick-lbl {
+  flex: 0 0 84px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.quick-chips .qchip.is-own {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 5px;
+}
+.quick-chips .qchip.is-add {
+  color: var(--ink-3);
+  border-style: dashed;
+  background: transparent;
+}
+.quick-chips .qchip.is-add:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.35); }
+.qchip-acts {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 120ms var(--ease);
+}
+.qchip.is-own:hover .qchip-acts,
+.qchip.is-own:focus-within .qchip-acts { opacity: 1; }
+.qchip-acts button {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.qchip-acts button:hover { color: var(--accent); }
+.qchip-acts button.is-del:hover { color: #b4381c; }
+.qchip-acts button:disabled { opacity: 0.28; cursor: default; }
+
+/* 产率表头上那个「不计」：原料类记录是**算出来的**默认值（不是开关），所以不给点，
+   样子沿用 `.th-mini.on`，只是没有 hover。 */
+.th-mini.is-static { cursor: default; color: #8a5a3a; background: #f3e7dc; }
+
+/* 设置页 06：那排「改哪一类」的类型胶囊（记录页显示按类型分开存） */
+.sheet-kind-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 12px;
+}
+.sheet-kind-lbl {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.sheet-kind-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.sheet-kind-chips .qchip { color: var(--ink-3); }
+.sheet-kind-chips .qchip.is-on {
+  color: var(--accent-ink);
+  background: #f7f0ea;
+  border-color: rgba(168, 71, 31, 0.32);
+}
+
+/* ---------- 「绑定产物」弹窗 ----------
+   三条路各一小节；①里那张结构图直接用算出来的 SVG（不套外框），挑库那栏复用 .recipe-* */
+.pbind { display: flex; flex-direction: column; gap: 14px; }
+.pbind-now {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  padding-bottom: 10px;
+  border-bottom: 1px dotted var(--line-2);
+}
+.pbind-lbl {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.pbind-bound { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.pbind-muted { color: var(--ink-3); font-size: 11px; }
+.pbind-muted.mono { font-family: var(--mono); }
+.pbind-sec { display: flex; flex-direction: column; gap: 8px; }
+.pbind-head { display: flex; align-items: center; gap: 10px; }
+.pbind-head .pbind-muted { flex: 1 1 auto; min-width: 0; }
+.pbind-q {
+  margin-left: auto;
+  width: 190px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 11.5px;
+  background: var(--paper);
+}
+.pbind-q:focus { outline: none; border-color: var(--ink-3); }
+.pbind-struct {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.pbind-svg { flex: 0 0 auto; width: 132px; height: 84px; display: flex; align-items: center; justify-content: center; }
+.pbind-svg svg { width: 100%; height: 100%; }
+.pbind-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.pbind-list { max-height: 210px; overflow-y: auto; }
+.pbind-sec-draw .pbind-acts { padding-bottom: 2px; }
+.pbind-foot { border-top: 1px dotted var(--line-2); padding-top: 10px; }
+.pbind-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.pbind-link:hover { color: var(--accent); }
+
+/* 「绑定产物」里「已经绑好了」那颗对勾：不占按钮位，只是把状态说清楚 */
+.pbind-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--accent-ink);
+}
+
+/* 多行确认框（列「哪几格不一样」用）：一行一条，底部一句灰说明 */
+.eln-messagebox .eln-msg-line { font-size: 12px; line-height: 1.7; color: var(--ink-2); word-break: break-word; }
+.eln-messagebox .eln-msg-hint { margin-top: 8px; font-size: 11.5px; color: var(--ink-3); }
+
+/* ---------- 「补档案」冲突列表 ----------
+   像代码合并那样：一行一格，左右两边是「档案里的 / 记录里的」，点哪边就取哪边；
+   选中的那边描边 + 淡底，没选的那边淡下去。谱图不参与（只补缺的）。 */
+.scf { display: flex; flex-direction: column; gap: 12px; }
+.scf-head { display: flex; align-items: center; gap: 8px; }
+.scf-cap { font-size: 11.5px; color: var(--ink-3); }
+.scf-spacer { flex: 1 1 auto; }
+.scf-quick {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.scf-quick:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.32); }
+.scf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.scf-row {
+  display: grid;
+  grid-template-columns: 1fr 76px 1fr;
+  align-items: stretch;
+  gap: 10px;
+}
+.scf-lbl {
+  align-self: center;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.scf-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+  border: 1px solid transparent;
+  background: #fbfaf8;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 120ms, border-color 120ms, background 120ms;
+}
+.scf-side:hover { opacity: 0.9; }
+.scf-side.on {
+  opacity: 1;
+  background: var(--paper);
+  border-color: var(--line-2);
+}
+.scf-row.is-take .scf-side.on { border-color: rgba(168, 71, 31, 0.35); background: #fdf6f2; }
+.scf-side-cap {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.scf-val {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.scf-side.on .scf-val { color: var(--ink); }
+.scf-fills, .scf-files { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.scf-fill, .scf-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  background: #fbfaf8;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.scf-file.is-muted { color: var(--ink-3); background: transparent; }
+.scf-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px dotted var(--line-2);
+  padding-top: 10px;
+}
+
+/* ---------- 投料表「说明」格里那颗「核对」 ----------
+   平时不占地方（hover 才浮出来），点开是这个词条的小对照卡：
+   MW / 密度 / 固体还是液体，能当场改（固体不按密度折体积）。 */
+.sheet .rtable td.note-td { position: relative; }
+.sheet .rtable .note-check {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: var(--paper);
+  padding: 1px 3px;
+  font: inherit;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.sheet .rtable tr:hover .note-check { opacity: 1; }
+.sheet .rtable .note-check:hover { color: var(--accent); }
+.check-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 80;
+  width: 236px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(20, 18, 14, 0.12);
+  padding: 9px 11px 8px;
+  text-align: left;
+}
+.check-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dotted var(--line-2);
+}
+.check-nm { font-size: 12.5px; color: var(--ink); }
+.check-meta { font-size: 10px; color: var(--ink-4); }
+.check-line { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11.5px; color: var(--ink-2); }
+.check-cap {
+  flex: 0 0 28px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.check-hint { font-size: 10px; color: var(--ink-4); }
+.check-chip {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.check-chip.on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.35); background: #f7f0ea; }
+.check-acts { display: flex; gap: 6px; margin-top: 7px; }
+.check-act {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 5px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.check-act:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.32); }
+
+/* 试剂库行里那颗「固 / 液」小签：点一下切换（固体不按密度折体积） */
+.rl-state {
+  margin-left: 5px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0 5px;
+  font: inherit;
+  font-size: 9.5px;
+  line-height: 14px;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.rl-state:hover { color: var(--accent); border-color: rgba(168, 71, 31, 0.32); }
+.rl-state.is-solid { color: #8a5a3a; background: #f3e7dc; border-color: rgba(168, 71, 31, 0.25); }
+/* 「核对」浮层翻到上方（表格底部那几行下面放不下时） */
+.check-menu.is-up { top: auto; bottom: calc(100% + 4px); }
+
+/* 设置页 06「块里的功能」：块下面的第三层开关 */
+.sheet-fx {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dotted var(--line-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sheet-fx-head {
+  font-size: 12px;
+  color: var(--ink-2);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sheet-fx-hint { font-size: 10.5px; color: var(--ink-4); }
+.sheet-fx-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.sheet-fx-row.is-static { cursor: default; }
+.sheet-fx-row.is-off { opacity: 0.55; }
+.sheet-fx-name { min-width: 0; }
+.sheet-fx-sub { font-size: 10.5px; color: var(--ink-4); }
+.sheet-fx-note {
+  font-size: 10px;
+  color: var(--accent-ink);
+  background: #f7f0ea;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.sheet-fx-chips { display: inline-flex; gap: 4px; }
+.sheet-fx-chips .qchip { font-size: 10.5px; padding: 1px 8px; }
+.sheet-fx-chips .qchip.is-on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.32); background: #f7f0ea; }
+
+/* ── 「挑几条实验」弹窗（ExpPick：建筛选表、接上一步）─────────────────────────
+   以前这些行一个样式都没有（纯原生按钮）。照 `.recipe-opt` 的样子来：
+   整行可点、悬停淡底、选中的加一圈极淡描边，不搞成框框。 */
+.xpick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.xpick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.xpick-row:hover { background: var(--canvas); }
+.xpick-row.is-on { border-color: #dcdcd7; background: var(--bone); }
+.xpick-box {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 1px solid #cfcdc6;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+}
+.xpick-row.is-on .xpick-box { border-color: var(--accent-ink); }
+.xpick-code { font-size: 10px; color: var(--ink-3); letter-spacing: 0.04em; }
+.xpick-title {
+  font-size: 12.5px;
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xpick-cond { font-size: 10.5px; color: var(--ink-4); white-space: nowrap; }
+.xpick-y { font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+/* 猜出来的「更可能就是它」：暖色小胶囊 */
+.xpick-tag {
+  font-size: 9.5px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f7f0ea;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+/* ── 反应式标题行里的「两步反应」小条 ─────────────────────────────────────
+   第 N 步 / 上一步 / 连上一步画：都不描边，只有悬停才浮出一点底；具体步骤用 mono，
+   跟页面里别的编号一致。 */
+.chain-step {
+  border: none;
+  background: none;
+  padding: 1px 2px;
+  margin-left: 8px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chain-step:hover { color: var(--accent-ink); }
+.chain-join {
+  margin-left: 6px;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chain-join:hover { color: var(--ink-2); border-color: #e4e2dc; }
+.chain-join.is-on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.32); background: #f7f0ea; }
+
+/* 两步反应那条链：列表卡片上标「第 2 步」。做成中性的细胶囊，别跟反应类型那颗
+   （暖色 is-rxn）抢眼——它是位置，不是化学信息。 */
+.tag.is-step {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 1px 6px;
+  background: none;
+  border: 1px solid #e2e0da;
+  color: var(--ink-3);
+}
+
+/* 纸放得下（`scrollHeight` 减掉底部呼吸位还够）时由 `EditorView` 挂上 `is-fit`：
+   这时候不该能滚——以前底部那 120px 会让页面白滚一段，用户报过「会上下动」。 */
+.editor.is-fit { overflow-y: hidden; }
+
+/* 反应式正在画（切换记录 / 改了投料表）：空着就空着，别让「点击上传」那行灰字闪一下 */
+.scheme-slot.is-busy .scheme-empty { visibility: hidden; }
+
+/* 「第 N 步」那行里的「产物（中间体）」格：宽一点，名字往往比试剂名长 */
+.step-line .step-prod { width: 168px; }
+
+/* 「第 N 步」那条分隔：跟「变量」那条虚线一个路子（左边小标签、一条虚线、右边小格子），
+   不要把整个步骤头做成一整块浅色横条（用户：「不用太复杂，分隔一下就行了」） */
+.sheet .rtable tr.step-head td {
+  background: transparent;
+  border-top: 1px dashed var(--line-2);
+  border-bottom: none;
+  padding: 6px 0 2px;
+}
+.sheet .rtable tr.step-head:first-child td { border-top: none; padding-top: 2px; }
+.step-rule {
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 1px dashed var(--line-2);
+  margin: 0 4px;
+}
+.step-head .step-tag { color: var(--ink-4); }
+.step-head .step-cond,
+.step-head .step-prod {
+  flex: 0 1 auto;
+  width: 132px;
+  min-width: 70px;
+  font-size: 11px;
+}
+.step-head .step-label { flex: 0 1 auto; width: 150px; }
+
+/* ---------- 多步记录：每个步骤自成一张投料表 ----------
+   「第 N 步」→ 这一步的条件行 → 这一步的列头 → 这一步的投料行，
+   两步就是两张表（列宽还是同一套 colgroup，所以两张表的列是对齐的）。 */
+.rtable tr.step-cond-row > td { padding: 0 !important; }
+/* 单步那条条件行是六列 grid（多出来的一列给反应规模让位），多步这里五格铺满；
+   多步的每条表都带着条件行，所以这行压紧一点（值 11.5px，跟投料表的数字一个字号） */
+.step-cond-row .cond-above {
+  grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr;
+  padding: 0 2px 3px;
+  gap: 0 14px;
+}
+.step-cond-row .cond-f-label { font-size: 8px; line-height: 1.4; }
+.step-cond-row .cond-f-val input { font-size: 11.5px; padding: 2px 4px; }
+/* 每一步的条件行不再挂「变量」小开关：筛条件的变量是整条记录的事，多步里摆两遍只是噪音 */
+.step-cond-row .cond-var-tog { display: none; }
+/* 一步以上：两步的行都在这**一张表**里，中间就一条虚线 + 一个小「第 N 步」 */
+.sheet .rtable tr.step-divider > td { padding: 5px 0 2px; }
+.step-divider-in { display: flex; align-items: center; gap: 7px; }
+.step-divider-lbl {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.step-divider-rule { flex: 1 1 auto; height: 0; border-top: 1px dashed var(--line-2); }
+
+/* 一步一块的「条件」：第 N 步 + 本步内容 + 这一步的条件行，都压在投料表上面，
+   所以尽量矮——标题那行 15px、标签 7.5px、值 11px，两块加起来也就 80 来像素 */
+.step-cond-block { margin-bottom: 2px; }
+.step-cond-block .step-line { min-height: 13px; gap: 5px; }
+.step-cond-block .step-no {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.step-cond-block .step-label { flex: 0 1 auto; width: 150px; min-width: 70px; font-size: 11px; padding: 1px 4px; }
+.step-cond-block .cond-above {
+  grid-template-columns: 1fr 0.8fr 1.18fr 1.05fr 1fr;
+  padding: 0 2px 1px;
+  gap: 0 14px;
+}
+.step-cond-block .cond-f-label { font-size: 7.5px; line-height: 1.15; }
+.step-cond-block .cond-f-val input { font-size: 11px; padding: 1px 14px 1px 3px; }
+/* 第 2 步起不再重复那排小标签（上一条刚写过、顺序也固定），省一行、也少一层灰字 */
+.step-cond-block[data-step]:not([data-step='1']) .cond-f-label { display: none; }
+/* 每一步的条件行不再挂「变量」小开关：筛条件的变量是整条记录的事，多步里摆两遍只是噪音 */
+.step-cond-block .cond-var-tog { display: none; }
+
+/* 结果表的数字列表头：右内边距跟格子里输入框的文字对齐（9px = 格子 3px + 输入框 6px） */
+.sheet .rtable.res-table thead th.n { padding-right: 9px; }
+/* 产物那一列：左边留一个定宽槽给小签（`--res-tag-w`），名字每行都从同一个位置起排；
+   表头按同样的偏移左缩进，就正好压在名字上面（小签宽窄不一会把名字顶得忽左忽右，踩过） */
+.pick-wrap .prod-slot,
+.pick-wrap .prod-link { flex: 0 0 var(--res-tag-w, 46px); min-width: 0; }
+.pick-wrap .prod-link { position: relative; justify-content: flex-start; }
+/* 小签最多占满这个槽（号长就省略号），解绑的 × 挂着 hover 才出现、不占宽度 */
+.pick-wrap .prod-link .cmp-tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-wrap .prod-link .cmp-unlink {
+  position: absolute;
+  right: -9px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--paper);
+}
+.sheet .rtable.res-table thead th.r-name { padding-left: calc(var(--res-tag-w, 46px) + 12px); }
+/* 单步那条结果：产物名后面还要挂化合物小签，名字列表窄了名会被切（「Ts苄基环丁烷」就切过），
+   从「性状 / 选择性」两列里匀一点出来 */
+.sheet .res-table:not(.is-multi) .r-appear { width: 12%; }
+.sheet .res-table:not(.is-multi) .r-dr { width: 84px; }
+.sheet .res-table:not(.is-multi) .r-mass { width: 88px; }
+
+/* 结果那张表：一步一行，左边挂一个「第 N 步」的小签 */
+.res-table .r-step { width: 48px; }
+/* 多步那张结果表多了一列小签，产物名那一格得宽一点（不然「苄基甲氧基环丁烷」被切） */
+/* 格子多、每格内容又短：auto 布局会把「产物名称」压到 166px（名字就被切了），
+   多步这张表改成按 colgroup 的宽度来 */
+.res-table.is-multi { table-layout: fixed; }
+.res-table.is-multi .r-name { width: 36%; }
+.res-table.is-multi .r-mw { width: 68px; }
+.res-table.is-multi .r-mass { width: 84px; }
+.res-table.is-multi .r-yield { width: 64px; }
+/* 多步：最后一行「最终产物」的性状 / dr,ee（跟「选择性测定」那行同一个样子） */
+.res-final { margin-top: 5px; }
+.res-final .sel-cap { color: var(--ink-4); }
+/* 「结果」右边那句「一步一行」：跟别处的小注一个样子 */
+.block-head .lbl-note {
+  margin-left: 7px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+.res-step-cell {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  white-space: nowrap;
+  padding-right: 4px !important;
+}
+/* 多步的结果表一行里格子多，别让「性状」那格把产物名挤没 */
+.res-table td input { min-width: 0; }
+
+/* 投料表工具行的「小数位」：一个小弹层，质量 / 体积各一排胶囊（自适应 · 2 · 3 · 4 位） */
+.prec-wrap { position: relative; display: inline-flex; }
+.prec-menu {
+  left: 0;
+  top: auto;
+  bottom: calc(100% + 6px);   /* 工具行在最底下，往上开 */
+  display: block;
+  min-width: 236px;
+  padding: 8px 9px;
+}
+.prec-row { display: flex; align-items: center; gap: 8px; }
+.prec-row + .prec-row { margin-top: 6px; }
+.prec-lbl {
+  flex: 0 0 auto;
+  width: 86px;
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.prec-chips { display: flex; gap: 4px; }
+.prec-chips .qchip {
+  flex: 1 1 auto;
+  justify-content: center;
+  font-size: 10.5px;
+  padding: 2px 6px;
+}
+.prec-chips .qchip.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* 分类段头右边那颗「就在这里新建」：平时很淡，鼠标进这一段才显形 */
+.list-cat-row { display: flex; align-items: center; gap: 4px; }
+.list-cat-row .list-cat-head { flex: 1 1 auto; min-width: 0; }
+.list-cat-add {
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent;
+  color: #c7c2b8; cursor: pointer; padding: 0;
+  opacity: 0; transition: opacity .12s, color .12s;
+}
+.list-cat:hover .list-cat-add { opacity: 1; }
+.list-cat-add:hover { color: var(--ink); background: #f1ece4; }
+
+/* ---------- 对照页（两条记录并排） ---------- */
+.cmp-head { align-items: flex-start; }
+.cmp-diffsum { font-size: 11px; color: var(--ink-3); max-width: 46ch; text-align: right; }
+.cmp-diffsum b { color: var(--accent-ink); font-weight: 500; }
+
+.cmp-pickrow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.cmp-pickcell {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--r);
+  background: var(--paper); box-shadow: 0 1px 2px rgba(20, 18, 14, 0.05);
+}
+.cmp-pickcell .cmp-code { font-size: 12px; color: var(--accent-ink); }
+.cmp-pickcell .cmp-title { font-size: 12.5px; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-pickcell .cmp-meta { font-size: 10.5px; color: var(--ink-4); white-space: nowrap; }
+.cmp-pickcell .cmp-open { margin-left: auto; }
+
+.cmp-empty { padding: 26px 4px; color: var(--ink-3); font-size: 12.5px; }
+
+.cmp-visual { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.cmp-col { background: var(--paper); border-radius: var(--r); padding: 10px 12px 12px; min-width: 0; }
+.cmp-col-head { display: flex; align-items: baseline; gap: 6px; font-size: 10.5px; color: var(--ink-4); margin-bottom: 6px; }
+.cmp-col-tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 9.5px; letter-spacing: 0;
+}
+.cmp-scheme { display: flex; justify-content: center; }
+.cmp-scheme svg { max-width: 100%; height: auto; max-height: 180px; }
+.cmp-scheme-empty { font-size: 11px; color: var(--ink-4); padding: 18px 0; }
+.cmp-tlc { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.cmp-tlc figure { margin: 0; flex: 1 1 45%; min-width: 0; }
+.cmp-tlc img {
+  width: 100%; height: auto; max-height: 300px; object-fit: contain;
+  border-radius: 4px; background: #fff;
+}
+.cmp-tlc img { cursor: zoom-in; }
+.cmp-tlc-note { font-size: 10.5px; color: var(--ink-3); margin: 6px 0 0; }
+.cmp-tlc figcaption { font-size: 10px; color: var(--ink-4); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-tlc-empty { margin-top: 10px; font-size: 11px; color: var(--ink-4); }
+
+.cmp-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
+.cmp-table .cmp-k { width: 118px; }
+.cmp-table th, .cmp-table td { text-align: left; padding: 5px 10px 5px 6px; border: 0; }
+.cmp-table thead th { font-size: 10px; color: var(--ink-4); font-family: var(--mono); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.cmp-table tbody th { font-weight: 400; color: var(--ink-3); white-space: nowrap; }
+.cmp-table tbody td { color: var(--ink); }
+.cmp-table tbody tr + tr td, .cmp-table tbody tr + tr th { border-top: 1px dotted #efeee9; }
+.cmp-table tr.cmp-sec td {
+  font-size: 10px; letter-spacing: 0.08em; color: var(--ink-4);
+  padding-top: 12px; border-top: 0 !important;
+}
+.cmp-table tr.is-diff > th { color: var(--ink); }
+.cmp-table tr.is-diff > td { color: var(--accent-ink); }
+.cmp-table tr.is-diff > td:first-of-type { box-shadow: inset 2px 0 0 var(--accent); }
+
+.cmp-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cmp-note { background: var(--paper); border-radius: var(--r); padding: 10px 12px 12px; min-width: 0; }
+.cmp-note-lbl { font-size: 10px; letter-spacing: 0.06em; color: var(--ink-4); margin-top: 8px; }
+.cmp-note-txt { font-size: 12px; color: var(--ink); margin: 3px 0 0; white-space: pre-wrap; line-height: 1.55; }
+
+@media (max-width: 900px) {
+  .cmp-pickrow, .cmp-visual, .cmp-notes { grid-template-columns: 1fr; }
+}
+
+/* ---------- 对照页（多实验：挑选、并排、结论） ---------- */
+.cmp-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.cmp-pick {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 320px; padding: 3px 4px 3px 9px;
+  border-radius: 999px; background: var(--paper);
+  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.06);
+  font-size: 11px; color: var(--ink);
+}
+.cmp-pick .mono { color: var(--accent-ink); font-size: 11.5px; }
+.cmp-pick-title { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-pick-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; border: 0; border-radius: 999px;
+  background: transparent; color: var(--ink-4); cursor: pointer;
+}
+.cmp-pick-x:hover { background: #f2ece7; color: var(--bad); }
+
+/* 并排那排：列数跟着记录条数走（最多 4 列，再多横向滚） */
+.cmp-visual { grid-template-columns: repeat(var(--cmp-cols, 2), minmax(0, 1fr)); }
+.cmp-col-date { margin-left: auto; font-size: 10px; color: var(--ink-4); }
+
+.cmp-multi thead th { padding-bottom: 6px; }
+.cmp-multi tbody th { width: 108px; }
+.cmp-multi tbody td { font-size: 11.5px; }
+
+/* 结论 */
+.cmp-note-box { margin-top: 4px; background: var(--paper); border-radius: var(--r); padding: 10px 12px 12px; }
+.cmp-note-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.cmp-note-head .spacer { flex: 1; }
+.cmp-note-title { font-size: 12px; color: var(--ink); }
+.cmp-note-hint { font-size: 10px; color: var(--ink-4); }
+.cmp-note-input {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  border: 1px solid var(--line-2); border-radius: 6px; background: #fff;
+  padding: 8px 10px; font: inherit; font-size: 12.5px; line-height: 1.6; color: var(--ink);
+  outline: none;
+}
+.cmp-note-input:focus { border-color: var(--ink-4); background: #fdfcf9; }
+
+/* ---------- 对照页：干净陈列（相同折叠 / 空行不显示 / 结果放大） ---------- */
+/* 挑记录那一行末尾的「全部字段」靠右："spacer 只在各自容器里才 flex" */
+.cmp-picks .spacer { flex: 1; }
+/* 第一条列上那颗「基准」小签：下面的产率差量是相对它算的 */
+.cmp-base-tag {
+  display: inline-flex; align-items: center; height: 14px; padding: 0 5px;
+  border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 9px; letter-spacing: 0.04em;
+}
+/* 每条一列的结果条：产率放大成一眼能比的大小，右边挂选择性 */
+.cmp-res { display: flex; align-items: baseline; gap: 5px; margin-top: 9px; }
+.cmp-res-y { font-size: 17px; line-height: 1; color: var(--ink); letter-spacing: -0.01em; }
+.cmp-res-d { font-size: 10.5px; color: var(--accent-ink); }
+.cmp-res-sel { margin-left: auto; font-size: 10.5px; color: var(--ink-3); }
+/* 「相同」那一行：点开才把这几行摊平 */
+.cmp-table tr.is-same > th { color: var(--ink-4); }
+.cmp-table tr.is-same > td { color: var(--ink-3); }
+.cmp-same-row > th { color: var(--ink-4); font-size: 10px; }
+.cmp-same-row > td { padding-top: 2px; }
+.cmp-same-tog {
+  display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%;
+  padding: 2px 0; border: 0; background: transparent;
+  color: var(--ink-3); font: inherit; font-size: 11px; text-align: left; cursor: pointer;
+}
+.cmp-same-tog:hover { color: var(--ink); }
+.cmp-same-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-same-n { flex: 0 0 auto; color: var(--ink-4); font-size: 10px; }
+.cmp-same-tog svg { flex: 0 0 auto; align-self: center; }
+/* 对照页的 TLC 只为「看一眼」，压到 190 高；不裁图（height auto + contain），
+   否则三张板图占满一屏、变量表要滚下去才看得见 */
+.cmp-col .cmp-tlc img { max-height: 190px; }
+
+/* ---------- 对照页：汇报展示（一条一张小卡，版式照 lib/reportcard.js 那张纸） ---------- */
+/* 条件一行（对应汇报卡的 `card-cond`）：淡色单行，空字段不摆占位 */
+.cmp-col .cmp-cond { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--ink-3); }
+/* 相对基准改了什么（复用 lib/sctfields.js 的 variations）——这一列为什么不一样，用强调色 */
+.cmp-col .cmp-var { margin-top: 3px; font-size: 11.5px; line-height: 1.5; color: var(--accent-ink); }
+.cmp-col .cmp-prod { margin-top: 3px; font-size: 11px; color: var(--ink-4); }
+/* TLC 不放在卡片里（会跟着列宽挤），单独一区自由并排：见下面 `.cmp-tlc.is-free` */
+
+/* ---------- 对照页：突出变量（相同的条件只写一次，卡片上是它自己的变量） ---------- */
+.cmp-same-brief { margin: -2px 0 12px; font-size: 11px; line-height: 1.7; color: var(--ink-3); }
+.cmp-same-brief-k {
+  display: inline-block; margin-right: 7px; padding: 0 6px;
+  border-radius: 999px; background: #f3efe8; color: var(--ink-4);
+  font-size: 9.5px; letter-spacing: 0.04em; vertical-align: 1px;
+}
+/* 卡片上的主角：这一条相对基准改了什么（基准那条自己写「基准」，淡一点） */
+.cmp-col .cmp-var.is-lead { margin-top: 9px; font-size: 13px; line-height: 1.45; color: var(--accent-ink); }
+.cmp-col .cmp-var.is-lead.is-base { font-size: 12px; color: var(--ink-4); }
+
+/* ---------- 对照页：TLC 自由对比（板子从卡片里拿出来，单独并排比斑点） ---------- */
+.cmp-tlc-box { margin: 4px 0 14px; background: var(--paper); border-radius: var(--r); padding: 10px 12px 12px; }
+/* 自由并排：盘子按自身比例、统一 240 高，一行放不下就换行；不裁图 */
+.cmp-tlc.is-free { margin-top: 2px; gap: 12px; align-items: flex-start; }
+.cmp-tlc.is-free figure { flex: 0 0 auto; margin: 0; }
+.cmp-tlc.is-free img {
+  height: 240px; width: auto; max-width: 100%; object-fit: contain;
+  border-radius: 4px; background: #fff; display: block;
+}
+.cmp-tlc.is-free figcaption {
+  display: flex; align-items: baseline; gap: 6px; margin-top: 5px;
+  font-size: 10.5px; color: var(--ink-4); max-width: 300px;
+}
+.cmp-tlc.is-free .cmp-tlc-note { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* TLC 图注：编号（强调）+ 展开剂/Rf + 文件名（淡、过长省略）；一行放不下就换行 */
+.cmp-tlc.is-free figcaption { flex-wrap: wrap; max-width: 300px; row-gap: 2px; }
+.cmp-tlc.is-free .cmp-tlc-code { color: var(--accent-ink); }
+.cmp-tlc.is-free .cmp-tlc-file { color: var(--ink-4); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* ---------- 排版板（自由画布）：列表 + 画布 + 素材抽屉 ----------
+   纸里的尺寸（.bd-*）全按 mm / pt 写、跟导 PDF 共用一份（lib/board.js 的 BOARD_CSS）；
+   这里只管画布外面的东西（抽屉、纸张阴影、吸附工具条）。 */
+.board-list { display: flex; flex-direction: column; }
+.board-row {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 6px; border-radius: 6px; cursor: pointer;
+}
+.board-row:hover { background: #f7f5f0; }
+.board-row-title { font-size: 13px; color: var(--ink); }
+.board-row-meta { font-size: 10.5px; color: var(--ink-4); }
+.board-row-proj {
+  font-size: 9.5px; color: var(--accent-ink); background: #f7f0ea;
+  border-radius: 999px; padding: 1px 7px;
+}
+.board-row-del {
+  margin-left: auto; width: 18px; height: 18px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: var(--ink-4);
+  cursor: pointer; opacity: 0; transition: opacity .12s, color .12s;
+}
+.board-row:hover .board-row-del { opacity: 1; }
+.board-row-del:hover { color: var(--bad); background: var(--bad-soft); }
+
+/* 头部：板名就地改 */
+.board-head { align-items: flex-start; }
+.board-head-main { min-width: 0; }
+.board-title {
+  display: block; width: 100%; max-width: 520px;
+  padding: 1px 4px; margin: 0 0 3px -4px;
+  border: 0; border-radius: 5px; background: transparent;
+  font-family: "Iowan Old Style", Georgia, serif;
+  font-size: 24px; line-height: 1.25; color: var(--ink); outline: none;
+}
+.board-title:focus { background: #f8f7f2; }
+.board-saved { font-size: 10.5px; color: var(--ink-4); }
+
+/* 左抽屉 + 右画布 */
+.board-wrap { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 16px; align-items: start; }
+.board-drawer {
+  background: var(--paper); border-radius: var(--r); padding: 6px 8px 10px;
+  height: calc(100vh - 250px); overflow-y: auto;
+}
+.board-drawer-h { font-size: 9px; letter-spacing: 0.08em; color: var(--ink-4); margin: 4px 2px 2px; }
+.board-drawer-empty { font-size: 10.5px; color: var(--ink-4); line-height: 1.5; padding: 4px 2px; }
+
+/* 一条记录一组：编号 + 能放的块 + 它的 TLC 小图 */
+.bd-rec { padding: 6px 2px 7px; border-bottom: 1px solid #f2f0ec; }
+.bd-rec:last-of-type { border-bottom: 0; }
+.bd-rec-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; min-width: 0; }
+.bd-rec-head .mono { font-size: 10.5px; color: var(--accent-ink); flex: 0 0 auto; }
+.bd-rec-title { font-size: 10.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-rec-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.bd-chip {
+  border: 0; background: #f5f2ec; border-radius: 4px; padding: 2px 6px;
+  font: inherit; font-size: 10.5px; color: var(--ink-2); cursor: pointer;
+}
+.bd-chip:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.bd-rec-tlc { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.bd-thumb {
+  padding: 0; border: 0; border-radius: 3px; overflow: hidden; cursor: pointer;
+  width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+  background: #fbfaf7;
+}
+.bd-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.bd-thumb:hover { outline: 1px solid var(--accent); }
+.board-addtext {
+  width: 100%; justify-content: center;
+  position: sticky; bottom: 0; margin-top: 4px;
+  background: var(--paper); box-shadow: 0 -6px 8px -6px rgba(20, 18, 14, 0.12);
+}
+
+/* 画布：一张真的 A4（210mm × 297mm），靠 zoom 缩进可视区 */
+.board-stage {
+  height: calc(100vh - 250px); overflow: auto;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.board-page {
+  flex: 0 0 auto; background: #fff;
+  box-shadow: 0 2px 14px rgba(20, 18, 14, 0.12);
+}
+.board-item { cursor: move; }
+.board-item.is-sel { outline: 0.35mm solid rgba(168, 71, 31, 0.5); outline-offset: 1.2mm; }
+.board-grip {
+  position: absolute; right: -2mm; bottom: -2mm; width: 4mm; height: 4mm;
+  border-radius: 0.6mm; background: var(--accent); cursor: nwse-resize;
+}
+.board-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 2.6mm; color: #b4b2aa; pointer-events: none;
+}
+
+/* 选中那一块的浮动工具条 */
+.board-tools { display: flex; align-items: center; justify-content: flex-end; gap: 2px; margin-top: 10px; }
+.board-tools-name { font-size: 10.5px; color: var(--ink-3); margin-right: 6px; }
+.board-tool {
+  border: 0; background: transparent; font: inherit; font-size: 11px;
+  color: var(--ink-2); padding: 3px 8px; border-radius: 5px; cursor: pointer;
+}
+.board-tool:hover { background: #f1efeb; color: var(--ink); }
+.board-tool.is-danger:hover { background: var(--bad-soft); color: var(--bad); }
+/* 拖动中：光标变抓取；吸附时那根参考线（页面坐标，单位 mm） */
+body.is-board-dragging { cursor: grabbing; }
+.board-guide { position: absolute; pointer-events: none; background: rgba(168, 71, 31, 0.32); }
+.board-guide.is-v { top: 0; bottom: 0; width: 0.28mm; }
+
+/* ---------- 排版板整页不滚：纸张必须一屏装得下 ----------
+   以前 `.single` 自带 `overflow-y:auto` + 100px 下留白，画布高度又是 `100vh - 250px` 硬算的，
+   结果纸张连带整页能上下滚（用户：「纸张会上下滑动」）。现在改成：外层不滚，画布用 flex 吃掉
+   剩余高度，`fit()` 按**真实高度**算 zoom，纸永远刚好装下；只有钉住「100%」时纸自己在 stage 里滚。 */
+.board-single { overflow: hidden; padding-bottom: 16px; }
+.board-single > .inner { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.board-single .board-head { flex: 0 0 auto; }
+.board-single .board-wrap { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.board-single .board-drawer { height: 100%; min-height: 0; }
+.board-single .board-stage { flex: 1 1 auto; height: 100%; min-height: 0; }
+.board-single .board-tools { flex: 0 0 auto; }
+.board-stage { overflow: hidden; align-items: center; }
+.board-stage.is-pinned { overflow: auto; align-items: flex-start; }
+/* 工具条常驻占位：选中前后高度一致，纸张不会因为多一行而重新缩放（看着像「纸上下跳」） */
+.board-tools-bar { flex: 0 0 auto; min-height: 30px; }
+.board-tools { margin-top: 0; }
+
+/* 编辑区：内容没超出时不许滚（is-fit，见 EditorView 的 updateEditorFit）；
+   没溢出时 Safari 仍会「橡皮筋」上下弹一下，`overscroll-behavior: contain` 把它按住，
+   也别让它把滚动传给外面的容器 */
+.editor { overscroll-behavior: contain; }
+/* 放得下的时候把那 120px 呼吸位也收掉：万一哪天判定没跟上，也只会多出一点空白，
+   不会让人往下滚一大段空页（用户报的「没超出页面但还是会滚动」就是滚进了这段 padding） */
+.editor.is-fit { padding-bottom: 24px; }
+
+/* ---------- 结果表最右那格：板图缩略（不占新一行；点开看大图，多张时右上角「换」） ---------- */
+.res-tlc-th { text-align: center !important; }
+.res-tlc-cell { padding: 1px 2px !important; }
+.tlc-mini { position: relative; display: flex; align-items: center; justify-content: center; gap: 2px; }
+.tlc-mini-btn { border: 0; background: transparent; padding: 0; line-height: 0; cursor: zoom-in; }
+.tlc-mini-btn img {
+  height: 26px; width: auto; max-width: 26px; object-fit: contain;
+  border-radius: 2px; background: #fbfaf7; box-shadow: 0 0 0 1px var(--line-2);
+}
+.tlc-mini-btn:hover img { box-shadow: 0 0 0 1px var(--ink-4); }
+.tlc-mini-swap {
+  position: absolute; right: -3px; bottom: -4px; opacity: 0; transition: opacity 0.12s;
+  border: 1px solid var(--line-2); background: #fff; border-radius: 3px; cursor: pointer;
+  font: inherit; font-size: 9px; line-height: 1; padding: 1px 3px; color: var(--ink-3);
+}
+.tlc-mini:hover .tlc-mini-swap { opacity: 1; }
+.tlc-mini-swap:hover { border-color: var(--ink-4); color: var(--ink); }
+.tlc-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.tlc-pick-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px;
+  padding: 6px; border: 1px solid var(--line-2); border-radius: 6px; background: #fff; cursor: pointer;
+  font: inherit; font-size: 10px; color: var(--ink-3);
+}
+.tlc-pick-opt img { height: 60px; width: auto; max-width: 100%; object-fit: contain; }
+.tlc-pick-opt.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.tlc-shots { display: flex; gap: 5px; margin-left: auto; }
+.tlc-shots img {
+  height: 22mm; width: auto; max-width: 80px; object-fit: contain;
+  border-radius: 3px; background: #fbfaf7; cursor: zoom-in;
+}
+.tlc-more { align-self: center; font-size: 11px; color: var(--ink-4); }
+/* 排版板抽屉：顶部「整组」两个按钮、底部「文字 / 结论」并排 */
+.board-addrow { width: 100%; }
+.board-addrow .btn { flex: 1 1 0; justify-content: center; }
+
+/* ---------- 附件大图里的「批注」 ----------
+   一张覆盖在图片上的 canvas：画的是归一化坐标，窗口缩放不跑位；保存时合成一张新 PNG 传回记录。
+   `.fp-shot` 包住 img + canvas，宽度跟着图片走（原来是 img 自己 margin:0 auto 居中的）。 */
+.fp.is-image .fp-shot { position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto; line-height: 0; }
+.fp.is-image .fp-shot .fp-img { display: block; margin: 0; }
+.fp-pen { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+/* 批注时把图放大到整个框宽：小截图（板上那点像素）不放大根本圈不准；笔画是归一化坐标，放大不影响存出来的位置。
+   `.fp.is-image` 那条是 `width: fit-content`（框跟着图走），批注时得把它顶成 100%，否则 img 的 100% 也是缩着的 */
+.fp.is-pen { width: 100%; }
+.fp.is-pen .fp-shot { width: 100%; }
+.fp.is-pen .fp-shot .fp-img { width: 100%; max-height: calc(100vh - 400px); object-fit: contain; }
+.fp-penbar {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 8px;
+  border: 1px solid var(--line-2); border-radius: 6px; background: #fbfaf7;
+}
+.fp-penhint { flex: 1 1 auto; font-size: 10.5px; color: var(--ink-3); }
+.fp-penhint.warn { color: var(--bad); }
+
+/* ---------- 图片盒子跟着图自己的比例走（尽量别留白边） ----------
+   以前 TLC / 照片都定死宽度（112 / 124px）+ `object-fit: contain`，
+   竖长条或横长的图四周就空出一圈纸白 —— 用户：「这种图片什么的尽量不要白边」。
+   现在盒子只给「最大」尺寸、高度定住、宽度按图的比例自己长：一张 562×1330 的板子
+   按 142 高算出来 60 宽，就不会再被塞进 112 宽的框里左右各留 20 多像素白。 */
+/* 照片同理：盒子按 124px 定宽（图注「反应 30min 后」这种按盒宽排得下），图 `contain` 居中 */
+.sec-shots .tlc-shot { display: block; width: 124px; height: auto; overflow: visible; background: transparent; }
+.sec-shots .tlc-shot img { display: block; width: 100%; height: 164px; object-fit: contain; background: transparent; }
+.sec-shots .tlc-cap { display: block; width: 100%; min-width: 0; }
+.sec-shots.is-lit .tlc-shot { width: 200px; height: auto; }
+.sec-shots.is-lit .tlc-shot img { display: block; width: 100%; height: 140px; object-fit: contain; }
+@media print {
+  .sheet .sec-tlc .tlc-shot.has-cap img { height: 104px !important; }
+  .sheet .sec-shots .tlc-shot img { height: 120px !important; }
+}
+
+/* ---------- 变量行里那颗「查 MW」 ----------
+   条件组「变量」那几行（RuPhos / Dcpf 这种配体）不进投料表，本地常常没有分子量，
+   所以要能就地查一次；查到的会写进试剂库，下次打这个名字直接带出来。
+   小、靠右、hover 才给底色——跟表里其他小按钮一个调子。 */
+.var-note-cell { text-align: right; padding-right: 4px !important; line-height: 1; }
+.var-look {
+  border: 0; background: transparent; font: inherit; font-size: 9.5px; line-height: 1.1;
+  letter-spacing: 0.02em; color: var(--ink-4); padding: 0 3px; border-radius: 3px; cursor: pointer;
+}
+.var-look:hover { background: #f1efeb; color: var(--ink-2); }
+.var-look.is-busy { color: var(--ink-4); cursor: default; }
+.var-look.is-ok { color: var(--ink-4); }
+.var-look.is-miss { color: var(--bad); }
+.var-look.is-err { color: var(--accent-ink); }
+.var-look:disabled { opacity: 0.6; }
+
+/* ---------- 设置页 07「常用选项」：内置的也能删了 ----------
+   一行的完整列表就是界面上这一串（不再区分「内置 / 自己加的」），所以「恢复默认」要单独一颗小字。 */
+.quick-reset {
+  border: 0; background: transparent; font: inherit; font-size: 10px;
+  color: var(--ink-4); padding: 1px 4px; border-radius: 3px; cursor: pointer;
+}
+.quick-reset:hover { background: #f1efeb; color: var(--ink-2); }
+
+/* ---------- 变量行的数字跟投料表长得一样（用户：「需要和投料表里面的接近一点，字体什么的还有格式」）----------
+   投料表那几格是 `<input class="n">`：SF Mono 11px / 500 / 强调色 / 右对齐 / padding 4px 4px 4px 6px；
+   变量行原来是 11.5px / 400 / `--ink-4` 灰，看着像「没填」。现在把字号、字重、颜色、内边距全对齐，
+   「—」用 `.var-na` 单独压淡（跟溶剂行那个 — 一个调子），当量那格也按 `.n` 的样子排。 */
+.sheet .rtable tr.rt-var td.n {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+  padding: 0 3px;
+}
+.sheet .rtable tr.rt-var td.var-amt { font-weight: 600; }
+.sheet .rtable tr.rt-var td.var-amt.is-liquid { font-weight: 600; color: var(--accent-ink); }
+.sheet .rtable tr.rt-var td.var-na { color: var(--ink-4); opacity: 1; }
+.sheet .rtable tr.rt-var td.n .var-na { color: var(--ink-4); font-weight: 400; }
+.sheet .rtable tr.rt-var .cond-eq {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-ink);
+  text-align: right;
+  padding: 4px 4px 4px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.sheet .rtable tr.rt-var .cond-in { font-size: 12.5px; padding: 4px 6px; }
+.sheet .rtable tr.rt-var > td { padding-left: 3px; padding-right: 3px; }
+
+/* ---------- 设置页：真的二级侧边栏（跟实验记录 / 化合物库那根中栏一个样子） ----------
+   用户：「这个二级侧边栏不要属于内容区域，干脆直接做成二级侧边栏，类似化合物或者实验侧边栏」。
+   所以复用 `.panes` + `.listpane`（bone 底、分隔线、自己滚），只是窄一点（208px）；
+   右边是 `.editor > .editor-inner`，跟别的页面同一套纸面留白。窄屏侧栏变横向胶囊。 */
+.set-panes { --panes-w: 288px; }
+/* 模块 + 它下面那几条子功能当成一组：组与组之间留一点点空，组内不留 */
+.set-group { display: flex; flex-direction: column; }
+.set-group + .set-group { margin-top: 3px; }
+.set-pane-title { font-family: var(--serif); font-size: 19px; line-height: 1.2; letter-spacing: -0.02em; color: var(--ink); }
+.set-pane-body { display: flex; flex-direction: column; gap: 2px; padding: 10px 10px 16px; }
+.set-mod {
+  display: flex; align-items: baseline; gap: 9px; width: 100%;
+  border: 0; background: transparent; font: inherit; font-size: 12.5px; color: var(--ink-2);
+  text-align: left; padding: 7px 9px; border-radius: 6px; cursor: pointer;
+}
+.set-mod:hover { background: #f1efeb; color: var(--ink); }
+.set-mod.is-on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(20, 18, 14, 0.05); }
+.set-mod-n { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
+.set-mod.is-on .set-mod-n { color: var(--accent); }
+/* 有子项的模块右边一颗小箭头：朝右 = 收着，转下来 = 展开（用户要的「展开和收缩」） */
+.set-mod-caret { margin-left: auto; flex: 0 0 auto; color: var(--ink-4); transition: transform 180ms var(--ease); }
+.set-mod.is-open .set-mod-caret { transform: rotate(90deg); }
+.set-mod.is-on .set-mod-caret { color: var(--ink-3); }
+/* 子项容器：高度按条数算（`subsMax()`），所以能动画到「刚好的高度」；收起时不吃点击、不进 Tab */
+.set-subs {
+  overflow: hidden;
+  transition: max-height 220ms var(--ease), opacity 160ms var(--ease);
+}
+.set-subs.is-shut { opacity: 0; pointer-events: none; }
+.set-inner { max-width: 860px; }
+@media (max-width: 900px) {
+  .set-panes { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .set-pane { border-right: 0; border-bottom: 1px solid var(--line); }
+  .set-pane .listpane-head { padding: 10px 14px 8px; border-bottom: 0; }
+  .set-pane-body { flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+  .set-group { flex-direction: row; }
+  .set-group + .set-group { margin-top: 0; }
+  .set-mod { width: auto; border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 11px; }
+  .set-mod.is-on { border-color: transparent; box-shadow: none; }
+  .set-mod-caret { display: none; }
+  .set-inner { padding: 20px 16px 0; }
+}
+
+/* ---------- 设置页侧边栏：更像「侧边栏」+ 功能搜索 ----------
+   一眼看过去要跟左边那根导轨是同一套语言：条目 13px、当前项 `#eae7e1` 实底 + 500 字重
+   （原来是纸白卡 + 投影，看着像浮在内容里的卡片，用户说「更像侧边栏一点」）。 */
+.set-pane-head { padding: 16px 12px 12px; gap: 10px; }
+.set-search input { padding: 6px 9px 6px 28px; font-size: 12px; }
+.set-mod { font-size: 13px; padding: 7px 8px; }
+.set-mod.is-on { background: #eae7e1; color: var(--ink); font-weight: 500; box-shadow: none; }
+.set-mod.is-on .set-mod-n { color: var(--accent); }
+/* 搜索结果：一条两行——上面是设置项，下面是它属于哪个模块 */
+.set-hit {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  border: 0; background: transparent; font: inherit; text-align: left;
+  padding: 7px 8px; border-radius: 6px; cursor: pointer;
+}
+.set-hit:hover { background: #f1efeb; }
+.set-hit-l { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
+.set-hit-m { font-size: 10px; color: var(--ink-4); }
+/* 当前模块下面的子功能（用户：「还有就是子功能快速选择」）：缩进一小格、字号再小一号，
+   点一下就地滚到那一节，省掉「先切模块再往下翻」。窄屏胶囊排不下，直接不显示。 */
+.set-sub {
+  display: flex; align-items: center; width: 100%; height: 27px;
+  border: 0; background: transparent; font: inherit;
+  font-size: 11.5px; color: var(--ink-3); text-align: left;
+  padding: 0 8px 0 26px; border-radius: 6px; cursor: pointer;
+}
+.set-sub:hover { background: #f3f1ec; color: var(--ink); }
+@media (max-width: 900px) { .set-sub { display: none; } }
+.set-hit-empty { margin: 6px 4px; font-size: 11.5px; line-height: 1.6; color: var(--ink-4); }
+/* 跳过去之后闪一下，让人知道落在哪一行 */
+@keyframes setFlash { 0%, 55% { background: var(--accent-soft); } 100% { background: transparent; } }
+.is-flash { animation: setFlash 1.4s ease; border-radius: 6px; }

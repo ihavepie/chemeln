@@ -16,15 +16,15 @@
 ## 3. 技术栈 / 启动 / 数据
 - 前端：Vue 3.5 `<script setup>`、vue-router 4（hash 模式）、Element Plus 2.8（zh-CN）、Vite 6，无 TypeScript、无状态管理库（一个 reactive store）。
 - 化学计算：`openchemlib` 9.25.1，**动态 import**（约 1.1 MB chunk），负责 SMILES/MOL → 分子式、MW、结构 SVG。**只给「带基团缩写」的结构另加一份 `indigo-ketcher` 1.46 的 WASM**（`src/lib/indigo.js`，11.8 MB，放 `vendor/indigo/`，按需加载）。
-- 服务端：零依赖 Node CommonJS（`server/index.js` 单文件，约 35+ 条 REST 路由），数据库用内置 `node:sqlite`，端口 4780。
-- 启动：`preview.command`（4780 已在跑就复用，再起 5173）、`npm run dev` / `npm run serve`。
+- 服务端：零依赖 Node CommonJS（`server/index.js` 83 条路由；纯清洗层在 `server/lib/normalize.js`，能单测），内置 `node:sqlite`，端口 4780。
+- 启动：`preview.command`（4780 在跑就复用，再起 5173）、`npm run dev` / `serve`；**`npm run check`** 跑 `test/` 下的纯逻辑测试（`node --test`，零依赖）。
 - 数据：全部在 `data/` —— `data/eln.db`（SQLite）+ `data/attachments/`（谱图等原始文件）+ `data/compounds/`（化合物文件）。备份 = 整个 `data/` 拷走。
 - **数据备份用 `node scripts/backup.js`**：`VACUUM INTO` 把（含 WAL 的）真数据写成一个自包含单文件，再连 `attachments/`、`compounds/` 一起拷到 `.backups/<日期>/`，默认留 7 份（`--list` 看已有、`--keep N` 改份数）。**别用 `cp data/eln.db` 当备份**——真数据在 `-wal` 里，拷出来是空壳。服务启动后每日自动备一次（`ELN_AUTO_BACKUP=0` 关）；`.backups/` 不进 git。
 - **绝对不能删**：`data/`（用户全部实验记录）、`server/package.json`（内容是 `{"type":"commonjs"}`，删了服务端起不来）、`src/styles/eln.css` 里从 v1 原样搬来的大段规则、`public/`（**现在就是 v2 构建产物，删了 4780 打不开**；旧 v1 在 `.backup/public-v1-*/`）。
 - **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。常用：`git diff` 看改了啥、`git checkout -- <文件>` 撤销未提交改动、`git log --oneline` 看历史。**git 只保代码，不保数据**：`data/` 得自己拷走。
   **两个远程**：`backup` = 本机裸仓库 `<项目目录>-backup.git`（`git push backup main` 推一份）；`origin` = `git@github.com:ihavepie/chemeln.git`（公开仓库，HTTPS 地址 https://github.com/ihavepie/chemeln）。
-  **这台机器连 github.com 的 HTTPS 会超时**（`curl https://github.com/` 000，但 `api.github.com` 通），所以走 SSH：用本机生成的专用私钥（路径只写在本地的 `CLOUD-DEPLOY.local.md`，公开仓库里不留），仓库 `core.sshCommand` 指到它，公钥在 GitHub 账号里登记过才能推。
-  **脱敏**：`CLOUD-DEPLOY.md` 是模板（占位地址），真实 IP / 私钥 / 密码只在本机 `CLOUD-DEPLOY.local.md`（已 gitignore）；脚本里的连接信息一律走环境变量。**全部历史已重写过**（私钥路径 / 用户名 / 密码抹掉，hash 全变），**别再把这些写进仓库**；细节见 `HISTORY.md`。
+  **这台机器连 github.com 的 HTTPS 会超时**（`api.github.com` 通），所以走 SSH：专用私钥路径只写在本地 `CLOUD-DEPLOY.local.md`，仓库 `core.sshCommand` 指到它，公钥要在 GitHub 登记过。
+  **脱敏**：`CLOUD-DEPLOY.md` 是占位模板，真实 IP / 私钥 / 密码只在本地 `CLOUD-DEPLOY.local.md`（已 gitignore），脚本里一律走环境变量。**历史已全部重写**过（hash 全变），**别再把这些写进仓库**。
 
 ## 4. 目录结构（一句话一个）
 - `src/main.js` — 入口：挂 router / Element Plus / 全局指令。
@@ -35,11 +35,11 @@
 - `src/components/AppRail.vue` — 最左固定导航条；顶部有**课题切换器**（含新建课题）。下面那个大按钮**跟着页面变**：在化合物库 / 化合物页时是「＋ 新建化合物」，其余页面是「＋ 新建实验」。导航项：工作台 / 实验记录 / 化合物库 / 条件筛选 / **排版板** / **回收站**（带条数）/ 设置。**「对照」页已撤**（用户：「对照感觉就不用了，只要排版板」）。
 - `src/components/SketcherModal.vue` — **画结构式弹窗**：iframe 里跑 **Ketcher**（`/vendor/ketcher/index.html`），「用这个结构」用 Ketcher 的异步接口 `getSmiles()` 取结构，交回调用方走 `lib/chem.js`（openchemlib）那条老路；**图直接用 Ketcher 自己渲的**（`getMol()` 拿带 S-group 的 molfile，手绘缩写得留着；用户要「画板画什么就出什么」）——算分子式 / MW、画结构 SVG、存成 `structure` 文件（出图前先过 `lib/abbrevspread.js` 把缩写基团的键补长）**Ketcher 的接口都是 Promise**，调用要 await。**要常挂、只切 `open`**（只切 `open`，不销毁 iframe）；每次打开按 `initial` 重载。
 - `vendor/ketcher/`（**构建产物，不进 git**）— Ketcher 独立版的打包结果（`index.html` + `assets/` + `wasm/` 里的 Indigo WASM + `raphael.min.js`），由 `scripts/build-ketcher.sh` 生成；服务端 `/vendor/*` 路由负责发（`serveVendor()`，MIME 补了 `.wasm/.woff2/.ttf/.map`）。
-- `vendor-build/ketcher/`（**源码进 git，node_modules 不进**）— Ketcher 小工程源码（`index.html` / `main.jsx` 挂 `ketcher-react` + `ketcher-standalone`，暴露 `window.sketcherApi`）；`npm install` + `vite build` 把产物写到 `vendor/ketcher/`。
+- `vendor-build/ketcher/`（**源码进 git，node_modules 不进**）— Ketcher 小工程源码（挂 `ketcher-react` + `ketcher-standalone`，暴露 `window.sketcherApi`）；`vite build` 把产物写到 `vendor/ketcher/`。
 - `src/components/FilePreview.vue` — **附件就地预览弹窗**（实验附件 `/api/files/:id`、化合物文件 `/api/compound-files/:id` 共用）：图片直接铺开、PDF 用 `<iframe>`，其它格式给个说明 + 下载；**宽度跟图片走**（小图不留空底）。**大图能批注**（传了 `expId` 才有）：红笔画圈 / 划线，「存成新图」把原图和笔画合成一张**新附件**（原名+`-批注`，JPEG 原图仍存 JPEG）；原图不动，打印 / 排版板读到的还是普通图片；笔画用归一化坐标，缩放不跑位。
 - `src/components/AppModal.vue` — 通用弹窗（`modelValue/title/confirmText/danger/showConfirm/width` 等）。`modelValue` 默认 `true`，传 `false` 只是隐藏不销毁内容。
 - `src/components/CatPick.vue` — 分类下拉（自绘菜单；`show-all` 决定是「筛选」还是「给记录归类」）。菜单有 `max-height: 56vh` + 滚动，分类多了不会把屏幕顶下去。
-- `src/components/ProjPick.vue` — 记录页「课题」格子的下拉（能打字，也能从已有课题里点一个）。小箭头**贴在输入框右侧内部、无边框**（不要做成带框的小方块，用户明确讨厌那种“空白的框”）；菜单贴着输入框下方弹出，下面放不下就往上翻。**宽度别照抄输入框**（那格只有 ~95px）：`MENU_MIN_W = 176`、夹进视口、`overflow-x: hidden`（照抄会溢出，踩过）。
+- `src/components/ProjPick.vue` — 记录页「课题」格的下拉（能打字，也能点已有课题）。小箭头**贴在输入框右侧内部、无边框**（用户讨厌那种“空白的框”）；菜单贴输入框下方弹出，放不下往上翻。**宽度别照抄输入框**（那格只有 ~95px）：`MENU_MIN_W = 176`、夹进视口、`overflow-x: hidden`（照抄会溢出，踩过）。
 - `src/components/PrintPanel.vue` — 打印面板：克隆真实两页 DOM 缩成 A4 缩略图 + 选项（范围/附件/页眉/黑白）；可以走系统打印（`body` 挂 `print-*` 类，`afterprint` 时摘掉），也可以「存成 PDF」走后端 WebKit 渲染。
 - `src/components/LabelBatchPanel.vue` — 批量打印化合物标签：勾选当前列表里的化合物 + 四档排版（大 100×46 / 中 65×30 / 小 50×23 / 迷你 34×14mm，分别 12 / 27 / 48 / 95 张一页）；整版 `justify-content: flex-end` **靠右对齐**，一次生成多页 PDF。大/中/小是原版式整体缩放，迷你走 `labelMarkupMini`。
 - `src/lib/print.js` — 打印导出共用：`collectCss()`、`A4_CSS`（`body{zoom:0.7498}` + `.pdf-page` 210×297mm）、`downloadBlob()`。
@@ -113,7 +113,7 @@
 - **配色与质感**：纸白 `#fff` 卡片、画布 `#f5f4f1`、极淡描边 `#eaeaea/#dcdcd7`、强调色 `#a8471f`；不加渐变。**卡片墙是例外**：要「亚克力感」——不描边、用柔和投影分层（见 `ExpGrid.vue` 那条）。**中栏列表的卡片（`.exp-card` / `.cmp-card`）也是投影分层**（白卡浮在 `--bone` 底上，卡片间 12px 缝；当前条用**卡片内套一圈 1px 强调色虚线 + 极淡强调色调底 `#fcf7f4` + 强调色编号 + 稍深投影**表示（**暖黄底都别用**，用户说「不要黄色」；**虚线是用户明确点名要的**），**不要红框 / 描边 / 左边竖条**）；其余地方（表单项、弹窗、表格）仍用极淡描边，别一股脑全改成投影。标题用 serif（Iowan Old Style），数字/编号用 mono。
 - **版式克制**：块与块之间尽量少分割线；表格默认不要行 hover（**例外**：`/list`、`/compounds` 的表格视图整行可点，所以行 hover 淡底 `#f7f5f0` 是用户点名要的）；聚焦格用 `#f8f7f2` 淡底、不要下划线；不搞「太敏感」的悬停弹层。
 - **代码风格**：Vue `<script setup>`；不引入 TypeScript；注释用中文、一两句话说明「为什么」；组件逻辑就地写，别为复用而过度抽象。
-- **样式放哪**：新规则追加到 `src/styles/eln.css` 末尾并加一行注释说明作用域；改完用 grep 确认规则没插错位置（踩过坑）。
+- **样式放哪**：规则在 `src/styles/eln/<分片>.css`（01-base / 02-sheet / 03-sheet-2p / 04-print / 05-compounds / 06-v2 / 07-mobile / 08-parallel / 09-screening / 10-tail），`eln.css` 只剩 `@import` 清单、**顺序不能动**。新规则进所属分片，别都堆 10-tail。
 - **新功能往哪写**：交互在组件内、纯逻辑进 `src/lib/*`、数据字段走 `server/db.js` 的 `ensureColumn` 迁移 + `server/index.js` 路由 + `api.js` + `store.js`。
 - **交互底线**：弹窗点背景可关、点内容绝不可关；输入框不触发文字拖选；破坏性操作先弹确认并写清后果。
 

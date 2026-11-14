@@ -427,3 +427,18 @@
   **补 2：热区的光标（用户：「切换页的话，光标可以变成箭头什么的吗」）**。原来两条缝都是手型（`cursor: pointer`），现在改成系统那两种**单向箭头**：纸左边 `w-resize`（←）、右边 `e-resize`（→），一眼看出往哪边翻；那一侧没有下一页 / 上一页（`is-off`）时回落到默认箭头，不给错误暗示。没用自造的 SVG cursor —— WKWebView 里能不能渲染出来没法用截图验证（截图抓不到光标），系统箭头是稳的。
   页签（`.ptab`）和顶上两颗 `‹ ›`（`.pg-arrow`）本来就是 `cursor: pointer`，没动。
   验证（WKWebView，读 `getComputedStyle`）：第 1 页 → 左 `default`（没有上一页）、右 `e-resize`；第 2 页 → 左 `w-resize`、右 `default`（这条记录只有两页，没有下一页，判断是对的）。
+## 2026-11-14 工程化三件：测试 / 服务端分层 / 样式分片（用户看了完成度评估后说「1 先做，3、4 也可以」）
+
+- **① 纯逻辑测试（`npm run check`，零依赖）**。之前整个项目**一条自动化检查都没有**：`package.json` 里只有 vite 的 dev/build，裁判全靠人眼截图。这次不引入 vitest（要装包、要网络），直接用 Node 自带的 `node --test` + `node:assert`——项目本来就 `"type": "module"`，`src/lib/*` 大多不碰 DOM，能直接 import。新增 `test/`：
+  `reagent.test.js`（`num/eqNum/eqLabel/round/saneDensity/densityUsable/amountText/volText/yieldInfo`——质量→产率这条链是记录、导出、打印共用的真理）、`sctfields.test.js`（`variations()` 的「只写变成什么」/一进一出/只改当量/基准没填/规模浮点收敛；`autoValue()` 里**条件组优先于整条记录**这条最近才加的规矩）、`export.test.js`（Markdown 抬头与三块、条件行不重复溶剂；CSV 的 BOM/CRLF/单位在表头）、`normalize.test.js`（写库前的清洗闸）。**37 条全绿**。
+  写的时候就被打脸四次（都是我的预期错、代码对）：`volText`/`amountText` 的体积是**去尾零**的（`2 mL` 不是 `2.00 mL`）；`reagentText` 用 ` · ` 连不是 ` + `；`safeName` 先 `basename` 再替换（`a/b\c:d.png` → `b_c_d_.png`）；`normalizeCondVars` **不 trim**（全空白的值会留下）——这四条现在都写进测试注释里当行为说明。
+  `npm run check` = `node --test test/*.test.js`（**注意不能写 `node --test test/`**：Node 24 会把目录当模块入口，报 `Cannot find module .../test`）。
+
+- **③ 服务端先分出「纯清洗层」**：`server/lib/normalize.js`（`str` / `numOrNull` / `safeName` / `normalizeCondVars` / `parseConds` / `normalizeConds` / `normalizeFieldVars` / `parseFieldVars`）。这些东西原来散在 5000 多行的 `index.js` 里，**不碰 db、不碰 req/res**，所以能搬能测。`index.js` 改成一行 `require('./lib/normalize')` 解构（5653 → 5586 行）。
+  **为什么没把 83 条路由全拆开**：handlers 都是闭包，引用着 `index.js` 里几十个模块级 helper 和可变状态（缓存、定时器、`PORT` 之类），拆成 `routes/*.js` 要先把这些显式传进去，**改错一处就是整个服务起不来**——而这是用户每天要用的东西。所以这轮只做「机械、可验证」的那部分，路由拆分留到以后按组慢慢搬（`server/lib/*` 这套模式照抄就行）。
+  验证方式：`ELN_DATA_DIR=/tmp/eln-smoke PORT=4799` 起一份**数据副本**（`VACUUM INTO` 出来的自包含单文件 + `attachments/`），把 28 个 GET 端点全打一遍（全 200，`/api/compound-files/:id` 404 是那条化合物本来没有文件），再走一遍**写**路径（`PUT /api/experiments/206` 带 `conds`：`71.54 → 71.5`、`mass` 落库、空候选被滤掉，符合预期）。确认没问题才重启 4780。
+
+- **④ `eln.css` 拆成 10 个分片**：`src/styles/eln/<分片>.css`（01-base / 02-sheet / 03-sheet-2p / 04-print / 05-compounds / 06-v2 / 07-mobile / 08-parallel / 09-screening / 10-tail），`eln.css` 只剩 `@import` 清单。**先切、后验**：切的时候按**连续行号**切，然后把分片 `cat` 起来跟原文逐字节比对（`roundtrip: True`，278→326 KB 那份），因为 `@import` 是按清单顺序内联的，顺序即层叠顺序。
+  **第一次切错了**：切点落在区块横幅那一行上，把 `/* ===…` 的注释劈成两半 → `postcss-import: Unclosed comment` 直接构建失败。改成「切在横幅行之前」才对（`grep -n "^/\* =\{20,\}"` 的行号要 **−1**）。
+  验证：`npm run build` 出来的 `public/assets/index-C9wXD2bS.css` **跟改之前同名同大小（559,413 B）**——Vite 的内容哈希没变，等于证明这条重构是字节级 no-op；`git diff --stat -- public/` 空。再取一份页面计算样式指纹（body / .sheet / .ptab / .exp-card / .rail / .hint / .btn 的 font/color/border/box-shadow 等 16 项）前后 `diff` → 完全一致。
+  顺带发现的（不是这次引入的）：构建出来的 CSS 559 KB 里**有一半是 Element Plus 的整套主题**（`el-theme.css` + EP 样式），这是打包体积的大头，要瘦身得从「按需引入 EP 组件样式」入手。
