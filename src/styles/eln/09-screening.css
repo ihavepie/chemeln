@@ -374,7 +374,6 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-c-per { width: 96px; }
 .rl-c-num { width: 44px; }
 .rl-c-when { width: 92px; }
-.rl-c-state { width: 78px; }
 .rl-c-more { width: 22px; }
 .rl-table td { padding: 9px 6px; vertical-align: middle; white-space: normal; }
 /* 数字与状态列：上下左右都居中，跟表头对齐 */
@@ -390,24 +389,20 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-per { display: block; }
 /* 试剂库里「当前引用为 0」的条目：数字淡一点，表示这个试剂现在没记录在用 */
 .rl-table .rl-zero { color: var(--ink-4); opacity: 0.55; }
-/* 角色：英文缩写小签，颜色跟投料表里的组分色一致（Sol / Cat / Base …） */
-.rl-role-chip {
-  display: inline-block;
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.03em;
-  padding: 1px 5px; border-radius: 3px; line-height: 1.5;
-  color: var(--tone, var(--ink-3));
-  border: 1px solid var(--tone, var(--line-2));
-  background: #fff; white-space: nowrap;
+/* 角色：英文缩写，加粗的那一档颜色（不加框，靠字重和颜色区分） */
+.rl-role-txt {
+  font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  color: var(--tone, var(--ink-2));
 }
-.rl-role-chip[data-tone='sub'] { --tone: #7c3315; }
-.rl-role-chip[data-tone='base'] { --tone: #1f6c9f; }
-.rl-role-chip[data-tone='acid'] { --tone: #1b6e73; }
-.rl-role-chip[data-tone='cat'] { --tone: #6b4d8f; }
-.rl-role-chip[data-tone='lig'] { --tone: #2f6b4f; }
-.rl-role-chip[data-tone='sol'] { --tone: #8d8b84; }
-.rl-role-chip[data-tone='add'] { --tone: #8a5f00; }
-.rl-role-chip[data-tone='ox'] { --tone: #9f2f2d; }
-.rl-role-chip[data-tone='red'] { --tone: #a8471f; }
+.rl-role-txt[data-tone='sub'] { --tone: #5e2511; }
+.rl-role-txt[data-tone='base'] { --tone: #164e73; }
+.rl-role-txt[data-tone='acid'] { --tone: #0f5257; }
+.rl-role-txt[data-tone='cat'] { --tone: #4b2f6b; }
+.rl-role-txt[data-tone='lig'] { --tone: #1c5136; }
+.rl-role-txt[data-tone='sol'] { --tone: #6b6a63; }
+.rl-role-txt[data-tone='add'] { --tone: #6d4900; }
+.rl-role-txt[data-tone='ox'] { --tone: #8a2422; }
+.rl-role-txt[data-tone='red'] { --tone: #8c3312; }
 /* 固 / 液：一个小圈（点一下切换，只影响「按密度折体积」） */
 .rl-solid {
   display: inline-block; margin-left: 4px; vertical-align: middle;
@@ -419,9 +414,10 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-solid.is-solid { border-color: var(--ink-3); color: var(--ink-2); background: #f3f2ee; }
 /* 状态：一个圆点（灰=已核对，橙=待核对，红=查不到；查询中转淡） */
 .rl-dot {
-  width: 9px; height: 9px; padding: 0; border-radius: 50%; cursor: pointer;
+  flex: 0 0 auto;
+  width: 7px; height: 7px; padding: 0; border-radius: 50%; cursor: pointer;
   border: 1px solid var(--accent); background: transparent;
-  display: inline-block; vertical-align: middle;
+  display: inline-block;
 }
 .rl-dot:hover:not(:disabled) { background: var(--accent-soft); }
 .rl-dot.is-done { border-color: #b9b5aa; background: #b9b5aa; }
@@ -472,6 +468,7 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 /* 试剂库里「这个试剂用过的当量 / 用量」小签（用得最多的那颗是强调色）。
    这排小签是「试剂的子记录」，要能一眼看清、还好点——所以做成正常大小的胶囊
    （以前 9px 高 14px，又小又难点，用户说像小字）。 */
+.rl-name-top { display: flex; align-items: center; gap: 6px; }
 .rl-nm { display: block; }
 .rl-vars { display: inline-flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 .rl-var,

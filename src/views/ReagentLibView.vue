@@ -459,7 +459,6 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
             <col class="rl-c-num" />
             <col class="rl-c-when" />
             <col class="rl-c-links" />
-            <col class="rl-c-state" />
             <col class="rl-c-more" />
           </colgroup>
           <thead>
@@ -473,14 +472,35 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
               <th class="n">在用</th>
               <th class="n">最近使用</th>
               <th class="n">外部库</th>
-              <th class="n">状态</th>
               <th />
             </tr>
           </thead>
           <tbody>
             <tr v-for="it in shown" :key="it.name" @click="copyName(it)" :title="`点一下复制「${it.name}」`">
               <td class="rl-name">
-                <span class="rl-nm">{{ it.name }}</span>
+                <span class="rl-name-top">
+                  <button
+                    type="button"
+                    class="rl-dot"
+                    :class="{
+                      'is-done': it.checkedAt && it.checkState !== 'miss',
+                      'is-miss': it.checkState === 'miss',
+                      'is-busy': checking === it.name,
+                      'is-run': allRun,
+                    }"
+                    :disabled="checking === it.name || allRun"
+                    :title="checking === it.name ? '查询中…' : it.checkState === 'miss' ? '查不到（三个库都没有）：点一下重查' : it.checkedAt ? '已核对：点一下重查' : '待核对：点一下按 PubChem / OPSIN 查'"
+                    @click.stop="verify(it)"
+                  />
+                  <span class="rl-nm">{{ it.name }}</span>
+                  <button
+                    v-if="it.checkState === 'miss'"
+                    type="button"
+                    class="rl-ext-btn"
+                    title="去外部数据库检索这个试剂"
+                    @click.stop="rowMenu($event, it)"
+                  >↗</button>
+                </span>
                 <!-- 同一个试剂用过的当量（一条记录填一条，这里按试剂归拢） -->
                 <span v-if="it.variants && it.variants.length" class="rl-vars">
                   <span
@@ -496,7 +516,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 </span>
               </td>
               <td class="rl-role">
-                <span class="rl-role-chip" :data-tone="roleTone(it.role)" :title="it.role || ''">{{ ROLE_EN[it.role] || it.role || '—' }}</span>
+                <span class="rl-role-txt" :data-tone="roleTone(it.role)" :title="it.role || ''">{{ ROLE_EN[it.role] || it.role || '—' }}</span>
                 <button
                   type="button"
                   class="rl-solid"
@@ -540,29 +560,6 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                   >{{ l.label }}</a>
                   <span v-if="!sitesForRow(it).length" class="rl-link is-idle">…</span>
                 </span>
-              </td>
-              <td class="n">
-                <!-- 状态胶囊：点一下就是核对（没查过）/ 重核（查过）；查不到时旁边给一个站外入口 -->
-                <button
-                  type="button"
-                  class="rl-dot"
-                  :class="{
-                    'is-done': it.checkedAt && it.checkState !== 'miss',
-                    'is-miss': it.checkState === 'miss',
-                    'is-busy': checking === it.name,
-                    'is-run': allRun,
-                  }"
-                  :disabled="checking === it.name || allRun"
-                  :title="checking === it.name ? '查询中…' : it.checkState === 'miss' ? '查不到（三个库都没有）：点一下重查' : it.checkedAt ? '已核对：点一下重查' : '待核对：点一下按 PubChem / OPSIN 查'"
-                  @click.stop="verify(it)"
-                />
-                <button
-                  v-if="it.checkState === 'miss'"
-                  type="button"
-                  class="rl-ext-btn"
-                  title="去外部数据库检索这个试剂"
-                  @click.stop="rowMenu($event, it)"
-                >↗</button>
               </td>
               <td class="n">
                 <button type="button" class="rl-more" title="改名 / 删除 / 站外检索" @click.stop="rowMenu($event, it)">⋯</button>
