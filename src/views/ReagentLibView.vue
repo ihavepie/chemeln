@@ -5,7 +5,7 @@ import { api } from '../api.js';
 import { store } from '../store.js';
 import { useRoute } from 'vue-router';
 import { confirm, prompt, toast } from '../lib/feedback.js';
-import { variantText } from '../lib/reagent.js';
+import { ROLE_EN, roleTone, variantText } from '../lib/reagent.js';
 import { LOOKUP_SITES, nameInfo } from '../lib/lookup.js';
 import { ctxMenu, openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
 import { setPageMenu } from '../lib/pagemenu.js';
@@ -496,16 +496,14 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 </span>
               </td>
               <td class="rl-role">
-                {{ it.role || '—' }}
+                <span class="rl-role-chip" :data-tone="roleTone(it.role)" :title="it.role || ''">{{ ROLE_EN[it.role] || it.role || '—' }}</span>
                 <button
                   type="button"
-                  class="rl-state"
+                  class="rl-solid"
                   :class="{ 'is-solid': it.solid }"
                   :title="it.solid ? '现在按固体记（不折体积）；点一下改成液体' : '现在按液体记（会按密度折体积）；点一下改成固体'"
                   @click.stop="toggleSolid(it)"
-                >
-                  {{ it.solid ? '固' : '液' }}
-                </button>
+                >{{ it.solid ? '固' : '液' }}</button>
               </td>
               <td class="n mono rl-edit" title="点一下自己填（填过就不再被核对覆盖）" @click.stop="editNumber(it, 'mw')">
                 <span v-if="it.mw == null" :class="{ 'rl-miss': it.checkState === 'miss' }">{{ it.checkState === 'miss' ? '查无' : '—' }}</span>
@@ -547,15 +545,17 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
                 <!-- 状态胶囊：点一下就是核对（没查过）/ 重核（查过）；查不到时旁边给一个站外入口 -->
                 <button
                   type="button"
-                  class="rl-state"
+                  class="rl-dot"
                   :class="{
                     'is-done': it.checkedAt && it.checkState !== 'miss',
                     'is-miss': it.checkState === 'miss',
+                    'is-busy': checking === it.name,
+                    'is-run': allRun,
                   }"
                   :disabled="checking === it.name || allRun"
-                  :title="it.checkState === 'miss' ? '三个库都没查到：点一下重新查，或去外部库看一眼' : it.checkedAt ? '已核对过，点一下重新查' : '点一下按 PubChem / OPSIN 核对'"
+                  :title="checking === it.name ? '查询中…' : it.checkState === 'miss' ? '查不到（三个库都没有）：点一下重查' : it.checkedAt ? '已核对：点一下重查' : '待核对：点一下按 PubChem / OPSIN 查'"
                   @click.stop="verify(it)"
-                >{{ checking === it.name ? '查询中…' : it.checkState === 'miss' ? '查不到' : it.checkedAt ? '已核对' : '待核对' }}</button>
+                />
                 <button
                   v-if="it.checkState === 'miss'"
                   type="button"

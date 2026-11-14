@@ -368,7 +368,7 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 }
 .rl-table th.n, .rl-table td.n { text-align: right; }
 /* 列宽：表头和数据对得上，数字列不再各自漂 */
-.rl-c-role { width: 64px; }
+.rl-c-role { width: 92px; }
 .rl-c-mw { width: 64px; }
 .rl-c-dens { width: 92px; }
 .rl-c-per { width: 96px; }
@@ -383,26 +383,52 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
 .rl-table tbody tr { cursor: pointer; }
 .rl-table tbody tr:hover { background: #faf9f6; }
 .rl-name { color: var(--ink); font-weight: 500; }
-.rl-role { color: var(--ink-3); white-space: nowrap; }
+.rl-role { white-space: nowrap; }
 .rl-last { color: var(--ink-4); }
 .rl-date { display: block; color: var(--ink-4); opacity: 0.75; font-size: 11px; }
 /* 1 mmol 折算：质量、体积各占一行（列不用那么宽） */
 .rl-per { display: block; }
 /* 试剂库里「当前引用为 0」的条目：数字淡一点，表示这个试剂现在没记录在用 */
 .rl-table .rl-zero { color: var(--ink-4); opacity: 0.55; }
-/* 状态胶囊：待核对 / 已核对 / 查不到（点一下就是核对）—— 做成有底色的小胶囊，一眼能扫 */
-.rl-state {
-  border: 1px solid transparent; background: #fdf7f3; color: var(--accent-ink);
-  border-color: rgba(168, 71, 31, 0.22);
-  padding: 2px 9px; border-radius: 999px;
-  font-size: 11px; line-height: 1.6; cursor: pointer; white-space: nowrap;
+/* 角色：英文缩写小签，颜色跟投料表里的组分色一致（Sol / Cat / Base …） */
+.rl-role-chip {
+  display: inline-block;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.03em;
+  padding: 1px 5px; border-radius: 3px; line-height: 1.5;
+  color: var(--tone, var(--ink-3));
+  border: 1px solid var(--tone, var(--line-2));
+  background: #fff; white-space: nowrap;
 }
-.rl-state:hover:not(:disabled) { background: #fbeade; border-color: var(--accent); }
-.rl-state.is-done { background: #f3f3f0; color: var(--ink-3); border-color: #e6e4de; }
-.rl-state.is-done:hover:not(:disabled) { background: #eceae4; color: var(--ink-2); border-color: var(--line-2); }
-.rl-state.is-miss { background: #fdeceb; color: #b4423a; border-color: rgba(180, 66, 58, 0.28); }
-.rl-state.is-miss:hover:not(:disabled) { background: #fbdcd9; border-color: #b4423a; }
-.rl-state:disabled { opacity: 0.6; cursor: default; }
+.rl-role-chip[data-tone='sub'] { --tone: #7c3315; }
+.rl-role-chip[data-tone='base'] { --tone: #1f6c9f; }
+.rl-role-chip[data-tone='acid'] { --tone: #1b6e73; }
+.rl-role-chip[data-tone='cat'] { --tone: #6b4d8f; }
+.rl-role-chip[data-tone='lig'] { --tone: #2f6b4f; }
+.rl-role-chip[data-tone='sol'] { --tone: #8d8b84; }
+.rl-role-chip[data-tone='add'] { --tone: #8a5f00; }
+.rl-role-chip[data-tone='ox'] { --tone: #9f2f2d; }
+.rl-role-chip[data-tone='red'] { --tone: #a8471f; }
+/* 固 / 液：一个小圈（点一下切换，只影响「按密度折体积」） */
+.rl-solid {
+  display: inline-block; margin-left: 4px; vertical-align: middle;
+  width: 15px; height: 15px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line-2); background: #fff;
+  font-size: 9px; line-height: 13px; text-align: center; color: var(--ink-4); cursor: pointer;
+}
+.rl-solid:hover { border-color: var(--ink-4); color: var(--ink-2); }
+.rl-solid.is-solid { border-color: var(--ink-3); color: var(--ink-2); background: #f3f2ee; }
+/* 状态：一个圆点（灰=已核对，橙=待核对，红=查不到；查询中转淡） */
+.rl-dot {
+  width: 9px; height: 9px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--accent); background: transparent;
+  display: inline-block; vertical-align: middle;
+}
+.rl-dot:hover:not(:disabled) { background: var(--accent-soft); }
+.rl-dot.is-done { border-color: #b9b5aa; background: #b9b5aa; }
+.rl-dot.is-done:hover:not(:disabled) { border-color: var(--ink-3); background: var(--ink-3); }
+.rl-dot.is-miss { border-color: #b4423a; background: #b4423a; }
+.rl-dot.is-miss:hover:not(:disabled) { background: #8f332c; }
+.rl-dot.is-busy, .rl-dot.is-run:disabled { opacity: 0.4; cursor: default; }
 /* 外部库那一列：小链接，鼠标停才浮出下划线 */
 .rl-c-links { width: 118px; }
 .rl-links { line-height: 1.6; }
