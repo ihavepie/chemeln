@@ -4137,15 +4137,14 @@ kbd {
    一张记录常常贴好几块板（0.5 h / 2 h / 过夜、各条件的对照），光有展开剂那一句分不清谁是谁，
    所以图注跟照片 / 文献图共用 `attachments.note`：板子下面一行虚线小字，点进去写。
    板子保持原来的 96×130 大小，图注多出来的高度由 figure 自己吃掉（base 那条 `height:132px` 是死的）。 */
-/* 盒子宽度 = 图自己的宽度（`fit-content`）：定死宽度 + `object-fit: contain` 会在竖长条 /
-   横长的图四周留一圈纸白（用户：「这种图片什么的尽量不要白边」）。高度定住、宽度跟着比例长。 */
+/* 盒子给一个**固定宽度**（不是跟着图缩）：板子很窄（562×1330 这种宽高比 0.42）时，
+   跟着图缩会把盒子压到 60px，图注「预搅拌时间不够」就被截掉 —— 用户宁可留一点白边也要看得见图注
+   （「感觉还是允许白边吧，图注被裁剪掉了」）。所以：宽度 104、图 `contain` 居中、图注按盒宽走。 */
 .sec-tlc .tlc-shot.has-cap {
-  display: block; width: fit-content; height: auto; overflow: visible; background: transparent;
+  display: block; width: 104px; height: auto; overflow: visible; background: transparent;
 }
-.sec-tlc .tlc-shot.has-cap img { display: block; width: auto; height: 142px; max-width: 168px; }
-/* 图注别再撑宽盒子：`width: 0` + `min-width: 100%` 让它只跟着图走（写 `width:100%` 时输入框自带的
-   20 字符固有宽度会参与 shrink-to-fit，把 60px 宽的板子撑成 123px 的白框，踩过） */
-.sec-tlc .tlc-cap { display: block; width: 0; min-width: 100%; max-width: 168px; margin-top: 2px; font-size: 9px; line-height: 1.4; }
+.sec-tlc .tlc-shot.has-cap img { display: block; width: 100%; height: 142px; object-fit: contain; }
+.sec-tlc .tlc-cap { display: block; width: 100%; max-width: none; margin-top: 2px; font-size: 9px; line-height: 1.4; }
 @media print {
   /* 打印时别让那 116px 的死高度把图注裁掉 */
   .sheet .sec-tlc .tlc-shot.has-cap { height: auto !important; overflow: visible !important; }
@@ -9671,11 +9670,12 @@ body.is-board-dragging { cursor: grabbing; }
    竖长条或横长的图四周就空出一圈纸白 —— 用户：「这种图片什么的尽量不要白边」。
    现在盒子只给「最大」尺寸、高度定住、宽度按图的比例自己长：一张 562×1330 的板子
    按 142 高算出来 60 宽，就不会再被塞进 112 宽的框里左右各留 20 多像素白。 */
-.sec-shots .tlc-shot { display: block; width: fit-content; height: auto; overflow: visible; background: transparent; }
-.sec-shots .tlc-shot img { display: block; width: auto; height: 164px; max-width: 200px; background: transparent; }
-.sec-shots .tlc-cap { display: block; width: 0; min-width: 100%; }
-.sec-shots.is-lit .tlc-shot { width: fit-content; height: auto; }
-.sec-shots.is-lit .tlc-shot img { display: block; width: auto; height: auto; max-height: 140px; max-width: 280px; }
+/* 照片同理：盒子按 124px 定宽（图注「反应 30min 后」这种按盒宽排得下），图 `contain` 居中 */
+.sec-shots .tlc-shot { display: block; width: 124px; height: auto; overflow: visible; background: transparent; }
+.sec-shots .tlc-shot img { display: block; width: 100%; height: 164px; object-fit: contain; background: transparent; }
+.sec-shots .tlc-cap { display: block; width: 100%; min-width: 0; }
+.sec-shots.is-lit .tlc-shot { width: 200px; height: auto; }
+.sec-shots.is-lit .tlc-shot img { display: block; width: 100%; height: 140px; object-fit: contain; }
 @media print {
   .sheet .sec-tlc .tlc-shot.has-cap img { height: 104px !important; }
   .sheet .sec-shots .tlc-shot img { height: 120px !important; }
