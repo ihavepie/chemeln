@@ -3859,11 +3859,13 @@ function ensureShotRenderer() {
   if (shotRendererPromise) return shotRendererPromise;
   shotRendererPromise = (async () => {
     const bin = path.join(CACHE_DIR, 'shot4-render');
-    if (fs.existsSync(bin)) return bin;
+    // 源码比二进制新就重编，否则改了 shot.swift 会一直用旧的那份
+    const src = path.join(__dirname, 'shot.swift');
+    if (fs.existsSync(bin) && fs.statSync(bin).mtimeMs > fs.statSync(src).mtimeMs) return bin;
     await fsp.mkdir(CACHE_DIR, { recursive: true });
     await new Promise((resolve, reject) => {
       const p = spawn('swiftc', ['-O', '-module-cache-path', path.join(CACHE_DIR, 'clang'),
-        path.join(__dirname, 'shot.swift'), '-o', bin], { stdio: ['ignore', 'ignore', 'pipe'] });
+        src, '-o', bin], { stdio: ['ignore', 'ignore', 'pipe'] });
       let err = '';
       p.stderr.on('data', (d) => (err += String(d)));
       p.on('error', () => reject(new Error('这台机器没有 swiftc，导不了长图')));

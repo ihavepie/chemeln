@@ -53,11 +53,19 @@ async function blobToDataURL(url) {
 
 let fileSeq = 0;
 const files = {}; // 迁移过程中造出来的二进制，跟着场景一起存
-async function addFile(url) {
-  const id = `f${fileSeq += 1}`;
+const fresh = []; // 还没交给 Excalidraw 的新图（updateScene 不带 files，得走 addFiles）
+/** 同一个块只渲一次：再点一次直接用上次那张图，不再等 0.4 秒 */
+const fileCache = {};
+
+async function addFile(url, key) {
+  if (key && fileCache[key]) return fileCache[key];
+  const id = `f${(fileSeq += 1)}`;
   const { dataURL, mimeType } = await blobToDataURL(url);
   files[id] = { id, dataURL, mimeType, created: Date.now(), lastRetrieved: Date.now() };
-  return { id, size: await imageSize(dataURL) };
+  fresh.push(files[id]);
+  const got = { id, size: await imageSize(dataURL) };
+  if (key) fileCache[key] = got;
+  return got;
 }
 
 /** 读一下图片真实宽高，搬过去才不会变形 */
@@ -71,7 +79,8 @@ function imageSize(dataURL) {
 }
 
 /** 单块渲图：把这一块按它的真实毫米宽排好，服务端截一张 3 倍像素的图 */
-async function rasterBlock(it) {
+async function rasterBlock(it, key) {
+  if (key && fileCache[key]) return fileCache[key];
   const mmW = (it.w || 1200) / 10;
   const cssPx = Math.round(mmW * (96 / 25.4));
   const exp = it.ref ? await ensureExp(it.ref) : null;
@@ -91,7 +100,10 @@ async function rasterBlock(it) {
   });
   const id = `b${(fileSeq += 1)}`;
   files[id] = { id, dataURL, mimeType: 'image/png', created: Date.now(), lastRetrieved: Date.now() };
-  return { id, size: await imageSize(dataURL) };
+  fresh.push(files[id]);
+  const got = { id, size: await imageSize(dataURL) };
+  if (key) fileCache[key] = got;
+  return got;
 }
 
 const ctxOf = () => ({ get: (id) => expCache[id] });
@@ -162,7 +174,7 @@ async function migrate(items) {
     if (it.type === 'tlc' && it.ref) {
       try {
         const f = await addFile(`/api/files/${it.ref}`);
-        sk.push({ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id });
+        sk.push({ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' });
       } catch {
         skipped.value += 1;
       }
@@ -173,7 +185,7 @@ async function migrate(items) {
       if (it.block === 'react' && it.ref) {
         try {
           const f = await addFile(`/api/experiments/${it.ref}/scheme.svg`);
-          sk.push({ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id });
+          sk.push({ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' });
         } catch {
           skipped.value += 1;
         }
@@ -184,7 +196,7 @@ async function migrate(items) {
       if (['title', 'conds', 'reagents', 'result', 'verdict', 'notes', 'compare'].includes(it.block) || it.block === 'concl') {
         try {
           const f = await rasterBlock(it);
-          sk.push({ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id });
+          sk.push({ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' });
         } catch {
           skipped.value += 1;
         }
@@ -213,6 +225,7 @@ async function load() {
     } else {
       const elements = await migrate(b.items || []);
       initial.value = { elements, appState: {}, files: { ...files } };
+      fresh.length = 0; // 迁移时造的图已经随 initialData 交过去了
     }
   } catch (e) {
     toast(e.message || '读不到这张板', 'err');
@@ -228,7 +241,7 @@ async function load() {
 const exps = ref([]);
 const tlcByExp = ref({});
 const q = ref('');
-const busy = ref('');
+const busyKeys = ref(new Set()); // 同时可以放好几个（各点各的，别把整栏都禁用）
 
 const CHIPS = [
   { key: 'title', label: '编号' },
@@ -250,7 +263,8 @@ async function loadDrawer() {
   try {
     const project = board.value && board.value.project;
     exps.value = (await api.experiments(project ? { project } : {})) || [];
-    const t = (await api.tlc(project || '')) || [];
+    // api.tlc 回的是 { items }，不是数组（这里写错会把整个 try 带崩、TLC 缩略图全没有）
+    const t = (await api.tlc(project || '')).items || [];
     const map = {};
     for (const x of t) (map[x.exp_id] ||= []).push(x);
     tlcByExp.value = map;
@@ -259,13 +273,21 @@ async function loadDrawer() {
   }
 }
 
-/** 新块落点：纸的左边往下排（跟旧画布的落点规则一致） */
-let cursorY = 40;
+/** 新块落点：接着纸上已有的内容往下排（别叠在别人身上），排到纸底再从纸顶来 */
 function nextPos(wPx, hPx) {
   const x = 60;
-  let y = cursorY;
-  if (y + hPx > 1080) y = 40;
-  cursorY = y + hPx + 18;
+  let bottom = 24;
+  try {
+    for (const el of exApi.getSceneElements()) {
+      if (el.locked || el.isDeleted) continue; // A4 白纸不算
+      if (el.x + (el.width || 0) < 0) continue;
+      bottom = Math.max(bottom, el.y + (el.height || 0));
+    }
+  } catch {
+    /* 还没 ready */
+  }
+  let y = Math.round(bottom + 24);
+  if (y + hPx > 1090) y = 40;
   return { x, y };
 }
 
@@ -273,46 +295,65 @@ function nextPos(wPx, hPx) {
 async function insertSkeletons(sk) {
   const EX = await import('@excalidraw/excalidraw');
   const els = EX.convertToExcalidrawElements(sk, { regenerateIds: false });
+  // 新图的二进制必须先塞进 Excalidraw 的文件表，否则元素只是张「破图」占位
+  if (fresh.length) exApi.addFiles(fresh.splice(0));
   const cur = exApi.getSceneElements();
   exApi.updateScene({ elements: [...cur, ...els], captureUpdate: 'IMMEDIATELY' });
-  exApi.scrollToContent(els, { fitToContent: false, animate: true });
+  // 只在落点看不见时才挪视口，而且不做动画（每次插入都飞一下很晃）
+  try {
+    const st = exApi.getAppState();
+    const z = st.zoom && st.zoom.value ? st.zoom.value : 1;
+    const el = els[0];
+    const sx = (el.x + (el.width || 0) / 2 + st.scrollX) * z;
+    const sy = (el.y + (el.height || 0) / 2 + st.scrollY) * z;
+    const w = exApi.getAppState().width || window.innerWidth;
+    const h = exApi.getAppState().height || window.innerHeight;
+    if (sx < 40 || sy < 40 || sx > w - 40 || sy > h - 40) {
+      exApi.scrollToContent(els, { fitToContent: false });
+    }
+  } catch {
+    /* 版本差异，忽略 */
+  }
 }
 
 async function addBlock(e, key) {
-  if (!exApi || busy.value) return;
-  busy.value = `${e.code}-${key}`;
+  const bk = `${e.code}-${key}`;
+  if (!exApi || busyKeys.value.has(bk)) return;
+  busyKeys.value.add(bk);
   try {
+    const ck = `blk:${e.id}:${key}`;
     if (key === 'react') {
-      const f = await addFile(`/api/experiments/${e.id}/scheme.svg`);
+      const f = await addFile(`/api/experiments/${e.id}/scheme.svg`, `${ck}:svg`);
       const w = 520;
       const { x, y } = nextPos(w, 120);
-      await insertSkeletons([{ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id }]);
+      await insertSkeletons([{ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' }]);
     } else {
       const it = { block: key, ref: e.id, code: e.code, w: key === 'reagents' ? 1500 : 1300 };
-      const f = await rasterBlock(it); // 3 倍像素的表格 / 文字块
+      const f = await rasterBlock(it, ck); // 3 倍像素的表格 / 文字块
       const w = it.w * K;
       const { x, y } = nextPos(w, 160);
-      await insertSkeletons([{ type: 'image', x, y, width: Math.round(w), height: Math.round((w * f.size.h) / f.size.w), fileId: f.id }]);
+      await insertSkeletons([{ type: 'image', x, y, width: Math.round(w), height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' }]);
     }
   } catch (err) {
     toast(err.message || '放不上去', 'err');
   } finally {
-    busy.value = '';
+    busyKeys.value.delete(bk);
   }
 }
 
 async function addTlc(e, t) {
-  if (!exApi || busy.value) return;
-  busy.value = `tlc-${t.id}`;
+  const bk = `tlc-${t.id}`;
+  if (!exApi || busyKeys.value.has(bk)) return;
+  busyKeys.value.add(bk);
   try {
-    const f = await addFile(`/api/files/${t.id}`);
+    const f = await addFile(`/api/files/${t.id}`, `tlc:${t.id}`);
     const w = 220;
     const { x, y } = nextPos(w, 240);
-    await insertSkeletons([{ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id }]);
+    await insertSkeletons([{ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' }]);
   } catch (err) {
     toast(err.message || '放不上去', 'err');
   } finally {
-    busy.value = '';
+    busyKeys.value.delete(bk);
   }
 }
 
@@ -445,7 +486,7 @@ load();
     <aside class="board-drawer bv2-drawer">
       <div class="board-drawer-top">
         <div class="board-drawer-t">
-          素材<span class="board-drawer-n">{{ busy ? '放上去中…' : exps.length + ' 条记录' }}</span>
+          素材<span class="board-drawer-n">{{ busyKeys.size ? '放上去中…' : exps.length + ' 条记录' }}</span>
         </div>
         <div class="searchbox bd-q">
           <Icon name="search" :size="12" />
@@ -463,22 +504,21 @@ load();
               v-for="c in CHIPS"
               :key="c.key"
               class="bd-chip"
-              :class="{ 'is-busy': busy === `${e.code}-${c.key}` }"
-              :disabled="!!busy"
+              :class="{ 'is-busy': busyKeys.has(`${e.code}-${c.key}`) }"
               @click="addBlock(e, c.key)"
             >
               {{ c.label }}
             </button>
           </div>
           <div v-if="(tlcByExp[e.id] || []).length" class="bd-rec-tlc">
-            <button v-for="t in tlcByExp[e.id]" :key="t.id" class="bd-thumb" :disabled="!!busy" @click="addTlc(e, t)">
+            <button v-for="t in tlcByExp[e.id]" :key="t.id" class="bd-thumb" @click="addTlc(e, t)">
               <img :src="`/api/files/${t.id}`" alt="" loading="lazy" />
             </button>
           </div>
         </div>
         <div v-if="!exps.length" class="board-drawer-empty">这个课题还没有实验记录</div>
         <div class="bd-rec-chips" style="margin-top: 10px">
-          <button class="btn btn-sm btn-ghost" :disabled="!!busy" @click="addText">
+          <button class="btn btn-sm btn-ghost" @click="addText">
             <Icon name="plus" :size="12" /> 文字
           </button>
         </div>

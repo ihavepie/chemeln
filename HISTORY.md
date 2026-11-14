@@ -1,3 +1,9 @@
+- **新画布：素材栏 TLC 缩略图没了 + 插入卡顿（用户报「侧边栏的tlc缩略图没有了，然后就是插入不太流畅」）**。
+  ① **TLC 小图全没**：`loadDrawer()` 写成 `const t = await api.tlc(...)` 再 `for…of`——但 `request()` 回的是整个响应体 `{items}`，对对象 `for…of` 直接抛 TypeError，整个 `try` 被吞掉，`tlcByExp` 永远是空。修：`.items || []`。（`api.experiments` 那条自己 `.then(d => d.items)`，所以记录列得出来、只有 TLC 挂掉，更难看穿。）
+  ② **插进去的块是「破图」**：`convertToExcalidrawElements` 造的 image 骨架 `status` 默认 `"pending"`，Excalidraw 只画 `status:"saved"` 的图；而且 `updateScene` **不收 files**，光给 `fileId` 它查不到二进制。修：骨架写 `status:'saved'`，插之前 `exApi.addFiles(fresh.splice(0))`（迁移时造的图走 `initialData.files`，那批要塞进 `fresh` 再清空，否则会重复交一次）。
+  ③ **「插入不太流畅」的真因是服务端渲图 1.7 秒**（每次一个 WKWebView 进程 + `shot.swift` 里硬等 0.8s + 0.6s）。`shot.swift` 改成**轮询** `document.readyState==='complete' && 所有 img.complete`（最多 2 秒，80ms 一拍）再量高度、撑高窗口后等 0.2s 拍照：794 宽的页 **1.7s → 0.45s**（`callAsyncJavaScript` 那条路会挂住不回调，试过，别用）。顺带把 `max(200, h)` 改成「量到多少裁多少」——原来小块的图 / PDF 底下留一大条白。
+  ④ 插入手感：`busy` 从「整栏禁用」改成按 key 记的集合（同时点好几颗都行，芯片只标自己那颗）；同一块渲过一次就 `fileCache` 复用，再点第二次是瞬间；新块落点改成**接着纸上已有内容往下排**（原来用一个 `cursorY`，页面刷新后又从纸顶压上去）；插入后不再 `scrollToContent(animate)` 飞一下，只在落点跑出视口时才挪。
+  验证：临时板 29/30（验完删）——素材栏 7 张 TLC 小图回来了；点「投料」落一块 raster（`image@60,48 567x155`，图内容正确、无白边），点 TLC 落原图；刷新页面后两块都还在（`files: b1,f2`）；`/api/snapshot/pdf` 仍是 A4 `595.5×842.25` 一页。**另：`ensureShotRenderer()` 现在按 mtime 判断要不要重编**，改了 `shot.swift` 不用再手动删 `.cache/shot4-render`。
 - **「新画布加载不出来」的真凶：5173 开发预览里 React 被打了两次**。
   用户在 5173（`preview.command` 起的那套）打开排版板，画布死；4780（构建版）一直是好的——所以之前我按「旧构建 / 没刷新」判断全跑偏了。
   证据：新加的页面报错面板抓到了 `TypeError: null is not an object (evaluating 'dispatcher.useEffect')`——React hooks 的 dispatcher 为 null，典型「一个页面里两份 react」。

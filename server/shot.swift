@@ -47,21 +47,40 @@ final class Shot: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        // 图片 / 字体晚一点才稳定，等一拍再量
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            webView.evaluateJavaScript("Math.max((document.querySelector('.snap')||document.body).scrollHeight, document.body.scrollHeight)") { v, _ in
-                let h = max(200, CGFloat((v as? NSNumber)?.doubleValue ?? 900))
-                webView.frame = NSRect(x: 0, y: 0, width: self.width, height: h)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    let cfg = WKSnapshotConfiguration()
-                    cfg.rect = CGRect(x: 0, y: 0, width: self.width, height: h)
-                    if self.snapWidth > 0 { cfg.snapshotWidth = NSNumber(value: Double(self.snapWidth)) }
-                    webView.takeSnapshot(with: cfg) { img, _ in
-                        guard let img else { print("SNAPFAIL"); exit(1) }
-                        self.pages.append((img, h))
-                        self.idx += 1
-                        self.loadNext()
-                    }
+        // 等图：轮询「图都加载完了没」，比死等 0.8 秒快得多（一块表格从 1.7s 降到 ~0.4s）
+        waitImages(webView, tries: 0)
+    }
+
+    private func waitImages(_ webView: WKWebView, tries: Int) {
+        let ready = "document.readyState === 'complete' && Array.from(document.images).every((im) => im.complete)"
+        webView.evaluateJavaScript(ready) { v, _ in
+            let done = (v as? NSNumber)?.boolValue ?? false
+            if !done && tries < 25 { // 最多等 2 秒，等不到就按现在的样子拍
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                    self.waitImages(webView, tries: tries + 1)
+                }
+                return
+            }
+            self.measureAndShot(webView)
+        }
+    }
+
+    private func measureAndShot(_ webView: WKWebView) {
+        webView.evaluateJavaScript("Math.max((document.querySelector('.snap')||document.body).scrollHeight, document.body.scrollHeight)") { v, _ in
+            // 量不到（null / 0）才退回整屏；量到了就按内容裁，别留一大块白（版面上的小块只有几十像素高）
+            let measured = (v as? NSNumber)?.doubleValue ?? 0
+            let h = measured > 0 ? max(16, CGFloat(measured)) : 900
+            webView.frame = NSRect(x: 0, y: 0, width: self.width, height: h)
+            // 撑高窗口后让排版重排一帧再拍
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                let cfg = WKSnapshotConfiguration()
+                cfg.rect = CGRect(x: 0, y: 0, width: self.width, height: h)
+                if self.snapWidth > 0 { cfg.snapshotWidth = NSNumber(value: Double(self.snapWidth)) }
+                webView.takeSnapshot(with: cfg) { img, _ in
+                    guard let img else { print("SNAPFAIL"); exit(1) }
+                    self.pages.append((img, h))
+                    self.idx += 1
+                    self.loadNext()
                 }
             }
         }
