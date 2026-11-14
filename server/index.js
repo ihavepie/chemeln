@@ -711,6 +711,8 @@ function listExperiments(query) {
            -- 记录页里「按投料表拼好的那张」有没有缓存：有就让卡片直接显示它。
            -- 附件是生成那一刻的快照，改过投料表以后卡片和记录页就对不上了（用户报过）。
            EXISTS(SELECT 1 FROM scheme_cache c WHERE c.exp_id = e.id) AS has_scheme,
+           -- 素材栏用：这条记录到底写了结论没有（有才给「结论」胶囊）
+           (CASE WHEN TRIM(IFNULL(e.conclusion, '')) <> '' OR TRIM(IFNULL(e.notes, '')) <> '' THEN 1 ELSE 0 END) AS has_conclusion,
            -- 这张卡的缩略图是不是「反应式」：是的话卡片墙按「裁剪式」显示（宽图铺满、左边对齐），
            -- 结构式 / 照片仍然整张缩进框里。前端按 scheme_thumb 判断。
            (EXISTS(SELECT 1 FROM scheme_cache c WHERE c.exp_id = e.id)

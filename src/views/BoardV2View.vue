@@ -290,6 +290,20 @@ const CHIPS = [
   { key: 'notes', label: '结论' },
 ];
 const CHIP_W = { title: 1200, react: 1200, conds: 1300, reagents: 1500, result: 1300, notes: 1300 };
+const has = (v) => v != null && String(v).trim() !== '';
+
+/** 这条记录到底有哪几块：没内容的胶囊不给（点了只会落一块空的） */
+function chipsOf(e) {
+  const out = [{ key: 'title', label: '编号' }];
+  if (e.has_scheme) out.push({ key: 'react', label: '反应式' });
+  if ([e.solvent, e.temperature, e.duration, e.atmosphere, e.concentration, e.base_mmol].some(has)) {
+    out.push({ key: 'conds', label: '条件' });
+  }
+  if (Number(e.reagent_count) > 0) out.push({ key: 'reagents', label: '投料' });
+  if (has(e.product_name) || has(e.yield_pct) || has(e.product_mass)) out.push({ key: 'result', label: '结果' });
+  if (e.has_conclusion) out.push({ key: 'notes', label: '结论' });
+  return out;
+}
 
 const hayOf = (e) => `${e.code} ${e.title || ''} ${e.objective || ''} ${e.product_name || ''}`.toLowerCase();
 const shown = computed(() => {
@@ -370,9 +384,9 @@ const peek = ref(null);
 let peekTimer = 0;
 const PEEK_MAX = 420;
 
-function peekAt(ev) {
+function peekAt(ev, maxW = PEEK_MAX) {
   const r = ev.currentTarget.getBoundingClientRect();
-  const w = Math.min(PEEK_MAX, Math.round(window.innerWidth * 0.42));
+  const w = Math.min(maxW, Math.round(window.innerWidth * 0.62));
   let x = Math.round(r.right + 12);
   if (x + w > window.innerWidth - 12) x = Math.max(12, Math.round(r.left - w - 12));
   const y = Math.round(Math.min(Math.max(12, r.top - 12), Math.max(12, window.innerHeight - 220)));
@@ -388,7 +402,8 @@ function schedulePeek(p) {
 
 function peekBlock(e, key, ev) {
   void ensureExp(e.id);
-  schedulePeek({ kind: 'block', expId: e.id, key, code: e.code, ...peekAt(ev) });
+  // 反应式是张宽图，给宽一点的浮卡
+  schedulePeek({ kind: 'block', expId: e.id, key, code: e.code, ...peekAt(ev, key === 'react' ? 620 : PEEK_MAX) });
 }
 
 function peekTlc(e, t, ev) {
@@ -662,7 +677,7 @@ load();
           </div>
           <div class="bd-rec-chips">
             <button
-              v-for="c in CHIPS"
+              v-for="c in chipsOf(e)"
               :key="c.key"
               class="bd-chip"
               :class="{ 'is-busy': busyKeys.has(`${e.code}-${c.key}`) }"
