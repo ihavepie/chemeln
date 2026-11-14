@@ -25,8 +25,10 @@ const props = defineProps({
   steps: { type: Array, default: () => [] },
   /** 这条记录的 TLC 板图（`category === 'tlc'` 的附件）：小反应只看板子时，结果这块就靠它们 */
   tlc: { type: Array, default: () => [] },
+  /** 哪条实验：大图里要批注的话，合成的新图得挂回这条记录 */
+  expId: { type: [Number, String], default: null },
 });
-const emit = defineEmits(['open-compound']);
+const emit = defineEmits(['open-compound', 'refresh']);
 
 const picking = ref(false);
 const shot = ref(null); // 点开的大图（TLC 板子）
@@ -331,7 +333,15 @@ function onYieldInput(ev, r) {
     <div v-if="info.theo && (!multi || info.over)" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>
       <template v-else-if="info.calc !== null">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　实测产率 <b>{{ round(info.calc, 1) }}%</b></template><template v-else>理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template></div>
 
-    <FilePreview v-if="shot" :src="shot.src" :name="shot.name" @close="shot = null" />
+    <FilePreview
+      v-if="shot"
+      :src="shot.src"
+      :name="shot.name"
+      :exp-id="expId"
+      category="tlc"
+      @close="shot = null"
+      @saved="emit('refresh')"
+    />
 
     <AppModal v-if="pickShot" title="结果区挂哪张 TLC 板" confirm-text="就这张" @close="pickShot = false" @confirm="pickShot = false">
       <div class="tlc-pick">

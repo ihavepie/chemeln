@@ -2048,7 +2048,7 @@ const preview = ref(null);
 const openAttachment = (id) => {
   const a = (exp.value?.attachments || []).find((x) => x.id === id);
   if (!a) return;
-  preview.value = { src: `/api/files/${id}`, name: a.original_name || a.filename || '附件' };
+  preview.value = { src: `/api/files/${id}`, name: a.original_name || a.filename || '附件', category: a.category || 'tlc' };
 };
 </script>
 
@@ -2438,7 +2438,8 @@ const openAttachment = (id) => {
             :model="fields"
             :steps="reagent.steps"
             :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind"
-            :yield-default="sheetFx.yield" :tlc="tlcShots"
+            :yield-default="sheetFx.yield" :tlc="tlcShots" :exp-id="exp.id"
+            @refresh="refreshAttachments"
             @open-compound="(id) => router.push(`/compounds/${id}`)"
           >
             <template #conds>
@@ -2567,12 +2568,15 @@ const openAttachment = (id) => {
               <TlcOcr :shots="tlcShots" scope="attachment" @pick="applyTlcOcr" />
             </div>
             <TlcStrip
+              captions
+              cap-placeholder="图注，如 2 h / 对照"
               :attachments="exp.attachments || []"
               :locked="exp.locked"
               :hovered="hovered"
               :on-hover="onHover"
               :on-pick="pickFile"
               :on-open="openAttachment"
+              :on-caption="saveCaption"
               :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
             />
           </section>
@@ -2680,7 +2684,15 @@ const openAttachment = (id) => {
       </div>
     </AppModal>
 
-    <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
+    <FilePreview
+      v-if="preview"
+      :src="preview.src"
+      :name="preview.name"
+      :exp-id="exp.id"
+      :category="preview.category || 'tlc'"
+      @close="preview = null"
+      @saved="refreshAttachments"
+    />
 
     <SketcherModal
       :open="schemeSketcherOpen"
