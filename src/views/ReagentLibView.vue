@@ -446,6 +446,12 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
           {{ items.length }} 个试剂（输入过的都留着）· 当前在用 {{ liveCount }} 个 · 固体 {{ solidCount }} 个
           <span v-if="pendingCount">· 待核对 {{ pendingCount }} 个</span>
           <span v-if="q.trim()">· 筛出 {{ shown.length }} 个</span>
+          <!-- 图注：名字前面那个点是什么意思 -->
+          <span class="rl-legend">
+            <span class="rl-legend-i"><i class="rl-legend-dot is-done" />已核对</span>
+            <span class="rl-legend-i"><i class="rl-legend-dot is-todo" />待核对</span>
+            <span class="rl-legend-i"><i class="rl-legend-dot is-miss" />查不到</span>
+          </span>
         </div>
 
         <table class="rl-table">
