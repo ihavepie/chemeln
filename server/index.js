@@ -3986,6 +3986,16 @@ const safeBoardItems = (r) => {
   }
 };
 
+const parseScene = (r) => {
+  const raw = (r && r.scene_json) || '';
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
 const parseBoard = (r) =>
   r && {
     id: r.id,
@@ -3993,6 +4003,7 @@ const parseBoard = (r) =>
     project: r.project,
     page: r.page || 'a4p',
     items: safeBoardItems(r),
+    scene: parseScene(r),
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -4052,6 +4063,13 @@ route('PUT', '/api/boards/:id', async (req, res, params) => {
   if ('items' in body) {
     fields.push('items_json = ?');
     values.push(JSON.stringify(Array.isArray(body.items) ? body.items.slice(0, 400) : []));
+  }
+  // 新版画布（Excalidraw）的场景：{elements, appState, files}，只存必要的，限制体积
+  if ('scene' in body) {
+    fields.push('scene_json = ?');
+    const sc = body.scene && typeof body.scene === 'object' ? body.scene : null;
+    const json = sc ? JSON.stringify({ elements: sc.elements || [], appState: sc.appState || {}, files: sc.files || {} }) : '';
+    values.push(json.length > 8_000_000 ? '' : json);
   }
   fields.push('updated_at = ?');
   values.push(nowISO());

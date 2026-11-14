@@ -1218,6 +1218,9 @@ onBeforeUnmount(() => {
               <Icon name="download" :size="12" /> 导出 PDF
             </button>
             <button class="btn btn-sm btn-ghost" :disabled="exporting" @click="exportPng" title="整张纸存成 PNG">存图</button>
+            <button class="btn btn-sm btn-ghost" title="用 Excalidraw 那套画布打开这张板（试作）" @click="router.push(`/b2/${route.params.id}`)">
+              新画布
+            </button>
             <button class="btn btn-sm btn-ghost" @click="removeBoard">删除</button>
           </div>
           <!-- 收集工具：都先「拿在手上」，再在纸上点 / 拖（像 ChemDraw 的画布） -->

@@ -1,3 +1,11 @@
+- **排版板新画布试作：把 Excalidraw 塞进来（`/b2/:id`）**（用户：「感觉自己做还是不太行……可以先学习一下其他的画布」）。
+  先修了两个真 bug：① **图片块拖不动**——`<img>` 默认自带 HTML5 拖放，一按住就起 dragstart、把 mousemove/mouseup 全吞了（AGENTS 里 pointdrag 那条早就记过这个坑，板上没防）；修法 = `BOARD_CSS` 里 `.bd-item img { -webkit-user-drag:none }` + stage 上 `@dragstart.prevent`。② **箭头「自己冒出来」**——原来 `onDrawDown` 一按下就先按默认大小画草稿（`shapeFrom` 在 `moved=false` 时给 1500×200），于是松手前先闪一块默认箭头；现在按下不画，动了才画。
+  然后按用户点单上了 Excalidraw：`npm i @excalidraw/excalidraw react react-dom`（0.18.1 / React 18.3.1，走 `.npm-cache`），
+  - `src/components/ExcalidrawHost.vue`：Vue 里 `createRoot` 挂 React，只做「挂载 / 传初始场景 / 把 onChange 抛出去」。
+  - `src/views/BoardV2View.vue` + 路由 `/b2/:id`：把老画布的 items **翻译**成元素 —— 文字 / 结论 → `text`；箭头 / 方框 → `arrow` / `rectangle`（老箭头没有 `up` 就按中线水平）；TLC 图 → `image` 用**原始文件**、反应式 → `image` 用**矢量 SVG**（所以放大不糊）；A4 纸 → 一张锁定的白矩形（794×1123 px，0.1mm×0.37795）。表格类块（投料 / 结果 / TLC 判断 / 对比表）**暂时跳过**，页头会写「还有 N 个没搬」。
+  - 存储：`boards` 加一列 `scene_json`（`ensureColumn`），`GET /api/boards/:id` 多返回 `scene`，`PUT` 收 `{scene}`。**老的 `items_json` 一个字不动**，两页互切（板页头部「新画布」、新页「回旧画布」）。
+  坑：① `initialData.scrollToContent` 在动态 `import()` 场景下不生效 → 在 `excalidrawAPI` 回调里再 `a.scrollToContent(a.getSceneElements(), { fitToContent: true })`；② 保存场景的 `files` 要 `{...迁移时造的, ...api.getFiles()}`——只取 `getFiles()` 时迁移塞进去的图全丢（第一次试运行场景里 4 个元素、0 个文件就是这么来的）。
+  验证：临时板（26，验完删）——文字/箭头（带箭头头）/方框/TLC 图都按原位置、原比例落到 A4 白纸上，`scrollToContent` 之后整页在视口里；场景存进 `scene_json`（4 元素）后重开不重新迁移。构建 ：Excalidraw 那几个 chunk 1.8MB / 1.1MB，只在 `/b2/:id` 懒加载；入口 chunk 仍是 266KB。
 - **导出全线改「截图 PDF」+ 画布第一轮（任意角度箭头 / 四角手柄 / 撤销 / 吸附）**。
   ① **导出**：用户「不想走会变 CSS 样式的那种 pdf，可以接受压信息，所有导出都是」。`shot.swift` 重写成**多页**（`shot <out> <宽> <snapWidth> <url…>`，`.pdf` 时每张截图铺满一页），`/api/snapshot/pdf` 收 `pages[]`（≤40）；`PrintPanel`（记录两页/三页）、`LabelBatchPanel`（标签多页）、`EditorView` 的汇报卡、板页全部改走它，CSS 末尾追加 `SNAP_NO_ZOOM`（`print.js`，把 `body{zoom:0.7498}` 压回 1，截图才按 794px = A4 出图）。`snapWidth` = 794×2 ≈190dpi。矢量 `print/pdf` 留着但界面不再用。
   ② **任意角度箭头**：原来只有「水平一根 CSS 三角」，现在画成 **inline SVG**（viewBox 用 mm，两端铺满）：`dir` 左右 + `up` 上下决定「尾 → 头」是哪条对角，箭头三角在 mm 空间里算，所以任意角度、粗细、放大都不糊。**老数据没有 `up`** → 按中线水平画（不这么兼容，历史板子里的箭头会全变斜）。
