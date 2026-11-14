@@ -9698,3 +9698,31 @@ body.is-board-dragging { cursor: grabbing; }
   color: var(--ink-4); padding: 1px 4px; border-radius: 3px; cursor: pointer;
 }
 .quick-reset:hover { background: #f1efeb; color: var(--ink-2); }
+
+/* ---------- 变量行的数字跟投料表长得一样（用户：「需要和投料表里面的接近一点，字体什么的还有格式」）----------
+   投料表那几格是 `<input class="n">`：SF Mono 11px / 500 / 强调色 / 右对齐 / padding 4px 4px 4px 6px；
+   变量行原来是 11.5px / 400 / `--ink-4` 灰，看着像「没填」。现在把字号、字重、颜色、内边距全对齐，
+   「—」用 `.var-na` 单独压淡（跟溶剂行那个 — 一个调子），当量那格也按 `.n` 的样子排。 */
+.sheet .rtable tr.rt-var td.n {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+  padding: 0 3px;
+}
+.sheet .rtable tr.rt-var td.var-amt { font-weight: 600; }
+.sheet .rtable tr.rt-var td.var-amt.is-liquid { font-weight: 600; color: var(--accent-ink); }
+.sheet .rtable tr.rt-var td.var-na { color: var(--ink-4); opacity: 1; }
+.sheet .rtable tr.rt-var td.n .var-na { color: var(--ink-4); font-weight: 400; }
+.sheet .rtable tr.rt-var .cond-eq {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-ink);
+  text-align: right;
+  padding: 4px 4px 4px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.sheet .rtable tr.rt-var .cond-in { font-size: 12.5px; padding: 4px 6px; }
+.sheet .rtable tr.rt-var > td { padding-left: 3px; padding-right: 3px; }

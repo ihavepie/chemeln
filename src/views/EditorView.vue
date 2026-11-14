@@ -2486,7 +2486,10 @@ const openAttachment = (id) => {
                   </td>
                   <!-- 温度 / 时间 / 气氛这种变量：没有分子量 / 当量 / mmol / 用量，
                        干脆把那五格并成一格，写清楚「变的是哪样」（一排「—」看着像挖了个洞） -->
-                  <td v-if="row.isMol" class="n var-mw">{{ row.info.mw != null ? round(row.info.mw, 2) : '—' }}</td>
+                  <td v-if="row.isMol" class="n var-mw">
+                    <template v-if="row.info.mw != null">{{ round(row.info.mw, 2) }}</template>
+                    <span v-else class="var-na">—</span>
+                  </td>
                   <td v-if="row.isMol" class="n var-eq">
                     <input
                       class="cond-eq"
@@ -2497,8 +2500,13 @@ const openAttachment = (id) => {
                       @input="setVarEq(row.c, row.ph, $event.target.value)"
                     />
                   </td>
-                  <td v-if="row.isMol" class="n var-mmol">{{ row.info.mmol != null ? round(row.info.mmol, 3) : '—' }}</td>
-                  <td v-if="row.isMol" class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">{{ row.info.amount }}</td>
+                  <td v-if="row.isMol" class="n var-mmol">
+                    <template v-if="row.info.mmol != null">{{ round(row.info.mmol, 3) }}</template>
+                    <span v-else class="var-na">—</span>
+                  </td>
+                  <td v-if="row.isMol" class="n var-amt" :class="{ 'is-liquid': /[µu]L|mL$/.test(row.info.amount || '') }">
+                    <span :class="{ 'var-na': row.info.amount === '—' }">{{ row.info.amount }}</span>
+                  </td>
                   <td v-if="row.isMol" class="var-note-cell">
                     <!-- 变量行里的试剂名不在投料表里，本地往往没分子量：给一颗「查 MW」，
                          查到的东西会落进试剂库（下次自动带出）。有 MW 了就不显示。 -->
