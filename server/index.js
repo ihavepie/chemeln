@@ -3850,7 +3850,7 @@ let shotRendererPromise = null;
 function ensureShotRenderer() {
   if (shotRendererPromise) return shotRendererPromise;
   shotRendererPromise = (async () => {
-    const bin = path.join(CACHE_DIR, 'shot3-render');
+    const bin = path.join(CACHE_DIR, 'shot4-render');
     if (fs.existsSync(bin)) return bin;
     await fsp.mkdir(CACHE_DIR, { recursive: true });
     await new Promise((resolve, reject) => {
@@ -4150,7 +4150,7 @@ route('POST', '/api/snapshot/png', async (req, res) => {
     const url = `http://127.0.0.1:${PORT}/api/print/page/${token}/1`;
     const bin = await ensureShotRenderer();
     const out = path.join(dir, 'out.png');
-    await runPrint(bin, [out, String(width), url, ...(snapWidth ? [String(snapWidth)] : [])]);
+    await runPrint(bin, [out, String(width), String(snapWidth), url]);
     const data = await fsp.readFile(out);
     res.writeHead(200, {
       'content-type': 'image/png',
@@ -4170,8 +4170,11 @@ route('POST', '/api/snapshot/png', async (req, res) => {
 /** 截图做成 PDF：同一张整页截图铺满一页 PDF（矢量 PDF 在字体 / 裁切上出过问题，改走位图） */
 route('POST', '/api/snapshot/pdf', async (req, res) => {
   const body = await readJson(req);
-  const html = str(body.html);
-  if (!html || html.length > 8_000_000) return fail(res, 400, '没有可导出的内容');
+  // 一页（html）或好几页（pages[]）：每页都是「一张截图铺满一页 A4」
+  const pages = Array.isArray(body.pages)
+    ? body.pages.slice(0, 40).map(String).filter(Boolean)
+    : [str(body.html)].filter(Boolean);
+  if (!pages.length || pages.join('').length > 20_000_000) return fail(res, 400, '没有可导出的内容');
   const width = Math.min(2000, Math.max(480, Number(body.width) || 794));
   const snapWidth = Math.min(3200, Math.max(0, Number(body.snapWidth) || 0));
 
@@ -4180,11 +4183,14 @@ route('POST', '/api/snapshot/pdf', async (req, res) => {
   PRINT_TOKENS.set(token, dir);
   try {
     await fsp.mkdir(dir, { recursive: true });
-    await fsp.writeFile(path.join(dir, 'page1.html'), pageDoc(html, str(body.css)), 'utf8');
-    const url = `http://127.0.0.1:${PORT}/api/print/page/${token}/1`;
+    const urls = [];
+    for (let i = 0; i < pages.length; i++) {
+      await fsp.writeFile(path.join(dir, `page${i + 1}.html`), pageDoc(pages[i], str(body.css)), 'utf8');
+      urls.push(`http://127.0.0.1:${PORT}/api/print/page/${token}/${i + 1}`);
+    }
     const bin = await ensureShotRenderer();
     const out = path.join(dir, 'out.pdf');
-    await runPrint(bin, [out, String(width), url, ...(snapWidth ? [String(snapWidth)] : [])]);
+    await runPrint(bin, [out, String(width), String(snapWidth), ...urls]);
     const data = await fsp.readFile(out);
     res.writeHead(200, {
       'content-type': 'application/pdf',

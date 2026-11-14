@@ -4,7 +4,7 @@ import AppModal from './AppModal.vue';
 import Icon from './Icon.vue';
 import { api } from '../api.js';
 import { confirm, toast } from '../lib/feedback.js';
-import { A4_CSS, collectCss, downloadBlob } from '../lib/print.js';
+import { A4_CSS, SNAP_NO_ZOOM, collectCss, downloadBlob } from '../lib/print.js';
 import { flattenTextareas } from '../lib/autogrow.js';
 
 /**
@@ -129,7 +129,14 @@ async function makePdf() {
   }
   making.value = true;
   try {
-    const blob = await api.printPdf({ pages, css: exportCss(), filename: props.filename });
+    // 截图做 PDF（不用矢量那条路：字体/裁切老出问题）；同一份页面，只是把 0.7498 的缩放压回去
+    const blob = await api.snapshotPdf({
+      pages,
+      css: `${exportCss()}\n${SNAP_NO_ZOOM}`,
+      width: 794,
+      snapWidth: 1588,
+      filename: props.filename,
+    });
     downloadBlob(blob, props.filename);
     toast('PDF 生成好了，已经下载');
     emit('close');

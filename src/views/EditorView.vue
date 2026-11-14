@@ -2322,7 +2322,13 @@ async function exportReportCard() {
       tlc: { note: fields.tlc_note, plates: tlcShots.value.map((f) => `/api/files/${f.id}`) },
     });
     const name = `汇报卡-${exp.value.code || '记录'}.pdf`;
-    const blob = await api.printPdf({ pages: [html], css: reportCardCss(), filename: name });
+    const blob = await api.snapshotPdf({
+      pages: [html],
+      css: `${reportCardCss()}\n${SNAP_NO_ZOOM}`,
+      width: 794,
+      snapWidth: 1588,
+      filename: name,
+    });
     downloadBlob(blob, name);
     toast('汇报卡好了，一张 A4，直接发就行');
   } catch (e) {

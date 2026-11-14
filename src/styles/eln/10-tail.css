@@ -1952,9 +1952,17 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .board-item.is-draft { opacity: 0.62; pointer-events: none; }
 .board-item.is-sel { outline: 0.35mm solid rgba(168, 71, 31, 0.5); outline-offset: 1.2mm; }
 .board-grip {
-  position: absolute; right: -2mm; bottom: -2mm; width: 4mm; height: 4mm;
-  border-radius: 0.6mm; background: var(--accent); cursor: nwse-resize;
+  position: absolute; width: 4mm; height: 4mm; z-index: 3;
+  border-radius: 0.6mm; background: var(--accent);
+  box-shadow: 0 0 0 0.6mm rgba(255, 255, 255, 0.9);
 }
+/* 形状：四角；块：左右两侧（高度是内容撑的，上下拉没意义） */
+.board-grip.is-r { right: -2mm; top: 50%; margin-top: -2mm; cursor: ew-resize; }
+.board-grip.is-l { left: -2mm; top: 50%; margin-top: -2mm; cursor: ew-resize; }
+.board-grip.is-se { right: -2mm; bottom: -2mm; cursor: nwse-resize; }
+.board-grip.is-nw { left: -2mm; top: -2mm; cursor: nwse-resize; }
+.board-grip.is-sw { left: -2mm; bottom: -2mm; cursor: nesw-resize; }
+.board-grip.is-ne { right: -2mm; top: -2mm; cursor: nesw-resize; }
 .board-empty {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 2.6mm; color: #b4b2aa; pointer-events: none;
@@ -1969,10 +1977,14 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 }
 .board-tool:hover { background: #f1efeb; color: var(--ink); }
 .board-tool.is-danger:hover { background: var(--bad-soft); color: var(--bad); }
+.board-tool.is-icon { font-size: 13px; line-height: 1; padding: 2px 6px; }
+.board-tool:disabled { opacity: 0.32; cursor: default; }
+.board-tool:disabled:hover { background: transparent; color: var(--ink-2); }
 /* 拖动中：光标变抓取；吸附时那根参考线（页面坐标，单位 mm） */
 body.is-board-dragging { cursor: grabbing; }
 .board-guide { position: absolute; pointer-events: none; background: rgba(168, 71, 31, 0.32); }
 .board-guide.is-v { top: 0; bottom: 0; width: 0.28mm; }
+.board-guide.is-h { left: 0; right: 0; height: 0.28mm; }
 
 /* ---------- 排版板整页不滚：纸张必须一屏装得下 ----------
    以前 `.single` 自带 `overflow-y:auto` + 100px 下留白，画布高度又是 `100vh - 250px` 硬算的，

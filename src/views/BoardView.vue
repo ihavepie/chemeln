@@ -160,7 +160,74 @@ function flushNow() {
 }
 
 watch(items, touch, { deep: true });
+watch(items, watchHistory, { deep: true });
 watch(() => board.value && board.value.title, touch);
+
+/* ---------------- 撤销 / 重做（快照栈） ----------------
+   Excalidraw 也是这么干的：一步 = 一次「有内容变化」的编辑。这里按 400ms 归组，
+   所以拖一下 / 连续打几个字算一步。**数据很小（一张板几十个块），整份快照最省事。 */
+const undoStack = [];
+const redoStack = [];
+const canUndo = ref(false);
+const canRedo = ref(false);
+let histTimer = 0;
+let lastSnap = null;
+let restoring = false;
+
+const snapNow = () => JSON.stringify(items.value);
+function syncHistBtns() {
+  canUndo.value = undoStack.length > 0;
+  canRedo.value = redoStack.length > 0;
+}
+
+/** 内容变了：把「变之前」那份压栈（同一拍里多次改动只压一次） */
+function watchHistory() {
+  if (restoring) return;
+  clearTimeout(histTimer);
+  histTimer = setTimeout(() => {
+    const now = snapNow();
+    if (lastSnap != null && now !== lastSnap) {
+      undoStack.push(lastSnap);
+      if (undoStack.length > 80) undoStack.shift();
+      redoStack.length = 0;
+      syncHistBtns();
+    }
+    lastSnap = now;
+  }, 400);
+}
+
+function restore(json) {
+  restoring = true;
+  items.value = JSON.parse(json);
+  clearSel();
+  draft.value = null;
+  lastSnap = json;
+  nextTick(() => {
+    restoring = false;
+    syncCursor();
+  });
+}
+
+function undo() {
+  if (!undoStack.length) return toast('没有可撤销的了', 'warn');
+  const cur = snapNow();
+  const prev = undoStack.pop();
+  redoStack.push(cur);
+  if (redoStack.length > 80) redoStack.shift();
+  restore(prev);
+  syncHistBtns();
+  touch();
+}
+
+function redo() {
+  if (!redoStack.length) return toast('没有可重做的了', 'warn');
+  const cur = snapNow();
+  const next = redoStack.pop();
+  undoStack.push(cur);
+  restore(next);
+  syncHistBtns();
+  touch();
+}
 
 /* ---------------- 画布缩放 ---------------- */
 
@@ -299,12 +366,30 @@ function shapeFrom(d) {
   const dx = d.x1 - d.x0;
   const dy = d.y1 - d.y0;
   if (d.kind === 'arrow') {
-    if (!d.moved || Math.abs(dx) < 60) {
+    if (!d.moved || (Math.abs(dx) < 60 && Math.abs(dy) < 60)) {
       const w = 1500;
       return { type: 'shape', shape: 'arrow', x: clamp(d.x0, 0, W - w), y: d.y0, w, h: 200, dir: 'right', color };
     }
-    const len = clamp(Math.abs(dx), 300, W);
-    return { type: 'shape', shape: 'arrow', x: dx < 0 ? clamp(d.x0 - len, 0, W - len) : clamp(d.x0, 0, W - len), y: d.y0, w: len, h: 200, dir: dx < 0 ? 'left' : 'right', color };
+    const dir = dx < 0 ? 'left' : 'right';
+    // 横向拖（上下差不到 6mm）就当水平箭头：高度给 20mm、不存 up（老数据的画法）；
+    // 斜着拖就是真实的「尾 → 头」对角，任意角度
+    if (Math.abs(dy) < 60) {
+      const len = clamp(Math.abs(dx), 300, W);
+      return { type: 'shape', shape: 'arrow', x: dir === 'left' ? clamp(d.x0 - len, 0, W - len) : clamp(d.x0, 0, W - len), y: d.y0, w: len, h: 200, dir, color };
+    }
+    const w = clamp(Math.abs(dx), 80, W);
+    const h = clamp(Math.abs(dy), 80, H);
+    return {
+      type: 'shape',
+      shape: 'arrow',
+      x: clamp(dx < 0 ? d.x0 - w : d.x0, 0, W - w),
+      y: clamp(dy < 0 ? d.y0 - h : d.y0, 0, H - h),
+      w,
+      h,
+      dir,
+      up: dy < 0, // 往上拖 → 头在上
+      color,
+    };
   }
   if (!d.moved || (Math.abs(dx) < 60 && Math.abs(dy) < 60)) {
     const w = 1400;
@@ -364,6 +449,12 @@ function toggleThick(it) {
 }
 function flipShape(it) {
   it.dir = it.dir === 'left' ? 'right' : 'left';
+  touch();
+}
+
+/** 上下翻转：老箭头（up 未设 = 水平）先转成对角，再翻 */
+function flipVertical(it) {
+  it.up = it.up === undefined ? false : !it.up;
   touch();
 }
 
@@ -660,7 +751,7 @@ async function editCaption(it) {
 
 /* ---------------- 拖 / 缩放（rAF + 直接改 transform，别每帧走响应式） ---------------- */
 
-const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, oh: 0, moved: false, nx: 0, ny: 0, nw: 0, nh: 0, gdx: 0, gdy: 0 });
+const drag = reactive({ on: false, mode: 'move', corner: 'r', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, oh: 0, moved: false, nx: 0, ny: 0, nw: 0, nh: 0, gdx: 0, gdy: 0 });
 /** 吸附时把那根参考线画出来（单位：画布单位；null = 不画） */
 const guideAt = reactive({ x: null, y: null });
 /* 吸附半径 / 落点算法在 `lib/board.js`（`SNAP` / `snapX`），这里只管画参考线 */
@@ -671,10 +762,51 @@ let raf = 0;
 let pend = null;
 
 function snapX(x, it) {
-  return snapXTo(x, it.w, pageSize.value.w);
+  const page = snapXTo(x, it.w, pageSize.value.w);
+  // 纸边 / 纸中线优先；没吸上再看别的块
+  if (page.line !== null) return page;
+  const cands = [];
+  for (const o of items.value) {
+    if (o.id === it.id) continue;
+    cands.push([o.x, o.x], [o.x + Math.round((o.w - it.w) / 2), o.x + Math.round(o.w / 2)], [o.x + o.w - it.w, o.x + o.w]);
+  }
+  const r = snapTo(cands, x);
+  return { x: r.v, line: r.line };
 }
 
-function startDrag(ev, it, mode) {
+/** 吸附：`cands` 是 [落点, 参考线] 成对（居中时落点≠线），4.5mm 内取最近的那个 */
+function snapTo(cands, cur) {
+  let best = cur;
+  let line = null;
+  let dist = 1e9;
+  for (const [pos, ln] of cands) {
+    const d = Math.abs(pos - cur);
+    if (d <= 45 && d < dist) {
+      dist = d;
+      best = pos;
+      line = ln;
+    }
+  }
+  return { v: best, line };
+}
+
+function snapY(y, it) {
+  const H = pageSize.value.h;
+  const h = it.h || 400;
+  const cands = [
+    [0, 0],
+    [Math.round((H - h) / 2), Math.round(H / 2)],
+    [H - h, H],
+  ];
+  for (const o of items.value) {
+    if (o.id === it.id) continue;
+    const oh = o.h || 0;
+    cands.push([o.y, o.y], [o.y + Math.round((oh - h) / 2), o.y + Math.round(oh / 2)], [o.y + oh - h, o.y + oh]);
+  }
+  return snapTo(cands, y);
+}
+
+function startDrag(ev, it, mode, corner = 'r') {
   if (ev.button !== 0) return;
   ev.preventDefault();
   ev.stopPropagation();
@@ -696,7 +828,7 @@ function startDrag(ev, it, mode) {
           })
           .filter(Boolean)
       : [];
-  Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, oh: it.h || 0, moved: false, nx: it.x, ny: it.y, nw: it.w, nh: it.h || 0 });
+  Object.assign(drag, { on: true, mode, corner, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, oh: it.h || 0, moved: false, nx: it.x, ny: it.y, nw: it.w, nh: it.h || 0 });
   guideAt.x = null;
   guideAt.y = null;
   window.addEventListener('mousemove', onMove);
@@ -727,12 +859,41 @@ function applyMove() {
   const dx = (pend.x - drag.sx) * k;
   const dy = (pend.y - drag.sy) * k;
   if (drag.mode === 'size') {
-    drag.nw = Math.round(clamp(drag.ow + dx, MIN_W, pageSize.value.w - it.x));
+    const W = pageSize.value.w;
+    const H = pageSize.value.h;
+    const c = drag.corner || 'r';
+    // 手柄名是方位：块给 'l' / 'r'，形状给 nw / ne / sw / se
+    const east = c === 'r' || c.endsWith('e');
+    const west = c === 'l' || c.endsWith('w');
+    const north = c.startsWith('n');
+    const south = c.startsWith('s');
+    let nw = drag.ow;
+    let nx = it.x;
+    if (east) nw = clamp(drag.ow + dx, MIN_W, W - it.x);
+    if (west) {
+      nw = clamp(drag.ow - dx, MIN_W, it.x + drag.ow);
+      nx = it.x + (drag.ow - nw);
+    }
+    drag.nw = Math.round(nw);
+    drag.nx = Math.round(nx);
+    dragEl.style.left = mm(drag.nx);
     dragEl.style.width = mm(drag.nw);
-    // 形状（箭头 / 方框）右下角那格拉的是「宽 + 高」，别的块只有宽
+    // 形状（箭头 / 方框）四角都能拉：宽 + 高一起改，拉左上/右上时 x/y 跟着走
     if (it.type === 'shape') {
-      drag.nh = Math.round(clamp((drag.oh || it.h || 400) + dy, 100, Math.max(120, pageSize.value.h - it.y - 40)));
+      const oh = drag.oh || it.h || 400;
+      let nh = oh;
+      let ny = it.y;
+      if (south) nh = clamp(oh + dy, 120, Math.max(140, H - it.y - 40));
+      if (north) {
+        nh = clamp(oh - dy, 120, it.y + oh);
+        ny = it.y + (oh - nh);
+      }
+      drag.nh = Math.round(nh);
+      drag.ny = Math.round(ny);
+      dragEl.style.top = mm(drag.ny);
       dragEl.style.height = mm(drag.nh);
+      // 老箭头（没有 up）一旦被拉高，改成「对角」画法
+      if (it.shape === 'arrow' && it.up === undefined && drag.nh !== oh) it.up = false;
     }
     return;
   }
@@ -746,10 +907,12 @@ function applyMove() {
   const nx = Math.round(clamp(drag.ox + dx, 0, pageSize.value.w - it.w));
   const ny = Math.round(clamp(drag.oy + dy, 0, pageSize.value.h - 100));
   const sx = snapX(nx, it);
+  const sy = snapY(ny, it);
   drag.nx = sx.x;
-  drag.ny = ny;
+  drag.ny = sy.y;
   guideAt.x = sx.line;
-  dragEl.style.transform = `translate(${(sx.x - drag.ox) / 10}mm, ${(ny - drag.oy) / 10}mm)`;
+  guideAt.y = sy.line;
+  dragEl.style.transform = `translate(${(sx.x - drag.ox) / 10}mm, ${(sy.y - drag.oy) / 10}mm)`;
 }
 
 function endDrag() {
@@ -771,9 +934,13 @@ function endDrag() {
   } else if (it && dragEl && drag.moved) {
     if (drag.mode === 'size') {
       it.w = drag.nw;
+      it.x = drag.nx;
+      it.y = drag.ny;
       if (it.type === 'shape' && drag.nh) it.h = drag.nh;
       dragEl.style.width = '';
       dragEl.style.height = '';
+      dragEl.style.left = '';
+      dragEl.style.top = '';
     } else {
       // 先把新位置写进 inline style，再摘 transform：否则会有一帧闪回原位
       dragEl.style.left = mm(drag.nx);
@@ -853,6 +1020,10 @@ function onPageCtx(ev) {
 function onKey(ev) {
   const tag = (ev.target && ev.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || ev.target?.isContentEditable) return;
+  if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'z' || ev.key === 'Z')) {
+    ev.preventDefault();
+    return ev.shiftKey ? redo() : undo();
+  }
   if (ev.key === 'Escape') {
     if (cancelDraw()) return;
     return clearSel();
@@ -945,11 +1116,13 @@ onMounted(async () => {
   document.head.appendChild(st);
 
   await load();
+  lastSnap = snapNow();
   await new Promise((r) => requestAnimationFrame(r));
   fit();
   if (items.value.length) syncCursor();
   ro = new ResizeObserver(fit);
   if (stageEl.value) ro.observe(stageEl.value);
+  syncHistBtns();
   window.addEventListener('keydown', onKey);
   window.addEventListener('pagehide', flushNow);
   window.addEventListener('beforeunload', flushNow);
@@ -1030,12 +1203,14 @@ onBeforeUnmount(() => {
         <div class="board-head-main">
           <input v-if="board" v-model="board.title" class="board-title" spellcheck="false" title="改板名" />
           <p class="page-desc">
-            点左边素材摆上来 · 拖动摆位 · 空白处拖动框选 · <b>双击改图注</b> · ⌘D 复制 · Delete 删
+            点素材摆上来 · 拖动摆位 · 空白处框选 · <b>双击改图注</b> · ⌘D 复制 · Delete 删
           </p>
         </div>
         <div class="board-head-acts">
           <div class="board-acts-row">
             <span class="board-saved">{{ saving ? '保存中…' : '已保存' }}</span>
+            <button class="board-tool is-icon" :disabled="!canUndo" title="撤销（⌘Z）" @click="undo">↶</button>
+            <button class="board-tool is-icon" :disabled="!canRedo" title="重做（⇧⌘Z）" @click="redo">↷</button>
             <button class="btn btn-sm btn-ghost" @click="togglePage">{{ pageSize.label }}</button>
             <button class="btn btn-sm btn-ghost" @click="pinned = !pinned">{{ pinned ? '适应窗口' : '100%' }}</button>
             <button class="btn btn-sm" :disabled="exporting" @click="exportPdf" title="把整张纸截成图，铺满一页 A4">
@@ -1093,9 +1268,25 @@ onBeforeUnmount(() => {
               @dblclick="editCaption(it)"
             >
               <div class="bd-body" v-html="itemHtml(it, expOf(it), ctxOf())" />
-              <span v-if="selIds.length === 1 && isSel(it)" class="board-grip" title="拖动改宽度" @mousedown.stop="startDrag($event, it, 'size')" />
+              <template v-if="selIds.length === 1 && isSel(it)">
+                <template v-if="it.type === 'shape'">
+                  <span
+                    v-for="c in ['nw', 'ne', 'sw', 'se']"
+                    :key="c"
+                    class="board-grip"
+                    :class="'is-' + c"
+                    :title="`拖${c === 'se' ? '右下' : c === 'nw' ? '左上' : c === 'ne' ? '右上' : '左下'}角改形状 / 角度`"
+                    @mousedown.stop="startDrag($event, it, 'size', c)"
+                  />
+                </template>
+                <template v-else>
+                  <span class="board-grip is-l" title="拖左边改宽度" @mousedown.stop="startDrag($event, it, 'size', 'l')" />
+                  <span class="board-grip is-r" title="拖右边改宽度" @mousedown.stop="startDrag($event, it, 'size', 'r')" />
+                </template>
+              </template>
             </div>
             <div v-if="guideAt.x != null" class="board-guide is-v" :style="{ left: mm(guideAt.x) }" />
+            <div v-if="guideAt.y != null" class="board-guide is-h" :style="{ top: mm(guideAt.y) }" />
             <div v-if="!items.length" class="board-empty">从左边点一个块放上来</div>
           </div>
         </div>
@@ -1137,9 +1328,10 @@ onBeforeUnmount(() => {
               />
             </span>
             <button class="board-tool" @click="toggleThick(selItem)">{{ selItem.thick ? '细一点' : '粗一点' }}</button>
-            <button v-if="selItem.shape !== 'box'" class="board-tool" @click="flipShape(selItem)">
-              {{ selItem.dir === 'left' ? '→ 向右' : '← 向左' }}
-            </button>
+            <template v-if="selItem.shape !== 'box'">
+              <button class="board-tool" title="左右翻转箭头" @click="flipShape(selItem)">⇄</button>
+              <button class="board-tool" title="上下翻转箭头" @click="flipVertical(selItem)">⇅</button>
+            </template>
           </template>
           <button class="board-tool" @click="editCaption(selItem)">{{ selItem.type === 'text' ? '改文字' : '图注' }}</button>
           <button class="board-tool" @click="raise(selItem, 'top')">置顶</button>

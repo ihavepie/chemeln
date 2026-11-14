@@ -64,6 +64,45 @@ export const BLOCKS = [
   { key: 'notes', label: '结论', w: 1400 },
 ];
 
+/**
+ * 箭头：盒子 + 「尾 → 头」对角，画成 inline SVG —— 所以是**任意角度**，放大也不糊。
+ * `dir` 决定头朝左还是朝右，`up` 决定头在上还是在下（拖出来的箭头会存这两个标记）；
+ * **老数据没有 `up`**，按「中线水平」画，免得历史板子里的箭头全变成斜的。
+ */
+function arrowSvg(it, color) {
+  const w = Math.max(1, (it.w || 100) / 10);
+  const h = Math.max(1, (it.h || 200) / 10);
+  const legacy = it.up === undefined || it.up === null;
+  const dir = it.dir === 'left' ? -1 : 1;
+  const head = legacy
+    ? { x: dir > 0 ? w : 0, y: h / 2 }
+    : { x: dir > 0 ? w : 0, y: it.up ? 0 : h };
+  const tail = legacy
+    ? { x: dir > 0 ? 0 : w, y: h / 2 }
+    : { x: dir > 0 ? 0 : w, y: it.up ? h : 0 };
+  const L = it.thick ? 4.4 : 3;
+  const W = it.thick ? 2.6 : 1.6;
+  const sw = it.thick ? 1.1 : 0.55;
+  const dx = head.x - tail.x;
+  const dy = head.y - tail.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const bx = head.x - ux * L;
+  const by = head.y - uy * L;
+  const px = -uy * W;
+  const py = ux * W;
+  const n = (v) => v.toFixed(2);
+  const pts = `${n(head.x)},${n(head.y)} ${n(bx + px)},${n(by + py)} ${n(bx - px)},${n(by - py)}`;
+  return (
+    `<svg class="bd-arrow-svg${it.thick ? ' is-thick' : ''}" viewBox="0 0 ${n(w)} ${n(h)}"` +
+    ` preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">` +
+    `<line x1="${n(tail.x)}" y1="${n(tail.y)}" x2="${n(bx)}" y2="${n(by)}" stroke="${esc(color)}"` +
+    ` stroke-width="${sw}" stroke-linecap="round"/>` +
+    `<polygon points="${pts}" fill="${esc(color)}"/></svg>`
+  );
+}
+
 const esc = (s) =>
   String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -245,8 +284,7 @@ export function itemHtml(it, exp, ctx) {
     const color = it.color || SHAPE_COLORS[0].v;
     const thick = it.thick ? ' is-thick' : '';
     if (it.shape === 'box') return `<div class="bd-shape bd-box${thick}" style="--sc:${esc(color)}"></div>${cap}`;
-    const dir = it.dir === 'left' ? 'is-l' : 'is-r';
-    return `<div class="bd-shape bd-arrow ${dir}${thick}" style="--sc:${esc(color)}"><i class="ln"></i><i class="hd"></i></div>${cap}`;
+    return arrowSvg(it, color) + cap;
   }
   if (it.type === 'text') return `<div class="bd-text">${esc(it.text)}</div>${cap}`;
   // scheme 是老数据（现在统一成 block: react）
@@ -300,6 +338,7 @@ export const BOARD_CSS = `
 .bd-shape { box-sizing: border-box; width: 100%; height: 100%; }
 .bd-box { border: 0.45mm solid var(--sc, #1c1b19); border-radius: 1.4mm; }
 .bd-box.is-thick { border-width: 0.9mm; }
+.bd-arrow-svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .bd-arrow { display: flex; align-items: center; }
 .bd-arrow.is-l { flex-direction: row-reverse; }
 .bd-arrow .ln { flex: 1 1 auto; border-top: 0.55mm solid var(--sc, #1c1b19); }

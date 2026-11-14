@@ -37,6 +37,9 @@ export const A4_CSS = [
   '.pdf-page { width: 210mm; height: 297mm; padding: 16mm 15mm; box-sizing: border-box; overflow: hidden; background: #fff; }',
 ];
 
+/** 截图导出用：把 `body{zoom:0.7498}` 压回去——截图按 CSS px 出图，794px 就是一页 A4 */
+export const SNAP_NO_ZOOM = 'body { zoom: 1 !important; }';
+
 export function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

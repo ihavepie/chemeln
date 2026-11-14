@@ -5,7 +5,7 @@ import Icon from './Icon.vue';
 import { api } from '../api.js';
 import { toast } from '../lib/feedback.js';
 import { labelMarkup, labelMarkupMini } from '../lib/label.js';
-import { collectCss, downloadBlob } from '../lib/print.js';
+import { SNAP_NO_ZOOM, collectCss, downloadBlob } from '../lib/print.js';
 
 /**
  * 批量打印化合物标签：自己排 A4（不用系统打印，那边没法排版）。
@@ -89,9 +89,11 @@ async function make() {
   making.value = true;
   try {
     const pages = buildPages();
-    const blob = await api.printPdf({
+    const blob = await api.snapshotPdf({
       pages,
-      css: labelCss(),
+      css: `${labelCss()}\n${SNAP_NO_ZOOM}`,
+      width: 794,
+      snapWidth: 1588,
       filename: `化合物标签-${chosen.value.length}张.pdf`,
     });
     downloadBlob(blob, `化合物标签-${chosen.value.length}张.pdf`);
