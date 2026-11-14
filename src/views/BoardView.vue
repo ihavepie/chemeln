@@ -538,59 +538,64 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="single board-single">
+    <!-- 素材：页面级左栏（以前塞在内容区里 196px，纸被挤扁；现在通高、整列滚动） -->
+    <aside class="board-drawer">
+      <div class="board-drawer-top">
+        <div class="board-drawer-t">
+          素材<span class="board-drawer-n">{{ exps.length }} 条记录</span>
+        </div>
+        <div class="bd-rec-chips">
+          <button class="bd-chip" title="挑几条记录排成一张对比表" @click="cmpPick = true">对比表…</button>
+          <button class="bd-chip" title="挑几条记录，各生成「条件 + TLC 判断」并竖排" @click="groupPick = true">成组摆放…</button>
+        </div>
+      </div>
+      <div class="board-drawer-body">
+        <div v-for="e in exps" :key="e.id" class="bd-rec">
+          <div class="bd-rec-head">
+            <span class="mono">{{ e.code }}</span>
+            <span class="bd-rec-title">{{ e.title || e.objective || '' }}</span>
+          </div>
+          <div class="bd-rec-chips">
+            <button v-for="c in chipsOf(e)" :key="c.key" class="bd-chip" @click="addBlock(e, c.key)">{{ c.label }}</button>
+          </div>
+          <div v-if="(tlcByExp[e.id] || []).length" class="bd-rec-tlc">
+            <button
+              v-for="t in tlcByExp[e.id]"
+              :key="t.id"
+              class="bd-thumb"
+              :title="`${e.code} · TLC`"
+              @click="addTlc(e, t)"
+            >
+              <img :src="`/api/files/${t.id}`" alt="" loading="lazy" />
+            </button>
+          </div>
+        </div>
+        <div v-if="!exps.length" class="board-drawer-empty">这个课题还没有实验记录</div>
+      </div>
+    </aside>
+
     <div class="inner board-inner">
-      <!-- 内容区宽度可拖（跟工作台 / 筛选表一个抓手）：板子含抽屉，太窄就挤 -->
+      <!-- 内容区宽度可拖（跟工作台 / 筛选表一个抓手） -->
       <DocGrip />
       <header class="page-head board-head">
         <div class="board-head-main">
           <input v-if="board" v-model="board.title" class="board-title" spellcheck="false" title="改板名" />
           <p class="page-desc">
-            左边点素材放上来 · 拖着摆位（靠边 / 居中有吸附） · 拖右下角改宽 · <b>双击改图注</b> · ⌘D 复制 · Delete 删
+            点左边素材摆上来 · 拖动摆位 · <b>双击改图注</b> · ⌘D 复制 · Delete 删
           </p>
         </div>
-        <span class="spacer" />
-        <span class="board-saved">{{ saving ? '保存中…' : '已保存' }}</span>
-        <button class="btn btn-sm btn-ghost" @click="togglePage">{{ pageSize.label }}</button>
-        <button class="btn btn-sm btn-ghost" @click="pinned = !pinned">{{ pinned ? '适应窗口' : '100%' }}</button>
-        <button class="btn btn-sm" :disabled="exporting" @click="exportPdf">
-          <Icon name="download" :size="12" /> 导出 PDF
-        </button>
-        <button class="btn btn-sm btn-ghost" @click="removeBoard">删除</button>
-      </header>
-
-      <div v-if="!board" class="cmp-empty">读取中…</div>
-      <div v-else class="board-wrap">
-        <!-- 素材抽屉：按记录分组，一条记录能放的块都在这儿 -->
-        <aside class="board-drawer">
-          <div class="board-drawer-h">整组</div>
-          <div class="bd-rec-chips">
-            <button class="bd-chip" title="挑几条记录排成一张对比表" @click="cmpPick = true">对比表…</button>
-            <button class="bd-chip" title="挑几条记录，各生成「条件 + TLC 判断」并竖排" @click="groupPick = true">成组摆放…</button>
+        <div class="board-head-acts">
+          <div class="board-acts-row">
+            <span class="board-saved">{{ saving ? '保存中…' : '已保存' }}</span>
+            <button class="btn btn-sm btn-ghost" @click="togglePage">{{ pageSize.label }}</button>
+            <button class="btn btn-sm btn-ghost" @click="pinned = !pinned">{{ pinned ? '适应窗口' : '100%' }}</button>
+            <button class="btn btn-sm" :disabled="exporting" @click="exportPdf">
+              <Icon name="download" :size="12" /> 导出 PDF
+            </button>
+            <button class="btn btn-sm btn-ghost" @click="removeBoard">删除</button>
           </div>
-
-          <div class="board-drawer-h">素材 · {{ exps.length }} 条记录</div>
-          <div v-for="e in exps" :key="e.id" class="bd-rec">
-            <div class="bd-rec-head">
-              <span class="mono">{{ e.code }}</span>
-              <span class="bd-rec-title">{{ e.title || e.objective || '' }}</span>
-            </div>
-            <div class="bd-rec-chips">
-              <button v-for="c in chipsOf(e)" :key="c.key" class="bd-chip" @click="addBlock(e, c.key)">{{ c.label }}</button>
-            </div>
-            <div v-if="(tlcByExp[e.id] || []).length" class="bd-rec-tlc">
-              <button
-                v-for="t in tlcByExp[e.id]"
-                :key="t.id"
-                class="bd-thumb"
-                :title="`${e.code} · TLC`"
-                @click="addTlc(e, t)"
-              >
-                <img :src="`/api/files/${t.id}`" alt="" loading="lazy" />
-              </button>
-            </div>
-          </div>
-          <div v-if="!exps.length" class="board-drawer-empty">这个课题还没有实验记录</div>
-          <div class="bd-rec-chips board-addrow">
+          <!-- 收集工具：不摆变量、不上纸的东西都从这儿加 -->
+          <div class="board-acts-row board-palette">
             <button class="btn btn-sm btn-ghost" @click="addText"><Icon name="plus" :size="12" /> 文字</button>
             <button class="btn btn-sm btn-ghost" @click="addConcl"><Icon name="plus" :size="12" /> 结论</button>
             <button class="btn btn-sm btn-ghost" title="画一根箭头（示意流程用）" @click="addShape('arrow')">
@@ -600,8 +605,11 @@ onBeforeUnmount(() => {
               <Icon name="plus" :size="12" /> 方框
             </button>
           </div>
-        </aside>
+        </div>
+      </header>
 
+      <div v-if="!board" class="cmp-empty">读取中…</div>
+      <div v-else class="board-wrap">
         <!-- 画布：一张 A4，靠 zoom 缩进可视区，纸里全是 mm 单位 -->
         <div ref="stageEl" class="board-stage" :class="{ 'is-pinned': pinned }" @mousedown.self="sel = ''">
           <div ref="pageEl" class="bd-page board-page" :style="{ width: mm(pageSize.w), height: mm(pageSize.h), zoom }" @mousedown.self="sel = ''">
@@ -627,36 +635,36 @@ onBeforeUnmount(() => {
       <!-- 工具条占位固定：选中/取消时版面不动，纸张不会因为多出一行而重新缩放 -->
       <div class="board-tools-bar">
         <div v-if="selItem" class="board-tools">
-        <span class="board-tools-name">
-          {{ selItem.type === 'tlc' ? selItem.code || 'TLC'
-            : selItem.type === 'text' ? '文字'
-            : selItem.type === 'shape' ? (selItem.shape === 'box' ? '方框' : '箭头')
-            : (BLOCKS.find((b) => b.key === (selItem.block || 'react')) || {}).label || '块' }}
-        </span>
-        <!-- 形状：颜色 / 粗细 / 箭头方向 -->
-        <template v-if="selItem.type === 'shape'">
-          <span class="board-swatches">
-            <button
-              v-for="c in SHAPE_COLORS"
-              :key="c.key"
-              type="button"
-              class="board-swatch"
-              :class="{ 'is-on': (selItem.color || SHAPE_COLORS[0].v) === c.v }"
-              :style="{ '--c': c.v }"
-              :title="c.label"
-              @click="setShapeColor(selItem, c.v)"
-            />
+          <span class="board-tools-name">
+            {{ selItem.type === 'tlc' ? selItem.code || 'TLC'
+              : selItem.type === 'text' ? '文字'
+              : selItem.type === 'shape' ? (selItem.shape === 'box' ? '方框' : '箭头')
+              : (BLOCKS.find((b) => b.key === (selItem.block || 'react')) || {}).label || '块' }}
           </span>
-          <button class="board-tool" @click="toggleThick(selItem)">{{ selItem.thick ? '细一点' : '粗一点' }}</button>
-          <button v-if="selItem.shape !== 'box'" class="board-tool" @click="flipShape(selItem)">
-            {{ selItem.dir === 'left' ? '→ 向右' : '← 向左' }}
-          </button>
-        </template>
-        <button class="board-tool" @click="editCaption(selItem)">{{ selItem.type === 'text' ? '改文字' : '图注' }}</button>
-        <button class="board-tool" @click="raise(selItem, 'top')">置顶</button>
-        <button class="board-tool" @click="raise(selItem, 'bottom')">置底</button>
-        <button class="board-tool" @click="center(selItem)">居中</button>
-        <button class="board-tool" @click="duplicate(selItem)">复制</button>
+          <!-- 形状：颜色 / 粗细 / 箭头方向 -->
+          <template v-if="selItem.type === 'shape'">
+            <span class="board-swatches">
+              <button
+                v-for="c in SHAPE_COLORS"
+                :key="c.key"
+                type="button"
+                class="board-swatch"
+                :class="{ 'is-on': (selItem.color || SHAPE_COLORS[0].v) === c.v }"
+                :style="{ '--c': c.v }"
+                :title="c.label"
+                @click="setShapeColor(selItem, c.v)"
+              />
+            </span>
+            <button class="board-tool" @click="toggleThick(selItem)">{{ selItem.thick ? '细一点' : '粗一点' }}</button>
+            <button v-if="selItem.shape !== 'box'" class="board-tool" @click="flipShape(selItem)">
+              {{ selItem.dir === 'left' ? '→ 向右' : '← 向左' }}
+            </button>
+          </template>
+          <button class="board-tool" @click="editCaption(selItem)">{{ selItem.type === 'text' ? '改文字' : '图注' }}</button>
+          <button class="board-tool" @click="raise(selItem, 'top')">置顶</button>
+          <button class="board-tool" @click="raise(selItem, 'bottom')">置底</button>
+          <button class="board-tool" @click="center(selItem)">居中</button>
+          <button class="board-tool" @click="duplicate(selItem)">复制</button>
           <button class="board-tool is-danger" @click="removeItem(selItem)">删除</button>
         </div>
       </div>
