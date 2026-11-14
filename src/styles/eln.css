@@ -4137,12 +4137,15 @@ kbd {
    一张记录常常贴好几块板（0.5 h / 2 h / 过夜、各条件的对照），光有展开剂那一句分不清谁是谁，
    所以图注跟照片 / 文献图共用 `attachments.note`：板子下面一行虚线小字，点进去写。
    板子保持原来的 96×130 大小，图注多出来的高度由 figure 自己吃掉（base 那条 `height:132px` 是死的）。 */
+/* 盒子宽度 = 图自己的宽度（`fit-content`）：定死宽度 + `object-fit: contain` 会在竖长条 /
+   横长的图四周留一圈纸白（用户：「这种图片什么的尽量不要白边」）。高度定住、宽度跟着比例长。 */
 .sec-tlc .tlc-shot.has-cap {
-  width: 112px; height: auto; overflow: visible;
-  display: flex; flex-direction: column; gap: 0;
+  display: block; width: fit-content; height: auto; overflow: visible; background: transparent;
 }
-.sec-tlc .tlc-shot.has-cap img { width: 112px; height: 142px; }
-.sec-tlc .tlc-cap { width: 112px; margin-top: 2px; font-size: 9px; line-height: 1.4; }
+.sec-tlc .tlc-shot.has-cap img { display: block; width: auto; height: 142px; max-width: 168px; }
+/* 图注别再撑宽盒子：`width: 0` + `min-width: 100%` 让它只跟着图走（写 `width:100%` 时输入框自带的
+   20 字符固有宽度会参与 shrink-to-fit，把 60px 宽的板子撑成 123px 的白框，踩过） */
+.sec-tlc .tlc-cap { display: block; width: 0; min-width: 100%; max-width: 168px; margin-top: 2px; font-size: 9px; line-height: 1.4; }
 @media print {
   /* 打印时别让那 116px 的死高度把图注裁掉 */
   .sheet .sec-tlc .tlc-shot.has-cap { height: auto !important; overflow: visible !important; }
@@ -9662,3 +9665,18 @@ body.is-board-dragging { cursor: grabbing; }
 }
 .fp-penhint { flex: 1 1 auto; font-size: 10.5px; color: var(--ink-3); }
 .fp-penhint.warn { color: var(--bad); }
+
+/* ---------- 图片盒子跟着图自己的比例走（尽量别留白边） ----------
+   以前 TLC / 照片都定死宽度（112 / 124px）+ `object-fit: contain`，
+   竖长条或横长的图四周就空出一圈纸白 —— 用户：「这种图片什么的尽量不要白边」。
+   现在盒子只给「最大」尺寸、高度定住、宽度按图的比例自己长：一张 562×1330 的板子
+   按 142 高算出来 60 宽，就不会再被塞进 112 宽的框里左右各留 20 多像素白。 */
+.sec-shots .tlc-shot { display: block; width: fit-content; height: auto; overflow: visible; background: transparent; }
+.sec-shots .tlc-shot img { display: block; width: auto; height: 164px; max-width: 200px; background: transparent; }
+.sec-shots .tlc-cap { display: block; width: 0; min-width: 100%; }
+.sec-shots.is-lit .tlc-shot { width: fit-content; height: auto; }
+.sec-shots.is-lit .tlc-shot img { display: block; width: auto; height: auto; max-height: 140px; max-width: 280px; }
+@media print {
+  .sheet .sec-tlc .tlc-shot.has-cap img { height: 104px !important; }
+  .sheet .sec-shots .tlc-shot img { height: 120px !important; }
+}
