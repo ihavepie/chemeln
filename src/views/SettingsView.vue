@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import Icon from '../components/Icon.vue';
 import AppModal from '../components/AppModal.vue';
 import { api } from '../api.js';
@@ -356,6 +356,50 @@ function pickMod(key) {
   uiSetIfChanged('setMod', key);
 }
 
+/* ---- 功能搜索（用户：「加上功能搜索」）----
+   设置页十来块东西，翻起来还是要找：顶上给一个搜索框，输「TLC」「产率」「备份」「编号」这种词
+   直接命中到**具体那一行**（切到对应模块 + 滚过去 + 闪一下），比一层层点模块快。
+   `kw` 里放英文 / 别名，中文按 label 直接匹配。 */
+const SET_SEARCH = [
+  { m: 'book', label: '记录本标题（课题名）', kw: 'title heading 名字' },
+  { m: 'book', label: '编号前缀', kw: 'prefix code 编号' },
+  { m: 'book', label: '记录人 / 课题组', kw: 'owner group' },
+  { m: 'book', label: '手机 / 局域网访问', kw: 'lan wifi 手机 访问' },
+  { m: 'book', label: '瓶子标签二维码地址', kw: 'qr 标签 二维码 url' },
+  { m: 'data', label: '数据目录', kw: 'data dir 路径' },
+  { m: 'data', label: '备份 / 还原', kw: 'backup restore 导出 备份' },
+  { m: 'cats', label: '课题与分类树（改名 / 编号前缀 / 删除）', kw: 'project category 课题 分类' },
+  { m: 'cats', label: '新建分类 / 拖动排序', kw: 'new category 拖' },
+  { m: 'ui', label: '快捷键', kw: 'keyboard shortcut 快捷键' },
+  { m: 'ui', label: '书签悬停预览', kw: 'peek 书签 预览' },
+  { m: 'page', label: 'A4 上显示哪几块（按记录类型）', kw: 'blocks 版式 块 显示', anchor: 'set-blocks' },
+  { m: 'page', label: '块里的功能（计产率 / 核对 / 结果表列）', kw: 'fx 产率 核对 性状 dr ee', anchor: 'set-fx' },
+  { m: 'page', label: '反应式 · 箭头上那行条件（自动 / 单行 / 两行）', kw: 'scheme 反应式 条件 格式', anchor: 'set-scheme' },
+  { m: 'page', label: '结果表最右那格 · 挂几张板', kw: 'tlc 板 缩略 几张', anchor: 'set-tlc-n' },
+  { m: 'page', label: '投料表「用量」小数位', kw: 'decimal 小数 位 质量 体积', anchor: 'set-decimals' },
+  { m: 'page', label: '常用选项（温度 / 时间 / 气氛 / 装置 / 光照）', kw: 'quick 下拉 候选 温度 时间 气氛 装置 光照', anchor: 'set-quick' },
+];
+const q = ref('');
+const modLabel = (key) => (SET_MODS.find((m) => m.key === key) || {}).label || '';
+const hits = computed(() => {
+  const k = q.value.trim().toLowerCase();
+  if (!k) return [];
+  return SET_SEARCH.filter((e) => `${e.label} ${e.kw || ''} ${modLabel(e.m)}`.toLowerCase().includes(k)).slice(0, 20);
+});
+async function goHit(hit) {
+  if (mod.value !== hit.m) {
+    mod.value = hit.m;
+    uiSetIfChanged('setMod', hit.m);
+  }
+  q.value = '';
+  await nextTick();
+  const el = hit.anchor ? document.getElementById(hit.anchor) : null;
+  if (!el) return;
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.add('is-flash');
+  setTimeout(() => el.classList.remove('is-flash'), 1400);
+}
+
 /* ---- 记录页显示：按记录类型各一套（和 `lib/sheetprefs.js` 的键一致）---- */
 const editKind = ref(currentSheetKind());
 if (editKind.value !== currentSheetKind()) useSheetBlocks(editKind.value);
@@ -508,22 +552,35 @@ async function removeProject(p) {
     <!-- 二级侧边栏：跟「实验记录 / 化合物库」那根中栏一个样子（bone 底 + 分隔线 + 可滚动），
          不是塞在内容区里的一列字。 -->
     <aside class="listpane set-pane">
-      <div class="listpane-head">
+      <div class="listpane-head set-pane-head">
         <h1 class="set-pane-title">设置</h1>
+        <div class="searchbox set-search">
+          <Icon name="search" :size="12" />
+          <input v-model="q" type="search" placeholder="搜设置项：TLC / 产率 / 备份…" autocomplete="off" />
+        </div>
       </div>
       <div class="listpane-body set-pane-body">
-        <button
-          v-for="m in SET_MODS"
-          :key="m.key"
-          type="button"
-          class="set-mod"
-          :class="{ 'is-on': mod === m.key }"
-          :aria-current="mod === m.key ? 'page' : undefined"
-          @click="pickMod(m.key)"
-        >
-          <span class="set-mod-n">{{ m.n }}</span>
-          <span class="set-mod-l">{{ m.label }}</span>
-        </button>
+        <template v-if="!q.trim()">
+          <button
+            v-for="m in SET_MODS"
+            :key="m.key"
+            type="button"
+            class="set-mod"
+            :class="{ 'is-on': mod === m.key }"
+            :aria-current="mod === m.key ? 'page' : undefined"
+            @click="pickMod(m.key)"
+          >
+            <span class="set-mod-n">{{ m.n }}</span>
+            <span class="set-mod-l">{{ m.label }}</span>
+          </button>
+        </template>
+        <template v-else>
+          <button v-for="hit in hits" :key="`${hit.m}-${hit.label}`" type="button" class="set-hit" @click="goHit(hit)">
+            <span class="set-hit-l">{{ hit.label }}</span>
+            <span class="set-hit-m">{{ modLabel(hit.m) }}</span>
+          </button>
+          <p v-if="!hits.length" class="set-hit-empty">没找到「{{ q }}」<br />试试 TLC / 产率 / 备份 / 编号</p>
+        </template>
       </div>
     </aside>
 
@@ -789,7 +846,7 @@ async function removeProject(p) {
             </button>
           </span>
         </div>
-        <div class="sheet-blocks">
+        <div id="set-blocks" class="sheet-blocks">
           <label v-for="(label, key) in SHEET_BLOCKS" :key="key">
             <input type="checkbox" :checked="sheetPrefs[key]" @change="setSheetPref(key, $event.target.checked)" />
             {{ label }}
@@ -797,7 +854,7 @@ async function removeProject(p) {
         </div>
 
         <!-- 第三层：块里面的功能（也是按记录类型各记一套） -->
-        <div class="sheet-fx">
+        <div id="set-fx" class="sheet-fx">
           <div class="sheet-fx-head">
             块里的功能
             <span class="sheet-fx-hint">只影响「{{ SHEET_KINDS.find((k) => k.key === editKind)?.label || '通用' }}」这一类记录</span>
@@ -814,7 +871,7 @@ async function removeProject(p) {
             <span v-if="!sheetPrefs[f.group]" class="sheet-fx-note">所在那一块关着</span>
           </label>
 
-          <div class="sheet-fx-row is-static">
+          <div id="set-scheme" class="sheet-fx-row is-static">
             <span class="sheet-fx-name">反应式 · 箭头上那行条件</span>
             <span class="sheet-fx-chips">
               <button
@@ -831,7 +888,7 @@ async function removeProject(p) {
             </span>
             <span class="sheet-fx-sub">{{ SCHEME_FMT_OPTS.find((o) => o.key === sheetSchemeFmt.fmt)?.hint || '' }}</span>
           </div>
-          <div class="sheet-fx-row is-static">
+          <div id="set-tlc-n" class="sheet-fx-row is-static">
             <span class="sheet-fx-name">结果表最右那格 · 挂几张板</span>
             <span class="sheet-fx-chips">
               <button
@@ -847,7 +904,7 @@ async function removeProject(p) {
             </span>
             <span class="sheet-fx-sub">一条记录常贴好几块板（0.5 h / 2 h / 过夜、各条件对照）；「不挂」= 结果表不放这一列（第 2 页 TLC 区照旧全列）</span>
           </div>
-          <div class="sheet-fx-row is-static">
+          <div id="set-decimals" class="sheet-fx-row is-static">
             <span class="sheet-fx-name">投料表「用量」小数位 · 质量（g）</span>
             <span class="sheet-fx-chips">
               <button
@@ -889,7 +946,7 @@ async function removeProject(p) {
           <b>内置的那几条也能删、也能用 ‹ › 挪位置</b>——动过之后这一行就照你排的顺序来；
           「恢复默认」回到内置那几条（动过之后才出现）。
         </p>
-        <div class="quick-rows">
+        <div id="set-quick" class="quick-rows">
           <div v-for="f in QUICK_ROWS" :key="f.key" class="quick-row">
             <span class="quick-lbl">{{ f.label }}</span>
             <span class="quick-chips">

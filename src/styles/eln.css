@@ -9755,3 +9755,25 @@ body.is-board-dragging { cursor: grabbing; }
   .set-mod.is-on { border-color: transparent; box-shadow: none; }
   .set-inner { padding: 20px 16px 0; }
 }
+
+/* ---------- 设置页侧边栏：更像「侧边栏」+ 功能搜索 ----------
+   一眼看过去要跟左边那根导轨是同一套语言：条目 13px、当前项 `#eae7e1` 实底 + 500 字重
+   （原来是纸白卡 + 投影，看着像浮在内容里的卡片，用户说「更像侧边栏一点」）。 */
+.set-pane-head { padding: 16px 12px 12px; gap: 10px; }
+.set-search input { padding: 6px 9px 6px 28px; font-size: 12px; }
+.set-mod { font-size: 13px; padding: 7px 8px; }
+.set-mod.is-on { background: #eae7e1; color: var(--ink); font-weight: 500; box-shadow: none; }
+.set-mod.is-on .set-mod-n { color: var(--accent); }
+/* 搜索结果：一条两行——上面是设置项，下面是它属于哪个模块 */
+.set-hit {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  border: 0; background: transparent; font: inherit; text-align: left;
+  padding: 7px 8px; border-radius: 6px; cursor: pointer;
+}
+.set-hit:hover { background: #f1efeb; }
+.set-hit-l { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
+.set-hit-m { font-size: 10px; color: var(--ink-4); }
+.set-hit-empty { margin: 6px 4px; font-size: 11.5px; line-height: 1.6; color: var(--ink-4); }
+/* 跳过去之后闪一下，让人知道落在哪一行 */
+@keyframes setFlash { 0%, 55% { background: var(--accent-soft); } 100% { background: transparent; } }
+.is-flash { animation: setFlash 1.4s ease; border-radius: 6px; }
