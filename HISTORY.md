@@ -1,3 +1,10 @@
+- **排版板导出改成「截图做 PDF」+ 另给 PNG**（用户：「pdf 导出感觉不是特别需要了……那个 pdf 导出好像会出问题，感觉截图做成 pdf 更好」）。
+  矢量那条路（`print.swift` 的 `createPDF` + PDFKit 合并）在板页上不稳，干脆不用了：
+  ① `shot.swift` 加了一种输出——`out` 以 `.pdf` 结尾时，把**整页截图铺满一页 PDF**（页面尺寸按 CSS px 折 pt：A4 竖 595.5×842.25、横 842.25×595.5），另收一个 `snapWidth` 参数按像素出图（A4 宽 794 → 1588 = 2 倍 ≈190dpi，2382 ≈288dpi）。
+  ② 两条新路由 `POST /api/snapshot/pdf`（截图铺满一页）/ `POST /api/snapshot/png`（多收 `snapWidth`），`api.js` 里加了 `snapshotPdf / snapshotPng`（共用 `binary()` 助手）。
+  ③ 板页：`snapDoc()` 用 `boardHtml()` 出整页 HTML + `SNAP_CSS`（BOARD_CSS + 清边距，**不带 `body{zoom:0.7498}`**——那是给 595px 打印视口缩页的，截图按 CSS px 出图），宽度按纸张算（竖 794 / 横 1123）；「导出 PDF」= 2 倍像素铺满一页，「存图」= 3 倍 PNG。
+  坑：**CGImage 画进 PDF 时别再翻**——按老经验 `translate + scale(1,-1)` 翻了一次，结果整页倒着（实测 `ctx.draw(cg, in:)` 直接就是正的）；另外 `shot.swift` 有缓存二进制（`.cache/shot*-render`），改了源就得把文件名换一个，否则还是旧行为（这次换成 `shot3-render`）。
+  验证：`node` 里直接 import `src/lib/board.js` 造一张板 → 打这两个接口：PDF 200 / 80KB / MediaBox `595.5 842.25`（横版 `842.25 595.5`）、PNG 200 / 2382×3369；`sips` 转出来的 PDF 截图与 PNG 的排版一致、字是正的；UI 里点「导出 PDF」拿到 `PDF 好了（截图铺满一页）` 提示（临时板 23，验完删）。
 - **排版板：框选 + 多选（PPT / ChemDraw 那种）**（用户：「需要框选工具，有类似的轮子吗」）。
   **结论：没有直接用现成库**——`selecto` / `moveable`（daybrush）确实是专门做这个的轮子，`fabric.js` / `konva` / `tldraw` 也能，但这块画布是「HTML 块 + 0.1mm 坐标 + 整纸 `zoom` + 内容统一走 `itemHtml()`」，换成 canvas 框架等于把渲染层重写（还会跟导出 PDF 那条路分叉）。所以按现有 mouse-event 体系自己写，一共 ~120 行。
   ① 选中从「一个 id」改成**一组 id**（`selIds`）：`isSel(it)` 给模板挂 `.is-sel`，`selItem` 只在恰好选一个时才有（缩放手柄也只在这时出现），`selItems` 给多选操作；`clearSel / selectOne` 收口。

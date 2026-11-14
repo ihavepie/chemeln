@@ -39,6 +39,25 @@ async function request(path, opts = {}) {
   return data;
 }
 
+/** 发一个 JSON 请求拿二进制（PDF / PNG） */
+async function binary(url, body, fallbackMsg) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    let msg = fallbackMsg;
+    try {
+      msg = (await res.json()).error || msg;
+    } catch {
+      /* 保持默认提示 */
+    }
+    throw new Error(msg);
+  }
+  return res.blob();
+}
+
 export const api = {
   bootstrap: (project = '') =>
     request(`/api/bootstrap${project ? `?project=${encodeURIComponent(project)}` : ''}`),
@@ -69,6 +88,10 @@ export const api = {
 
   /* 素材抽屉：本课题所有 TLC 板子（带记录编号） */
   tlc: (project = '') => request(`/api/tlc${project ? `?project=${encodeURIComponent(project)}` : ''}`),
+
+  /* 截图 / 截图做成的 PDF：返回二进制，不走 JSON */
+  snapshotPng: async (body) => binary('/api/snapshot/png', body, '截图失败'),
+  snapshotPdf: async (body) => binary('/api/snapshot/pdf', body, 'PDF 生成失败'),
 
   /* 自己生成 PDF：返回二进制，不走 JSON */
   printPdf: async (body) => {

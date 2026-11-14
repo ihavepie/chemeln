@@ -23,8 +23,10 @@ import {
   boardHtml,
   blockHtml,
   BOARD_CSS,
-  PRINT_CSS,
 } from '../lib/board.js';
+
+/** 截图 / 截图做 PDF 用的样式：跟纸上一样，但**不带** `body{zoom:0.7498}`（那是给 595px 打印视口缩页用的） */
+const SNAP_CSS = `html, body { margin: 0; padding: 0; background: #fff; }\n${BOARD_CSS}`;
 
 /**
  * 排版板：一张 A4 白纸，把记录里的东西（编号 / 反应式 / 条件 / 投料 / 结果 / 结论 / TLC / 文字）
@@ -881,17 +883,41 @@ function togglePage() {
   setTimeout(fit, 0);
 }
 
+/** 导出 = **把整张纸截成一张图**：PDF 就是这张图铺满一页，另给一份 PNG。
+    矢量 PDF（print.swift 那套）在字体 / 裁切上出过问题，这里不再用它。 */
+function snapDoc() {
+  const html = boardHtml(items.value, pageSize.value, expOf, ctxOf());
+  const wpx = Math.round((pageSize.value.w / 10 / 25.4) * 96); // A4 竖 794 / 横 1123
+  return { html, css: SNAP_CSS, width: wpx };
+}
+
 async function exportPdf() {
   if (!items.value.length) return toast('画布还是空的', 'warn');
   exporting.value = true;
   try {
     const name = `${board.value.title || '排版板'}.pdf`;
-    const html = boardHtml(items.value, pageSize.value, expOf, ctxOf());
-    const blob = await api.printPdf({ pages: [html], css: PRINT_CSS, filename: name });
+    const d = snapDoc();
+    const blob = await api.snapshotPdf({ ...d, snapWidth: d.width * 2, filename: name });
     downloadBlob(blob, name);
-    toast('PDF 好了，一张 A4', 'ok');
+    toast('PDF 好了（截图铺满一页）', 'ok');
   } catch (e) {
     toast(e.message || '导出失败', 'err');
+  } finally {
+    exporting.value = false;
+  }
+}
+
+async function exportPng() {
+  if (!items.value.length) return toast('画布还是空的', 'warn');
+  exporting.value = true;
+  try {
+    const name = `${board.value.title || '排版板'}.png`;
+    const d = snapDoc();
+    const blob = await api.snapshotPng({ ...d, snapWidth: d.width * 3, filename: name });
+    downloadBlob(blob, name);
+    toast('截图好了', 'ok');
+  } catch (e) {
+    toast(e.message || '截图失败', 'err');
   } finally {
     exporting.value = false;
   }
@@ -1012,9 +1038,10 @@ onBeforeUnmount(() => {
             <span class="board-saved">{{ saving ? '保存中…' : '已保存' }}</span>
             <button class="btn btn-sm btn-ghost" @click="togglePage">{{ pageSize.label }}</button>
             <button class="btn btn-sm btn-ghost" @click="pinned = !pinned">{{ pinned ? '适应窗口' : '100%' }}</button>
-            <button class="btn btn-sm" :disabled="exporting" @click="exportPdf">
+            <button class="btn btn-sm" :disabled="exporting" @click="exportPdf" title="把整张纸截成图，铺满一页 A4">
               <Icon name="download" :size="12" /> 导出 PDF
             </button>
+            <button class="btn btn-sm btn-ghost" :disabled="exporting" @click="exportPng" title="整张纸存成 PNG">存图</button>
             <button class="btn btn-sm btn-ghost" @click="removeBoard">删除</button>
           </div>
           <!-- 收集工具：都先「拿在手上」，再在纸上点 / 拖（像 ChemDraw 的画布） -->

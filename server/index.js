@@ -3850,7 +3850,7 @@ let shotRendererPromise = null;
 function ensureShotRenderer() {
   if (shotRendererPromise) return shotRendererPromise;
   shotRendererPromise = (async () => {
-    const bin = path.join(CACHE_DIR, 'shot-render');
+    const bin = path.join(CACHE_DIR, 'shot3-render');
     if (fs.existsSync(bin)) return bin;
     await fsp.mkdir(CACHE_DIR, { recursive: true });
     await new Promise((resolve, reject) => {
@@ -4139,6 +4139,7 @@ route('POST', '/api/snapshot/png', async (req, res) => {
   const html = str(body.html);
   if (!html || html.length > 8_000_000) return fail(res, 400, '没有可导出的内容');
   const width = Math.min(2000, Math.max(480, Number(body.width) || 794));
+  const snapWidth = Math.min(3200, Math.max(0, Number(body.snapWidth) || 0));
 
   const token = crypto.randomUUID();
   const dir = path.join(os.tmpdir(), `eln-shot-${token}`);
@@ -4149,7 +4150,7 @@ route('POST', '/api/snapshot/png', async (req, res) => {
     const url = `http://127.0.0.1:${PORT}/api/print/page/${token}/1`;
     const bin = await ensureShotRenderer();
     const out = path.join(dir, 'out.png');
-    await runPrint(bin, [out, String(width), url]);
+    await runPrint(bin, [out, String(width), url, ...(snapWidth ? [String(snapWidth)] : [])]);
     const data = await fsp.readFile(out);
     res.writeHead(200, {
       'content-type': 'image/png',
@@ -4160,6 +4161,40 @@ route('POST', '/api/snapshot/png', async (req, res) => {
     res.end(data);
   } catch (e) {
     fail(res, 500, e.message || '长图生成失败');
+  } finally {
+    PRINT_TOKENS.delete(token);
+    fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+/** 截图做成 PDF：同一张整页截图铺满一页 PDF（矢量 PDF 在字体 / 裁切上出过问题，改走位图） */
+route('POST', '/api/snapshot/pdf', async (req, res) => {
+  const body = await readJson(req);
+  const html = str(body.html);
+  if (!html || html.length > 8_000_000) return fail(res, 400, '没有可导出的内容');
+  const width = Math.min(2000, Math.max(480, Number(body.width) || 794));
+  const snapWidth = Math.min(3200, Math.max(0, Number(body.snapWidth) || 0));
+
+  const token = crypto.randomUUID();
+  const dir = path.join(os.tmpdir(), `eln-shotp-${token}`);
+  PRINT_TOKENS.set(token, dir);
+  try {
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(path.join(dir, 'page1.html'), pageDoc(html, str(body.css)), 'utf8');
+    const url = `http://127.0.0.1:${PORT}/api/print/page/${token}/1`;
+    const bin = await ensureShotRenderer();
+    const out = path.join(dir, 'out.pdf');
+    await runPrint(bin, [out, String(width), url, ...(snapWidth ? [String(snapWidth)] : [])]);
+    const data = await fsp.readFile(out);
+    res.writeHead(200, {
+      'content-type': 'application/pdf',
+      'content-length': data.length,
+      'cache-control': 'no-store',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(str(body.filename) || '记录.pdf')}`,
+    });
+    res.end(data);
+  } catch (e) {
+    fail(res, 500, e.message || 'PDF 生成失败');
   } finally {
     PRINT_TOKENS.delete(token);
     fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
