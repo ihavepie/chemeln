@@ -32,6 +32,8 @@ const skipped = ref(0);
 const hostEl = ref(null);
 let exApi = null;
 const saving = ref(false);
+/** 第一次摆好之前先把画布藏起来：不然会看到「默认 100% → 缩到整页」那一下闪 */
+const fitted = ref(false);
 
 /** 0.1mm → CSS px（96dpi）：A4 = 794 × 1123 */
 const K = 96 / 25.4 / 10;
@@ -239,12 +241,12 @@ async function load() {
     // 元素全被删了（⌘A + Delete / 清空画布）：东西还在 JSON 里，先给个「恢复」按钮，别自作主张盖回来
     if (els && !alive.length) {
       deletedBox.value = { elements: els, appState: b.scene.appState || {}, files: b.scene.files || {} };
-      initial.value = { elements: [], appState: { viewBackgroundColor: '#f5f4f1' }, files: {} };
+      initial.value = { elements: [], appState: { viewBackgroundColor: '#ffffff' }, files: {} };
     } else if (els) {
-      initial.value = { elements: els, appState: { viewBackgroundColor: '#f5f4f1' }, files: b.scene.files || {} };
+      initial.value = { elements: els, appState: { viewBackgroundColor: '#ffffff' }, files: b.scene.files || {} };
     } else {
       const elements = await migrate(b.items || []);
-      initial.value = { elements, appState: { viewBackgroundColor: '#f5f4f1' }, files: { ...files } };
+      initial.value = { elements, appState: { viewBackgroundColor: '#ffffff' }, files: { ...files } };
       fresh.length = 0; // 迁移时造的图已经随 initialData 交过去了
     }
   } catch (e) {
@@ -469,25 +471,51 @@ async function addText() {
 
 /* ---------------- 存回场景（防抖 800ms） ---------------- */
 /**
- * 把 **A4 那张纸**塞进视口（不是「所有元素」）：老 items 里有画到纸外的箭头，
- * 按内容 fit 会把纸挤到一边、右边还被裁掉。`initialData.scrollToContent` 在异步 import 下也不一定生效。
+ * 把 **A4 那张纸**塞进视口（不是「所有元素」）：老 items 里有画到纸外的图，
+ * 按内容 fit 会把纸挤到一边、右边还被裁掉。
+ * 自己算 zoom / scroll 再一次性 updateScene —— 比 `scrollToContent` 稳：不会先摆一次再补一次，
+ * 位置算准了两次也是同一个值，屏幕上看不出跳动。
  */
 function fitPaper(a) {
   try {
     const els = a.getSceneElements();
-    const paper = els.find((e) => e.type === 'rectangle' && e.locked) || els;
-    a.scrollToContent(paper, { fitToContent: true });
+    const paper = els.find((e) => e.type === 'rectangle' && e.locked);
+    if (!paper) return;
+    const st = a.getAppState();
+    const W = st.width || 0;
+    const H = st.height || 0;
+    if (!W || !H) return;
+    const pad = 14;
+    const z = Math.min((W - pad * 2) / paper.width, (H - pad * 2) / paper.height);
+    const zoom = Math.max(0.1, Math.min(3, Math.round(z * 100) / 100));
+    const scrollX = W / 2 / zoom - (paper.x + paper.width / 2);
+    const scrollY = H / 2 / zoom - (paper.y + paper.height / 2);
+    a.updateScene({ appState: { zoom: { value: zoom }, scrollX, scrollY }, captureUpdate: 'NEVER' });
   } catch {
     /* 版本差异，忽略 */
   }
 }
 
+let sizeWatch = null;
 function onReady(a) {
   exApi = a;
   if (import.meta.env.DEV) window.__exApi = a; // 只在开发预览里挂个把手，方便量几何
-  // 120ms 先摆一次，600ms 再补一次（图 / 字体晚到会把布局顶一下，不补就会「跳回去」）
-  setTimeout(() => fitPaper(a), 120);
-  setTimeout(() => fitPaper(a), 600);
+  setTimeout(() => {
+    fitPaper(a);
+    requestAnimationFrame(() => {
+      fitted.value = true;
+    });
+  }, 120);
+  // 舞台尺寸变了（收素材栏 / 专注 / 拖窗口）跟着重新摆；尺寸没变就不动，免得打断正在看的位置
+  const box = st => `${st.width}x${st.height}`;
+  let last = box(a.getAppState());
+  sizeWatch = setInterval(() => {
+    const cur = box(a.getAppState());
+    if (cur !== last) {
+      last = cur;
+      fitPaper(a);
+    }
+  }, 200);
 }
 
 let timer = 0;
@@ -510,7 +538,7 @@ async function saveNow() {
         elements: p.elements || [],
         files: { ...files, ...((exApi && exApi.getFiles && exApi.getFiles()) || {}) },
         appState: {
-          viewBackgroundColor: '#f5f4f1',
+          viewBackgroundColor: '#ffffff',
           scrollX: appState.scrollX,
           scrollY: appState.scrollY,
           zoom: appState.zoom,
@@ -591,6 +619,7 @@ window.addEventListener('blur', unpeek);
 if (focus.value) document.body.classList.add('is-board-focus');
 
 onBeforeUnmount(() => {
+  if (sizeWatch) clearInterval(sizeWatch);
   document.body.classList.remove('is-board-focus');
   window.removeEventListener('blur', unpeek);
   unpeek();
@@ -690,7 +719,7 @@ load();
       <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
       <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
       <div v-if="loading" class="cmp-empty">读取中…</div>
-      <div v-else class="bv2-canvas">
+      <div v-else class="bv2-canvas" :class="{ 'is-fitted': fitted }">
         <div v-if="failed" class="bv2-fail">
           <p>这个画布起不来：{{ failed }}</p>
           <p class="bv2-fail-hint">先回旧画布也能用，把上面的报错截图发我就能定位。</p>
@@ -746,7 +775,8 @@ load();
 }
 .bv2-fail-hint { color: var(--ink-4); font-size: 11.5px; }
 .bv2-saved { font-size: 10.5px; color: var(--ink-4); margin-right: 2px; }
-.bv2-canvas { flex: 1 1 auto; min-height: 0; overflow: visible; }
+.bv2-canvas { flex: 1 1 auto; min-height: 0; overflow: visible; opacity: 0; }
+.bv2-canvas.is-fitted { opacity: 1; transition: opacity 140ms ease; }
 /* 窗口窄的时候：板名让位、工具按钮缩一圈，别跟右边那排操作叠在一起 */
 @media (max-width: 1460px) {
   .bv2-title { display: none; }
