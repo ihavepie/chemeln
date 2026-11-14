@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import ExpPick from '../components/ExpPick.vue';
@@ -13,6 +13,8 @@ import { toast } from '../lib/feedback.js';
 import { DEFAULT_FIELDS } from '../lib/sctfields.js';
 import { schemeParts } from '../lib/expScheme.js';
 import DocGrip from '../components/DocGrip.vue';
+import { openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
+import { setPageMenu } from '../lib/pagemenu.js';
 
 /**
  * 条件筛选 = 一摞平行实验里「跟基准不一样」的那些，摊成一张清单。
@@ -82,6 +84,54 @@ async function buildSchemes() {
 }
 
 /* --- 自己的筛选表 --- */
+/** 组头的右键：存成筛选表 / 收成平行组 / 打开基准 */
+function groupMenu(ev, g) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'table', label: '存成筛选表' },
+      ...(g.source === 'auto' ? [{ key: 'adopt', label: '收成正式平行组' }] : []),
+      CTX_SEP,
+      { key: 'base', label: '打开基准记录' },
+    ],
+    (key) => {
+      if (key === 'table') return asTable(g);
+      if (key === 'adopt') return adopt(g);
+      if (key === 'base') return open(g.members[0]);
+    }
+  );
+}
+
+/** 清单里一行的右键：打开记录 */
+function memberMenu(ev, g, m) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'open', label: '打开这条记录' },
+      { key: 'table', label: '整摞存成筛选表' },
+    ],
+    (key) => {
+      if (key === 'open') return open(m);
+      if (key === 'table') return asTable(g);
+    }
+  );
+}
+
+/** 本页空白处右键 */
+function pageMenuHere(ev) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'new', label: '新建筛选表', icon: 'plus' },
+      { key: 'reload', label: '刷新条件筛选' },
+    ],
+    (key) => {
+      if (key === 'new') pickOpen.value = true;
+      if (key === 'reload') return load();
+    }
+  );
+}
+
 async function createTable(picked) {
   pickOpen.value = false;
   try {
@@ -112,7 +162,15 @@ async function asTable(g) {
   }
 }
 
-onMounted(load);
+let offPageMenu = null;
+onMounted(() => {
+  void load();
+  offPageMenu = setPageMenu(pageMenuHere);
+});
+onBeforeUnmount(() => {
+  if (offPageMenu) offPageMenu();
+  offPageMenu = null;
+});
 watch(() => store.project, load);
 
 const open = (m) => router.push(`/e/${m.id}`);
@@ -195,7 +253,7 @@ async function adopt(g) {
       </div>
 
       <section v-for="g in rows" :key="g.id" class="page-card cx-group">
-        <div class="cx-head">
+        <div class="cx-head" @contextmenu.prevent.stop="groupMenu($event, g)">
           <b>{{ headOf(g) }}</b>
           <span class="cx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>
           <span v-if="singleVar(g)" class="mx-var">单变量 · {{ singleVar(g) }}</span>
@@ -214,7 +272,7 @@ async function adopt(g) {
 
         <ul class="cx-list">
           <li v-for="m in g.members" :key="m.id">
-            <button type="button" class="cx-row" :class="{ 'is-base': isBase(g, m) }" @click="open(m)">
+            <button type="button" class="cx-row" :class="{ 'is-base': isBase(g, m) }" @click="open(m)" @contextmenu.prevent.stop="memberMenu($event, g, m)">
               <span class="cx-code mono">{{ m.code }}</span>
               <span class="cx-tags">
                 <template v-if="isBase(g, m)">

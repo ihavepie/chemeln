@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from '../components/Icon.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList } from '../store.js';
 import { confirm, toast } from '../lib/feedback.js';
 import DocGrip from '../components/DocGrip.vue';
+import { openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
+import { setPageMenu } from '../lib/pagemenu.js';
 
 /**
  * 回收站：删掉的实验 / 化合物暂存在这里。
@@ -39,7 +41,15 @@ async function load() {
   }
 }
 
-onMounted(load);
+let offPageMenu = null;
+onMounted(() => {
+  void load();
+  offPageMenu = setPageMenu(pageMenuHere);
+});
+onBeforeUnmount(() => {
+  if (offPageMenu) offPageMenu();
+  offPageMenu = null;
+});
 
 async function restore(t) {
   try {
@@ -69,6 +79,36 @@ async function purge(t) {
   } catch (e) {
     toast(e.message, 'err');
   }
+}
+
+/** 行的右键：恢复 / 彻底删除 */
+function rowMenu(ev, t) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'restore', label: '恢复' },
+      { key: 'purge', label: '彻底删除', danger: true },
+    ],
+    (key) => {
+      if (key === 'restore') return restore(t);
+      if (key === 'purge') return purge(t);
+    }
+  );
+}
+
+/** 本页空白处右键 */
+function pageMenuHere(ev) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'reload', label: '刷新回收站' },
+      ...(items.value.length ? [{ key: 'clear', label: '清空回收站', danger: true }] : []),
+    ],
+    (key) => {
+      if (key === 'reload') return load();
+      if (key === 'clear') return clearAll();
+    }
+  );
 }
 
 async function clearAll() {
@@ -114,7 +154,7 @@ async function clearAll() {
           {{ items.length }} 条 · 实验 {{ counts.experiment }} 条 · 化合物 {{ counts.compound }} 个
         </div>
         <div class="trash-list">
-          <div v-for="t in items" :key="t.id" class="trash-row">
+          <div v-for="t in items" :key="t.id" class="trash-row" @contextmenu.prevent="rowMenu($event, t)">
             <span class="trash-kind">{{ t.entityName }}</span>
             <span class="trash-label">{{ t.label }}</span>
             <span class="spacer" />

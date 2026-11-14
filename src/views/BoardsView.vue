@@ -1,11 +1,13 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon from '../components/Icon.vue';
 import DocGrip from '../components/DocGrip.vue';
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { prompt, confirm, toast } from '../lib/feedback.js';
+import { openCtxMenu } from '../lib/ctxmenu.js';
+import { setPageMenu } from '../lib/pagemenu.js';
 
 /** 排版板列表：一张板一行，点进去就是那张自由画布 */
 const router = useRouter();
@@ -23,7 +25,45 @@ async function load() {
     loading.value = false;
   }
 }
-onMounted(load);
+let offPageMenu = null;
+onMounted(() => {
+  void load();
+  offPageMenu = setPageMenu(pageMenuHere);
+});
+onBeforeUnmount(() => {
+  if (offPageMenu) offPageMenu();
+  offPageMenu = null;
+});
+
+/** 行的右键：打开 / 删掉 */
+function rowMenu(ev, b) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'open', label: '打开这张板' },
+      { key: 'del', label: '删掉这张板', danger: true },
+    ],
+    (key) => {
+      if (key === 'open') return router.push(`/b/${b.id}`);
+      if (key === 'del') return del(b);
+    }
+  );
+}
+
+/** 本页空白处右键 */
+function pageMenuHere(ev) {
+  openCtxMenu(
+    ev,
+    [
+      { key: 'new', label: '新建排版板', icon: 'plus' },
+      { key: 'reload', label: '刷新列表' },
+    ],
+    (key) => {
+      if (key === 'new') return create();
+      if (key === 'reload') return load();
+    }
+  );
+}
 
 async function create() {
   const title = await prompt({ title: '新建排版板', value: '排版板', confirmText: '建' });
@@ -76,7 +116,7 @@ const when = (ts) => String(ts || '').replace('T', ' ').slice(0, 16);
 
       <div v-else class="page-card board-card">
         <div class="board-list">
-        <div v-for="b in items" :key="b.id" class="board-row" @click="router.push(`/b/${b.id}`)">
+        <div v-for="b in items" :key="b.id" class="board-row" @click="router.push(`/b/${b.id}`)" @contextmenu.prevent="rowMenu($event, b)">
           <span class="board-row-title">{{ b.title || '（未命名）' }}</span>
           <span class="board-row-meta">{{ b.count }} 块素材</span>
           <span class="board-row-meta">{{ when(b.updated_at) }}</span>
