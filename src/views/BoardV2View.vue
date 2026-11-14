@@ -36,6 +36,30 @@ const saving = ref(false);
 const fitted = ref(false);
 /** 载入时顺手把几对「图 + 图注」编了组：ready 之后存一次（不然下次又散着） */
 const groupedOnLoad = ref(0);
+/** 手绘风开关：Excalidraw 在窄容器（手机版 UI）里没有「线条样式」那个入口，这里自己给一个 */
+const sketch = ref(false);
+function applySketch(on) {
+  sketch.value = on;
+  if (!exApi) return;
+  exApi.updateScene({ appState: { currentItemRoughness: on ? 1 : 0 }, captureUpdate: 'NEVER' });
+  const sel = exApi.getAppState().selectedElementIds || {};
+  const hasSel = Object.keys(sel).length > 0;
+  // 有选中就只改选中的；没选中时切到「关」= 把整张板都压成规整线（一键去手绘）
+  const touch = (e) => {
+    if (e.type === 'image' || e.type === 'text') return false;
+    if (!['rectangle', 'ellipse', 'diamond', 'arrow', 'line', 'draw'].includes(e.type)) return false;
+    return hasSel ? !!sel[e.id] : true;
+  };
+  const els = exApi.getSceneElements().map((e) =>
+    touch(e) && (e.roughness ?? 0) !== (on ? 1 : 0)
+      ? { ...e, roughness: on ? 1 : 0, version: (e.version || 1) + 1, versionNonce: Math.floor(Math.random() * 1e9) }
+      : e
+  );
+  exApi.updateScene({ elements: els, captureUpdate: 'IMMEDIATELY' });
+}
+function toggleSketch() {
+  applySketch(!sketch.value);
+}
 
 /** 0.1mm → CSS px（96dpi）：A4 = 794 × 1123 */
 const K = 96 / 25.4 / 10;
@@ -247,8 +271,11 @@ async function load() {
     board.value = b;
     const els = (b.scene && Array.isArray(b.scene.elements) && b.scene.elements.length) ? b.scene.elements : null;
     if (els) {
-      const n = groupLooseCaptions(els);
-      if (n) groupedOnLoad.value = n;
+      const g = groupLooseCaptions(els);
+      const r = flattenRoughness(els);
+      // 只有「这张板最近没人动」时才自动存回去：正在编辑的板子绝不能被载入方覆盖
+      const fresh = Date.now() - Date.parse(b.updated_at || 0) < 90_000;
+      if ((g || r) && !fresh) groupedOnLoad.value = g + r;
     }
     const alive = els ? els.filter((e) => !e.isDeleted) : [];
     // 元素全被删了（⌘A + Delete / 清空画布）：东西还在 JSON 里，先给个「恢复」按钮，别自作主张盖回来
@@ -370,6 +397,20 @@ const newGroupId = () => `g${Date.now().toString(36)}${Math.random().toString(36
  * 这里把「左边缘基本对齐、就在图正下方 26px 内、自己还没编组」的文字跟那张图编到一组，
  * 载入时顺手整理一次（已经编过组的不动；想拆开就选中按 ⇧⌘G）。
  */
+/** 老元素里 roughness > 0（手绘风）的统一压成规整线；返回改了几个 */
+function flattenRoughness(els) {
+  let n = 0;
+  for (const e of els) {
+    if (e.isDeleted || e.type === 'image' || e.type === 'text') continue;
+    if (!['rectangle', 'ellipse', 'diamond', 'arrow', 'line', 'draw'].includes(e.type)) continue;
+    if ((e.roughness ?? 0) !== 0) {
+      e.roughness = 0;
+      n += 1;
+    }
+  }
+  return n;
+}
+
 function groupLooseCaptions(els) {
   const live = els.filter((e) => !e.isDeleted);
   const imgs = live.filter((e) => e.type === 'image');
@@ -795,6 +836,11 @@ load();
           <span class="bv2-title" :title="board ? board.title : ''">{{ board ? board.title : '排版板' }}</span>
           <span class="bv2-saved">{{ saving ? '保存中…' : '已保存' }}</span>
           <button v-if="deletedBox" class="btn btn-sm btn-ghost" @click="restoreDeleted">恢复上次内容</button>
+          <button
+            class="btn btn-sm btn-ghost"
+            :title="sketch ? '现在是手绘风：点一下恢复规整线（没选中图形时会把整张板一起压平）' : '现在是规整线：点一下切成手绘风（有选中就只改选中的）'"
+            @click="toggleSketch"
+          >手绘{{ sketch ? '：开' : '：关' }}</button>
           <button class="btn btn-sm btn-ghost" :disabled="!!downloading" @click="exportPng">存图</button>
           <button class="btn btn-sm" :disabled="!!downloading" @click="exportPdf">
             <Icon name="download" :size="12" /> 导出 PDF

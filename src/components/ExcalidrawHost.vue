@@ -33,7 +33,15 @@ onMounted(async () => {
     const init = props.initial || {};
     const initialData = {
       elements: Array.isArray(init.elements) ? init.elements : [],
-      appState: { viewBackgroundColor: '#f5f4f1', currentItemStrokeColor: '#1c1b19', ...(init.appState || {}) },
+      appState: {
+        viewBackgroundColor: '#f5f4f1',
+        currentItemStrokeColor: '#1c1b19',
+        // 默认不要手绘（roughness 0 = 规整线）
+        currentItemRoughness: 0,
+        currentItemStrokeStyle: 'solid',
+        currentItemFillStyle: 'solid',
+        ...(init.appState || {}),
+      },
       files: init.files || {},
       // 别让 Excalidraw 自己 fit：它按「所有元素」算，板上有画到纸外的图就会把纸挤歪，
       // 而且它比我们晚一拍执行，看起来就是「先正了一下又跳回去」。fit 由外面按 A4 纸做。
