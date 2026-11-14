@@ -168,7 +168,7 @@ async function adopt(g) {
         <button class="btn btn-sm btn-ghost" @click="pickOpen = true"><Icon name="plus" :size="12" /> 新建筛选表</button>
       </div>
       <template v-if="tables.length">
-        <section v-for="(t, i) in tables" :key="t.id" class="sct-block">
+        <section v-for="(t, i) in tables" :key="t.id" class="page-card sct-block">
           <div class="sct-block-head">
             <b><span class="sct-cap-no">Table {{ i + 1 }}</span>{{ t.title }}</b>
             <span class="cx-meta">{{ t.rows.length }} 条 · {{ (t.vars || []).length }} 列</span>
@@ -194,7 +194,7 @@ async function adopt(g) {
         还没有可以筛的东西。一摞平行实验里至少要有一条跟基准不一样（改了条件 / 加减了试剂），重复或平行的那种不会进来；原料记录也不算。
       </div>
 
-      <section v-for="g in rows" :key="g.id" class="cx-group">
+      <section v-for="g in rows" :key="g.id" class="page-card cx-group">
         <div class="cx-head">
           <b>{{ headOf(g) }}</b>
           <span class="cx-meta">{{ g.count }} 条 · 基准 {{ g.members[0].code }}</span>

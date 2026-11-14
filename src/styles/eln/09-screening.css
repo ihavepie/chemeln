@@ -3,7 +3,7 @@
    组头一行（组名 · 条数 · 基准 + 单变量/自动匹配小标），
    下面一个组员一行：编号 · 「改了什么」小标（没改就是「重复 / 平行」）· 产率 · 选择性。
    ================================================================ */
-.cx-group { margin-top: 22px; }
+.cx-group { margin-top: 12px; padding: 12px 14px; }
 .cx-group:first-of-type { margin-top: 12px; }
 .cx-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
 .cx-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
@@ -264,7 +264,7 @@
 .sct-src-chip.is-on { border-color: var(--accent-ink); color: var(--accent-ink); background: #fdf6f2; }
 
 /* 条件筛选首页：每张筛选表就地摊开（标题行 + 三线表） */
-.sct-block { margin: 12px 0 20px; }
+.sct-block { margin: 12px 0 20px; padding: 12px 14px; }
 .sct-block-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 2px; }
 .sct-block-head b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .sct-block-head .spacer { flex: 1 1 auto; }
