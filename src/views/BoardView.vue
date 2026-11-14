@@ -49,8 +49,11 @@ const zoom = computed(() => (pinned.value ? 1 : fitZoom.value));
 const pageSize = computed(() => PAGE[board.value?.page || 'a4p'] || PAGE.a4p);
 const selItem = computed(() => items.value.find((it) => it.id === sel.value) || null);
 
-/** 1 个画布单位（0.1mm）在屏幕上等于多少 px */
-const unitsPerPx = () => 1 / (MM_PER_PX * 0.1 * zoom.value);
+/**
+ * 屏幕上 1px 等于多少画布单位：1px = MM_PER_PX 毫米，1 单位 = 0.1mm，再除以 zoom。
+ * **别写成 1/(MM_PER_PX*0.1*zoom)**——那是 37.8/zoom，比真值大 14 倍，拖一下整块就飞了（踩过）。
+ */
+const unitsPerPx = () => MM_PER_PX / 0.1 / zoom.value;
 const nextZ = () => items.value.reduce((m, it) => Math.max(m, it.z || 0), 0) + 1;
 
 /* ---------------- 读 / 存 ---------------- */
@@ -245,7 +248,7 @@ async function editCaption(it) {
 
 /* ---------------- 拖 / 缩放 ---------------- */
 
-const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0 });
+const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, moved: false });
 const SNAP = 45; // 4.5mm 内吸附到边 / 中线
 
 function snapX(x, it) {
@@ -261,7 +264,7 @@ function startDrag(ev, it, mode) {
   ev.preventDefault();
   ev.stopPropagation();
   sel.value = it.id;
-  Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w });
+  Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, moved: false });
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', endDrag);
 }
@@ -270,6 +273,11 @@ function onMove(ev) {
   if (!drag.on) return;
   const it = items.value.find((x) => x.id === drag.id);
   if (!it) return;
+  // 3px 死区：只是点一下别把块挪歪
+  if (!drag.moved) {
+    if (Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) < 3) return;
+    drag.moved = true;
+  }
   const k = unitsPerPx();
   const dx = (ev.clientX - drag.sx) * k;
   const dy = (ev.clientY - drag.sy) * k;
