@@ -764,14 +764,27 @@ function animatePaper(dir = navDir, ms = 300) {
   }, ms);
 }
 
-/** 上下一条：按左栏列表的顺序走，当前这条不在列表里（被筛掉）才退回平行组 */
+/** 上下一条：**按左栏显示顺序**（`store.listOrder`，分类分组 + 卡片堆展开后的序列）走，
+    所以能跨平行组、跨分类一路翻；左栏还没算出来时退回列表接口顺序，再退平行组。
+    用户：「就还是可以切换到非平行实验」。 */
 function neighborExp(step) {
   const id = Number(exp.value?.id);
-  const items = Array.isArray(store.items) ? store.items : [];
-  const i = items.findIndex((x) => Number(x.id) === id);
-  if (i >= 0) return items[i + step] || null;
-  const j = siblings.value.findIndex((x) => Number(x.id) === id);
-  return j >= 0 ? siblings.value[j + step] || null : null;
+  const order = Array.isArray(store.listOrder) && store.listOrder.length ? store.listOrder : null;
+  const pools = [
+    order,
+    (Array.isArray(store.items) ? store.items : []).map((x) => Number(x.id)),
+    siblings.value.map((x) => Number(x.id)),
+  ];
+  for (const pool of pools) {
+    if (!pool) continue;
+    const i = pool.indexOf(id);
+    if (i >= 0) {
+      const next = pool[i + step];
+      if (next != null) return { id: next };
+      return null;   // 到头就停，不绕回
+    }
+  }
+  return null;
 }
 function onWheel(ev) {
   if (!scrollSwitch.value) return;
@@ -828,15 +841,13 @@ function flipPage(dir) {
   void nextTick(() => editorEl.value?.scrollTo({ top: 0 }));
 }
 
-/** 键盘 ↑/↓ 在这组平行实验里上下切（哪一页都能切，跟左右翻页互不干扰） */
+/** 键盘 ↑/↓ 切上 / 下一条记录：跟滚轮同一个口径（左栏显示顺序，能跨平行组），
+    所以平行实验之间照旧一条一条走，走到组尾就进下一条普通记录。 */
 function onParallelKey(ev) {
   if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
-  if (siblings.value.length < 2) return;
   if (arrowBusy(ev)) return;
-  const i = siblings.value.findIndex((s) => String(s.id) === String(exp.value?.id));
-  if (i < 0) return;
   const dir = ev.key === 'ArrowUp' ? -1 : 1;
-  const next = siblings.value[i + dir];
+  const next = neighborExp(dir);
   if (!next) return;
   ev.preventDefault();
   navDir = dir;

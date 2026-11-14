@@ -265,6 +265,17 @@ const sections = computed(() => {
   return out;
 });
 
+/** 眼睛看到的顺序（分类 → 行 → 卡片堆里的成员）：记录页 ↑↓ / 滚轮切换照这个走，
+    这样才能从一条平行实验翻到**别的实验**去，而不是只在组里打转。 */
+const visualOrder = computed(() =>
+  sections.value.flatMap((sec) =>
+    sec.rows.flatMap((r) => (r.one ? [Number(r.one.id)] : r.members.map((m) => Number(m.id))))
+  )
+);
+watch(visualOrder, (v) => {
+  store.listOrder = v;
+}, { immediate: true });
+
 /* 拖它自己那一格、或者紧后头那一格，都不用再画落点格（原地没动） */
 function showSlot(sec, at) {
   const d = drop.value;

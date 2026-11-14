@@ -54,6 +54,9 @@ export const store = reactive({
      组件内的 ref 一重建就归零，表现出来就是「点一下组员或卡片，卡片堆自己收起了」。 */
   openStacks: {},       // { [groupId]: true }
   listScroll: 0,
+  /* 左栏列表里那几条的**显示顺序**（ExpListPane 算好放进来：分类分组 + 卡片堆展开后的 id 序列）。
+     记录页上下切换（↑↓ / 滚轮）按它走，所以能跨平行组、跨分类一路翻下去。 */
+  listOrder: [],
 });
 
 /** 当前用哪种视图看列表：'card' 卡片墙 / 'table' 表格（都读同一份 store.items / store.compounds） */
