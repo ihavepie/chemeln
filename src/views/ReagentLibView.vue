@@ -274,7 +274,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
         <div>
           <h1 class="page-title">试剂库</h1>
           <p class="page-desc">
-            用过的试剂都在这里：某个名字最近一次用的组分、分子量、浓度 / 密度，以及「1 mmol 折多少 g / µL」。点一行复制名字。
+            记录中出现过的试剂汇总：最近一次使用的角色、分子量、密度 / 浓度，以及按 1 mmol 折算的质量与体积。单击一行可复制名称。
           </p>
         </div>
         <span class="spacer" />
@@ -287,7 +287,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
           {{ allRun ? `核对中 ${allDone}${pendingCount ? ` / ${allDone + pendingCount}` : ''}` : pendingCount ? `全部核对（${pendingCount}）` : missCount ? `重查查不到的（${missCount}）` : '都核对过了' }}
         </button>
         <button type="button" class="rl-allcheck rl-sites-btn" @click="openSites">检索站点</button>
-        <input v-model="q" class="rl-search" placeholder="搜试剂名 / 组分…" spellcheck="false" />
+        <input v-model="q" class="rl-search" placeholder="搜试剂名 / 角色…" spellcheck="false" />
       </header>
 
       <!-- 自定义检索站点：自己的数据库 / 供应商页面，{name} 会换成试剂名 -->
@@ -321,13 +321,13 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
           <thead>
             <tr>
               <th>试剂</th>
-              <th>组分</th>
-              <th class="n">MW</th>
-              <th class="n">浓度 / 密度</th>
-              <th class="n">1 mmol ≈</th>
-              <th class="n">用过</th>
-              <th class="n">当前</th>
-              <th class="n">最近</th>
+              <th>角色</th>
+              <th class="n">分子量</th>
+              <th class="n">密度 / 浓度</th>
+              <th class="n">1 mmol 折算</th>
+              <th class="n">次数</th>
+              <th class="n">在用</th>
+              <th class="n">最近使用</th>
               <th class="n rl-acts-h" />
             </tr>
           </thead>

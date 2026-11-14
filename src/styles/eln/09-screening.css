@@ -333,7 +333,7 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
    试剂库（侧栏「试剂库」那一页）：用过的试剂的汇总表。
    一张干净的三线感列表——不描边、行 hover 淡底，数字等宽右对齐。
    ================================================================ */
-.rl-head { align-items: flex-end; }
+.rl-head { align-items: flex-end; gap: 10px; flex-wrap: wrap; }
 .rl-search {
   width: 210px;
   height: 30px;
@@ -365,9 +365,9 @@ body.is-doc-resizing * { cursor: col-resize !important; user-select: none !impor
   white-space: nowrap;
 }
 .rl-table th.n, .rl-table td.n { text-align: right; }
-.rl-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.rl-table td { padding: 9px 8px; }
 .rl-table tbody tr { cursor: pointer; }
-.rl-table tbody tr:hover { background: #f8f7f2; }
+.rl-table tbody tr:hover { background: #faf9f6; }
 .rl-name { color: var(--ink); font-weight: 500; }
 .rl-role { color: var(--ink-3); white-space: nowrap; }
 .rl-last { color: var(--ink-4); white-space: nowrap; }
