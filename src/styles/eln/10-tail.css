@@ -1989,6 +1989,14 @@ body.is-board-dragging { cursor: grabbing; }
 .board-single .board-drawer { height: 100%; min-height: 0; }
 .board-single .board-stage { flex: 1 1 auto; height: 100%; min-height: 0; }
 .board-single .board-tools { flex: 0 0 auto; }
+/* 框选：贴鼠标的虚线框（挂在 body 上，坐标就是窗口坐标） */
+.bd-marquee {
+  position: fixed; z-index: 88; pointer-events: none;
+  border: 1px solid rgba(168, 71, 31, 0.6);
+  background: rgba(168, 71, 31, 0.06);
+  border-radius: 1px;
+}
+
 /* ---------- 素材悬停预览：胶囊出那一块、TLC 小图出大图 ----------
    漂在素材栏右边，`pointer-events:none` —— 它只让人看一眼，不能抢点击/挡住别的胶囊 */
 .bd-peek {

@@ -41,7 +41,17 @@ const router = useRouter();
 
 const board = ref(null);
 const items = ref([]);
-const sel = ref('');
+/* 选中：**一组 id**（框选 / Shift 点选都是多选，单块操作照旧只看 `selItem`） */
+const selIds = ref([]);
+const selItem = computed(() => (selIds.value.length === 1 ? items.value.find((it) => it.id === selIds.value[0]) || null : null));
+const selItems = computed(() => items.value.filter((it) => selIds.value.includes(it.id)));
+const isSel = (it) => selIds.value.includes(it.id);
+const selectOne = (id) => {
+  selIds.value = id ? [id] : [];
+};
+const clearSel = () => {
+  selIds.value = [];
+};
 const saving = ref(false);
 const exporting = ref(false);
 const exps = ref([]);
@@ -54,7 +64,6 @@ const pinned = ref(false); // 钉住 = 按真实大小看（100%），可以滚
 
 const zoom = computed(() => (pinned.value ? 1 : fitZoom.value));
 const pageSize = computed(() => PAGE[board.value?.page || 'a4p'] || PAGE.a4p);
-const selItem = computed(() => items.value.find((it) => it.id === sel.value) || null);
 
 /** 1px 等于多少画布单位（纯算术在 `lib/board.js`，这里只把 zoom 接进去） */
 const unitsPerPx = () => unitsPerPxOf(zoom.value);
@@ -208,7 +217,7 @@ function syncCursor() {
 
 function push(it) {
   items.value.push({ caption: '', ...it, z: nextZ() });
-  sel.value = items.value[items.value.length - 1].id;
+  selectOne(items.value[items.value.length - 1].id);
   return nextTick();
 }
 
@@ -246,7 +255,7 @@ const draw = reactive({ on: false, kind: '', x0: 0, y0: 0, x1: 0, y1: 0, moved: 
 function armTool(kind) {
   tool.value = tool.value === kind ? '' : kind;
   draft.value = null;
-  sel.value = '';
+  clearSel();
 }
 
 /** 屏幕坐标 → 画布单位。
@@ -566,7 +575,54 @@ function chipsOf(e) {
 
 function removeItem(it) {
   items.value = items.value.filter((x) => x.id !== it.id);
-  sel.value = '';
+  clearSel();
+}
+
+/* ---- 多选（框选 / Shift 点选）：整组挪、整组删、整组复制 ---- */
+
+function removeMany() {
+  const ids = new Set(selIds.value);
+  if (!ids.size) return;
+  items.value = items.value.filter((x) => !ids.has(x.id));
+  clearSel();
+}
+
+/** 一组块允许的位移：整组一起夹边界，别把组拉变形 */
+function clampDelta(list, dx, dy) {
+  const W = pageSize.value.w;
+  const H = pageSize.value.h;
+  const minX = Math.min(...list.map((i) => i.x));
+  const maxX = Math.max(...list.map((i) => i.x + i.w));
+  const minY = Math.min(...list.map((i) => i.y));
+  const maxY = Math.max(...list.map((i) => i.y + (i.h || 0)));
+  return { dx: clamp(dx, -minX, W - maxX), dy: clamp(dy, -minY, H - 60 - (maxY - minY)) };
+}
+
+function moveSelection(dx, dy) {
+  const list = selItems.value;
+  if (!list.length) return;
+  const d = clampDelta(list, dx, dy);
+  for (const it of list) {
+    it.x = Math.round(it.x + d.dx);
+    it.y = Math.round(it.y + d.dy);
+  }
+  touch();
+}
+
+function raiseMany(where) {
+  const list = selItems.value;
+  if (!list.length) return;
+  const zs = items.value.map((x) => x.z || 0);
+  let z = where === 'top' ? Math.max(...zs) + 1 : Math.min(...zs) - list.length;
+  for (const it of list) it.z = z++;
+  touch();
+}
+
+function duplicateMany() {
+  const made = selItems.value.map((it) => ({ ...it, id: uid(), x: it.x + 100, y: it.y + 100, z: nextZ() }));
+  items.value.push(...made);
+  selIds.value = made.map((m) => m.id);
+  touch();
 }
 
 function raise(it, where) {
@@ -581,7 +637,7 @@ function center(it) {
 function duplicate(it) {
   const copy = { ...it, id: uid(), x: it.x + 100, y: it.y + 100, z: nextZ() };
   items.value.push(copy);
-  sel.value = copy.id;
+  selectOne(copy.id);
 }
 
 async function editCaption(it) {
@@ -602,12 +658,13 @@ async function editCaption(it) {
 
 /* ---------------- 拖 / 缩放（rAF + 直接改 transform，别每帧走响应式） ---------------- */
 
-const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, oh: 0, moved: false, nx: 0, ny: 0, nw: 0, nh: 0 });
+const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, oh: 0, moved: false, nx: 0, ny: 0, nw: 0, nh: 0, gdx: 0, gdy: 0 });
 /** 吸附时把那根参考线画出来（单位：画布单位；null = 不画） */
 const guideAt = reactive({ x: null, y: null });
 /* 吸附半径 / 落点算法在 `lib/board.js`（`SNAP` / `snapX`），这里只管画参考线 */
 
 let dragEl = null;
+let dragGroup = []; // 多选一起拖时，每块的原坐标 + DOM
 let raf = 0;
 let pend = null;
 
@@ -619,9 +676,24 @@ function startDrag(ev, it, mode) {
   if (ev.button !== 0) return;
   ev.preventDefault();
   ev.stopPropagation();
-  sel.value = it.id;
+  // 点没选中的块 = 只选它；Shift = 加选 / 减选；多选里拖其中一块 = 整组挪
+  if (ev.shiftKey && mode === 'move') {
+    selIds.value = isSel(it) ? selIds.value.filter((x) => x !== it.id) : [...selIds.value, it.id];
+  } else if (!isSel(it) || selIds.value.length === 1) {
+    selectOne(it.id);
+  }
   // grip 的 mousedown 挂在 span 上，要往上找那块
   dragEl = ev.currentTarget?.closest?.('.board-item') || null;
+  dragGroup =
+    mode === 'move' && selIds.value.length > 1
+      ? selIds.value
+          .map((id) => {
+            const g = items.value.find((x) => x.id === id);
+            const el = pageEl.value && pageEl.value.querySelector(`.board-item[data-id="${id}"]`);
+            return g && el ? { it: g, el, ox: g.x, oy: g.y } : null;
+          })
+          .filter(Boolean)
+      : [];
   Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, oh: it.h || 0, moved: false, nx: it.x, ny: it.y, nw: it.w, nh: it.h || 0 });
   guideAt.x = null;
   guideAt.y = null;
@@ -636,6 +708,7 @@ function onMove(ev) {
     if (Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) < 3) return;
     drag.moved = true;
     if (dragEl) dragEl.style.willChange = drag.mode === 'size' ? 'width' : 'transform';
+    for (const g of dragGroup) g.el.style.willChange = 'transform';
     document.body.classList.add('is-board-dragging');
   }
   pend = { x: ev.clientX, y: ev.clientY };
@@ -661,6 +734,13 @@ function applyMove() {
     }
     return;
   }
+  if (dragGroup.length) {
+    const d = clampDelta(dragGroup.map((g) => g.it), Math.round(dx), Math.round(dy));
+    drag.gdx = d.dx;
+    drag.gdy = d.dy;
+    for (const g of dragGroup) g.el.style.transform = `translate(${d.dx / 10}mm, ${d.dy / 10}mm)`;
+    return;
+  }
   const nx = Math.round(clamp(drag.ox + dx, 0, pageSize.value.w - it.w));
   const ny = Math.round(clamp(drag.oy + dy, 0, pageSize.value.h - 100));
   const sx = snapX(nx, it);
@@ -677,7 +757,16 @@ function endDrag() {
   }
   pend = null;
   const it = items.value.find((x) => x.id === drag.id);
-  if (it && dragEl && drag.moved) {
+  if (it && dragEl && drag.moved && dragGroup.length) {
+    for (const g of dragGroup) {
+      g.el.style.left = mm(g.ox + drag.gdx);
+      g.el.style.top = mm(g.oy + drag.gdy);
+      g.el.style.transform = '';
+      g.el.style.willChange = '';
+      g.it.x = Math.round(g.ox + drag.gdx);
+      g.it.y = Math.round(g.oy + drag.gdy);
+    }
+  } else if (it && dragEl && drag.moved) {
     if (drag.mode === 'size') {
       it.w = drag.nw;
       if (it.type === 'shape' && drag.nh) it.h = drag.nh;
@@ -696,11 +785,60 @@ function endDrag() {
   drag.on = false;
   drag.moved = false;
   dragEl = null;
+  dragGroup = [];
   guideAt.x = null;
   guideAt.y = null;
   document.body.classList.remove('is-board-dragging');
   window.removeEventListener('mousemove', onMove);
   window.removeEventListener('mouseup', endDrag);
+}
+
+/* ---------------- 框选（PPT / ChemDraw 那种橡皮筋） ----------------
+   空白处按下拖 → 虚线框；框到谁选谁（按每块的真实矩形比，块的高度是内容撑的，只有 DOM 量得准）。
+   点一下空白 = 取消选择；Shift 框选 = 加选。 */
+const marq = reactive({ on: false, x0: 0, y0: 0, x1: 0, y1: 0, add: false });
+const marqStyle = computed(() => {
+  if (!marq.on) return null;
+  return {
+    left: Math.min(marq.x0, marq.x1) + 'px',
+    top: Math.min(marq.y0, marq.y1) + 'px',
+    width: Math.abs(marq.x1 - marq.x0) + 'px',
+    height: Math.abs(marq.y1 - marq.y0) + 'px',
+  };
+});
+
+function onPageDown(ev) {
+  if (ev.button !== 0 || tool.value) return;
+  if (!ev.shiftKey) clearSel();
+  Object.assign(marq, { on: true, x0: ev.clientX, y0: ev.clientY, x1: ev.clientX, y1: ev.clientY, add: ev.shiftKey });
+  window.addEventListener('mousemove', onMarqMove);
+  window.addEventListener('mouseup', endMarq);
+}
+
+function onMarqMove(ev) {
+  if (!marq.on) return;
+  marq.x1 = ev.clientX;
+  marq.y1 = ev.clientY;
+  const x = Math.min(marq.x0, marq.x1);
+  const y = Math.min(marq.y0, marq.y1);
+  const w = Math.abs(marq.x1 - marq.x0);
+  const h = Math.abs(marq.y1 - marq.y0);
+  if (w < 3 && h < 3) return;
+  const hit = [];
+  for (const el of pageEl.value.querySelectorAll('.board-item')) {
+    const b = el.getBoundingClientRect();
+    if (b.right < x || b.left > x + w || b.bottom < y || b.top > y + h) continue;
+    if (el.dataset.id) hit.push(el.dataset.id);
+  }
+  selIds.value = marq.add ? [...new Set([...selIds.value, ...hit])] : hit;
+}
+
+function endMarq() {
+  window.removeEventListener('mousemove', onMarqMove);
+  window.removeEventListener('mouseup', endMarq);
+  const dragged = marq.on && (Math.abs(marq.x1 - marq.x0) > 3 || Math.abs(marq.y1 - marq.y0) > 3);
+  marq.on = false;
+  if (!dragged) clearSel(); // 点一下空白 = 取消选择
 }
 
 /** 右键：工具还拿在手上就收笔（不然会跟页面右键菜单打架） */
@@ -715,24 +853,23 @@ function onKey(ev) {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || ev.target?.isContentEditable) return;
   if (ev.key === 'Escape') {
     if (cancelDraw()) return;
-    return (sel.value = '');
+    return clearSel();
   }
-  const it = selItem.value;
-  if (!it) return;
+  const list = selItems.value;
+  if (!list.length) return;
   if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'd' || ev.key === 'D')) {
     ev.preventDefault();
-    return duplicate(it);
+    return list.length > 1 ? duplicateMany() : duplicate(list[0]);
   }
   if (ev.key === 'Delete' || ev.key === 'Backspace') {
     ev.preventDefault();
-    return removeItem(it);
+    return list.length > 1 ? removeMany() : removeItem(list[0]);
   }
   const step = ev.shiftKey ? 100 : 10;
   const map = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
   if (map[ev.key]) {
     ev.preventDefault();
-    it.x = clamp(it.x + map[ev.key][0], 0, pageSize.value.w - it.w);
-    it.y = clamp(it.y + map[ev.key][1], 0, pageSize.value.h - 100);
+    moveSelection(map[ev.key][0], map[ev.key][1]);
   }
 }
 
@@ -867,7 +1004,7 @@ onBeforeUnmount(() => {
         <div class="board-head-main">
           <input v-if="board" v-model="board.title" class="board-title" spellcheck="false" title="改板名" />
           <p class="page-desc">
-            点左边素材摆上来 · 拖动摆位 · <b>双击改图注</b> · ⌘D 复制 · Delete 删
+            点左边素材摆上来 · 拖动摆位 · 空白处拖动框选 · <b>双击改图注</b> · ⌘D 复制 · Delete 删
           </p>
         </div>
         <div class="board-head-acts">
@@ -900,13 +1037,13 @@ onBeforeUnmount(() => {
       <div v-if="!board" class="cmp-empty">读取中…</div>
       <div v-else class="board-wrap">
         <!-- 画布：一张 A4，靠 zoom 缩进可视区，纸里全是 mm 单位 -->
-        <div ref="stageEl" class="board-stage" :class="{ 'is-pinned': pinned }" @mousedown.self="sel = ''">
+        <div ref="stageEl" class="board-stage" :class="{ 'is-pinned': pinned }" @mousedown.self="clearSel">
           <div
             ref="pageEl"
             class="bd-page board-page"
             :class="{ 'is-armed': !!tool }"
             :style="{ width: mm(pageSize.w), height: mm(pageSize.h), zoom }"
-            @mousedown.self="sel = ''"
+            @mousedown.self="onPageDown"
             @mousedown.capture="onDrawDown"
             @contextmenu="onPageCtx"
           >
@@ -923,13 +1060,13 @@ onBeforeUnmount(() => {
               :key="it.id"
               class="bd-item board-item"
               :data-id="it.id"
-              :class="{ 'is-sel': sel === it.id }"
+              :class="{ 'is-sel': isSel(it) }"
               :style="{ left: mm(it.x), top: mm(it.y), width: mm(it.w), ...(it.type === 'shape' ? { height: mm(it.h || 400) } : {}), zIndex: it.z || 1 }"
               @mousedown="startDrag($event, it, 'move')"
               @dblclick="editCaption(it)"
             >
               <div class="bd-body" v-html="itemHtml(it, expOf(it), ctxOf())" />
-              <span v-if="sel === it.id" class="board-grip" title="拖动改宽度" @mousedown.stop="startDrag($event, it, 'size')" />
+              <span v-if="selIds.length === 1 && isSel(it)" class="board-grip" title="拖动改宽度" @mousedown.stop="startDrag($event, it, 'size')" />
             </div>
             <div v-if="guideAt.x != null" class="board-guide is-v" :style="{ left: mm(guideAt.x) }" />
             <div v-if="!items.length" class="board-empty">从左边点一个块放上来</div>
@@ -937,9 +1074,21 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+    <Teleport to="body">
+      <div v-if="marqStyle" class="bd-marquee" :style="marqStyle" />
+    </Teleport>
+
       <!-- 工具条占位固定：选中/取消时版面不动，纸张不会因为多出一行而重新缩放 -->
       <div class="board-tools-bar">
-        <div v-if="selItem" class="board-tools">
+        <!-- 多选：整组置顶 / 置底 / 复制 / 删除 -->
+        <div v-if="selItems.length > 1" class="board-tools">
+          <span class="board-tools-name">{{ selItems.length }} 块</span>
+          <button class="board-tool" @click="raiseMany('top')">置顶</button>
+          <button class="board-tool" @click="raiseMany('bottom')">置底</button>
+          <button class="board-tool" @click="duplicateMany">复制</button>
+          <button class="board-tool is-danger" @click="removeMany">删除</button>
+        </div>
+        <div v-else-if="selItem" class="board-tools">
           <span class="board-tools-name">
             {{ selItem.type === 'tlc' ? selItem.code || 'TLC'
               : selItem.type === 'text' ? '文字'
