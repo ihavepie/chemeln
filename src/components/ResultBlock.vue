@@ -27,6 +27,12 @@ const props = defineProps({
   tlc: { type: Array, default: () => [] },
   /** 哪条实验：大图里要批注的话，合成的新图得挂回这条记录 */
   expId: { type: [Number, String], default: null },
+  /** 结果表里那几列要不要出现（设置页 06 → 块里的功能，按记录类型各记一套） */
+  showAppear: { type: Boolean, default: true },
+  showDrEe: { type: Boolean, default: true },
+  showTlc: { type: Boolean, default: true },
+  /** 最右那格一次摆几张板（1–3） */
+  tlcMax: { type: Number, default: 1 },
 });
 const emit = defineEmits(['open-compound', 'refresh']);
 
@@ -34,14 +40,16 @@ const picking = ref(false);
 const shot = ref(null); // 点开的大图（TLC 板子）
 const pickShot = ref(false); // 「换一张板」的小弹层
 
-/** 结果表最右那格挂的那张板：明确引用过的优先；没选过就默认最新一张（不占一行） */
-const refShot = computed(() => {
+/** 结果表最右那格摆的板：明确引用过的那张排第一，其余按新的在前，最多 `tlcMax` 张 */
+const refShots = computed(() => {
   const id = Number(props.model.tlc_shot_id);
   const hit = id ? props.tlc.find((a) => Number(a.id) === id) : null;
-  if (hit) return hit;
-  // 没引用过就默认最新一张（id 最大）：reduce 的种子是 null，别直接读 a.id
-  return props.tlc.reduce((a, b) => (!a || Number(b.id) > Number(a.id) ? b : a), null);
+  const rest = props.tlc.filter((a) => a !== hit).sort((a, b) => Number(b.id) - Number(a.id));
+  return [...(hit ? [hit] : []), ...rest].slice(0, Math.max(1, Number(props.tlcMax) || 1));
 });
+/** 那一列多宽跟着张数走（一张 38px 左右，别让 26px 的缩略图挤成一团） */
+const tlcColW = computed(() => `${refShots.value.length * 28 + 10}px`);
+const hasTlcCol = computed(() => !!props.showTlc && props.tlc.length > 0);
 function openShot(a) {
   shot.value = { src: `/api/files/${a.id}`, name: a.original_name || 'TLC' };
 }
@@ -208,12 +216,12 @@ function onYieldInput(ev, r) {
     <table class="rtable res-table" :class="{ 'is-multi': multi }">
       <colgroup>
         <col v-if="multi" class="r-step" />
-        <col class="r-name" /><col v-if="!multi" class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col v-if="!multi" class="r-dr" /><col v-if="tlc.length" class="r-tlc" /><col class="r-del" />
+        <col class="r-name" /><col v-if="!multi && showAppear" class="r-appear" /><col class="r-mw" /><col class="r-mass" /><col class="r-yield" /><col v-if="!multi && showDrEe" class="r-dr" /><col v-if="hasTlcCol" class="r-tlc" :style="{ width: tlcColW }" /><col class="r-del" />
       </colgroup>
       <thead>
         <tr>
           <th v-if="multi" />
-          <th class="r-name">产物名称</th><th v-if="!multi">性状</th><th class="n">产物 MW</th>
+          <th class="r-name">产物名称</th><th v-if="!multi && showAppear">性状</th><th class="n">产物 MW</th>
           <th class="n">质量 / g</th>
           <th class="n">
             <span class="th-with-btn"
@@ -235,8 +243,8 @@ function onYieldInput(ev, r) {
               </button></span
             >
           </th>
-          <th v-if="!multi" class="n">dr / ee</th>
-          <th v-if="tlc.length" class="res-tlc-th">TLC</th>
+          <th v-if="!multi && showDrEe" class="n">dr / ee</th>
+          <th v-if="hasTlcCol" class="res-tlc-th">TLC</th>
           <th />
         </tr>
       </thead>
@@ -275,7 +283,7 @@ function onYieldInput(ev, r) {
               </button>
             </div>
           </td>
-          <td v-if="!multi"><input :value="r.rm.appearance" placeholder="白色固体" :disabled="locked" @input="r.rm.appearance = $event.target.value; notify()" @change="notify()" /></td>
+          <td v-if="!multi && showAppear"><input :value="r.rm.appearance" placeholder="白色固体" :disabled="locked" @input="r.rm.appearance = $event.target.value; notify()" @change="notify()" /></td>
           <td><input class="n" inputmode="decimal" :value="r.rm.product_mw ?? ''" placeholder="自动" :disabled="locked" @input="onNumInput($event, r.rm, 'product_mw')" /></td>
           <td><input class="n" inputmode="decimal" :value="r.rm.product_mass ?? ''" :placeholder="multi ? '' : '2.3975'" :disabled="locked" @input="onMassInput($event, r)" @change="afterMass(r)" /></td>
           <td>
@@ -288,22 +296,24 @@ function onYieldInput(ev, r) {
               @input="onYieldInput($event, r)"
             />
           </td>
-          <td v-if="!multi"><input class="n" :value="r.rm.dr_ee" placeholder="> 20:1" :disabled="locked" @input="r.rm.dr_ee = $event.target.value; notify()" @change="notify()" /></td>
-          <td v-if="tlc.length" class="res-tlc-cell">
-            <div v-if="refShot && (r.last || !multi)" class="tlc-mini">
+          <td v-if="!multi && showDrEe"><input class="n" :value="r.rm.dr_ee" placeholder="> 20:1" :disabled="locked" @input="r.rm.dr_ee = $event.target.value; notify()" @change="notify()" /></td>
+          <td v-if="hasTlcCol" class="res-tlc-cell">
+            <div v-if="refShots.length && (r.last || !multi)" class="tlc-mini">
               <button
+                v-for="s in refShots"
+                :key="s.id"
                 type="button"
                 class="tlc-mini-btn"
-                :title="(refShot.original_name || 'TLC') + ' · 点开看大图'"
-                @click="openShot(refShot)"
+                :title="(s.original_name || 'TLC') + ' · 点开看大图'"
+                @click="openShot(s)"
               >
-                <img :src="'/api/files/' + refShot.id" alt="TLC" loading="lazy" />
+                <img :src="'/api/files/' + s.id" alt="TLC" loading="lazy" />
               </button>
               <button
                 v-if="tlc.length > 1 && !locked"
                 type="button"
                 class="tlc-mini-swap noprint"
-                title="换一张板"
+                title="换哪几张挂在结果里"
                 @click.stop="pickShot = true"
               >
                 换
@@ -343,7 +353,7 @@ function onYieldInput(ev, r) {
       @saved="emit('refresh')"
     />
 
-    <AppModal v-if="pickShot" title="结果区挂哪张 TLC 板" confirm-text="就这张" @close="pickShot = false" @confirm="pickShot = false">
+    <AppModal v-if="pickShot" title="结果区先挂哪张板" confirm-text="就这张" @close="pickShot = false" @confirm="pickShot = false">
       <div class="tlc-pick">
         <button
           v-for="a in tlc"

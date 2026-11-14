@@ -25,7 +25,7 @@ import SyncConflicts from '../components/SyncConflicts.vue';
 import { api } from '../api.js';
 import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
-import { sheetFx, sheetPrefs, useSheetBlocks } from '../lib/sheetprefs.js';
+import { sheetFx, sheetPrefs, sheetTlcMax, useSheetBlocks } from '../lib/sheetprefs.js';
 import { KINDS, RXN_TYPES } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
@@ -2439,6 +2439,8 @@ const openAttachment = (id) => {
             :steps="reagent.steps"
             :base="reagent.base" :notify="notify" :locked="exp.locked" :kind="fields.kind"
             :yield-default="sheetFx.yield" :tlc="tlcShots" :exp-id="exp.id"
+            :show-appear="sheetFx.resAppear" :show-dr-ee="sheetFx.resDrEe" :show-tlc="sheetFx.resTlc"
+            :tlc-max="sheetTlcMax.n"
             @refresh="refreshAttachments"
             @open-compound="(id) => router.push(`/compounds/${id}`)"
           >

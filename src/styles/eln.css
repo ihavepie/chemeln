@@ -9613,10 +9613,10 @@ body.is-board-dragging { cursor: grabbing; }
 /* ---------- 结果表最右那格：板图缩略（不占新一行；点开看大图，多张时右上角「换」） ---------- */
 .res-tlc-th { text-align: center !important; }
 .res-tlc-cell { padding: 1px 2px !important; }
-.tlc-mini { position: relative; display: flex; justify-content: center; }
+.tlc-mini { position: relative; display: flex; align-items: center; justify-content: center; gap: 2px; }
 .tlc-mini-btn { border: 0; background: transparent; padding: 0; line-height: 0; cursor: zoom-in; }
 .tlc-mini-btn img {
-  height: 26px; width: auto; max-width: 34px; object-fit: contain;
+  height: 26px; width: auto; max-width: 26px; object-fit: contain;
   border-radius: 2px; background: #fbfaf7; box-shadow: 0 0 0 1px var(--line-2);
 }
 .tlc-mini-btn:hover img { box-shadow: 0 0 0 1px var(--ink-4); }

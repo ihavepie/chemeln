@@ -9,6 +9,9 @@ import {
   setSheetPref,
   setSheetFx,
   showAllSheetBlocks,
+  sheetTlcMax,
+  setTlcMax,
+  TLC_N_OPTS,
   useSheetBlocks,
   currentSheetKind,
   sheetFx,
@@ -756,6 +759,22 @@ async function removeProject(p) {
             <span v-if="!sheetPrefs[f.group]" class="sheet-fx-note">所在那一块关着</span>
           </label>
 
+          <div class="sheet-fx-row is-static">
+            <span class="sheet-fx-name">结果表最右那格 · 一次摆几张板</span>
+            <span class="sheet-fx-chips">
+              <button
+                v-for="n in TLC_N_OPTS"
+                :key="n"
+                type="button"
+                class="qchip"
+                :class="{ 'is-on': sheetTlcMax.n === n }"
+                @click="setTlcMax(n)"
+              >
+                {{ n }} 张
+              </button>
+            </span>
+            <span class="sheet-fx-sub">一条记录常贴好几块板（0.5 h / 2 h / 过夜、各条件对照）；这里只影响结果表那格，第 2 页 TLC 区照旧全列</span>
+          </div>
           <div class="sheet-fx-row is-static">
             <span class="sheet-fx-name">投料表「用量」小数位 · 质量（g）</span>
             <span class="sheet-fx-chips">

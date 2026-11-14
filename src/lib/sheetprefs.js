@@ -54,12 +54,19 @@ export const SHEET_FX = [
     hint: '取消 = 只记质量和选择性（原料 / 粗产物 / 中间体这种不称产率的）',
   },
   { key: 'check', group: 'reagents', label: '说明格的「核对」（查 MW / 密度 / 固体）' },
+  // 结果表那几列：很多人从来不填性状 / dr·ee，空着也占宽度（尤其挤掉 TLC 那格）
+  { key: 'resAppear', group: 'result', label: '结果表的「性状」列', hint: '取消 = 那列不出现（已写的内容不丢，勾回来就有）' },
+  { key: 'resDrEe', group: 'result', label: '结果表的「dr / ee」列', hint: '取消 = 那列不出现；总选择性那一行已经撤了，ee 就靠这格' },
+  { key: 'resTlc', group: 'result', label: '结果表的「TLC 板图」列', hint: '取消 = 结果表不挂板图（第 2 页的 TLC 区照旧有）' },
 ];
 const FX_KEYS = SHEET_FX.map((f) => f.key);
 /** 某一类的默认：只有「原料」默认不记产率（以前是写死在 ResultBlock 里的） */
 export const fxDefaultsFor = (kind) => ({
   yield: normKind(kind) !== '原料',
   check: true,
+  resAppear: true,
+  resDrEe: true,
+  resTlc: true,
 });
 /** 当前这一套的功能开关（设置页改它，记录页读它） */
 export const sheetFx = reactive({ ...fxDefaultsFor('') });
@@ -140,5 +147,22 @@ export function showAllSheetBlocks() {
   for (const key of BLOCK_KEYS) setSheetPref(key, true);
 }
 
+/* ---------- 结果表最右那格一次放几张板 ----------
+   一条记录常常贴好几块板（0.5 h / 2 h / 过夜，或者几个条件的对照），
+   放几张是全局一个数（不分记录类型）：1 / 2 / 3。 */
+export const TLC_N_OPTS = [1, 2, 3];
+const TLCN_KEY = 'tlcN';
+const normTlcN = (v) => (Number(v) >= 1 && Number(v) <= 3 ? Math.round(Number(v)) : 1);
+export const sheetTlcMax = reactive({ n: normTlcN(uiGet(TLCN_KEY, 1)) });
+export function setTlcMax(v) {
+  const n = normTlcN(v);
+  if (sheetTlcMax.n === n) return;
+  sheetTlcMax.n = n;
+  uiSetIfChanged(TLCN_KEY, n);
+}
+
 // 开机时从服务器合并下来的更"新"的那份：重读当前这一套
-onUiMerged(() => useSheetBlocks(activeKind));
+onUiMerged(() => {
+  useSheetBlocks(activeKind);
+  sheetTlcMax.n = normTlcN(uiGet(TLCN_KEY, 1));
+});
