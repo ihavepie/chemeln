@@ -106,6 +106,14 @@ async function rasterBlock(it, key) {
   return got;
 }
 
+/** 图注就是一行原生 text（能双击直接改），跟在图下面 */
+function captionSk(text, x, y, w) {
+  return [{
+    type: 'text', x, y, width: Math.round(w), text: String(text),
+    fontSize: 13, fontFamily: 2, strokeColor: '#4a463f', textAlign: 'left',
+  }];
+}
+
 const ctxOf = () => ({ get: (id) => expCache[id] });
 const expCache = {};
 const expLoading = new Set();
@@ -174,7 +182,10 @@ async function migrate(items) {
     if (it.type === 'tlc' && it.ref) {
       try {
         const f = await addFile(`/api/files/${it.ref}`);
-        sk.push({ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' });
+        const hPx = Math.round((w * f.size.h) / f.size.w);
+        sk.push({ type: 'image', x, y, width: w, height: hPx, fileId: f.id, status: 'saved' });
+        const cap = String(it.caption || '').trim();
+        if (cap) sk.push(...captionSk(cap, x, y + hPx + 4, w));
       } catch {
         skipped.value += 1;
       }
@@ -216,15 +227,24 @@ async function migrate(items) {
   return EX.convertToExcalidrawElements(sk, { regenerateIds: false });
 }
 
+/** 场景里被删光的元素（Excalidraw 的删除只是打 isDeleted）——能一键捞回来，不用重新搬 items */
+const deletedBox = ref(null);
+
 async function load() {
   try {
     const b = (await api.board(route.params.id)).board;
     board.value = b;
-    if (b.scene && Array.isArray(b.scene.elements) && b.scene.elements.length) {
-      initial.value = { elements: b.scene.elements, appState: b.scene.appState || {}, files: b.scene.files || {} };
+    const els = (b.scene && Array.isArray(b.scene.elements) && b.scene.elements.length) ? b.scene.elements : null;
+    const alive = els ? els.filter((e) => !e.isDeleted) : [];
+    // 元素全被删了（⌘A + Delete / 清空画布）：东西还在 JSON 里，先给个「恢复」按钮，别自作主张盖回来
+    if (els && !alive.length) {
+      deletedBox.value = { elements: els, appState: b.scene.appState || {}, files: b.scene.files || {} };
+      initial.value = { elements: [], appState: { viewBackgroundColor: '#f5f4f1' }, files: {} };
+    } else if (els) {
+      initial.value = { elements: els, appState: { ...(b.scene.appState || {}), viewBackgroundColor: '#f5f4f1' }, files: b.scene.files || {} };
     } else {
       const elements = await migrate(b.items || []);
-      initial.value = { elements, appState: {}, files: { ...files } };
+      initial.value = { elements, appState: { viewBackgroundColor: '#f5f4f1' }, files: { ...files } };
       fresh.length = 0; // 迁移时造的图已经随 initialData 交过去了
     }
   } catch (e) {
@@ -249,15 +269,27 @@ const CHIPS = [
   { key: 'conds', label: '条件' },
   { key: 'reagents', label: '投料' },
   { key: 'result', label: '结果' },
-  { key: 'verdict', label: 'TLC 判断' },
   { key: 'notes', label: '结论' },
 ];
+const CHIP_W = { title: 1200, react: 1200, conds: 1300, reagents: 1500, result: 1300, notes: 1300 };
 
 const hayOf = (e) => `${e.code} ${e.title || ''} ${e.objective || ''} ${e.product_name || ''}`.toLowerCase();
 const shown = computed(() => {
   const k = q.value.trim().toLowerCase();
   return k ? exps.value.filter((e) => hayOf(e).includes(k)) : exps.value;
 });
+
+/** 把删掉的元素原样放回来（位置、图片都还是原来的） */
+function restoreDeleted() {
+  const box = deletedBox.value;
+  if (!box || !exApi) return;
+  const els = box.elements.map((e) => ({ ...e, isDeleted: false }));
+  exApi.updateScene({ elements: els, captureUpdate: 'IMMEDIATELY' });
+  deletedBox.value = null;
+  void import('@excalidraw/excalidraw').then(() => {
+    exApi.scrollToContent(exApi.getSceneElements(), { fitToContent: false });
+  });
+}
 
 async function loadDrawer() {
   try {
@@ -316,6 +348,62 @@ async function insertSkeletons(sk) {
   }
 }
 
+/* ---------------- 悬停预览：胶囊出那一块的内容，TLC 小图出大图 ----------------
+   浮在素材栏右边、不吃鼠标（point-events:none），跟旧画布同一套样式（.bd-peek） */
+const peek = ref(null);
+let peekTimer = 0;
+const PEEK_MAX = 420;
+
+function peekAt(ev) {
+  const r = ev.currentTarget.getBoundingClientRect();
+  const w = Math.min(PEEK_MAX, Math.round(window.innerWidth * 0.42));
+  let x = Math.round(r.right + 12);
+  if (x + w > window.innerWidth - 12) x = Math.max(12, Math.round(r.left - w - 12));
+  const y = Math.round(Math.min(Math.max(12, r.top - 12), Math.max(12, window.innerHeight - 220)));
+  return { x, y, w };
+}
+
+function schedulePeek(p) {
+  clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => {
+    peek.value = p;
+  }, 170); // 慢一点才弹，扫过去不闪
+}
+
+function peekBlock(e, key, ev) {
+  void ensureExp(e.id);
+  schedulePeek({ kind: 'block', expId: e.id, key, code: e.code, ...peekAt(ev) });
+}
+
+function peekTlc(e, t, ev) {
+  schedulePeek({ kind: 'tlc', tlc: t, code: e.code, ...peekAt(ev) });
+}
+
+function unpeek() {
+  clearTimeout(peekTimer);
+  peek.value = null;
+}
+
+const peekHtml = computed(() => {
+  const p = peek.value;
+  if (!p || p.kind !== 'block') return '';
+  const d = expCache[p.expId];
+  if (!d) return '<div class="bd-ph">读取中…</div>';
+  const mm = (CHIP_W[p.key] || 1300) / 10;
+  const it = { type: 'block', block: p.key, ref: p.expId, w: CHIP_W[p.key] || 1300 };
+  return `<div class="bd-body" style="width:${mm}mm">${itemHtml(it, d, ctxOf())}</div>`;
+});
+
+/** 预览按「真实毫米宽」排完再缩到浮卡宽度 */
+const peekZoom = computed(() => {
+  const p = peek.value;
+  if (!p || p.kind !== 'block' || p.key === 'react') return 1;
+  const natural = ((CHIP_W[p.key] || 1300) / 10) * (96 / 25.4);
+  return Math.min(1, (p.w - 22) / natural);
+});
+
+const chipLabel = (key) => (CHIPS.find((c) => c.key === key) || {}).label || '块';
+
 async function addBlock(e, key) {
   const bk = `${e.code}-${key}`;
   if (!exApi || busyKeys.value.has(bk)) return;
@@ -328,7 +416,7 @@ async function addBlock(e, key) {
       const { x, y } = nextPos(w, 120);
       await insertSkeletons([{ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' }]);
     } else {
-      const it = { block: key, ref: e.id, code: e.code, w: key === 'reagents' ? 1500 : 1300 };
+      const it = { block: key, ref: e.id, code: e.code, w: CHIP_W[key] || 1300 };
       const f = await rasterBlock(it, ck); // 3 倍像素的表格 / 文字块
       const w = it.w * K;
       const { x, y } = nextPos(w, 160);
@@ -348,8 +436,13 @@ async function addTlc(e, t) {
   try {
     const f = await addFile(`/api/files/${t.id}`, `tlc:${t.id}`);
     const w = 220;
-    const { x, y } = nextPos(w, 240);
-    await insertSkeletons([{ type: 'image', x, y, width: w, height: Math.round((w * f.size.h) / f.size.w), fileId: f.id, status: 'saved' }]);
+    const hPx = Math.round((w * f.size.h) / f.size.w);
+    const { x, y } = nextPos(w, Math.min(hPx, 900));
+    const sk = [{ type: 'image', x, y, width: w, height: hPx, fileId: f.id, status: 'saved' }];
+    // 图注跟着图一起落：图注是附件里早就写好那句（老画布也是这么干的）
+    const cap = String(t.note || '').trim();
+    if (cap) sk.push(...captionSk(cap, x, y + hPx + 4, w));
+    await insertSkeletons(sk);
   } catch (err) {
     toast(err.message || '放不上去', 'err');
   } finally {
@@ -396,7 +489,7 @@ async function saveNow() {
         elements: p.elements || [],
         files: { ...files, ...((exApi && exApi.getFiles && exApi.getFiles()) || {}) },
         appState: {
-          viewBackgroundColor: appState.viewBackgroundColor || '#f5f4f1',
+          viewBackgroundColor: '#f5f4f1',
           scrollX: appState.scrollX,
           scrollY: appState.scrollY,
           zoom: appState.zoom,
@@ -493,7 +586,7 @@ load();
           <input v-model="q" type="text" spellcheck="false" placeholder="搜编号 / 题目 / 产物" />
         </div>
       </div>
-      <div class="board-drawer-body">
+      <div class="board-drawer-body" @scroll="unpeek">
         <div v-for="e in shown" :key="e.id" class="bd-rec">
           <div class="bd-rec-head">
             <span class="mono">{{ e.code }}</span>
@@ -506,12 +599,21 @@ load();
               class="bd-chip"
               :class="{ 'is-busy': busyKeys.has(`${e.code}-${c.key}`) }"
               @click="addBlock(e, c.key)"
+              @mouseenter="peekBlock(e, c.key, $event)"
+              @mouseleave="unpeek"
             >
               {{ c.label }}
             </button>
           </div>
           <div v-if="(tlcByExp[e.id] || []).length" class="bd-rec-tlc">
-            <button v-for="t in tlcByExp[e.id]" :key="t.id" class="bd-thumb" @click="addTlc(e, t)">
+            <button
+              v-for="t in tlcByExp[e.id]"
+              :key="t.id"
+              class="bd-thumb"
+              @click="addTlc(e, t)"
+              @mouseenter="peekTlc(e, t, $event)"
+              @mouseleave="unpeek"
+            >
               <img :src="`/api/files/${t.id}`" alt="" loading="lazy" />
             </button>
           </div>
@@ -525,17 +627,31 @@ load();
       </div>
     </aside>
 
+    <!-- 悬停预览：胶囊出那一块、TLC 小图出大图；不吃鼠标，扫过去就走 -->
+    <Teleport to="body">
+      <div
+        v-if="peek"
+        class="bd-peek"
+        :style="{ left: peek.x + 'px', top: peek.y + 'px', ...(peek.kind === 'block' ? { width: peek.w + 'px' } : {}) }"
+      >
+        <div class="bd-peek-h">
+          <span class="mono">{{ peek.code }}</span>
+          <span>{{ peek.kind === 'tlc' ? 'TLC' : chipLabel(peek.key) }}</span>
+        </div>
+        <img v-if="peek.kind === 'tlc'" class="bd-peek-img" :src="`/api/files/${peek.tlc.id}`" alt="" />
+        <div v-else class="bd-peek-body" :style="{ zoom: peekZoom }" v-html="peekHtml" />
+      </div>
+    </Teleport>
+
     <div class="inner bv2-inner">
       <header class="page-head bv2-head">
         <div class="bv2-head-main">
           <h1 class="page-title">{{ board ? board.title : '排版板' }}</h1>
-          <p class="page-desc">
-            新版画布（Excalidraw）· 框选 / 八点手柄 / 旋转 / ⌘Z 撤销 / 吸附 / 箭头绑框边都是它自带的
-            <span v-if="skipped"> · 还有 {{ skipped }} 个表格类块没搬过来（先在旧画布上摆）</span>
-          </p>
+          <p v-if="skipped" class="page-desc">还有 {{ skipped }} 个表格类块没搬过来（先在旧画布上摆）</p>
         </div>
         <span class="spacer" />
         <span class="bv2-saved">{{ saving ? '保存中…' : '已保存' }}</span>
+        <button v-if="deletedBox" class="btn btn-sm btn-ghost" @click="restoreDeleted">恢复上次内容</button>
         <button class="btn btn-sm" :disabled="!!downloading" @click="exportPdf">
           <Icon name="download" :size="12" /> 导出 PDF
         </button>
@@ -569,8 +685,22 @@ load();
 }
 .bv2-fail-hint { color: var(--ink-4); font-size: 11.5px; }
 .bv2-inner { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: 26px 28px 16px; max-width: none; }
-.bv2-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 14px; flex: 0 0 auto; }
+.bv2-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 50px; flex: 0 0 auto; }
 .bv2-head-main { min-width: 0; }
 .bv2-saved { font-size: 10.5px; color: var(--ink-4); margin-right: 8px; }
-.bv2-canvas { flex: 1 1 auto; min-height: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.bv2-canvas { flex: 1 1 auto; min-height: 0; overflow: visible; }
+
+/* ---- 画布上只留一排工具：汉堡菜单、素材库、缩放/撤销/帮助、下面那行提示全藏掉 ---- */
+.bv2-canvas :deep(.App-menu_top__left),
+.bv2-canvas :deep(.layer-ui__wrapper__top-right),
+.bv2-canvas :deep(.layer-ui__wrapper__footer),
+.bv2-canvas :deep(.HintViewer),
+.bv2-canvas :deep(.disable-zen-mode) { display: none !important; }
+
+/* 工具条从纸面上挪到画布上方那一条（.bv2-head 留了 50px 的空，正好放它）。
+   根节点默认 overflow:hidden，会把这排工具裁掉 —— 放开才能浮出去 */
+.bv2-canvas :deep(.excalidraw) { overflow: visible; }
+.bv2-canvas :deep(.FixedSideContainer_side_top) { top: -46px; left: 0; right: 0; bottom: auto; height: auto; }
+.bv2-canvas :deep(.App-menu_top) { display: flex; justify-content: flex-start; gap: 0; }
+.bv2-canvas :deep(.shapes-section) { justify-content: flex-start; }
 </style>

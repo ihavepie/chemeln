@@ -1,3 +1,11 @@
+- **新画布第二轮：悬停预览回来了 / 去掉「TLC 判断」/ 图注随图落 / 画布只剩一排工具**（用户：「原来的hover没有了，然后不需要tlc判断，图片什么的放上去就附带之前写的图注。然后内容区需要优化一下，这个需要移动一下，就是画布尽量看着干净一点」）。
+  ① **悬停预览**：照 `/b-old` 那套搬回来（同一个 `.bd-peek` 样式，`Teleport to="body"` + `position:fixed` + `pointer-events:none`）：胶囊 170ms 后弹出**那一块真实内容**（`itemHtml` 按该块真实毫米宽排完再 `zoom` 缩到浮卡宽度），TLC 小图弹大图；`@scroll` 素材栏时收起。
+  ② **删掉「TLC 判断」胶囊**（`CHIPS` 里 remove，迁移那侧照旧认 `verdict`）。
+  ③ **图注跟着图一起落**：TLC 图插进去时把 `attachments.note` 那句一起落下（原生 `text`，能双击改），跟老画布 `it.caption` 同一来源；迁移老板子时也照着补。`captionSk()` 一行工具，插图 + 图注在**同一次 `updateScene`** 里（一步撤销）。
+  ④ **画布干净**：汉堡菜单 / 素材库触发 / 底部缩放·撤销·帮助 / 工具栏下面那行提示 全 `display:none`；**工具条本身挪到画布上方那条空里**（`.bv2-head` 留 50px；`.FixedSideContainer_side_top{top:-46px;left:0;right:0}` + `.App-menu_top` 改 flex 左对齐）。**关键坑**：`.excalidraw` 根节点默认 `overflow:hidden`，不把它改 `visible` 工具条就被裁掉、整排消失（第一次就是白忙）。
+  ⑤ 顺手：`.bv2-canvas` 去掉圆角+描边（画布底色固定 `#f5f4f1`，白纸才认得出是张纸；原来场景存成白底 → 纸和画布分不开）。
+  ⑥ **场景被删空时给条后路**：Excalidraw 的删除只是打 `isDeleted`，`items_json` 也没动——所以画布上一个元素都不剩时，页头出现「恢复上次内容」按钮，点了原样放回来（位置 / 图片都还在）。不自动恢复，免得盖掉用户「我就是想清空」的意图。
+  验证：临时板 31（投料 raster + TLC 图带图注「1.和氢化环化对比」落在图下方 + 用工具条画了一个矩形，都存进 `scene_json`）；临时板 32（场景全 `isDeleted` → 按钮出现 → 点击后 `visible 2 of 2`）；画布上只剩工具条 + 白纸，`document.querySelectorAll` 量到 `.App-menu_top__left` / `.layer-ui__wrapper__top-right` / `.layer-ui__wrapper__footer` 都被藏掉。用户板 16 之前被删空的元素后来自己恢复成 14 个 visible（应该是用户自己 ⌘Z 了），场景里 8 个 files 都在。
 - **新画布：素材栏 TLC 缩略图没了 + 插入卡顿（用户报「侧边栏的tlc缩略图没有了，然后就是插入不太流畅」）**。
   ① **TLC 小图全没**：`loadDrawer()` 写成 `const t = await api.tlc(...)` 再 `for…of`——但 `request()` 回的是整个响应体 `{items}`，对对象 `for…of` 直接抛 TypeError，整个 `try` 被吞掉，`tlcByExp` 永远是空。修：`.items || []`。（`api.experiments` 那条自己 `.then(d => d.items)`，所以记录列得出来、只有 TLC 挂掉，更难看穿。）
   ② **插进去的块是「破图」**：`convertToExcalidrawElements` 造的 image 骨架 `status` 默认 `"pending"`，Excalidraw 只画 `status:"saved"` 的图；而且 `updateScene` **不收 files**，光给 `fileId` 它查不到二进制。修：骨架写 `status:'saved'`，插之前 `exApi.addFiles(fresh.splice(0))`（迁移时造的图走 `initialData.files`，那批要塞进 `fresh` 再清空，否则会重复交一次）。
