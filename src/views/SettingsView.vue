@@ -403,7 +403,7 @@ const SET_SEARCH = [
   { m: 'cats', label: '新建分类 / 拖动排序', kw: 'new category 拖' },
   { m: 'ui', label: '快捷键', kw: 'keyboard shortcut 快捷键' },
   { m: 'ui', label: '书签悬停预览', kw: 'peek 书签 预览' },
-  { m: 'ui', label: '切记录时停在同一页', kw: 'page keep 翻页 第2页 续页 切记录' },
+  { m: 'ui', label: '切记录时停在同一页', kw: 'page keep 翻页 第2页 续页 切记录 滚轮 动画 推 力度' },
   { m: 'page', label: 'A4 上显示哪几块（按记录类型）', kw: 'blocks 版式 块 显示', anchor: 'set-blocks' },
   { m: 'page', label: '块里的功能（计产率 / 核对 / 结果表列）', kw: 'fx 产率 核对 性状 dr ee', anchor: 'set-fx' },
   { m: 'page', label: '反应式 · 箭头上那行条件（自动 / 单行 / 两行）', kw: 'scheme 反应式 条件 格式', anchor: 'set-scheme' },
@@ -615,6 +615,29 @@ onUiMerged(() => {
 function setKeepPage(v) {
   keepPage.value = !!v;
   uiSetIfChanged('pageKeep', !!v);
+}
+/** 「换记录时的推拉动画」（`pageAnim`，默认开） */
+const pageAnim = ref(uiGet('pageAnim', true) !== false);
+onUiMerged(() => {
+  pageAnim.value = uiGet('pageAnim', true) !== false;
+});
+function setPageAnim(v) {
+  pageAnim.value = !!v;
+  uiSetIfChanged('pageAnim', !!v);
+}
+/** 滚轮力度：滚多少像素才切一条（`scrollWheel`） */
+const WHEEL_PRESETS = [
+  { key: 'light', label: '轻一点', px: 44 },
+  { key: 'normal', label: '正好', px: 90 },
+  { key: 'heavy', label: '要滚多一点', px: 160 },
+];
+const scrollWheel = ref(String(uiGet('scrollWheel', 'light') || 'light'));
+onUiMerged(() => {
+  scrollWheel.value = String(uiGet('scrollWheel', 'light') || 'light');
+});
+function setScrollWheel(k) {
+  scrollWheel.value = k;
+  uiSetIfChanged('scrollWheel', k);
 }
 /** 滚到头再滚 = 切上/下一条记录（`scrollSwitch`，默认开） */
 const scrollSwitch = ref(uiGet('scrollSwitch', true) !== false);
@@ -941,8 +964,28 @@ function setScrollSwitch(v) {
           <input type="checkbox" :checked="scrollSwitch" @change="setScrollSwitch($event.target.checked)" />
           <span>滚到头再滚就切上 / 下一条</span>
         </label>
+        <label class="check-row mt8">
+          <input type="checkbox" :checked="pageAnim" @change="setPageAnim($event.target.checked)" />
+          <span>换记录时播「推」的动画</span>
+        </label>
+        <div class="set-row mt8">
+          <span class="set-row-l">滚轮切一条要滚多少</span>
+          <span class="set-row-chips">
+            <button
+              v-for="o in WHEEL_PRESETS"
+              :key="o.key"
+              type="button"
+              class="qchip"
+              :class="{ 'is-on': scrollWheel === o.key }"
+              :title="`约 ${o.px}px`"
+              @click="setScrollWheel(o.key)"
+            >
+              {{ o.label }}
+            </button>
+          </span>
+        </div>
         <p class="hint mt8">
-          纸面放得下不用滚的时候，竖向滚轮直接算切换；放不下时先滚到底，再往下多滚一点才切（防误触，700ms 内只切一次）。「上 / 下一条」按左栏列表的顺序；到头就停。
+          纸面放得下不用滚的时候，竖向滚轮直接算切换；放不下时先滚到底，再往下多滚那一点才切（防误触，一刀切完 460ms 内不重复）。「上 / 下一条」按左栏列表的顺序（含平行实验），到头就停；键盘 ↑↓ 是同一个口径。
         </p>
       </section>
 

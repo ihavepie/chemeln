@@ -704,6 +704,11 @@ body {
 .cat-pick-wrap { position: relative; flex: 1; min-width: 0; }
 
 /* 工具栏里用：宽度跟着名字走，不撑满；收缩时文字不塌 */
+/* 设置页 04「切换记录」里那种「左边一句说明 + 右边几颗选项」的行（跟 `sheet-fx-row` 一个意思，
+   这里不依赖记录类型的上下文，所以单独一条） */
+.set-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.set-row-l { font-size: 11.5px; color: var(--ink-3); }
+.set-row-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 /* 翻页箭头：贴在页签两边，小小的、没有底色（用户：鼠标点比记快捷键省事，但快捷键留着） */
 .pg-arrow {
   flex: 0 0 auto;

@@ -410,3 +410,8 @@
   ① 动画从「新页淡入」改成两段接起来的「推」：切记录一开始先 `paperOut(dir)` —— 旧纸顺着方向滑走（`paper-out-down/up`，130ms，`translateY(∓26px)` + 淡到 0.12，`forwards` 停在推走的位置），数据到齐后 `paperIn(dir)` 从反方向接手推进来（`paper-in-down/up`，260ms，`translateY(±26px)` + 0.12 → 1）。因为 out 是在 `flush()` + `load()` **之前**就开始的，等待时间正好被这段推走盖住；万一网络慢，加了个 420ms 的兜底把旧纸放回来（不然纸一直半透明）。往下滚 = 内容往上被推走、新页从下面上来。`prefers-reduced-motion` / 打印时都不播。
   ② 滚轮门槛 140px → **44px**（`WHEEL_TRIGGER`），冷却 700ms → **460ms**（`WHEEL_IDLE` 380 → 320）：一次鼠标滚轮一格就够触发，不用一直滚到底再攒一大截。
   验证（WKWebView）：两个 `deltaY: 30` 的 wheel（共 60px）就切到了下一条，探针读到 class 序列 `paper-out-down → paper-in-down` ✓；连发 8 个 `deltaY: 60`（共 480px）也只切了一次（冷却挡住了后面的）✓。
+- **这些手感也放进设置页（用户：「然后刚刚这些也可以加进模块那边」）**。04 界面那张「切换记录」卡现在是完整的：
+  `☑ 切记录时停在同一页`（`pageKeep`）/ `☑ 滚到头再滚就切上 / 下一条`（`scrollSwitch`）/ `☑ 换记录时播「推」的动画`（`pageAnim`）/ **滚轮切一条要滚多少**：轻一点 44px · 正好 90px · 要滚多一点 160px（`scrollWheel`，默认「轻一点」）。底下那句说明也一并改了（原来写死「700ms 内只切一次」）。
+  `scrollWheel` 在 `EditorView` 里就是 `WHEEL_PX = {light:44, normal:90, heavy:160}`，门槛每次现读；`pageAnim` 直接进 `paperRoot()`（关掉就不挂 keyframes，跟 `prefers-reduced-motion` 一个效果）。两个 key 都进了服务端白名单（**改完重启服务**）和设置搜索（搜「滚轮 / 动画 / 推 / 力度」都能命中）。
+  顺手补了个 `.set-row` 的小样式（左边一句说明 + 右边几颗 `qchip`），跟「记录页」那块的分段选项同一套观感。
+  验证（WKWebView + 真接口）：把 `scrollWheel` 设 `heavy`、`pageAnim` 设 false → 两个 `deltaY:30`（60px）**不切**且抓不到动画 class；改成 3×60（180px）→ 切到 SJ-2-7 且仍无动画；写回 `light` + 动画开 → 60px 就切、class 序列 `paper-out-down → paper-in-down`。测完四个 key 都还原成默认（true / true / true / light）。

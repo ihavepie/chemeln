@@ -988,7 +988,7 @@ function settingsFor(project) {
  * `view` / `group` / `sheet` / `peek` / `docw` / `colw:<表名>`。
  * 当前课题（`eln:project`）**故意不同步**：那是「这台机器上我正想看哪个课题」，别被别的设备改掉。
  */
-const UI_PREF_KEY_RE = /^(view|group|sheet|sheetFx|peek|docw|reagentPrec|reagentPrecVol|tlcN|schemeFmt|setMod|setOpen|pageKeep|scrollSwitch|colw:[a-z]{1,24})$/;
+const UI_PREF_KEY_RE = /^(view|group|sheet|sheetFx|peek|docw|reagentPrec|reagentPrecVol|tlcN|schemeFmt|setMod|setOpen|pageKeep|scrollSwitch|pageAnim|scrollWheel|colw:[a-z]{1,24})$/;
 const UI_PREF_LIMIT = 40;          // 最多几个 key
 const UI_PREF_VALUE_MAX = 20000;   // 单个值序列化后最多多长（列宽表也就几百字节）
 

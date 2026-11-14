@@ -732,13 +732,20 @@ function onPageKey(ev) {
     纸面本来就放得下（不需要滚）时，竖向滚轮没有别的用处，就直接算切换；
     放不下的时候要先自己滚到底，再往下**多滚 140px** 才切，免得看着看着被弹走。 */
 const scrollSwitch = ref(uiGet('scrollSwitch', true) !== false);
+/** 「换记录时的推拉动画」（设置页 04，`pageAnim`，默认开） */
+const pageAnim = ref(uiGet('pageAnim', true) !== false);
+/** 滚轮力度：轻一点 44 / 正好 90 / 要滚多一点 160（`scrollWheel`，默认「轻一点」） */
+const WHEEL_PX = { light: 44, normal: 90, heavy: 160 };
+const wheelPreset = ref(String(uiGet('scrollWheel', 'light') || 'light'));
 onUiMerged(() => {
   scrollSwitch.value = uiGet('scrollSwitch', true) !== false;
+  pageAnim.value = uiGet('pageAnim', true) !== false;
+  wheelPreset.value = String(uiGet('scrollWheel', 'light') || 'light');
 });
 let wheelAcc = 0;
 let wheelLast = 0;
 let wheelLock = 0;
-const WHEEL_TRIGGER = 44;    // 累计这么多像素就算一次「故意再滚」（用户：滚太多了，收小）
+// 累计多少像素算一次「故意再滚」：跟设置页那个「滚轮力度」走（用户：滚太多了，默认收到 44）
 const WHEEL_IDLE = 320;      // 手停这么久就重新累计
 const WHEEL_COOLDOWN = 460;  // 切完这么长时间内不再切（刚好接住一次「推」的动画）
 /**
@@ -752,7 +759,8 @@ let navDir = 1;
 const reducedMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const PAPER_CLASSES = ['paper-in-down', 'paper-in-up', 'paper-out-down', 'paper-out-up'];
 function paperRoot() {
-  return reducedMotion ? null : editorEl.value?.querySelector('.editor-inner') || null;
+  if (reducedMotion || !pageAnim.value) return null;
+  return editorEl.value?.querySelector('.editor-inner') || null;
 }
 /** 推走旧的那一页（切记录一开始就播，趁数据还在路上，所以看得见「被推走」） */
 let paperSafety = 0;
@@ -824,7 +832,7 @@ function onWheel(ev) {
     return;
   }
   wheelAcc += ev.deltaY;
-  if (Math.abs(wheelAcc) < WHEEL_TRIGGER) return;
+  if (Math.abs(wheelAcc) < (WHEEL_PX[wheelPreset.value] || WHEEL_PX.light)) return;
   wheelAcc = 0;
   navDir = down ? 1 : -1;
   const next = neighborExp(down ? 1 : -1);
