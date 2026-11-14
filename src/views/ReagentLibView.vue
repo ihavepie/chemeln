@@ -6,8 +6,8 @@ import { store } from '../store.js';
 import { useRoute } from 'vue-router';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 import { variantText } from '../lib/reagent.js';
-import { LOOKUP_SITES } from '../lib/lookup.js';
-import { openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
+import { LOOKUP_SITES, nameInfo } from '../lib/lookup.js';
+import { ctxMenu, openCtxMenu, CTX_SEP } from '../lib/ctxmenu.js';
 
 // 自定义检索站点（设置里加的）：url 模板里 {name} 换成试剂名
 const customSites = ref([]);
@@ -23,31 +23,68 @@ const extSites = (name) => {
   return [...builtin, ...mine];
 };
 
-/** 行尾「⋯」菜单：改名、删除，和「去哪个库查这个试剂」 */
+/** 名称 → { cid, cas }（跟「核对」抓取是同一条链路：/api/lookup?q=），按名字缓存 */
+const idCache = new Map();
+async function idsOf(name) {
+  if (idCache.has(name)) return idCache.get(name);
+  let ids = { name };
+  try {
+    const info = await nameInfo(name);
+    if (info) ids = { name, cid: info.cid || '', cas: (info.cas && info.cas[0]) || '' };
+  } catch {
+    /* 查不到就只按名字搜 */
+  }
+  idCache.set(name, ids);
+  return ids;
+}
+
+function openUrl(href) {
+  if (!href) return;
+  const a = document.createElement('a');
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.click();
+}
+
+/**
+ * 行尾「⋯」菜单：改名 / 删除 + **外部库直达**。
+ * 外部库先用「名字」查一次 cid / cas（`/api/lookup`，跟我们抓 PubChem 是同一条链路），
+ * 解析出来就是 `…/compound/<cid>` 这种**直接落在化合物页**的地址，不是搜索结果页。
+ * 解析要一点时间：先把菜单开出来（放一条「解析中…」），回来后替换成真实链接。
+ */
 function rowMenu(ev, it) {
-  const sites = extSites(it.name);
-  const items = [
+  const base = [
     { key: 'rename', label: '改名' },
     { key: 'del', label: '删除', danger: true },
     CTX_SEP,
-    ...sites.map((s, i) => ({ key: `site:${i}`, label: `${s.label} 检索` })),
-    ...(sites.length ? [CTX_SEP] : []),
-    { key: 'sites', label: '检索站点…' },
   ];
-  openCtxMenu(ev, items, (key) => {
+  let links = [];
+  openCtxMenu(ev, [...base, { key: 'loading', label: '正在解析化合物编号…', disabled: true }], (key) => {
     if (key === 'rename') return renameEntry(it);
     if (key === 'del') return removeEntry(it);
     if (key === 'sites') return openSites();
     if (key.startsWith('site:')) {
-      const href = (sites[Number(key.slice(5))] || {}).href;
-      if (href) {
-        const a = document.createElement('a');
-        a.href = href;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.click();
-      }
+      const one = links.find((l) => l.key === key);
+      if (one) openUrl(one.href);
     }
+  });
+  void idsOf(it.name).then((ids) => {
+    links = LOOKUP_SITES.concat(customSites.value.map((s) => ({
+      key: 'custom:' + s.label,
+      label: s.label,
+      url: (x) => String(s.url || '').replace(/\{name\}/g, encodeURIComponent(x.name || '')),
+    })))
+      .map((site) => ({ key: 'site:' + site.key, label: site.label, href: site.url(ids) }))
+      .filter((l) => l.href);
+    const items = [
+      ...base,
+      ...links.map((l) => ({ key: l.key, label: `在 ${l.label} 打开` })),
+      ...(links.length ? [CTX_SEP] : []),
+      { key: 'sites', label: '检索站点…' },
+    ];
+    // 菜单是响应式的：替换掉 items 就会就地刷新（人可能已经关掉了，也没关系）
+    ctxMenu.items = items;
   });
 }
 
@@ -306,17 +343,18 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
             记录中出现过的试剂汇总：最近一次使用的角色、分子量、密度 / 浓度，以及按 1 mmol 折算的质量与体积。单击一行可复制名称。
           </p>
         </div>
-        <span class="spacer" />
-        <button
-          type="button"
-          class="rl-allcheck"
-          :disabled="allRun || (!pendingCount && !missCount)"
-          @click="verifyAll"
-        >
-          {{ allRun ? `核对中 ${allDone}${pendingCount ? ` / ${allDone + pendingCount}` : ''}` : pendingCount ? `全部核对（${pendingCount}）` : missCount ? `重查查不到的（${missCount}）` : '都核对过了' }}
-        </button>
-        <button type="button" class="rl-allcheck rl-sites-btn" @click="openSites">检索站点</button>
-        <input v-model="q" class="rl-search" placeholder="搜试剂名 / 角色…" spellcheck="false" />
+        <div class="rl-tools">
+          <button
+            type="button"
+            class="rl-allcheck"
+            :disabled="allRun || (!pendingCount && !missCount)"
+            @click="verifyAll"
+          >
+            {{ allRun ? `核对中 ${allDone}${pendingCount ? ` / ${allDone + pendingCount}` : ''}` : pendingCount ? `全部核对（${pendingCount}）` : missCount ? `重查查不到的（${missCount}）` : '都核对过了' }}
+          </button>
+          <button type="button" class="rl-allcheck rl-sites-btn" @click="openSites">检索站点</button>
+          <input v-model="q" class="rl-search" placeholder="搜试剂名 / 角色…" spellcheck="false" />
+        </div>
       </header>
 
       <!-- 自定义检索站点：自己的数据库 / 供应商页面，{name} 会换成试剂名 -->
