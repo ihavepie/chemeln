@@ -17,6 +17,33 @@ export const PAGE = {
 export const MM_PER_PX = 25.4 / 96;
 export const mm = (u) => `${(u / 10).toFixed(2)}mm`;
 
+/**
+ * 屏幕上 1px 等于多少**画布单位**（1 单位 = 0.1mm）：1px = `MM_PER_PX` 毫米，再除以 zoom。
+ * **别写成 `1/(MM_PER_PX*0.1*zoom)`** —— 那是 37.8/zoom，比真值大 14 倍，拖一下整块就飞（踩过）。
+ * 抽成纯函数是为了能单测：这个数错了，拖拽 / 摆块 / 量高度全都跟着错。
+ */
+export const unitsPerPx = (zoom = 1) => MM_PER_PX / 0.1 / (zoom || 1);
+/** 反过来：一个画布单位 = 多少屏幕 px（导出 / 量尺寸用） */
+export const pxPerUnit = (zoom = 1) => 0.1 * (1 / MM_PER_PX) * (zoom || 1);
+/** 靠边 / 水平居中吸附的半径：4.5mm */
+export const SNAP = 45;
+
+/**
+ * 把 x 吸到「贴左边 / 水平居中 / 贴右边」里最近的那个。
+ * 返回 `{ x, line }`：`line` 是参考线该画在哪儿（null = 不画）。
+ * 只吸这三个位置——块跟块之间的对齐交给肉眼，不然拖动会一直「粘」在别的块上。
+ */
+export function snapX(x, w, pageW, snap = SNAP) {
+  const mid = Math.round(pageW / 2);
+  const targets = [
+    [0, 0],
+    [Math.round((pageW - w) / 2), mid],
+    [pageW - w, pageW],
+  ];
+  for (const [at, line] of targets) if (Math.abs(x - at) <= snap) return { x: at, line };
+  return { x, line: null };
+}
+
 /** 缩到比这还窄就没法看 */
 export const MIN_W = 240;
 

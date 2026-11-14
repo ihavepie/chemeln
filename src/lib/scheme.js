@@ -88,7 +88,7 @@ export async function preloadSchemeLib() {
  *  - 字母 / 右括号后面、紧跟空白或结尾的 +/- 当上标（Na+）；
  *  - 想强制就当手写 `_{3}` / `^{2}`。
  */
-function splitScript(text) {
+export function splitScript(text) {
   const s = String(text || '');
   const out = [];
   let buf = '';
@@ -133,6 +133,36 @@ function splitScript(text) {
   flush();
   return out;
 }
+
+/* ---------------- 箭头那行字的排版预算（纯算术，单独导出好测） ----------------
+   这几条是「条件不许画出箭头」的实现：字宽估小了 / 箭头算短了，字就压到结构上，
+   而且**画出来才看得见**、不会报错。所以把它们从 `composeChainSvg` 里拎出来单测。 */
+/** 箭头上下的条件字号（跟结构式里的原子标签差不多大） */
+export const CAP_SIZE = 15;
+/** 箭头最短多长 */
+export const ARROW_MIN = 110;
+/** `auto`：单行那行字超过这个宽度就退回两行（再宽整张图会被拉长、结构被缩小） */
+export const AUTO_SINGLE_MAX = 430;
+/** 箭头两头各留多少 px（字稳稳落在箭头里面） */
+export const ARROW_PAD = 25;
+
+/**
+ * 一行字的像素宽：**按实测校准**——15px 的 Helvetica 混排约 0.47×字号 / 西文字符，
+ * 中文按全角 1.0×字号。
+ */
+export function capTextWidth(text, size = CAP_SIZE) {
+  let w = 0;
+  for (const ch of String(text ?? '')) w += ch.charCodeAt(0) > 255 ? size : size * 0.47;
+  return w;
+}
+
+/** 箭头长度 = 字宽 + 两头留白（至少 `ARROW_MIN`） */
+export function arrowLenFor(capW, min = ARROW_MIN) {
+  return Math.max(min, Math.round(capW) + ARROW_PAD * 2);
+}
+
+/** `auto` 格式下要不要退回两行 */
+export const shouldWrapCaps = (capW) => capW > AUTO_SINGLE_MAX;
 
 const esc = (s) =>
   String(s || '')
@@ -240,16 +270,13 @@ async function molSvg(smiles, id, molfile = '') {
 export async function composeChainSvg({ stages = [], background = true, fmt = 'auto' } = {}) {
   const GAP = 14;          // 结构之间的一般间距（用户要「宽松一点，但不要太散」）
   const PLUS = 18;         // 加号的宽度
-  const ARROW_MIN = 110;   // 箭头最短多长；实际长度按上下最长那行字来（够写条件就行，别拉太长）
   const MAX_ARROW = 680;      // `wrap` 格式下折行时的总预算（一行 = 340）
-  const AUTO_SINGLE_MAX = 430; // `auto`：单行那行字超过这个宽度就退回两行（再宽结构就太小了）
   const FMT = ['auto', 'single', 'wrap'].includes(fmt) ? fmt : 'auto';
-  const CAP_SIZE = 15;     // 箭头上下的条件字号（跟结构式里的原子标签差不多大）
   const MAX_LINE_W = 250;  // 条件先折行（单行最多 ~250px，最多 2 行），再拿折完最宽的那行算箭头长度
   const LINE_H = 20;
   const CAP_GAP = 12;      // 最近那行字离箭头多远
-  // 字号按实测校准过：15px 的 Helvetica 混排大约 0.47×字号 / 西文字符，中文按全角 1.0×
-  const textW = (t) => [...String(t)].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? CAP_SIZE : CAP_SIZE * 0.47), 0);
+  // 字宽估算 / 箭头长度 / 折行阈值都在模块顶部导出了（`capTextWidth` / `arrowLenFor` / `shouldWrapCaps`）
+  const textW = (t) => capTextWidth(t);
 
   // ① 每个结构先出图（同一张图里同一个化合物只出一种，两步共用的中间体不会画两遍）
   const drawn = new Map();
@@ -286,11 +313,11 @@ export async function composeChainSvg({ stages = [], background = true, fmt = 'a
     const oneLine = () => caps(st.above, 1, 1e6);
     const twoLine = () => caps(st.above, 2, Math.round(MAX_ARROW / 2));
     let above = FMT === 'wrap' ? twoLine() : oneLine();
-    if (FMT === 'auto' && widest(above) > AUTO_SINGLE_MAX) above = twoLine();
+    if (FMT === 'auto' && shouldWrapCaps(widest(above))) above = twoLine();
     const below = caps(st.below, 2, MAX_LINE_W);
     const capW = Math.max(widest(above), widest(below));
     // 线长 = 字宽 + 50：两头各留 25px，字稳稳落在箭头里面（画出来那根线就是 arrowLen 那么长）
-    const arrowLen = Math.max(ARROW_MIN, Math.round(capW) + 50);
+    const arrowLen = arrowLenFor(capW);
 
     const rs = [];
     const list = st.reactants || [];

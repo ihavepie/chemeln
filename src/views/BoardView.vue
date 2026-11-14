@@ -11,6 +11,9 @@ import {
   MIN_W,
   BLOCKS,
   MM_PER_PX,
+  pxPerUnit,
+  snapX as snapXTo,
+  unitsPerPx as unitsPerPxOf,
   mm,
   clamp,
   uid,
@@ -50,11 +53,8 @@ const zoom = computed(() => (pinned.value ? 1 : fitZoom.value));
 const pageSize = computed(() => PAGE[board.value?.page || 'a4p'] || PAGE.a4p);
 const selItem = computed(() => items.value.find((it) => it.id === sel.value) || null);
 
-/**
- * 屏幕上 1px 等于多少画布单位：1px = MM_PER_PX 毫米，1 单位 = 0.1mm，再除以 zoom。
- * **别写成 1/(MM_PER_PX*0.1*zoom)**——那是 37.8/zoom，比真值大 14 倍，拖一下整块就飞了（踩过）。
- */
-const unitsPerPx = () => MM_PER_PX / 0.1 / zoom.value;
+/** 1px 等于多少画布单位（纯算术在 `lib/board.js`，这里只把 zoom 接进去） */
+const unitsPerPx = () => unitsPerPxOf(zoom.value);
 const nextZ = () => items.value.reduce((m, it) => Math.max(m, it.z || 0), 0) + 1;
 
 /* ---------------- 读 / 存 ---------------- */
@@ -143,8 +143,9 @@ watch(() => board.value && board.value.title, touch);
 function fit() {
   const el = stageEl.value;
   if (!el) return;
-  const pxW = pageSize.value.w * 0.1 * (1 / MM_PER_PX);
-  const pxH = pageSize.value.h * 0.1 * (1 / MM_PER_PX);
+  // 画布单位（0.1mm）→ 屏幕 px（不乘 zoom：这里算的是 100% 时纸张多大）
+  const pxW = pageSize.value.w * pxPerUnit(1);
+  const pxH = pageSize.value.h * pxPerUnit(1);
   const w = el.clientWidth - 16;
   const h = el.clientHeight - 16;
   if (w <= 0 || h <= 0) return;
@@ -319,25 +320,14 @@ async function editCaption(it) {
 const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, moved: false, nx: 0, ny: 0, nw: 0 });
 /** 吸附时把那根参考线画出来（单位：画布单位；null = 不画） */
 const guideAt = reactive({ x: null, y: null });
-const SNAP = 45; // 4.5mm 内吸附到边 / 中线
+/* 吸附半径 / 落点算法在 `lib/board.js`（`SNAP` / `snapX`），这里只管画参考线 */
 
 let dragEl = null;
 let raf = 0;
 let pend = null;
 
-/** 吸到「左 / 水平居中 / 右」里最近的那个；返回 [落点, 参考线要画在哪儿] */
 function snapX(x, it) {
-  const page = pageSize.value;
-  const mid = Math.round(page.w / 2);
-  const targets = [
-    [0, 0],
-    [Math.round((page.w - it.w) / 2), mid],
-    [page.w - it.w, page.w],
-  ];
-  for (const [at, line] of targets) {
-    if (Math.abs(x - at) <= SNAP) return { x: at, line };
-  }
-  return { x, line: null };
+  return snapXTo(x, it.w, pageSize.value.w);
 }
 
 function startDrag(ev, it, mode) {

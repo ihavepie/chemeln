@@ -450,3 +450,14 @@
 - **效果**：入口 CSS 559.41 KB（gzip 83.19）→ **251.14 KB（gzip 43.07）**；入口 JS 1,550.51 KB（gzip 515.32）→ **261.23 KB（gzip 96.00）**，`openchemlib`（1.1 MB）自己一个 chunk、真用到化学计算时才拉。
 - **验证**（这是关键）：EP 换掉之后最怕悄悄少了什么样式。做法是拿改之前的构建产物截图、改之后同样尺寸再截，**比 sha256**：`/reagents`、`/e/206`、`/list` 三页**像素完全一致**（时间戳都碰巧一样，说明差一点就能看出来）。另外把两个 CSS 的选择器集合做差集，确认「老有新没有」的全是 EP 内部的东西（carousel / time-select / col / skeleton 的 keyframes），我们自己的规则一条没丢；`box-sizing` 的出现次数从 132 掉到 18，但那 132 条全是 EP 的，我们自己的 `* { box-sizing: border-box }` 在 `01-base.css` 里。
   交互面也逐个试了：`el-dialog`（二维码弹窗，遮罩 + 按钮都对）、`ElMessageBox.prompt`（新建分类，输入框和「取消 / 建」都在）、`ElNotification`（切记录那句 toast，`.eln-toast` 自定义类照旧生效）。路由逐条过了一遍：`/` `/list` `/compounds` `/c/80` `/screenings` `/s/22` `/boards` `/b/2` `/trash` `/reagents` `/settings` `/e/206` 全部正常挂载。
+## 2026-11-14 B：把「坐标」「箭头排版」「打印恒 2 页」这三条真理补上测试
+
+- **① 排版板的坐标换算 / 吸附（`src/lib/board.js`）**。`unitsPerPx`（1px = 多少画布单位）和 `snapX`（贴左 / 水平居中 / 贴右，4.5mm）原来是 `BoardView.vue` 里的闭包，测不到；现在抽成纯函数（`unitsPerPx(zoom)` / `pxPerUnit(zoom)` / `SNAP` / `snapX(x, w, pageW)`），BoardView 只把 `zoom` 接进去。「别写成 `1/(MM_PER_PX*0.1*zoom)`」这条注释里的警告，现在有测试钉着：那条错式子是 **14.28 倍**（`test/board.test.js` 直接断言这个数）。另外 `fit()` 里算纸张 px 的那两行改用 `pxPerUnit(1)`，少一处手写换算。
+  **验证**：抽完 `npm run build`，`/b/2` 截图跟抽之前 **sha256 完全相同**（像素级 no-op）。
+- **② 反应式箭头那行字的排版预算（`src/lib/scheme.js`）**。`CAP_SIZE` / `ARROW_MIN` / `AUTO_SINGLE_MAX` / `ARROW_PAD` 提成导出常量，`capTextWidth()`（西文 0.47×字号、中文全角 1.0×）/ `arrowLenFor()` / `shouldWrapCaps()` 成为可测的纯函数，`composeChainSvg` 内部改成调它们（数值一字不改）。
+  测试钉的是不变量：**字永远落在箭头里面**（`arrowLen - 字宽 >= 50`，即两头各 25px）、`auto` 超过 430px 才折两行、`splitScript()` 的上下标规则（`Pd(PPh3)4` 的 3/4 是下标，`0.05 eq` / `12 h` / `-78 °C` / `4:1` / `CuSO4·5H2O` 里的 5 都不是，`Na+` 的上标，`_{3}`/`^{2}` 强制）——这条判错了箭头上的条件会变成一堆假化学式，而且不报错。
+- **③ 「打印恒 2 页」（`npm run check:pages`）**。这件事只能在真浏览器里量（`.pdf-page` 是 `overflow:hidden`，超了不报错、直接裁掉）。做法：
+  - 新增 `server/jsrun.swift`——和 `print.swift` / `shot.swift` / `ocr.swift` 并列的本机小工具：「用 WKWebView 打开一个 URL、跑一段 JS、把返回值打到 stdout」，首次用到才编到 `.cache/jsrun`（**不进 git**）。**踩了个坑**：`js` / `url` 必须是**文件作用域的 `let`**；用 `guard let js = …` 会编译报 `class declaration cannot close over value`，退而用全局 `var` 能编过但 `evaluateJavaScript` 一直返回 `nil`（排查了半天）——注释里写清楚了。
+  - `scripts/check-pages.mjs`：挑一条记录（默认库里最新，或 `--id 206`），用 `#/e/<id>` 和 `#/e/<id>?p=2` 各量一次**当前那张纸的实际高度**，外加页签数 / 结果表数 / 投料表行数；跟 `test/print-baseline.json` 比：纸页长高超过 8px、或结果表 / 页签变少就 **exit 1**。顺带把「computed 抛错 → 整块静默消失」也纳入（`.res-table` 少一张就报）。
+  - 第一次基线：`node scripts/check-pages.mjs --id 206 --update` → 第 1 页 1078px、第 2 页 327px。
+  - **验证**：把基线改成假的（第 1 页 900px、结果表 2 张）再跑，能正确报两条并 exit 1，然后还原。
