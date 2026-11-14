@@ -9707,7 +9707,10 @@ body.is-board-dragging { cursor: grabbing; }
    用户：「这个二级侧边栏不要属于内容区域，干脆直接做成二级侧边栏，类似化合物或者实验侧边栏」。
    所以复用 `.panes` + `.listpane`（bone 底、分隔线、自己滚），只是窄一点（208px）；
    右边是 `.editor > .editor-inner`，跟别的页面同一套纸面留白。窄屏侧栏变横向胶囊。 */
-.set-panes { --panes-w: 208px; }
+.set-panes { --panes-w: 288px; }
+/* 模块 + 它下面那几条子功能当成一组：组与组之间留一点点空，组内不留 */
+.set-group { display: flex; flex-direction: column; }
+.set-group + .set-group { margin-top: 3px; }
 .set-pane-title { font-family: var(--serif); font-size: 19px; line-height: 1.2; letter-spacing: -0.02em; color: var(--ink); }
 .set-pane-body { display: flex; flex-direction: column; gap: 2px; padding: 10px 10px 16px; }
 .set-mod {
@@ -9719,14 +9722,27 @@ body.is-board-dragging { cursor: grabbing; }
 .set-mod.is-on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(20, 18, 14, 0.05); }
 .set-mod-n { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
 .set-mod.is-on .set-mod-n { color: var(--accent); }
+/* 有子项的模块右边一颗小箭头：朝右 = 收着，转下来 = 展开（用户要的「展开和收缩」） */
+.set-mod-caret { margin-left: auto; flex: 0 0 auto; color: var(--ink-4); transition: transform 180ms var(--ease); }
+.set-mod.is-open .set-mod-caret { transform: rotate(90deg); }
+.set-mod.is-on .set-mod-caret { color: var(--ink-3); }
+/* 子项容器：高度按条数算（`subsMax()`），所以能动画到「刚好的高度」；收起时不吃点击、不进 Tab */
+.set-subs {
+  overflow: hidden;
+  transition: max-height 220ms var(--ease), opacity 160ms var(--ease);
+}
+.set-subs.is-shut { opacity: 0; pointer-events: none; }
 .set-inner { max-width: 860px; }
 @media (max-width: 900px) {
   .set-panes { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .set-pane { border-right: 0; border-bottom: 1px solid var(--line); }
   .set-pane .listpane-head { padding: 10px 14px 8px; border-bottom: 0; }
   .set-pane-body { flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+  .set-group { flex-direction: row; }
+  .set-group + .set-group { margin-top: 0; }
   .set-mod { width: auto; border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 11px; }
   .set-mod.is-on { border-color: transparent; box-shadow: none; }
+  .set-mod-caret { display: none; }
   .set-inner { padding: 20px 16px 0; }
 }
 
@@ -9750,9 +9766,10 @@ body.is-board-dragging { cursor: grabbing; }
 /* 当前模块下面的子功能（用户：「还有就是子功能快速选择」）：缩进一小格、字号再小一号，
    点一下就地滚到那一节，省掉「先切模块再往下翻」。窄屏胶囊排不下，直接不显示。 */
 .set-sub {
-  display: block; width: 100%; border: 0; background: transparent; font: inherit;
-  font-size: 11.5px; line-height: 1.45; color: var(--ink-3); text-align: left;
-  padding: 5px 8px 5px 26px; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; width: 100%; height: 27px;
+  border: 0; background: transparent; font: inherit;
+  font-size: 11.5px; color: var(--ink-3); text-align: left;
+  padding: 0 8px 0 26px; border-radius: 6px; cursor: pointer;
 }
 .set-sub:hover { background: #f3f1ec; color: var(--ink); }
 @media (max-width: 900px) { .set-sub { display: none; } }

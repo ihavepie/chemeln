@@ -347,13 +347,44 @@ const SET_MODS = [
   { key: 'page', n: '05', label: '记录页', desc: 'A4 上显示哪几块、块里的功能、反应式排版与常用选项。' },
 ];
 const mod = ref(uiGet('setMod', 'book'));
+/** 哪些模块是展开的（存 `uiprefs` 的 `setOpen`，跟 `setMod` 一样换浏览器/重开都还在）。
+    没存过 = 只展开当前那块。 */
+function readOpen() {
+  const v = uiGet('setOpen', null);
+  if (!Array.isArray(v)) return [String(uiGet('setMod', 'book') || 'book')];
+  return v.filter((k) => SET_MODS.some((m) => m.key === k));
+}
+const openMods = ref(readOpen());
+function isOpen(key) {
+  return openMods.value.includes(key);
+}
+function setOpen(key, on) {
+  const next = on ? [...new Set([...openMods.value, key])] : openMods.value.filter((k) => k !== key);
+  openMods.value = next;
+  uiSetIfChanged('setOpen', next);
+}
 // 开机合并是异步的（bootstrap 回来比打开页面晚一拍）：合并完再对一次，免得停在默认那块
-onUiMerged(() => { mod.value = String(uiGet('setMod', 'book') || 'book'); });
+onUiMerged(() => {
+  mod.value = String(uiGet('setMod', 'book') || 'book');
+  openMods.value = readOpen();
+});
 const curMod = computed(() => SET_MODS.find((m) => m.key === mod.value) || SET_MODS[0]);
+/** 点模块 = 切到它 + 展开它；点的是「已经选中的那块」就把它的子项收起来（再点一下又展开）。 */
 function pickMod(key) {
-  if (mod.value === key) return;
-  mod.value = key;
-  uiSetIfChanged('setMod', key);
+  const wasActive = mod.value === key;
+  if (!wasActive) {
+    mod.value = key;
+    uiSetIfChanged('setMod', key);
+    setOpen(key, true);
+    return;
+  }
+  setOpen(key, !isOpen(key));
+}
+/** 子项那几条的高度（`max-height` 用它算，好动画到「刚好的高度」而不是一个瞎猜的大值） */
+const SUB_ROW_H = 27;
+function subsMax(key) {
+  const n = (SET_SUBS[key] || []).length;
+  return isOpen(key) ? `${n * SUB_ROW_H}px` : '0px';
 }
 
 /* ---- 功能搜索（用户：「加上功能搜索」）----
@@ -425,6 +456,7 @@ async function goHit(hit) {
     mod.value = hit.m;
     uiSetIfChanged('setMod', hit.m);
   }
+  setOpen(hit.m, true);   // 命中那块顺手展开，子项跟着可见（不然跳过去左边还是收着的）
   q.value = '';
   await nextTick();
   jumpTo(hit.anchor);
@@ -591,28 +623,41 @@ async function removeProject(p) {
       </div>
       <div class="listpane-body set-pane-body">
         <template v-if="!q.trim()">
-          <template v-for="m in SET_MODS" :key="m.key">
+          <div v-for="m in SET_MODS" :key="m.key" class="set-group">
             <button
               type="button"
               class="set-mod"
-              :class="{ 'is-on': mod === m.key }"
+              :class="{ 'is-on': mod === m.key, 'is-open': isOpen(m.key) }"
               :aria-current="mod === m.key ? 'page' : undefined"
+              :aria-expanded="SET_SUBS[m.key] ? String(isOpen(m.key)) : undefined"
               @click="pickMod(m.key)"
             >
               <span class="set-mod-n">{{ m.n }}</span>
               <span class="set-mod-l">{{ m.label }}</span>
+              <!-- 有子项的模块才有这颗箭头；转 90° 就是展开 -->
+              <Icon v-if="SET_SUBS[m.key]" name="chevron" :size="11" class="set-mod-caret" />
             </button>
-            <!-- 当前模块的子功能就地展开：点一下直接滚到那一节 -->
-            <button
-              v-for="sb in mod === m.key ? SET_SUBS[m.key] || [] : []"
-              :key="`${m.key}-${sb.anchor}`"
-              type="button"
-              class="set-sub"
-              @click="jumpTo(sb.anchor)"
+            <!-- 子功能：点一下直接滚到那一节。开合用 max-height 动画（高度按条数算，
+                 不用瞎猜一个大值），收起时不让它接走点击 / Tab。 -->
+            <div
+              v-if="SET_SUBS[m.key]"
+              class="set-subs"
+              :class="{ 'is-shut': !isOpen(m.key) }"
+              :style="{ maxHeight: subsMax(m.key) }"
+              :aria-hidden="isOpen(m.key) ? undefined : 'true'"
             >
-              {{ sb.label }}
-            </button>
-          </template>
+              <button
+                v-for="sb in SET_SUBS[m.key]"
+                :key="`${m.key}-${sb.anchor}`"
+                type="button"
+                class="set-sub"
+                :tabindex="isOpen(m.key) ? 0 : -1"
+                @click="jumpTo(sb.anchor)"
+              >
+                {{ sb.label }}
+              </button>
+            </div>
+          </div>
         </template>
         <template v-else>
           <button v-for="hit in hits" :key="`${hit.m}-${hit.label}`" type="button" class="set-hit" @click="goHit(hit)">
