@@ -704,6 +704,28 @@ body {
 .cat-pick-wrap { position: relative; flex: 1; min-width: 0; }
 
 /* 工具栏里用：宽度跟着名字走，不撑满；收缩时文字不塌 */
+/* 纸左右那两条空白 = 翻页热区（用户：「加一些热点区域，点击可以切换页面，只用鼠标就能操作」）。
+   固定定位、位置由 `updateEdgeBox()` 按纸面 rect 写进 style；平时完全透明，
+   悬停才浮出一颗很淡的箭头 —— 不挡纸上任何东西（纸上没覆盖到，工具栏也没盖）。 */
+.edge-flip {
+  position: fixed;
+  z-index: 3;   /* 平行书签是 45，压在它下面：书签那条缝照样点书签 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 8px;
+  color: transparent;
+  transition: color 140ms var(--ease), background 140ms var(--ease);
+}
+.edge-flip:hover { color: var(--ink-4); background: rgba(20, 18, 14, 0.022); }
+.edge-flip.is-off { cursor: default; }
+.edge-flip.is-off:hover { color: transparent; background: transparent; }
+.edge-arrow { font-family: var(--sans); font-size: 26px; line-height: 1; user-select: none; }
+@media print {
+  .edge-flip { display: none !important; }
+}
+
 /* 设置页 04「切换记录」里那种「左边一句说明 + 右边几颗选项」的行（跟 `sheet-fx-row` 一个意思，
    这里不依赖记录类型的上下文，所以单独一条） */
 .set-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }

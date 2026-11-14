@@ -625,6 +625,15 @@ function setPageAnim(v) {
   pageAnim.value = !!v;
   uiSetIfChanged('pageAnim', !!v);
 }
+/** 「点纸左右两侧的空白翻页」（`edgeFlip`，默认开） */
+const edgeFlip = ref(uiGet('edgeFlip', true) !== false);
+onUiMerged(() => {
+  edgeFlip.value = uiGet('edgeFlip', true) !== false;
+});
+function setEdgeFlip(v) {
+  edgeFlip.value = !!v;
+  uiSetIfChanged('edgeFlip', !!v);
+}
 /** 滚轮力度：滚多少像素才切一条（`scrollWheel`） */
 const WHEEL_PRESETS = [
   { key: 'light', label: '轻一点', px: 44 },
@@ -967,6 +976,10 @@ function setScrollSwitch(v) {
         <label class="check-row mt8">
           <input type="checkbox" :checked="pageAnim" @change="setPageAnim($event.target.checked)" />
           <span>换记录时播「推」的动画</span>
+        </label>
+        <label class="check-row mt8">
+          <input type="checkbox" :checked="edgeFlip" @change="setEdgeFlip($event.target.checked)" />
+          <span>点纸左右两侧的空白翻页</span>
         </label>
         <div class="set-row mt8">
           <span class="set-row-l">滚轮切一条要滚多少</span>

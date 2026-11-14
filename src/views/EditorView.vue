@@ -641,9 +641,22 @@ let fitTimers = [];
 /** 内容会异步长（反应式画完、谱图载入、字体回来），量一次不够——补几拍再量 */
 function scheduleFit() {
   updateEditorFit();
-  requestAnimationFrame(updateEditorFit);
+  updateEdgeBox();
+  requestAnimationFrame(() => {
+    updateEditorFit();
+    updateEdgeBox();
+  });
   for (const t of fitTimers) clearTimeout(t);
-  fitTimers = [setTimeout(updateEditorFit, 250), setTimeout(updateEditorFit, 900)];
+  fitTimers = [
+    setTimeout(() => {
+      updateEditorFit();
+      updateEdgeBox();
+    }, 250),
+    setTimeout(() => {
+      updateEditorFit();
+      updateEdgeBox();
+    }, 900),
+  ];
 }
 
 /** 窄屏（手机）走只读精简页，桌面版式完全不渲染 */
@@ -732,7 +745,32 @@ function onPageKey(ev) {
     纸面本来就放得下（不需要滚）时，竖向滚轮没有别的用处，就直接算切换；
     放不下的时候要先自己滚到底，再往下**多滚 140px** 才切，免得看着看着被弹走。 */
 const scrollSwitch = ref(uiGet('scrollSwitch', true) !== false);
-/** 「换记录时的推拉动画」（设置页 04，`pageAnim`，默认开） */
+/** 「点纸左右两侧的空白翻页」（设置页 04，`edgeFlip`，默认开）：只用鼠标也能翻。
+    两条透明的热点带贴在编辑区左右那两条空白里，中间是纸，互不遮挡。 */
+const edgeFlip = ref(uiGet('edgeFlip', true) !== false);
+const edgeBox = reactive({ left: {}, right: {} });
+/** 量一下纸东西两侧的空白有多大、纸在哪（写进 fixed 的热点带） */
+function updateEdgeBox() {
+  const ed = editorEl.value;
+  const sheet = document.querySelector('.sheet:not(.is-hidden)');
+  if (!ed || !sheet || !edgeFlip.value) {
+    edgeBox.left = {};
+    edgeBox.right = {};
+    return;
+  }
+  const e = ed.getBoundingClientRect();
+  const r = sheet.getBoundingClientRect();
+  const top = Math.max(e.top, 0);
+  const height = Math.max(0, Math.min(e.bottom, window.innerHeight) - top);
+  const gap = 6;
+  const lw = Math.max(0, Math.round(r.left - e.left - gap));
+  const rw = Math.max(0, Math.round(e.right - r.right - gap));
+  // 缝太窄就别放热区（点了也容易点歪）：16px 起算
+  edgeBox.left = lw >= 16 ? { left: `${Math.round(e.left)}px`, top: `${Math.round(top)}px`, height: `${Math.round(height)}px`, width: `${lw}px` } : {};
+  edgeBox.right = rw >= 16 ? { right: `${Math.round(window.innerWidth - e.right)}px`, top: `${Math.round(top)}px`, height: `${Math.round(height)}px`, width: `${rw}px` } : {};
+}
+
+/** 「换记录时播「推」的动画」（设置页 04，`pageAnim`，默认开） */
 const pageAnim = ref(uiGet('pageAnim', true) !== false);
 /** 滚轮力度：轻一点 44 / 正好 90 / 要滚多一点 160（`scrollWheel`，默认「轻一点」） */
 const WHEEL_PX = { light: 44, normal: 90, heavy: 160 };
@@ -740,6 +778,8 @@ const wheelPreset = ref(String(uiGet('scrollWheel', 'light') || 'light'));
 onUiMerged(() => {
   scrollSwitch.value = uiGet('scrollSwitch', true) !== false;
   pageAnim.value = uiGet('pageAnim', true) !== false;
+  edgeFlip.value = uiGet('edgeFlip', true) !== false;
+  nextTick(updateEdgeBox);
   wheelPreset.value = String(uiGet('scrollWheel', 'light') || 'light');
 });
 let wheelAcc = 0;
@@ -1962,6 +2002,7 @@ function tickW(s) {
 }
 const railStyle = ref({});
 function updateRail() {
+  updateEdgeBox();
   const el = sheetEl.value;
   if (!el || page.value !== 1) return;
   const r = el.getBoundingClientRect();
@@ -1977,7 +2018,10 @@ function updateRail() {
   };
 }
 watch([() => exp.value?.id, () => page.value, () => siblings.value.length], () => {
-  nextTick(updateRail);
+  nextTick(() => {
+    updateRail();
+    updateEdgeBox();
+  });
 });
 
 /**
@@ -2301,6 +2345,29 @@ const openAttachment = (id) => {
     <!-- 左：实验列表。读取中就一直挂着——从列表/卡片墙点进来时，这栏以前会跟着
          整棵 v-if 分支一起卸载重建，看着就是闪一下 -->
     <ExpListPane />
+    <!-- 纸左右那两条空白当翻页热区（只在鼠标够得着的地方出现，纸上和工具栏都不拦） -->
+    <div
+      v-if="exp && edgeFlip && !isPhone"
+      class="edge-flip is-l noprint"
+      :class="{ 'is-off': prevPageNum == null }"
+      :style="edgeBox.left"
+      title="上一页（←）"
+      aria-label="上一页"
+      @click="flipPage(-1)"
+    >
+      <span class="edge-arrow">‹</span>
+    </div>
+    <div
+      v-if="exp && edgeFlip && !isPhone"
+      class="edge-flip is-r noprint"
+      :class="{ 'is-off': nextPageNum == null }"
+      :style="edgeBox.right"
+      title="下一页（→）"
+      aria-label="下一页"
+      @click="flipPage(1)"
+    >
+      <span class="edge-arrow">›</span>
+    </div>
     <div class="editor" :class="{ 'is-fit': editorFits }" ref="editorEl" @scroll="updateRail">
       <!-- 读取中：左边列表原地不动，只把右边这张纸换成空白骨架，
            不然点开记录是一整片白闪一下再长出内容 -->

@@ -415,3 +415,9 @@
   `scrollWheel` 在 `EditorView` 里就是 `WHEEL_PX = {light:44, normal:90, heavy:160}`，门槛每次现读；`pageAnim` 直接进 `paperRoot()`（关掉就不挂 keyframes，跟 `prefers-reduced-motion` 一个效果）。两个 key 都进了服务端白名单（**改完重启服务**）和设置搜索（搜「滚轮 / 动画 / 推 / 力度」都能命中）。
   顺手补了个 `.set-row` 的小样式（左边一句说明 + 右边几颗 `qchip`），跟「记录页」那块的分段选项同一套观感。
   验证（WKWebView + 真接口）：把 `scrollWheel` 设 `heavy`、`pageAnim` 设 false → 两个 `deltaY:30`（60px）**不切**且抓不到动画 class；改成 3×60（180px）→ 切到 SJ-2-7 且仍无动画；写回 `light` + 动画开 → 60px 就切、class 序列 `paper-out-down → paper-in-down`。测完四个 key 都还原成默认（true / true / true / light）。
+- **纸左右两条空白 = 翻页热区（用户：「这边可以加一些热点区域，点击可以切换页面，只用鼠标就能操作，然后也可以取消，进到模块那边」）**。
+  纸上两侧那两条 canvas 色的空地现在各是一条透明热区（`.edge-flip.is-l / .is-r`），点一下就上一页 / 下一页，跟 ←/→、页签旁的 `‹ ›` 同一个 `flipPage()`（到头置灰、不绕回）。
+  做法：**不做 DOM 盒子去盖纸**，而是 `updateEdgeBox()` 量 `.editor` 和当前可见 `.sheet` 的 rect，算出左右缝隙宽度直接写成 `position: fixed` 的 `left/top/height/width`（写进 `edgeBox`）。缝隙 < 16px 就不放热区（窗口窄时纸几乎贴边，点了容易点歪）。位置在 `updateRail()`（滚动 / 缩放）、`scheduleFit()`（图片和字体加载完后那几拍）、换页和 `onUiMerged` 之后都会重算 —— **第一版只在挂载时算一次，量到的是纸还没长开的尺寸，右边热区只有 34px、左边干脆没出来**，加进 `scheduleFit()` 才稳。
+  视觉：平时完全透明，悬停才浮出一颗很淡的 `‹`/`›`（`--ink-4`）+ 2% 底色；到头那一侧 `is-off` 连悬停反馈都没有。`z-index: 3` 放在平行书签（45）**下面**，所以纸左边那条缝里点书签还是点书签。打印时 `display:none`。
+  开关：设置页 04 那张卡加了「☑ 点纸左右两侧的空白翻页」（`edgeFlip`，默认开），服务端白名单加了它（**改完重启**）。
+  验证（WKWebView + 真接口，1440 宽）：热区实测左 `w=24 x=548..572`、右 `w=34 x=1406..1440`（纸 578..1400、编辑区 548..1440）；点右边热区 → 跳到「第 2 页 · 续页」；把 `edgeFlip` 写 false → 两个热区都消失（`none`）。测完写回 true。
