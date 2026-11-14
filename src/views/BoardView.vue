@@ -21,6 +21,7 @@ import {
   uid,
   itemHtml,
   boardHtml,
+  blockHtml,
   BOARD_CSS,
   PRINT_CSS,
 } from '../lib/board.js';
@@ -66,14 +67,24 @@ function groupTlc(list) {
   for (const t of list || []) (tlcByExp[t.exp_id] ||= []).push(t);
 }
 
+const expLoading = new Map();
 async function ensureExp(id) {
-  if (!id || expCache[id]) return expCache[id];
-  try {
-    expCache[id] = await api.experiment(id);
-  } catch {
-    expCache[id] = null;
-  }
-  return expCache[id];
+  if (!id) return null;
+  if (expCache[id]) return expCache[id];
+  if (expLoading.has(id)) return expLoading.get(id); // 同一个 id 只发一次（搜素材时按字触发）
+  const p = api
+    .experiment(id)
+    .then((d) => {
+      expCache[id] = d;
+      return d;
+    })
+    .catch(() => {
+      expCache[id] = null;
+      return null;
+    })
+    .finally(() => expLoading.delete(id));
+  expLoading.set(id, p);
+  return p;
 }
 
 const expOf = (it) => (it && it.ref && it.type !== 'tlc' && it.type !== 'text' ? expCache[it.ref] : null);
@@ -292,6 +303,164 @@ async function onGroupPicked(ids) {
   await nextTick();
   syncCursor();
 }
+
+/* ---------------- 素材栏：搜记录里的字 + 悬停预览 ---------------- */
+
+const bdQ = ref('');
+const q = computed(() => bdQ.value.trim().toLowerCase());
+
+/** 投料表里的试剂名：列表接口只给了 `reagent_sig`（`role:名字:当量:…|…`），拆出来当搜索词 */
+const reagentNames = (e) =>
+  String(e.reagent_sig || '')
+    .split('|')
+    .map((seg) => String(seg.split(':')[1] || '').trim())
+    .filter(Boolean)
+    .join(' ');
+
+const tlcNoteOf = (e) =>
+  (tlcByExp[e.id] || [])
+    .map((t) => [t.note, t.solvent, t.verdict].filter(Boolean).join(' '))
+    .join(' ');
+
+/** 详情里那段正文（没读到就当没有，读到之后 computed 会自己重算） */
+function detailText(e) {
+  const d = expCache[e.id];
+  if (!d) return '';
+  const steps = typeof d.steps_json === 'string' ? d.steps_json : JSON.stringify(d.steps || '');
+  return [d.procedure, d.workup, d.characterization, d.conclusion, d.notes, d.tlc_note, d.addition, steps]
+    .filter(Boolean)
+    .join(' ');
+}
+
+const hayOf = (e) =>
+  [
+    e.code,
+    e.title,
+    e.objective,
+    e.substrates,
+    e.product_name,
+    e.category_name,
+    e.kind,
+    e.solvent,
+    e.temperature,
+    reagentNames(e),
+    tlcNoteOf(e),
+    detailText(e),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+const filExps = computed(() => (q.value ? exps.value.filter((e) => hayOf(e).includes(q.value)) : exps.value));
+
+/** 不是编号 / 题目命中时，指出是**哪一行字**命中的，顺手带几个字上下文 */
+const HINT_FIELDS = [
+  ['题目', (e) => e.title],
+  ['描述', (e) => e.objective],
+  ['底物', (e) => e.substrates],
+  ['产物', (e) => e.product_name],
+  ['试剂', (e) => reagentNames(e)],
+  ['溶剂', (e) => e.solvent],
+  ['分类', (e) => e.category_name],
+  ['条件', (e) => [e.temperature, e.duration, e.atmosphere].filter(Boolean).join(' ')],
+  ['TLC', (e) => tlcNoteOf(e)],
+  ['操作', (e, d) => d.procedure],
+  ['后处理', (e, d) => d.workup],
+  ['表征', (e, d) => d.characterization],
+  ['结论', (e, d) => [d.conclusion, d.notes].filter(Boolean).join(' ')],
+];
+
+function hintOf(e) {
+  if (!q.value) return '';
+  if (String(e.code || '').toLowerCase().includes(q.value)) return '';
+  if (String(e.title || '').toLowerCase().includes(q.value)) return '';
+  const d = expCache[e.id] || {};
+  for (const [label, fn] of HINT_FIELDS) {
+    const v = String(fn(e, d) || '');
+    const at = v.toLowerCase().indexOf(q.value);
+    if (at < 0) continue;
+    const from = Math.max(0, at - 6);
+    const to = Math.min(v.length, at + q.value.length + 12);
+    return `${label} · ${from > 0 ? '…' : ''}${v.slice(from, to).replace(/\s+/g, ' ').trim()}`;
+  }
+  return '';
+}
+
+// 打字后把还没读过的详情补上（正文里的字也能搜到）；延迟一拍，别边敲边轰请求
+let searchTimer = 0;
+watch(q, (v) => {
+  clearTimeout(searchTimer);
+  if (!v) return;
+  searchTimer = setTimeout(() => {
+    for (const e of exps.value) if (!expCache[e.id]) void ensureExp(e.id);
+  }, 220);
+});
+
+/* 悬停预览：胶囊出那一块的内容，TLC 小图出大图。浮在素材栏右边、不吃鼠标（point-events:none） */
+const peek = ref(null);
+let peekTimer = 0;
+const PEEK_MAX = 420;
+
+function peekAt(ev) {
+  const r = ev.currentTarget.getBoundingClientRect();
+  const w = Math.min(PEEK_MAX, Math.round(window.innerWidth * 0.42));
+  let x = Math.round(r.right + 12);
+  if (x + w > window.innerWidth - 12) x = Math.max(12, Math.round(r.left - w - 12));
+  const y = Math.round(Math.min(Math.max(12, r.top - 12), Math.max(12, window.innerHeight - 220)));
+  return { x, y, w };
+}
+
+function schedulePeek(p) {
+  clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => {
+    peek.value = p;
+  }, 170); // 慢一点才弹，扫过去不闪
+}
+
+function peekBlock(e, key, ev) {
+  const at = peekAt(ev);
+  void ensureExp(e.id); // 内容要详情；没到之前先显示占位
+  schedulePeek({ kind: 'block', expId: e.id, key, ...at });
+}
+
+function peekTlc(e, t, ev) {
+  schedulePeek({ kind: 'tlc', tlc: t, code: e.code, ...peekAt(ev) });
+}
+
+function unpeek() {
+  clearTimeout(peekTimer);
+  peek.value = null;
+}
+
+const peekCode = computed(() => {
+  const p = peek.value;
+  if (!p) return '';
+  if (p.kind === 'tlc') return p.code || '';
+  const d = expCache[p.expId];
+  if (d) return d.code || '';
+  const e = exps.value.find((x) => x.id === p.expId);
+  return (e && e.code) || '';
+});
+
+/** 预览内容：详情没到之前先给占位（别拿列表那份去画「投料表是空的」） */
+const peekHtml = computed(() => {
+  const p = peek.value;
+  if (!p || p.kind !== 'block') return '';
+  const d = expCache[p.expId];
+  if (!d) return '<div class="bd-ph">读取中…</div>';
+  return blockHtml(p.key, d);
+});
+
+/** 预览按「真实毫米宽」排完再缩到卡片宽度（反应式是 img width:100%，不用缩） */
+const peekZoom = computed(() => {
+  const p = peek.value;
+  if (!p || p.kind !== 'block' || p.key === 'react' || p.key === 'compare') return 1;
+  const w = (BLOCKS.find((b) => b.key === p.key) || {}).w || 1300;
+  const natural = (w / 10) * (96 / 25.4);
+  return Math.min(1, (p.w - 22) / natural);
+});
+
+const blockLabel = (key) => (BLOCKS.find((b) => b.key === key) || {}).label || '块';
 
 function chipsOf(e) {
   const out = [{ key: 'title', label: '编号' }];
@@ -542,21 +711,36 @@ onBeforeUnmount(() => {
     <aside class="board-drawer">
       <div class="board-drawer-top">
         <div class="board-drawer-t">
-          素材<span class="board-drawer-n">{{ exps.length }} 条记录</span>
+          素材<span class="board-drawer-n">{{ q ? '命中 ' + filExps.length + ' / ' + exps.length : exps.length + ' 条记录' }}</span>
+        </div>
+        <!-- 搜记录里的字：编号 / 题目 / 底物 / 产物 / 试剂 / 结论正文都算 -->
+        <div class="searchbox bd-q">
+          <Icon name="search" :size="12" />
+          <input v-model="bdQ" type="text" spellcheck="false" placeholder="搜编号 / 试剂 / 产物 / 结论…" />
         </div>
         <div class="bd-rec-chips">
           <button class="bd-chip" title="挑几条记录排成一张对比表" @click="cmpPick = true">对比表…</button>
           <button class="bd-chip" title="挑几条记录，各生成「条件 + TLC 判断」并竖排" @click="groupPick = true">成组摆放…</button>
         </div>
       </div>
-      <div class="board-drawer-body">
-        <div v-for="e in exps" :key="e.id" class="bd-rec">
+      <div class="board-drawer-body" @scroll="unpeek">
+        <div v-for="e in filExps" :key="e.id" class="bd-rec">
           <div class="bd-rec-head">
             <span class="mono">{{ e.code }}</span>
             <span class="bd-rec-title">{{ e.title || e.objective || '' }}</span>
           </div>
+          <div v-if="hintOf(e)" class="bd-rec-hint">{{ hintOf(e) }}</div>
           <div class="bd-rec-chips">
-            <button v-for="c in chipsOf(e)" :key="c.key" class="bd-chip" @click="addBlock(e, c.key)">{{ c.label }}</button>
+            <button
+              v-for="c in chipsOf(e)"
+              :key="c.key"
+              class="bd-chip"
+              @click="addBlock(e, c.key)"
+              @mouseenter="peekBlock(e, c.key, $event)"
+              @mouseleave="unpeek"
+            >
+              {{ c.label }}
+            </button>
           </div>
           <div v-if="(tlcByExp[e.id] || []).length" class="bd-rec-tlc">
             <button
@@ -565,12 +749,15 @@ onBeforeUnmount(() => {
               class="bd-thumb"
               :title="`${e.code} · TLC`"
               @click="addTlc(e, t)"
+              @mouseenter="peekTlc(e, t, $event)"
+              @mouseleave="unpeek"
             >
               <img :src="`/api/files/${t.id}`" alt="" loading="lazy" />
             </button>
           </div>
         </div>
         <div v-if="!exps.length" class="board-drawer-empty">这个课题还没有实验记录</div>
+        <div v-else-if="!filExps.length" class="board-drawer-empty">没有匹配「{{ bdQ.trim() }}」的记录</div>
       </div>
     </aside>
 
@@ -669,6 +856,27 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <!-- 悬停预览：胶囊出那一块、TLC 小图出大图；不吃鼠标，扫过去就走 -->
+    <Teleport to="body">
+      <div
+        v-if="peek"
+        class="bd-peek"
+        :style="{ left: peek.x + 'px', top: peek.y + 'px', ...(peek.kind === 'block' ? { width: peek.w + 'px' } : {}) }"
+      >
+        <div class="bd-peek-h">
+          <span class="mono">{{ peekCode }}</span>
+          <span>{{ peek.kind === 'tlc' ? 'TLC' : blockLabel(peek.key) }}</span>
+        </div>
+        <img v-if="peek.kind === 'tlc'" class="bd-peek-img" :src="`/api/files/${peek.tlc.id}`" alt="" />
+        <div
+          v-else
+          class="bd-peek-body"
+          :style="{ zoom: peekZoom }"
+          v-html="peekHtml"
+        />
+      </div>
+    </Teleport>
 
     <ExpPick
       :model-value="cmpPick"

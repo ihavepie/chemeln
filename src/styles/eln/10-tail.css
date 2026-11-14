@@ -1904,6 +1904,14 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 .board-drawer-n { font-size: 10.5px; color: var(--ink-4); }
 .board-drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 18px 26px; }
 .board-drawer-empty { font-size: 11.5px; color: var(--ink-4); line-height: 1.6; padding: 6px 2px; }
+/* 素材栏的搜索框（复用 .searchbox，只压扁一点） */
+.bd-q { margin-bottom: 10px; }
+.bd-q input { padding: 6px 8px 6px 27px; font-size: 12px; }
+/* 命中的不是编号 / 题目时，标出是哪一行字 */
+.bd-rec-hint {
+  font-size: 10.5px; color: var(--accent-ink); margin: 0 2px 5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* 一条记录一组：编号 + 能放的块 + 它的 TLC 小图 */
 .bd-rec { padding: 8px 2px 9px; border-bottom: 1px solid #f2f0ec; }
@@ -1975,6 +1983,21 @@ body.is-board-dragging { cursor: grabbing; }
 .board-single .board-drawer { height: 100%; min-height: 0; }
 .board-single .board-stage { flex: 1 1 auto; height: 100%; min-height: 0; }
 .board-single .board-tools { flex: 0 0 auto; }
+/* ---------- 素材悬停预览：胶囊出那一块、TLC 小图出大图 ----------
+   漂在素材栏右边，`pointer-events:none` —— 它只让人看一眼，不能抢点击/挡住别的胶囊 */
+.bd-peek {
+  position: fixed; z-index: 90;
+  padding: 8px 10px 10px;
+  background: #fff; border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(20, 18, 14, 0.16), 0 0 0 1px var(--line);
+  pointer-events: none;
+}
+.bd-peek-h { display: flex; align-items: baseline; gap: 6px; font-size: 10px; color: var(--ink-4); margin-bottom: 6px; }
+.bd-peek-h .mono { color: var(--accent-ink); }
+.bd-peek-body { max-height: 62vh; overflow: hidden; }
+/* TLC 那张让它自己定宽（窄板就不留一大片白），跟附件预览一个道理 */
+.bd-peek-img { display: block; max-width: 300px; max-height: 56vh; border-radius: 3px; }
+
 .board-stage { overflow: hidden; align-items: center; }
 .board-stage.is-pinned { overflow: auto; align-items: flex-start; }
 /* 工具条常驻占位：选中前后高度一致，纸张不会因为多一行而重新缩放（看着像「纸上下跳」） */

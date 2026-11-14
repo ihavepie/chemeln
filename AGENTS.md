@@ -9,7 +9,7 @@
 
 ## 2. 现在只有一套前端（v2），v1 已退役
 - **4780 = 正式运行的那套**：`public/` 里是 `vite build` 产物（`index.html` + `assets/`），由 `start.command` 起的服务直接发出去。
-- **5173 = 开发预览**：`preview.command` / `npm run dev` 起的 Vite，直接读 `src/`，改完热更新。**所有改动先在这里看效果**，确认后 `npm run build` 就会重新写进 `public/`。
+- **5173 = 开发预览**：`preview.command` / `npm run dev` 起的 Vite，直接读 `src/`、改完热更新。**改动先在这看效果**，确认后 `npm run build` 写进 `public/`。
 - `vite.config.js` 的 `build.outDir` 已经是 **`public`**（不再有 `dist/`）。**改完源码记得 build 一次**，否则 4780 上还是旧构建。
 - v1 已退役（备份在 `.backup/public-v1-*/`），`public/` 只由 `npm run build` 覆盖。**打包**：路由全懒加载；Element Plus **只引 Dialog / MessageBox / Notification 的样式**（别引 `element-plus/dist/index.css`＝整套主题）；入口 chunk 261 KB / CSS 251 KB，`openchemlib` 1.1 MB 按需。
 
@@ -21,7 +21,7 @@
 - 数据：全部在 `data/` —— `data/eln.db`（SQLite）+ `data/attachments/`（谱图等原始文件）+ `data/compounds/`（化合物文件）。备份 = 整个 `data/` 拷走。
 - **数据备份用 `node scripts/backup.js`**：`VACUUM INTO` 把（含 WAL 的）真数据写成一个自包含单文件，再连 `attachments/`、`compounds/` 一起拷到 `.backups/<日期>/`，默认留 7 份（`--list` 看已有、`--keep N` 改份数）。**别用 `cp data/eln.db` 当备份**——真数据在 `-wal` 里，拷出来是空壳。服务启动后每日自动备一次（`ELN_AUTO_BACKUP=0` 关）；`.backups/` 不进 git。
 - **绝对不能删**：`data/`（用户全部实验记录）、`server/package.json`（内容是 `{"type":"commonjs"}`，删了服务端起不来）、`src/styles/eln.css` 里从 v1 原样搬来的大段规则、`public/`（**现在就是 v2 构建产物，删了 4780 打不开**；旧 v1 在 `.backup/public-v1-*/`）。
-- **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。常用：`git diff` 看改了啥、`git checkout -- <文件>` 撤销未提交改动、`git log --oneline` 看历史。**git 只保代码，不保数据**：`data/` 得自己拷走。
+- **版本控制（2026-10-30 起）**：本目录是本地 git 仓库，`.gitignore` 排掉 `data/`、`.backup/`、`node_modules/`、`.npm-cache/`、`.cache/`。**`public/` 是提交进去的**（回退代码时不 build 也能回到对应版本）——所以改完 `src/` 要先 `npm run build` 再提交，别让源码和构建产物对不上。**git 只保代码，不保数据**：`data/` 得自己拷走。
   **两个远程**：`backup` = 本机裸仓库 `<项目目录>-backup.git`（`git push backup main` 推一份）；`origin` = `git@github.com:ihavepie/chemeln.git`（公开仓库，HTTPS 地址 https://github.com/ihavepie/chemeln）。
   **这台机器连 github.com 的 HTTPS 会超时**（`api.github.com` 通），所以走 SSH：专用私钥路径只写在本地 `CLOUD-DEPLOY.local.md`，仓库 `core.sshCommand` 指到它，公钥要在 GitHub 登记过。
   **脱敏**：`CLOUD-DEPLOY.md` 是占位模板，真实 IP / 私钥 / 密码只在本地 `CLOUD-DEPLOY.local.md`（已 gitignore），脚本里一律走环境变量。**历史已全部重写**过（hash 全变），**别再把这些写进仓库**。
@@ -65,9 +65,9 @@
 - `src/views/ScreeningView.vue` — **一张条件筛选表**（`/s/:id`，表格本体是 `ScreeningTable` 组件 + `editable`），照**文献里的优化表**做：`Entry` 序号列 + 「相对标准条件」列（自动算相对基准的改动，基准行写 `none`）+ 结果列；**样式照文献的三线表**：细顶线 + 粗中线 + 粗底线、**没有竖线也没有行线**、基准行不铺底。**别改回网格线 / 外框 / 列底色**。列 = 一串**字段**（`vars`）：每个字段有 `source`，**自动**（`temperature` / `solvent` / `duration` / `yield` / `sel` 等 15 种，直接用记录里的值；清单在 `lib/sctfields.js`）或**手动**（`manual`，单元格手填）。「加字段」是弹窗（名字 + 一排来源胶囊），列头悬停才露「改 / ×」（`sct-th-acts`）。表里**只存三样**：挑了哪些实验（`entries[].exp_id`）、手动列填的字（`entries[].cells`）、列定义（`vars`）；**自动列一格都不存**。改一下防抖 600ms 自动存。行尾 × 只把这一行从表里去掉，不动记录。**表归属课题**（`screenings.project`），列表按当前课题过滤。
 - `src/components/ScreeningTable.vue` — 筛选表的**三线表本体**（Entry / 编号 / 字段列；实验名有值才跟在编号后面 `.sct-title`），`editable` 为真时才有表头的「改 / ×」、行尾 × 和手动列输入框（事件 `change` / `rename-field` / `remove-field` / `remove-row` 交回父组件）；只读时点编号发 `open`；**筛选表不套卡片**：铺在纸面上的三线表（`.sct-plain` 只是留白壳）。样式照用户给的文献表：**Times 衬线**（`--sct-serif`）、14px、细顶线 + 表头下/表尾各 2.5px、数字右对齐、基准行不铺底；**表头 / 标题 / 脚注 / 基准行全用英文**（`Table N.`、`Code`、`none`、`Variations…`、`Yield [%]`、脚注 `[a]`/`[b]`），格子里不重复 %；**表格铺满内容宽度**（调宽度拖内容区右边那条线）；**表格上方只放反应式，不要「Standard conditions: …」那行字**（用户明确不要，条件画在箭头上下）。**别改回无衬线 / 等宽 / 满页宽**。详见 §6。
 - ~~`CompareView.vue`~~ — **对照页已删**（记录只收集、板做对比），`/compare` 重定向到 `/boards`；要回退见 HISTORY。
-- `src/views/BoardsView.vue` / `BoardView.vue` / `src/lib/board.js` — **排版板（自由画布）**（`/boards` 列表 → `/b/:id`）：一张 A4 白纸，把**记录里的东西**绝对定位摆上去，拖 / 缩放 / 写图注 / 导 PDF。能放的块：**编号 · 反应式 · 条件 · 投料表 · 结果 · TLC 判断 · 结论**（`BLOCKS`，`blockHtml(kind, exp)` 渲染）+ **TLC 图** + **一段文字**。**素材是页面级左栏**（在 `.inner` **外面**、288px 通高；原来 196px 塞在内容区里）；按记录分组（`api.experiments({project})` + `api/tlc`），一行一条：编号 + 块胶囊 + TLC 小图。**收集工具（文字/结论/箭头/方框）在标题右边那行下面**（`.board-palette`）。
+- `src/views/BoardsView.vue` / `BoardView.vue` / `src/lib/board.js` — **排版板（自由画布）**（`/boards` 列表 → `/b/:id`）：一张 A4 白纸，把**记录里的东西**绝对定位摆上去，拖 / 缩放 / 写图注 / 导 PDF。能放的块：**编号 · 反应式 · 条件 · 投料表 · 结果 · TLC 判断 · 结论**（`BLOCKS`，`blockHtml(kind, exp)` 渲染）+ **TLC 图** + **一段文字**。**素材是页面级左栏**（在 `.inner` **外面**、288px 通高；原来 196px 塞在内容区里）；按记录分组（`api.experiments({project})` + `api/tlc`），一行一条：编号 + 块胶囊 + TLC 小图。**收集工具（文字/结论/箭头/方框）在标题右边那行下面**（`.board-palette`）。**素材栏能搜记录正文**（编号/题目/底物/产物/试剂/TLC 注/操作/结论；打字后补拉详情）+ **悬停胶囊 / TLC 小图出预览**（`.bd-peek`，`pointer-events:none`，170ms）。
   **板才是「对比 + 结论」的地方**（实验只做收集）：除单条记录的块，还有 **「对比表」块**（`block:'compare'` + `refs[]`：抽屉「对比表…」挑 2–8 条 → 一张 `编号 / 改了什么 / TLC 判断 / 产率` 小表，「改了什么」直接调 `sctfields.variations()`，超过 3 项截断）；**「结论」块**（`block:'concl'`：带「结论」小标题的文字块，双击改字）；**「成组摆放」**（抽屉按钮 → 挑几条 → 每条自动生成 `条件` + `TLC 判断` 两块、竖着排下来，正好当筛选总结页）。对比表要多条记录的数据，所以 `itemHtml(it, exp, ctx)` 第三个参数是 `{get(id)}`（BoardView 的 `expCache`），**屏幕和导出都要传**（模板里漏传过一次，表里只剩「至少要两条」）。
-  **关窗口会丢最后 700ms 的改动**（防抖 700ms 才存）：`pagehide` / `beforeunload` 补一次 `saveNow(true)`（keepalive）——`onBeforeUnmount` 只在路由切换时跑，关标签页不跑。
+  **关窗口会丢最后 700ms 的改动**：`pagehide` / `beforeunload` 补一次 `saveNow(true)`（keepalive）——`onBeforeUnmount` 只在路由切换时跑，关标签页不跑。
   **两条铁律**：① **坐标一律 0.1mm 整数**（A4 = 2100×2970），屏幕上给纸张加 CSS `zoom`（适应窗口 / 100%）把纸缩进可视区，纸里的字号间距全按 **mm / pt** 写 —— 所以屏幕和 PDF 一模一样。**整页不许滚**：`.board-single{overflow:hidden}` + `.inner` flex 列 + `.board-stage` 用 `flex:1 min-height:0` 吃剩余高度（别再写 `calc(100vh - 250px)`），`fit()` 按 stage 真实高度算 zoom；**工具条要常驻占位**（`.board-tools-bar{min-height:30px}`），否则选中时 stage 变高/变矮、纸张会跟着缩放跳一下；只有「100%」档 `.board-stage.is-pinned` 才内部滚；② **块内容只由 `itemHtml()` 生成**（屏幕 `v-html`、PDF 拼进 `boardHtml()`），别再给屏幕单写一套渲染。`BOARD_CSS` 由 `BoardView` 注入 `<head>`（id `board-page-css`，卸载时删），导出用 `PRINT_CSS = html/body 清边距 + body{zoom:0.7498} + BOARD_CSS`。
   **`zoom: 0.7498` 不能省**：print.swift 视口 595.28×841.89，A4 = 794px，不缩会裁掉右/下边。
   交互：拖拽 / 缩放全走 mouse 事件（Safari 不可靠 HTML5 拖放），**拖动期间只写 `el.style.transform`（rAF 合帧、不碰响应式），松手才回写 x/y 并先赋 left/top 再清 transform**（否则闪回原位）；吸附时画参考线；**px→单位换算必须是 `MM_PER_PX / 0.1 / zoom`（=2.646/zoom）**——写成 `1/(MM_PER_PX*0.1*zoom)` 会大 14 倍、一拖就飞（踩过）；有 3px 死区（点一下不算拖）；靠边 / 水平居中有 4.5mm 吸附；方向键 1mm、Shift 10mm；⌘D 复制；Delete 删；双击改图注（文字块是改文字）；工具条 置顶/置底/居中/复制/删除；防抖 700ms 自动存。**新块落点**按「已排到哪儿」的实测底边往下排（`cursorY` + `syncCursor()`，连点时先按 62mm 估一格以免叠住）。A4 竖/横一键切（`board.page`）。**板子只读记录，删板不碰数据**。设计稿 `BOARD-DESIGN.md`。
@@ -120,10 +120,10 @@
 ## 6. 当前进度
 
 > 更早轮次在 **`HISTORY.md`**；本文件有 **64 KB 注入上限**，最近几轮留下面，再早的往下搬。加新内容前先看体积。
-- **最近几轮**：明细在 HISTORY；**排版板＝自由画布**（A4 绝对定位，放 编号/反应式/条件/投料/结果/结论 + TLC + 文字，导 PDF）；**「对照」页已撤**（要看对比就摆一张排版板）；**结果块最右一列挂 TLC 板图缩略**（小反应先看板子；判断/选择性两行已删，数据列还在）；筛选表**别改回无衬线 / 满页宽**；**变量 = 投料表续篇**（`#vars` 槽 + 虚线）；候选名下拉 `CondCand.vue`；导出有「一页汇报卡（PDF）」。
+- **最近几轮**：明细在 HISTORY；**排版板＝自由画布**（A4 绝对定位，摆块 + TLC + 文字，导 PDF）；**「对照」页已撤**（要看对比就摆一张排版板）；**结果块最右一列挂 TLC 板图缩略**（小反应先看板子；判断/选择性两行已删，数据列还在）；筛选表**别改回无衬线 / 满页宽**；**变量 = 投料表续篇**（`#vars` 槽 + 虚线）；候选名下拉 `CondCand.vue`；导出有「一页汇报卡（PDF）」。
 - **分支**：`try/record-kind`（回退 `git checkout main`），见 HISTORY。
 - **已完成**：v2 全功能已进 `public/`（4780 跑的就是它）；清单在 `HISTORY.md`。
-- **半成品 / 待确认**：「本地结构图片识别（MolScribe 一类）」只讨论过、没做；非 macOS 服务器上「存成 PDF」不可用（要 swift/WebKit）。
+- **半成品**：本地结构图片识别只讨论过没做；非 macOS 上「存成 PDF」不可用（要 swift/WebKit）。
 - **明确不做**：多人协作、账号权限、云同步、富文本编辑。手机端（≤820px）只做「看档案 / 看记录 / 拍照上传」，不做手机上编辑记录。
 
 ## 7. 踩过的坑与硬限制
