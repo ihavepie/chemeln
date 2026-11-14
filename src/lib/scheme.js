@@ -66,7 +66,7 @@ function wrapPhrases(line, maxW, measure, maxLines = 2) {
 }
 
 const BOND_PX = 30; // 一根键的像素长度，整张图的尺度基准（26 → 30：结构在反应式里别显小）
-const PAD = 12;
+const PAD = 8;
 
 let cached = null;
 async function chem() {
@@ -220,7 +220,7 @@ async function molSvg(smiles, id, molfile = '') {
   const vb = (svg.match(/viewBox="([^"]+)"/) || [])[1] || '';
   // 分子坐标里一根键≈1，所以「键长 BOND_PX 像素」= 宽高各给 bbox*BOND_PX；
   // 里面 viewBox 的形状和它差不多，缩放就≈1，键长才是齐的
-  const EDGE = 10;
+  const EDGE = 6;
   return {
     w: Math.round(bw * BOND_PX + EDGE * 2),
     h: Math.round(bh * BOND_PX + EDGE * 2),
@@ -238,10 +238,10 @@ async function molSvg(smiles, id, molfile = '') {
  *   直接贴在纸面上看（比如筛选表表头那张）就传 false，不然纸面会多出一块白方块。
  */
 export async function composeChainSvg({ stages = [], background = true } = {}) {
-  const GAP = 12;          // 结构之间的一般间距
+  const GAP = 14;          // 结构之间的一般间距（用户要「宽松一点，但不要太散」）
   const PLUS = 18;         // 加号的宽度
   const ARROW_MIN = 110;   // 箭头最短多长；实际长度按上下最长那行字来（够写条件就行，别拉太长）
-  const MAX_ARROW = 360;      // 「看着舒服」的箭头长度上限
+  const MAX_ARROW = 680;      // 只当「极端长」的兜底：超过它才折两行
   const CAP_SIZE = 15;     // 箭头上下的条件字号（跟结构式里的原子标签差不多大）
   const MAX_LINE_W = 250;  // 条件先折行（单行最多 ~250px，最多 2 行），再拿折完最宽的那行算箭头长度
   const LINE_H = 20;
@@ -277,16 +277,14 @@ export async function composeChainSvg({ stages = [], background = true } = {}) {
   let prevKey = ''; // 上一段的产物：下一段里跟它同一个的底物不再画一次
   for (let si = 0; si < stages.length; si++) {
     const st = stages[si] || {};
-    // 先按「一行、箭头不超过 MAX_ARROW」排；真放不下才折两行 —— 两行比「拉一根 900 宽的图、
-    // 贴到纸面上字全缩小」要好读，也比原来硬排一行压到结构上强
-    let above = caps(st.above, 1, MAX_ARROW - 30);
+    // 箭头上**一行写完**（用户：「条件单行」）：箭头自己跟着长，条件永远不会画出箭头外；
+    // 只有极端长（> MAX_ARROW）才折两行兜底，不然一张图会被拉得极宽、贴到纸上字全变小
+    let above = caps(st.above, 1, 1e6);
+    if (widest(above) > MAX_ARROW) above = caps(st.above, 2, Math.round(MAX_ARROW / 2));
     const below = caps(st.below, 2, MAX_LINE_W);
-    if (widest(above) > MAX_ARROW - 30) {
-      above = caps(st.above, 2, Math.round((MAX_ARROW - 30) / 2) + 70);
-    }
     const capW = Math.max(widest(above), widest(below));
-    // 画出来那根线比 arrowLen 短（两头留白 / 箭头尖用掉了约 37px），所以这里补回来
-    const arrowLen = Math.min(MAX_ARROW, Math.max(ARROW_MIN, Math.round(capW) + 30));
+    // 线长 = 字宽 + 50：两头各留 25px，字稳稳落在箭头里面（画出来那根线就是 arrowLen 那么长）
+    const arrowLen = Math.max(ARROW_MIN, Math.round(capW) + 50);
 
     const rs = [];
     const list = st.reactants || [];
@@ -309,8 +307,8 @@ export async function composeChainSvg({ stages = [], background = true } = {}) {
     });
     nodes.push({
       kind: 'arrow',
-      // 区域至少要有「条件那行字」那么宽，两头再各留 13px —— 字永远不会压到结构上
-      w: Math.max(arrowLen, Math.round(capW)) + 26,
+      // 区域宽度 = 线长 + 两头各 13px —— 字永远不会压到结构上
+      w: arrowLen + 26,
       len: arrowLen,
       above,
       below,

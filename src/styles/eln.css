@@ -6882,8 +6882,10 @@ body.cat-dragging .tree-group { transition: background 120ms var(--ease), outlin
   justify-content: center;
 }
 .scheme-live > div { width: 100%; display: flex; align-items: center; justify-content: center; }
-.scheme-live svg { display: block; max-width: 100%; max-height: 190px; width: auto; height: auto; }
-@media print { .scheme-live svg { max-height: 190px; } }
+.scheme-live svg { display: block; width: 100%; height: auto; max-height: 240px; }
+/* 以前是 `max-height:190px + width:auto`：高度先撞顶，图就只有格子宽的 80%，左右各留一条白
+   （用户：「左右间距空白不要太大，不缩成一小块」）。现在宽度吃满、高度按比例，240px 才封顶。 */
+@media print { .scheme-live svg { max-height: 190px; } }  /* 打印这块保持原样，别动「恒 2 页」 */
 
 /* 反应式格子右上角的「画反应式」按钮：字号跟着这一带走，别把标签挤歪 */
 .scheme-head { align-items: center; }
