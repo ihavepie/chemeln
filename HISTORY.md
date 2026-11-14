@@ -250,3 +250,9 @@
   验证（WKWebView + 真接口 + sips 看 PDF）：抽屉 9 条记录各带胶囊；依次加 编号/反应式/条件/投料/结果/结论 六块 → 内容正确（`SJ-2-1 · A to C`、`条件 THF · −78 ℃ · 12 h · N₂ · 圆底烧瓶 · 40 mmol`、投料表 6 行、`产物 苄基环丁烷醇 · 产率 52.3% · 质量 4.9476 g`、结论占位）；新块落点 y=152.1mm 接在已有内容下方不叠；导 PDF 一页 A4，表格四列完整、图注居中、反应式与 TLC 都在；测试板都删了（用户自己建的那张 `排版板` id=2 **没动**）。
 - **拖一下就「飞走」（用户报的）**：排版板第二版把坐标换成 mm 之后，`unitsPerPx()` 写成了 `1 / (MM_PER_PX * 0.1 * zoom)` = 37.8/zoom，而真值是 `MM_PER_PX / 0.1 / zoom` = 2.646/zoom —— **大了 14.3 倍**，鼠标动 1px 块就窜出 14px 的位移，看起来就是「一拖就滑走」。改成后者，并顺手加 3px 死区（不足 3px 不算拖，只是点一下别把块挪歪）。
   验证（WKWebView 派发真实 mouse 序列，board 2）：+60px / +30px 拖拽 → 块从 `8mm,7.4mm` 到 `40.2mm,23.5mm`，即 +32.2mm / +16.1mm，正好等于 `60 × 2.646 / zoom(0.4935)`。**注意**：那次验证拖的是用户自己那张板（id 2）的第一块，跑完已经按原坐标 `x=80,y=74` 写回去了。
+- **拖动改顺滑（用户：「拖拽还能顺滑一点吗」）**：以前每个 `mousemove` 都改响应式坐标 → Vue 每帧重渲染 + 写 `left/top`（触发重排），加上 Safari 的 mousemove 又密，拖起来发涩。现在：
+  ① **rAF 合帧**：mousemove 只记最新坐标（`pend`），一个 `requestAnimationFrame` 里最多写一次 DOM；
+  ② **拖的时候不改坐标**：只写 `el.style.transform = translate(...mm)`（合成层，不触发重排），**松手才把最终 x/y 回写进响应式数据并赋值 `left/top`**（顺序是先写 left/top 再清 transform，否则会闪回原位一帧）；
+  ③ 拖起来给 `will-change: transform`，`body` 挂 `is-board-dragging`（grabbing 光标）；
+  ④ **吸附有参考线了**：4.5mm 内吸到左/中/右时，页面里画一根 0.28mm 的强调色竖线（`guideAt`），不再是「莫名其妙跳一下」；缩放（拖右下角）同样走 rAF + 直接写 `style.width`。
+  验证（临时板 + 真实鼠标序列）：拖动中 `left` 保持 30mm 不动、`transform(64.3mm, 32.2mm)` 跟手、`will-change=transform`、`body.is-board-dragging`；吸到中线时 transform 46.1mm、参考线在 105mm；松手后 `left=74mm`（正好中线）、transform 与 willChange 清空、`items.x=740` 落库；负方向拖 -170px → -91.1mm，数值都对得上 `px × 2.646 / zoom`。

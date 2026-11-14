@@ -9562,3 +9562,7 @@ body.is-picker-open .editor { overscroll-behavior: none; }
 }
 .board-tool:hover { background: #f1efeb; color: var(--ink); }
 .board-tool.is-danger:hover { background: var(--bad-soft); color: var(--bad); }
+/* 拖动中：光标变抓取；吸附时那根参考线（页面坐标，单位 mm） */
+body.is-board-dragging { cursor: grabbing; }
+.board-guide { position: absolute; pointer-events: none; background: rgba(168, 71, 31, 0.32); }
+.board-guide.is-v { top: 0; bottom: 0; width: 0.28mm; }

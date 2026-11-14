@@ -246,17 +246,30 @@ async function editCaption(it) {
   if (v != null) it.caption = v;
 }
 
-/* ---------------- 拖 / 缩放 ---------------- */
+/* ---------------- 拖 / 缩放（rAF + 直接改 transform，别每帧走响应式） ---------------- */
 
-const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, moved: false });
+const drag = reactive({ on: false, mode: 'move', id: '', sx: 0, sy: 0, ox: 0, oy: 0, ow: 0, moved: false, nx: 0, ny: 0, nw: 0 });
+/** 吸附时把那根参考线画出来（单位：画布单位；null = 不画） */
+const guideAt = reactive({ x: null, y: null });
 const SNAP = 45; // 4.5mm 内吸附到边 / 中线
 
+let dragEl = null;
+let raf = 0;
+let pend = null;
+
+/** 吸到「左 / 水平居中 / 右」里最近的那个；返回 [落点, 参考线要画在哪儿] */
 function snapX(x, it) {
   const page = pageSize.value;
-  for (const c of [0, Math.round((page.w - it.w) / 2), page.w - it.w]) {
-    if (Math.abs(x - c) <= SNAP) return c;
+  const mid = Math.round(page.w / 2);
+  const targets = [
+    [0, 0],
+    [Math.round((page.w - it.w) / 2), mid],
+    [page.w - it.w, page.w],
+  ];
+  for (const [at, line] of targets) {
+    if (Math.abs(x - at) <= SNAP) return { x: at, line };
   }
-  return x;
+  return { x, line: null };
 }
 
 function startDrag(ev, it, mode) {
@@ -264,33 +277,78 @@ function startDrag(ev, it, mode) {
   ev.preventDefault();
   ev.stopPropagation();
   sel.value = it.id;
-  Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, moved: false });
+  // grip 的 mousedown 挂在 span 上，要往上找那块
+  dragEl = ev.currentTarget?.closest?.('.board-item') || null;
+  Object.assign(drag, { on: true, mode, id: it.id, sx: ev.clientX, sy: ev.clientY, ox: it.x, oy: it.y, ow: it.w, moved: false, nx: it.x, ny: it.y, nw: it.w });
+  guideAt.x = null;
+  guideAt.y = null;
   window.addEventListener('mousemove', onMove);
   window.addEventListener('mouseup', endDrag);
 }
 
 function onMove(ev) {
   if (!drag.on) return;
-  const it = items.value.find((x) => x.id === drag.id);
-  if (!it) return;
   // 3px 死区：只是点一下别把块挪歪
   if (!drag.moved) {
     if (Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) < 3) return;
     drag.moved = true;
+    if (dragEl) dragEl.style.willChange = drag.mode === 'size' ? 'width' : 'transform';
+    document.body.classList.add('is-board-dragging');
   }
+  pend = { x: ev.clientX, y: ev.clientY };
+  if (!raf) raf = requestAnimationFrame(applyMove);
+}
+
+/** 一帧只写一次 DOM：拖的是 transform（合成层，不触发重排），松手才回写坐标 */
+function applyMove() {
+  raf = 0;
+  if (!pend || !drag.on) return;
+  const it = items.value.find((x) => x.id === drag.id);
+  if (!it || !dragEl) return;
   const k = unitsPerPx();
-  const dx = (ev.clientX - drag.sx) * k;
-  const dy = (ev.clientY - drag.sy) * k;
+  const dx = (pend.x - drag.sx) * k;
+  const dy = (pend.y - drag.sy) * k;
   if (drag.mode === 'size') {
-    it.w = Math.round(clamp(drag.ow + dx, MIN_W, pageSize.value.w - 20));
-  } else {
-    it.x = snapX(Math.round(clamp(drag.ox + dx, 0, pageSize.value.w - it.w)), it);
-    it.y = Math.round(clamp(drag.oy + dy, 0, pageSize.value.h - 100));
+    drag.nw = Math.round(clamp(drag.ow + dx, MIN_W, pageSize.value.w - it.x));
+    dragEl.style.width = mm(drag.nw);
+    return;
   }
+  const nx = Math.round(clamp(drag.ox + dx, 0, pageSize.value.w - it.w));
+  const ny = Math.round(clamp(drag.oy + dy, 0, pageSize.value.h - 100));
+  const sx = snapX(nx, it);
+  drag.nx = sx.x;
+  drag.ny = ny;
+  guideAt.x = sx.line;
+  dragEl.style.transform = `translate(${(sx.x - drag.ox) / 10}mm, ${(ny - drag.oy) / 10}mm)`;
 }
 
 function endDrag() {
+  if (raf) {
+    cancelAnimationFrame(raf);
+    raf = 0;
+  }
+  pend = null;
+  const it = items.value.find((x) => x.id === drag.id);
+  if (it && dragEl && drag.moved) {
+    if (drag.mode === 'size') {
+      it.w = drag.nw;
+      dragEl.style.width = '';
+    } else {
+      // 先把新位置写进 inline style，再摘 transform：否则会有一帧闪回原位
+      dragEl.style.left = mm(drag.nx);
+      dragEl.style.top = mm(drag.ny);
+      dragEl.style.transform = '';
+      it.x = drag.nx;
+      it.y = drag.ny;
+    }
+    dragEl.style.willChange = '';
+  }
   drag.on = false;
+  drag.moved = false;
+  dragEl = null;
+  guideAt.x = null;
+  guideAt.y = null;
+  document.body.classList.remove('is-board-dragging');
   window.removeEventListener('mousemove', onMove);
   window.removeEventListener('mouseup', endDrag);
 }
@@ -451,6 +509,7 @@ onBeforeUnmount(() => {
               <div class="bd-body" v-html="itemHtml(it, expOf(it))" />
               <span v-if="sel === it.id" class="board-grip" title="拖动改宽度" @mousedown.stop="startDrag($event, it, 'size')" />
             </div>
+            <div v-if="guideAt.x != null" class="board-guide is-v" :style="{ left: mm(guideAt.x) }" />
             <div v-if="!items.length" class="board-empty">从左边点一个块放上来</div>
           </div>
         </div>
