@@ -9729,31 +9729,29 @@ body.is-board-dragging { cursor: grabbing; }
 .sheet .rtable tr.rt-var .cond-in { font-size: 12.5px; padding: 4px 6px; }
 .sheet .rtable tr.rt-var > td { padding-left: 3px; padding-right: 3px; }
 
-/* ---------- 设置页：二级侧边栏（分模块，一屏一块） ----------
-   用户：「设置这边开始有点复杂了，可以分模块然后做二级侧边栏」。
-   左侧一列模块名（编号 + 名称，跟卡片上的 01–07 对得上），右侧只渲染当前那一块；
-   侧栏 sticky，纸面滚动时它不动；窄窗口（≤900px）收成一行横向胶囊。 */
-.set-wrap { display: flex; gap: 26px; align-items: flex-start; }
-.set-nav {
-  position: sticky; top: 4px; flex: 0 0 auto; width: 150px;
-  display: flex; flex-direction: column; gap: 1px; padding: 2px 0;
+/* ---------- 设置页：真的二级侧边栏（跟实验记录 / 化合物库那根中栏一个样子） ----------
+   用户：「这个二级侧边栏不要属于内容区域，干脆直接做成二级侧边栏，类似化合物或者实验侧边栏」。
+   所以复用 `.panes` + `.listpane`（bone 底、分隔线、自己滚），只是窄一点（208px）；
+   右边是 `.editor > .editor-inner`，跟别的页面同一套纸面留白。窄屏侧栏变横向胶囊。 */
+.set-panes { --panes-w: 208px; }
+.set-pane-title { font-family: var(--serif); font-size: 19px; line-height: 1.2; letter-spacing: -0.02em; color: var(--ink); }
+.set-pane-body { display: flex; flex-direction: column; gap: 2px; padding: 10px 10px 16px; }
+.set-mod {
+  display: flex; align-items: baseline; gap: 9px; width: 100%;
+  border: 0; background: transparent; font: inherit; font-size: 12.5px; color: var(--ink-2);
+  text-align: left; padding: 7px 9px; border-radius: 6px; cursor: pointer;
 }
-.set-nav-item {
-  display: flex; align-items: baseline; gap: 8px; width: 100%;
-  border: 0; background: transparent; font: inherit; font-size: 12.5px; color: var(--ink-3);
-  text-align: left; padding: 7px 9px; border-radius: 5px; cursor: pointer;
-}
-.set-nav-item:hover { background: #f1efeb; color: var(--ink); }
-.set-nav-item.is-on { background: var(--accent-soft); color: var(--accent-ink); }
-.set-nav-n { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
-.set-nav-item.is-on .set-nav-n { color: var(--accent-ink); }
-.set-body { flex: 1 1 auto; min-width: 0; }
-/* 一块一块看：卡片之间靠 gap，别再叠 .card 自带的 margin-bottom */
-.set-body .card { margin-bottom: 14px; }
-.set-body > .card:last-child { margin-bottom: 0; }
+.set-mod:hover { background: #f1efeb; color: var(--ink); }
+.set-mod.is-on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(20, 18, 14, 0.05); }
+.set-mod-n { font-family: var(--mono); font-size: 9px; color: var(--ink-4); }
+.set-mod.is-on .set-mod-n { color: var(--accent); }
+.set-inner { max-width: 860px; }
 @media (max-width: 900px) {
-  .set-wrap { flex-direction: column; gap: 14px; }
-  .set-nav { position: static; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 6px; }
-  .set-nav-item { width: auto; border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 11px; }
-  .set-nav-item.is-on { border-color: transparent; }
+  .set-panes { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .set-pane { border-right: 0; border-bottom: 1px solid var(--line); }
+  .set-pane .listpane-head { padding: 10px 14px 8px; border-bottom: 0; }
+  .set-pane-body { flex-direction: row; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+  .set-mod { width: auto; border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 11px; }
+  .set-mod.is-on { border-color: transparent; box-shadow: none; }
+  .set-inner { padding: 20px 16px 0; }
 }

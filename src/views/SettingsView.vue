@@ -27,7 +27,6 @@ import { amountDecimals, setAmountDecimals, setVolumeDecimals, volumeDecimals } 
 import { onUiMerged, uiGet, uiSetIfChanged } from '../lib/uiprefs.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickFull, quickList } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
-import DocGrip from '../components/DocGrip.vue';
 
 const saving = ref(false);
 
@@ -505,29 +504,35 @@ async function removeProject(p) {
 </script>
 
 <template>
-  <div class="single">
-    <div class="inner">
-      <DocGrip />
-      <header class="page-head">
-        <h1 class="page-title">设置</h1>
-        <p class="page-desc">{{ curMod.desc }}</p>
-      </header>
+  <div class="panes set-panes">
+    <!-- 二级侧边栏：跟「实验记录 / 化合物库」那根中栏一个样子（bone 底 + 分隔线 + 可滚动），
+         不是塞在内容区里的一列字。 -->
+    <aside class="listpane set-pane">
+      <div class="listpane-head">
+        <h1 class="set-pane-title">设置</h1>
+      </div>
+      <div class="listpane-body set-pane-body">
+        <button
+          v-for="m in SET_MODS"
+          :key="m.key"
+          type="button"
+          class="set-mod"
+          :class="{ 'is-on': mod === m.key }"
+          :aria-current="mod === m.key ? 'page' : undefined"
+          @click="pickMod(m.key)"
+        >
+          <span class="set-mod-n">{{ m.n }}</span>
+          <span class="set-mod-l">{{ m.label }}</span>
+        </button>
+      </div>
+    </aside>
 
-      <div class="set-wrap">
-        <nav class="set-nav" aria-label="设置分类">
-          <button
-            v-for="m in SET_MODS"
-            :key="m.key"
-            type="button"
-            class="set-nav-item"
-            :class="{ 'is-on': mod === m.key }"
-            :aria-current="mod === m.key ? 'page' : undefined"
-            @click="pickMod(m.key)"
-          >
-            <span class="set-nav-n">{{ m.n }}</span>{{ m.label }}
-          </button>
-        </nav>
-        <div class="set-body">
+    <div class="editor">
+      <div class="editor-inner set-inner">
+        <header class="page-head">
+          <h1 class="page-title">{{ curMod.label }}</h1>
+          <p class="page-desc">{{ curMod.desc }}</p>
+        </header>
 
       <section v-if="mod === 'book'" class="card">
         <div class="card-head">
@@ -909,10 +914,8 @@ async function removeProject(p) {
         </div>
       </section>
 
-        </div>
+        <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上</p>
       </div>
-
-      <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上</p>
     </div>
   </div>
 </template>
