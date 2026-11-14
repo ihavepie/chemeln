@@ -1,0 +1,21 @@
+# 每次 push / PR 跑一遍纯逻辑测试（`npm run check`，Node 自带 test runner，零依赖）。
+# 这些测试护的是「质量→产率」「筛选表改了什么」「写库前的清洗」这类错了也不报错的算术。
+name: check
+
+on:
+  push:
+    branches: [main, 'try/**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # 测试只用到 src/lib 里的纯函数（会 import vue），不需要 openchemlib / indigo 的 wasm
+      - run: npm ci
+      - run: npm run check
