@@ -1,17 +1,24 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
-import DashboardView from './views/DashboardView.vue';
-import EditorView from './views/EditorView.vue';
-import EmptyEditor from './views/EmptyEditor.vue';
-import CompoundsView from './views/CompoundsView.vue';
-import CompoundDetail from './views/CompoundDetail.vue';
-import ScreeningsView from './views/ScreeningsView.vue';
-import ScreeningView from './views/ScreeningView.vue';
-import SettingsView from './views/SettingsView.vue';
-import TrashView from './views/TrashView.vue';
-import ReagentLibView from './views/ReagentLibView.vue';
-import BoardsView from './views/BoardsView.vue';
-import BoardView from './views/BoardView.vue';
-import MobileHome from './components/MobileHome.vue';
+
+/**
+ * 每个页面都**懒加载**（`() => import(...)`）：以前一次性静态 import 进来，首屏要把
+ * 编辑器、画板、筛选表、设置页全下完才出画面（1.5 MB 一个 chunk）。拆开之后各页各一个
+ * chunk，Vite 的模块预取会在浏览器闲时把相邻页预取回来，点过去并不慢。
+ * 只有外壳用到的组件留在 `App.vue` 里同步引（导轨、列表这类）。
+ */
+const DashboardView = () => import('./views/DashboardView.vue');
+const EditorView = () => import('./views/EditorView.vue');
+const EmptyEditor = () => import('./views/EmptyEditor.vue');
+const CompoundsView = () => import('./views/CompoundsView.vue');
+const CompoundDetail = () => import('./views/CompoundDetail.vue');
+const ScreeningsView = () => import('./views/ScreeningsView.vue');
+const ScreeningView = () => import('./views/ScreeningView.vue');
+const SettingsView = () => import('./views/SettingsView.vue');
+const TrashView = () => import('./views/TrashView.vue');
+const ReagentLibView = () => import('./views/ReagentLibView.vue');
+const BoardsView = () => import('./views/BoardsView.vue');
+const BoardView = () => import('./views/BoardView.vue');
+const MobileHome = () => import('./components/MobileHome.vue');
 
 /** 手机上只放这几页（扫瓶签看档案 / 看记录 / 拍照上传），其它一律送到 `#/m` */
 const PHONE_ALLOWED = ['compound', 'editor', 'mobile'];

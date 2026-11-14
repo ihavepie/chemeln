@@ -442,3 +442,11 @@
   **第一次切错了**：切点落在区块横幅那一行上，把 `/* ===…` 的注释劈成两半 → `postcss-import: Unclosed comment` 直接构建失败。改成「切在横幅行之前」才对（`grep -n "^/\* =\{20,\}"` 的行号要 **−1**）。
   验证：`npm run build` 出来的 `public/assets/index-C9wXD2bS.css` **跟改之前同名同大小（559,413 B）**——Vite 的内容哈希没变，等于证明这条重构是字节级 no-op；`git diff --stat -- public/` 空。再取一份页面计算样式指纹（body / .sheet / .ptab / .exp-card / .rail / .hint / .btn 的 font/color/border/box-shadow 等 16 项）前后 `diff` → 完全一致。
   顺带发现的（不是这次引入的）：构建出来的 CSS 559 KB 里**有一半是 Element Plus 的整套主题**（`el-theme.css` + EP 样式），这是打包体积的大头，要瘦身得从「按需引入 EP 组件样式」入手。
+## 2026-11-14 瘦身（A → E 的 E）：Element Plus 按需 + 路由懒加载
+
+- **① Element Plus 只引用到的样式**。整个项目其实只用 `ElDialog`（`AppModal.vue`）、`ElMessageBox` / `ElNotification`（`lib/feedback.js`）三个组件，但 `main.js` 一直引 `element-plus/dist/index.css`——那是**整套主题**（表格 / 日期选择器 / 级联 / 走马灯…），构建产物里的 CSS 有一半是它。现在换成四个 `element-plus/es/components/<组件>/style/css`（base + dialog + message-box + notification，每个会自己带上 overlay / button / input 这些子依赖）。
+  同时**去掉 `app.use(ElementPlus)`**：三个组件都是在用到处 `import` 的（`<script setup>` 里 import 过就能在模板里写 `<el-dialog>`），全局注册只是把整个组件库拖进 JS 产物。zh-cn locale 也不用装——按钮文案一直是显式传的（`feedback.js` 里每个 confirmText / cancelText）。
+- **② 路由全部懒加载**（`router.js` 里 `() => import('./views/X.vue')`）：以前首屏要把编辑器 / 画板 / 筛选表 / 设置页全下完。
+- **效果**：入口 CSS 559.41 KB（gzip 83.19）→ **251.14 KB（gzip 43.07）**；入口 JS 1,550.51 KB（gzip 515.32）→ **261.23 KB（gzip 96.00）**，`openchemlib`（1.1 MB）自己一个 chunk、真用到化学计算时才拉。
+- **验证**（这是关键）：EP 换掉之后最怕悄悄少了什么样式。做法是拿改之前的构建产物截图、改之后同样尺寸再截，**比 sha256**：`/reagents`、`/e/206`、`/list` 三页**像素完全一致**（时间戳都碰巧一样，说明差一点就能看出来）。另外把两个 CSS 的选择器集合做差集，确认「老有新没有」的全是 EP 内部的东西（carousel / time-select / col / skeleton 的 keyframes），我们自己的规则一条没丢；`box-sizing` 的出现次数从 132 掉到 18，但那 132 条全是 EP 的，我们自己的 `* { box-sizing: border-box }` 在 `01-base.css` 里。
+  交互面也逐个试了：`el-dialog`（二维码弹窗，遮罩 + 按钮都对）、`ElMessageBox.prompt`（新建分类，输入框和「取消 / 建」都在）、`ElNotification`（切记录那句 toast，`.eln-toast` 自定义类照旧生效）。路由逐条过了一遍：`/` `/list` `/compounds` `/c/80` `/screenings` `/s/22` `/boards` `/b/2` `/trash` `/reagents` `/settings` `/e/206` 全部正常挂载。

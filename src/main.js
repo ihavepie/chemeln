@@ -1,7 +1,12 @@
 import { createApp } from 'vue';
-import ElementPlus from 'element-plus';
-import zhCn from 'element-plus/es/locale/lang/zh-cn';
-import 'element-plus/dist/index.css';
+// Element Plus **按需引样式**：整个项目只用 Dialog / MessageBox / Notification 三个组件
+// （见 AppModal.vue、lib/feedback.js），以前引 `element-plus/dist/index.css` 会把整套主题
+// （含表格、日期选择器、级联…几十个组件）都打进产物 —— 构建产物里的 CSS 有一半是它。
+// 每个 `style/css` 会自己带上 base 和它依赖的子组件（overlay / button / input…），不用手写。
+import 'element-plus/es/components/base/style/css';
+import 'element-plus/es/components/dialog/style/css';
+import 'element-plus/es/components/message-box/style/css';
+import 'element-plus/es/components/notification/style/css';
 import './styles/eln.css';
 import './styles/el-theme.css';
 import App from './App.vue';
@@ -64,5 +69,8 @@ document.addEventListener(
 );
 window.addEventListener('resize', growAll);
 
-app.use(router).use(ElementPlus, { locale: zhCn }).mount('#app');
+// 不再 `app.use(ElementPlus)`：三个组件都是在用到处直接 import 的（`<script setup>` 里 import 了
+// 就能在模板里当 `<el-dialog>` 用），全局注册只会把整个组件库拖进 JS 产物。
+// 按钮文案一直是显式传的（`feedback.js` 里每个 confirmText / cancelText），所以也不需要 zh-cn locale。
+app.use(router).mount('#app');
 
