@@ -1,3 +1,9 @@
+- **排版板正式换成 Excalidraw（`/b/:id` 就是它了，老画布退到 `/b-old/:id`）**（用户：「画布拖动还是不行，所以直接转 excalidraw 试试好了」）。
+  ① 路由对调：`/b/:id` → `BoardV2View`（Excalidraw），`/b-old/:id` → 原来的 HTML 画布，`/b2/:id` 重定向到 `/b/:id`；两个页面互相有「新画布 / 旧画布」入口。卡墙、列表、右键菜单里的链接不用改（还是 `/b/:id`）。
+  ② **表格类块也搬了**：`rasterBlock(it)` 把这一块按真实毫米宽排进 `.bd-body`，服务端 `/api/snapshot/png` 渲 **3 倍像素**（`cssPx = w/10*96/25.4`，`snapWidth = cssPx*3`）当 `image` 贴上——排版跟记录页一模一样，A4 上放大到约 300% 以内清楚。反应式仍是矢量 SVG、TLC/照片仍用原文件（这两类放大不糊）。
+  ③ **素材栏接进来了**：左侧 250px（复用 `.board-drawer` 那套样式），搜编号/题目/产物 → 每行七个块胶囊 + 它的 TLC 小图，点一下 `convertToExcalidrawElements` 造元素再 `updateScene` 加进去（落点沿纸左边往下排，`cursorY`），`scrollToContent` 滚过去。
+  ④ **导出**：`exportToBlob`（`exportScale: 2`）→「存图」直接下 PNG；「导出 PDF」把这张图塞进一页 A4 的 HTML，交给我们那条 `/api/snapshot/pdf`（截图铺满一页）出真 PDF。
+  验证：临时板（28，验完删）放 编号（raster）/投料（raster）/文字（原生）/箭头（原生，任意角度）→ 四样都按位置落好；点素材栏「结果」胶囊能新插入一块 raster 并自动滚到它；构建后 `/b/<id>` 正常出画布、控制台无 chunk 错误。
 - **「还是拖不动 / 新画布加载不出来」的排查（结论：多半是页面没刷新）**。
   每次 `npm run build` 都会清空 `public/` 并换掉资源文件名，而 4780 发的是 `no-store` 的 index.html + 带 hash 的 chunk；
   **已经打开的页面**点「新画布」时会去拿**刚刚被删掉**的旧 chunk，于是路由懒加载失败、看起来就是「点了没反应 / 加载不出来」，

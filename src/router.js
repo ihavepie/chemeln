@@ -43,9 +43,10 @@ export const router = createRouter({
     { path: '/compare', redirect: '/boards' },
     { path: '/reagents', name: 'reagents', component: ReagentLibView },
     { path: '/boards', name: 'boards', component: BoardsView },
-    { path: '/b/:id', name: 'board', component: BoardView },
-    // 新版画布（Excalidraw）试作：同一张板，另存一份 scene，随时能切回 /b/:id
-    { path: '/b2/:id', name: 'board2', component: () => import('./views/BoardV2View.vue') },
+    // 排版板 = Excalidraw 那套画布（老 HTML 画布退到 /b-old/:id，随时能切）
+    { path: '/b/:id', name: 'board', component: () => import('./views/BoardV2View.vue') },
+    { path: '/b-old/:id', name: 'board-old', component: BoardView },
+    { path: '/b2/:id', redirect: (to) => `/b/${to.params.id}` },
     { path: '/trash', name: 'trash', component: TrashView },
     { path: '/settings', name: 'settings', component: SettingsView },
     { path: '/:pathMatch(.*)*', redirect: '/' },
