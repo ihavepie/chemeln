@@ -1,3 +1,8 @@
+- **「新画布加载不出来」的真凶：5173 开发预览里 React 被打了两次**。
+  用户在 5173（`preview.command` 起的那套）打开排版板，画布死；4780（构建版）一直是好的——所以之前我按「旧构建 / 没刷新」判断全跑偏了。
+  证据：新加的页面报错面板抓到了 `TypeError: null is not an object (evaluating 'dispatcher.useEffect')`——React hooks 的 dispatcher 为 null，典型「一个页面里两份 react」。
+  修法：`vite.config.js` 加 `resolve.dedupe: ['react', 'react-dom']` + `optimizeDeps.include: [react, react-dom, react-dom/client, @excalidraw/excalidraw]`，让 Excalidraw 自带的 react 和我们这份共用一套；Vite 检测到 config 变化会自己重启，5173 立刻好了（`/b/16` 探针：`.excalidraw` 存在、无报错）。
+  顺手加了**页面级报错面板**（`main.js`：`error` / `unhandledrejection` / `app.config.errorHandler` → 左下角红框，可关、时间戳 + 文件行号），以后本机没 devtools 也能截图定位；新画布起不来时页面中间给「回旧画布」按钮兜底。
 - **排版板正式换成 Excalidraw（`/b/:id` 就是它了，老画布退到 `/b-old/:id`）**（用户：「画布拖动还是不行，所以直接转 excalidraw 试试好了」）。
   ① 路由对调：`/b/:id` → `BoardV2View`（Excalidraw），`/b-old/:id` → 原来的 HTML 画布，`/b2/:id` 重定向到 `/b/:id`；两个页面互相有「新画布 / 旧画布」入口。卡墙、列表、右键菜单里的链接不用改（还是 `/b/:id`）。
   ② **表格类块也搬了**：`rasterBlock(it)` 把这一块按真实毫米宽排进 `.bd-body`，服务端 `/api/snapshot/png` 渲 **3 倍像素**（`cssPx = w/10*96/25.4`，`snapWidth = cssPx*3`）当 `image` 贴上——排版跟记录页一模一样，A4 上放大到约 300% 以内清楚。反应式仍是矢量 SVG、TLC/照片仍用原文件（这两类放大不糊）。

@@ -37,6 +37,13 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'es2020',
   },
+  /* Excalidraw 是 React 组件，Vite 的预构建会把它自带的 react 和我们装的 react 各打一份，
+     于是运行时 hooks 的 dispatcher 是 null（报 `dispatcher.useEffect`）；
+     dedupe + include 让它俩共用一个 react。开发预览（5173）尤其必踩。 */
+  resolve: { dedupe: ['react', 'react-dom'] },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-dom/client', '@excalidraw/excalidraw'],
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,
