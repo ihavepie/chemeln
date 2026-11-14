@@ -99,10 +99,6 @@ function rollup() {
   const vals = props.cands.map((c) => num(c.yield_pct)).filter((v) => v !== null && v >= 0);
   props.model.yield_pct = vals.length ? round(Math.max(...vals), 1) : '';
 }
-const maxYield = computed(() => {
-  const vals = props.cands.map((c) => num(c.yield_pct)).filter((v) => v !== null && v >= 0);
-  return vals.length ? Math.max(...vals) : null;
-});
 function syncCand(c, i) {
   if (candIsTyped(c, i)) return;
   const inf = candInfo(c);
@@ -314,10 +310,6 @@ function onYieldInput(ev, r) {
         <span>MW</span>
         <input class="n" inputmode="decimal" :value="model.product_mw ?? ''" placeholder="自动" :disabled="locked" @input="onNumInput($event, model, 'product_mw')" />
       </label>
-      <span class="res-shared-info">
-        <template v-if="info.theo">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template>
-        <template v-if="maxYield !== null">　·　最高 <b>{{ round(maxYield, 1) }}%</b>（{{ cands.length }} 个候选）</template>
-      </span>
     </div>
     <table class="rtable res-table" :class="{ 'is-multi': multi, 'is-cand': candMode }">
       <!-- 候选模式：条件 | 质量 | 产率 | dr·ee | 备注 | TLC（产物那几格挪到上面一行了） -->
@@ -510,7 +502,7 @@ function onYieldInput(ev, r) {
     </div>
     <!-- 多步记录不再重复这行「理论产量」：每一步的质量 / 产率在表里都有；
          但「称到的比理论还多」那种异常还是要报 -->
-    <div v-if="!candMode && info.theo && (!multi || info.over)" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>
+    <div v-if="info.theo && (!multi || info.over)" class="res-note" :class="{ warn: info.over }"><template v-if="info.over">理论产量只有 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol × {{ round(model.product_mw, 2) }}），称到的 {{ round(model.product_mass, 4) }} g 对应 <b>{{ round(info.calc, 1) }}%</b> —— 检查规模 / 产物 MW / 残留溶剂。</template><template v-else-if="noYield">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　<span class="muted">不计产率</span></template>
       <template v-else-if="info.calc !== null">理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）　·　实测产率 <b>{{ round(info.calc, 1) }}%</b></template><template v-else>理论产量 <b>{{ round(info.theo, 4) }} g</b>（{{ round(baseMmol, 3) }} mmol）</template></div>
 
     <FilePreview

@@ -8195,17 +8195,36 @@ body.is-pointer-dragging .list-cat-blank { display: flex; min-height: 40px; alig
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px 14px;
-  margin-bottom: 6px;
-  font-size: 11.5px;
+  gap: 2px 16px;
+  margin-bottom: 3px;
+  font-size: 11px;
   color: var(--ink-3);
 }
-.res-shared .res-prod { flex: 1 1 220px; min-width: 150px; }
-.res-shared .res-prod input { font-size: 12.5px; color: var(--ink); }
-.res-shared .sel-f { flex: 0 0 auto; gap: 6px; }
-.res-shared .sel-f input { width: 84px; }
-.res-shared .sel-f input.n { width: 56px; }
-.res-shared-info { flex: 0 1 auto; font-size: 11px; color: var(--ink-3); }
+/* 产物名给一块宽度上限，性状 / MW 紧跟在后面（别让它们被推到纸面最右边，中间空一大片） */
+.res-shared .res-prod { flex: 0 1 210px; min-width: 110px; }
+.res-shared .res-prod input { font-size: 12.5px; }
+/* 这一行**不在 `.rtable` 里**，得自己按掉浏览器默认那个 2px 灰框 —— 第一版漏了，
+   结果产物 / 性状 / MW 三格全变成白底方框，性状和 MW 还被挤窄、字被截断（用户「css 有点没弄好」）。 */
+.res-shared input {
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink);
+  padding: 3px 5px;
+  outline: none;
+}
+.res-shared input:hover { background: #f8f7f2; }
+.res-shared input:focus { background: #f8f7f2; border-color: var(--line-2); }
+.res-shared input::placeholder { color: var(--ink-4); }
+.res-shared input.n { font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; text-align: right; }
+.res-shared .sel-f { display: inline-flex; align-items: baseline; gap: 4px; flex: 0 0 auto; }
+.res-shared .sel-f > span { font-size: 10px; color: var(--ink-4); white-space: nowrap; }
+.res-shared .sel-f input { width: 88px; }
+.res-shared .sel-f input.n { width: 60px; }
+.res-shared-info { flex: 0 1 auto; font-size: 10.5px; color: var(--ink-3); }
 .res-shared-info b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
 /* 候选那行的第一格：序号（跟投料表 Entry 1/2 对得上）+ 条件 */
 .res-cand-cell { display: flex; align-items: center; gap: 6px; min-width: 0; }
