@@ -57,15 +57,39 @@ function dockPanel() {
     zIndex: '20',
   });
 }
+/** ☰ 打开的主菜单（.dropdown-menu）：Excalidraw 是把它挂在左上那格里往下掉的，
+    这里钉到卡片右上角、正好落在 ☰ 下面，右边缘对齐。 */
+function dockMenu() {
+  const el = document.querySelector('.bv2-canvas .dropdown-menu');
+  const card = el && el.closest('.bv2-canvas');
+  if (!el || !card) return;
+  const r = card.getBoundingClientRect();
+  const w = el.offsetWidth;
+  if (w > 320) return; // 窄窗口（手机版 UI）那个是整宽下拉，别动它
+  Object.assign(el.style, {
+    position: 'fixed',
+    left: `${Math.round(r.right - 8 - w)}px`,
+    right: 'auto',
+    top: `${Math.round(r.top + 46)}px`,
+    bottom: 'auto',
+    zIndex: '22',
+  });
+}
+function dockAll() {
+  dockPanel();
+  dockMenu();
+}
 let panelWatch = null;
-/** 面板是 React 那边按需挂上来的：盯着它的出现（选中图形就自动出现，点 ☰ 也会） */
+/** 面板 / 菜单是 React 那边按需挂上来的：盯着它们的出现（选中图形会自动冒样式面板，点 ☰ 会冒主菜单） */
 function watchPanel() {
   if (panelWatch) return;
   const root = document.querySelector('.bv2-canvas');
   if (!root) return;
   panelWatch = new MutationObserver(() => {
-    const el = document.querySelector('.bv2-canvas .App-menu__left');
-    if (el && el.style.position !== 'fixed') dockPanel();
+    const panel = document.querySelector('.bv2-canvas .App-menu__left');
+    if (panel && panel.style.position !== 'fixed') dockPanel();
+    const menu = document.querySelector('.bv2-canvas .dropdown-menu');
+    if (menu && menu.style.position !== 'fixed') dockMenu();
   });
   panelWatch.observe(root, { childList: true, subtree: true });
 }
@@ -77,8 +101,9 @@ function togglePanel() {
   btn.click();
   setTimeout(() => {
     // 主菜单（.dropdown-menu）和那会儿自动出现的样式面板（.Island.sidebar）都算「开着」
-    const q = '.excalidraw .dropdown-menu, .excalidraw .Island.sidebar';
+    const q = '.excalidraw .dropdown-menu, .excalidraw .App-menu__left, .excalidraw .Island.sidebar';
     panelOpen.value = !!document.querySelector(q);
+    dockAll();
   }, 60);
 }
 
@@ -647,7 +672,7 @@ function onReady(a) {
     if (cur !== last) {
       last = cur;
       fitPaper(a);
-      dockPanel(); // 卡片尺寸变了（收起素材栏 / 进专注 / 改窗口），面板跟着重新贴边
+      dockAll(); // 卡片尺寸变了（收起素材栏 / 改窗口），面板和菜单跟着重新贴边
     }
   }, 200);
   watchPanel();
@@ -856,15 +881,15 @@ load();
           <button class="btn btn-sm" :disabled="!!downloading" @click="exportPdf">
             <Icon name="download" :size="12" /> 导出 PDF
           </button>
+          <button
+            class="bv2-menu"
+            :class="{ 'is-on': panelOpen }"
+            title="菜单：画布背景 / 重置画布 / 帮助（材质：Excalidraw 主菜单）"
+            @pointerdown.stop.prevent
+            @mousedown.stop.prevent
+            @click.stop="togglePanel"
+          >☰</button>
         </div>
-        <button
-          class="bv2-menu"
-          :class="{ 'is-on': panelOpen }"
-          title="菜单：画布背景 / 重置画布 / 帮助（选中的图形点一下 = 样式面板）"
-          @pointerdown.stop.prevent
-          @mousedown.stop.prevent
-          @click.stop="togglePanel"
-        >☰</button>
         <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
       </div>
     </div>
@@ -938,7 +963,7 @@ load();
 .bv2-canvas :deep(.HintViewer),
 .bv2-canvas :deep(.disable-zen-mode) { display: none !important; }
 
-/* 工具条浮在卡片左上角（不再占用单独一条） */
+/* 工具条浮在卡片左上角（不再占用单独一条；左上角那颗 ☰ 已挪到右上） */
 .bv2-canvas :deep(.App-top-bar) { display: flex !important; justify-content: flex-start !important; align-items: flex-start; }
 .bv2-canvas :deep(.App-top-bar > *) { margin-left: 0 !important; }
 /* 选中元素时 Excalidraw 会往工具条左边塞一个 24px 的格子（里面只有已经藏掉的汉堡按钮），
@@ -961,7 +986,7 @@ load();
 }
 .bv2-canvas :deep(.App-bottom-bar .Island) { width: auto; }
 .bv2-canvas :deep(.App-bottom-bar > *) { pointer-events: auto; }
-.bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 46px; right: 8px; bottom: auto; height: auto; }
+.bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 8px; right: 8px; bottom: auto; height: auto; }
 /* 原生样式面板（选中图形后自动出现的 .App-menu__left，描边/背景/线宽/透明度/图层…）：
    它的 offset parent 是工具条那一层，改不了，所以 JS 里用 position:fixed 按卡片位置算到左下角；
    这里是万一没挂上时的兜底（钉卡片左上、让过工具条那行）。 */
@@ -973,10 +998,9 @@ load();
   max-height: calc(100% - 62px);
   overflow-y: auto;
 }
-.bv2-menu { z-index: 21 !important; }
-/* 左上角那颗 ☰：和工具条并排（工具条给它让出 38px） */
+/* ☰：右上角那组里的最后一个小方块（原来浮在左上角，占掉工具条 38px） */
 .bv2-menu {
-  position: absolute; left: 8px; top: 8px; z-index: 7;
+  flex: 0 0 auto;
   width: 32px; height: 32px; padding: 0; border-radius: 7px; cursor: pointer;
   border: 1px solid var(--line-2); background: #fff; color: var(--ink-2);
   font-size: 15px; line-height: 1;

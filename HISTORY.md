@@ -617,3 +617,11 @@
 - ② 的原因：选中元素时 Excalidraw 往工具条左边塞一个 24px 的 `.App-menu_top__left`（里面只有一个我们早就 `display:none` 掉的汉堡按钮），`.shapes-section` 被顶到 left 70，于是跟 left 8 的 ☰ 之间空出一段。量出来的数：无选中 `.App-toolbar [46,8,602,48]`，有选中 `[70,8,602,48]`。
 - 修法：`.App-menu_top__left { width:0; min-width:0; flex:0 0 0 }`。**注意不能 `display:none`** —— 样式面板 `.App-menu__left` 是挂在这个节点里面的，父节点一藏，面板就变成 0×0 再也出不来（这个坑我踩了一次：面板 `[−474,−12,0,0]`、children=1）。
 - 验证：1500×900 选中/不选中 `.shapes-section` 都在 left 46；面板仍钉在卡片内 `[8,168,200,698]`；1160 宽（手机版 UI）工具条贴着 ☰ 跑、样式在底部那条；`check:types` 0 错 / `check` 58 绿 / `build` 通过。
+
+## 2026-11-15 排版板：☰ 挪到右上角，主菜单钉在它下面
+
+- 用户：「这个菜单按钮可以放在右边吗」。☰ 从卡片左上（独占 38px、把工具条顶到 left 46）挪进右上那组，做成「存图 / 导出 PDF / ☰」里最后一个小方块；工具条回到 `left:8px`，卡片左边彻底空出来。
+- 主菜单是 `.dropdown-menu`（**不是样式面板那个 `.Island.App-menu__left`**），Excalidraw 把它挂在左上那格里往下掉，所以点右上角的 ☰ 会在左边弹出。加了 `dockMenu()`：`position:fixed`，`left = card.right − 8 − 菜单宽`、`top = card.top + 46`、右边缘对齐 ☰。
+- 坑：窄窗口（卡片 <730px → 手机版 UI）那个 `.dropdown-menu` 是**整宽下拉**（量到 `offsetWidth = 1160`），按同样公式会被算到 `left:-460`、铺满整个画布。加了一条 `if (w > 320) return;` —— 窄窗口保持原生。
+- `dockAll()`（面板 + 菜单）在 `MutationObserver`、`togglePanel` 之后、`sizeWatch` 卡片尺寸变化时统一调用。
+- 验证：1500 宽菜单 `[804,54,200,340]`（右边缘 1004 ≈ 卡片 1012 − 8），☰ 方块 `[970,8,32,32]`，工具条 `[8,8,602,48]`；1160 宽菜单回到原生 `absolute [8,48,339,217]`；`check:types` 0 错 / `check` 58 绿 / `build` 通过。
