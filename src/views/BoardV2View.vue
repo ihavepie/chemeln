@@ -1001,9 +1001,9 @@ load();
 /* ☰：右上角那组里的最后一个小方块（原来浮在左上角，占掉工具条 38px） */
 .bv2-menu {
   flex: 0 0 auto;
-  width: 32px; height: 32px; padding: 0; border-radius: 7px; cursor: pointer;
+  width: 30px; height: 30px; padding: 0; border-radius: 7px; cursor: pointer;
   border: 1px solid var(--line-2); background: #fff; color: var(--ink-2);
-  font-size: 15px; line-height: 1;
+  font-size: 14px; line-height: 1;
   box-shadow: 0 1px 2px rgba(20, 18, 14, 0.06);
 }
 .bv2-menu:hover { color: var(--ink); border-color: var(--ink-4); }
