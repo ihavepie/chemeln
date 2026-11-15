@@ -590,3 +590,13 @@
 - 剩下几十条是零碎的真问题/类型收窄：`CSSRule` 上读 `media`（收窄成 `CSSMediaRule`）、`cloneNode` 返回 `Node`、`Element.dataset`（收窄成 `HTMLElement`）、`segBoxDist` 的元组参数、`boardHtml` 的 `expOf` 被推成零参函数、`scheme.js` 里 JSDoc 写成 `@param {object[]} o.stages`（必须先声明 `o`）、`chemdraw.js` 里「先建数组后补属性」（`groups[].box/paths`）。
 - **接进 CI**：`.github/workflows/check.yml` 里 `npm ci → npm run check → npm run check:types`。
 - 验证：`npm run check:types` **0 error**；`npm run check` 58 条仍全绿；`npm run build` 通过；`/list` 上点「新建分类」→ ElMessageBox.prompt 正常弹出（`feedback.js` 三个函数都改了签名，这是最容易写坏的地方）。
+
+## 2026-11-15 排版板：☰ 开出来的原生面板别压工具条
+
+- 现象：宽窗口下点 ☰ 打开「样式面板」后，面板和工具条糊在同一块（用户：「还是有和工具栏重合」）。之前试过两版都不对：把 `.FixedSideContainer_side_top` 整块 `display:none`（**搜索框和面板都在这块里，一起没了**），或者 `left:340px` 把工具条推开（**面板跟着容器一起右移，还是叠在一起**）。
+- 真正的原因：Excalidraw 把 `.App-menu__left` 挂在工具条容器里，`top` 从容器顶部（=8px）算，所以面板顶边和工具条在同一条线上。
+- 解法：只钉面板，不动工具条 ——
+  `.bv2-canvas :deep(.App-menu__left){position:absolute;left:8px;right:auto;top:54px;z-index:20;max-height:calc(100% - 62px);overflow-y:auto}`。
+  `top:54px` 是因为面板开着时它上面还有一行原生搜索框（`Find on canvas`，也在同一容器里），让过去才不叠。
+- 另外两件事：① 只有**选中元素**时 ☰ 开的才是样式面板（`.App-menu__left`）；没选中时开的是主菜单（帮助/重置画布/Excalidraw links/画布背景，另一套 class），它本来就在 ☰ 下面，不会压工具条，于是 ☰ 的开合状态检测要放宽成 `.App-menu__left, .dropdown-menu, .Island.sidebar` 三种都算；② `.is-panel` 那套「面板开时收工具条」的逻辑和 CSS 全删了（面板挪开位置后不需要让）。
+- 验证：5173 + 1500×900 → 面板在卡片左上（卡片内 left 8 / top 54，宽 ~200），工具条整排在原位；1160 宽（手机版 UI）点 ☰ 开的是原生小菜单、样式仍走底部那条；`npm run build` 通过，4780 同步。

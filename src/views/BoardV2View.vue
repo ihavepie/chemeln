@@ -36,22 +36,21 @@ const saving = ref(false);
 const fitted = ref(false);
 /** 载入时顺手把几对「图 + 图注」编了组：ready 之后存一次（不然下次又散着） */
 const groupedOnLoad = ref(0);
-/** 原生样式侧栏开着没有（☰ 切换） */
+/** ☰ 打开的那一栏（原生菜单 / 样式面板）开着没有，只用来给按钮上个「按下」的样子 */
 const panelOpen = ref(false);
 const hasSel = ref(false);
 function togglePanel() {
-  if (!exApi) return;
-  // 原生面板只对「选中的图形」有意义：什么都没选时点它只会开一个空面板，给个提示
-  if (!hasSel.value) {
-    toast('先选中一个图形，再点这里改颜色 / 线宽 / 线型', 'ok', 2200);
-    return;
-  }
-  try {
-    const now = exApi.toggleSidebar({ name: 'default', force: !panelOpen.value });
-    panelOpen.value = typeof now === 'boolean' ? now : !panelOpen.value;
-  } catch {
-    panelOpen.value = !panelOpen.value;
-  }
+  // 走 Excalidraw 自己那个汉堡按钮的点击：内部会打开「菜单 + 样式」那一栏，
+  // 直接调 toggleSidebar 只会开一个空的库面板。
+  const btn = document.querySelector('.excalidraw .dropdown-menu-button');
+  if (!btn) return;
+  btn.click();
+  setTimeout(() => {
+    // 选中元素时开的是「样式面板」（.App-menu__left），没选时开的是主菜单（另一个 class），
+    // 窄窗口（手机版 UI）是右侧抽屉 .Island.sidebar —— 都算「开着」
+    const q = '.excalidraw .App-menu__left, .excalidraw .dropdown-menu, .excalidraw .Island.sidebar';
+    panelOpen.value = !!document.querySelector(q);
+  }, 60);
 }
 /** 手绘风开关：Excalidraw 在窄容器（手机版 UI）里没有「线条样式」那个入口，这里自己给一个 */
 const sketch = ref(false);
@@ -869,7 +868,9 @@ load();
           class="bv2-menu"
           :class="{ 'is-on': panelOpen }"
           title="样式：颜色 / 线宽 / 线型 / 透明度 / 图层（Excalidraw 原生面板）"
-          @click="togglePanel"
+          @pointerdown.stop.prevent
+          @mousedown.stop.prevent
+          @click.stop="togglePanel"
         >☰</button>
         <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
         <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
@@ -970,6 +971,29 @@ load();
 .bv2-canvas :deep(.App-bottom-bar .Island) { width: auto; }
 .bv2-canvas :deep(.App-bottom-bar > *) { pointer-events: auto; }
 .bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 46px; right: 8px; bottom: auto; height: auto; }
+/* 原生样式面板（宽窗口下是 .App-menu__left）：Excalidraw 把它挂在工具条容器里、
+   top 从 0 开始算，所以会正好压在工具条上。这里把它钉到卡片左上、往下让一行，
+   工具条保持原位不用动。 */
+.bv2-canvas :deep(.App-menu__left) {
+  position: absolute !important;
+  left: 8px !important;
+  right: auto !important;
+  top: 54px !important;
+  z-index: 20 !important;
+  max-height: calc(100% - 62px);
+  overflow-y: auto;
+}
+/* 窄窗口（手机版 UI）下样式面板是右侧抽屉 .Island.sidebar，它的 left 会把它顶到卡片外 */
+.bv2-canvas :deep(.Island.sidebar) {
+  position: absolute !important;
+  left: 8px !important;
+  top: 50px !important;
+  bottom: auto !important;
+  z-index: 20 !important;
+  max-height: calc(100% - 60px);
+  overflow-y: auto;
+}
+.bv2-menu { z-index: 21 !important; }
 /* 左上角那颗 ☰：和工具条并排（工具条给它让出 38px） */
 .bv2-menu {
   position: absolute; left: 8px; top: 8px; z-index: 7;
