@@ -81,30 +81,6 @@ function togglePanel() {
     panelOpen.value = !!document.querySelector(q);
   }, 60);
 }
-/** 手绘风开关：Excalidraw 在窄容器（手机版 UI）里没有「线条样式」那个入口，这里自己给一个 */
-const sketch = ref(false);
-function applySketch(on) {
-  sketch.value = on;
-  if (!exApi) return;
-  exApi.updateScene({ appState: { currentItemRoughness: on ? 1 : 0 }, captureUpdate: 'NEVER' });
-  const sel = exApi.getAppState().selectedElementIds || {};
-  const hasSel = Object.keys(sel).length > 0;
-  // 有选中就只改选中的；没选中时切到「关」= 把整张板都压成规整线（一键去手绘）
-  const touch = (e) => {
-    if (e.type === 'image' || e.type === 'text') return false;
-    if (!['rectangle', 'ellipse', 'diamond', 'arrow', 'line', 'draw'].includes(e.type)) return false;
-    return hasSel ? !!sel[e.id] : true;
-  };
-  const els = exApi.getSceneElements().map((e) =>
-    touch(e) && (e.roughness ?? 0) !== (on ? 1 : 0)
-      ? { ...e, roughness: on ? 1 : 0, version: (e.version || 1) + 1, versionNonce: Math.floor(Math.random() * 1e9) }
-      : e
-  );
-  exApi.updateScene({ elements: els, captureUpdate: 'IMMEDIATELY' });
-}
-function toggleSketch() {
-  applySketch(!sketch.value);
-}
 
 /** 0.1mm → CSS px（96dpi）：A4 = 794 × 1123 */
 const K = 96 / 25.4 / 10;
@@ -347,14 +323,6 @@ async function load() {
    点一个块 / 一张 TLC 就落到纸上；悬停出预览（老 HTML 画布已废弃，功能都搬到这里了）。 */
 const exps = ref([]);
 const drawerOpen = ref(localStorage.getItem('eln:bdDrawer') !== '0');
-/** 专注：连最左导航导轨也收起来，整窗都是画布 */
-const focus = ref(localStorage.getItem('eln:bdFocus') === '1');
-function toggleFocus() {
-  focus.value = !focus.value;
-  localStorage.setItem('eln:bdFocus', focus.value ? '1' : '0');
-  document.body.classList.toggle('is-board-focus', focus.value);
-  setTimeout(() => exApi && fitPaper(exApi), 260);
-}
 function toggleDrawer() {
   drawerOpen.value = !drawerOpen.value;
   localStorage.setItem('eln:bdDrawer', drawerOpen.value ? '1' : '0');
@@ -785,12 +753,10 @@ async function exportPdf() {
 
 window.addEventListener('blur', unpeek);
 
-if (focus.value) document.body.classList.add('is-board-focus');
 
 onBeforeUnmount(() => {
   if (sizeWatch) clearInterval(sizeWatch);
   if (panelWatch) panelWatch.disconnect();
-  document.body.classList.remove('is-board-focus');
   window.removeEventListener('blur', unpeek);
   unpeek();
   clearTimeout(timer);
@@ -886,11 +852,6 @@ load();
           <span class="bv2-title" :title="board ? board.title : ''">{{ board ? board.title : '排版板' }}</span>
           <span class="bv2-saved">{{ saving ? '保存中…' : '已保存' }}</span>
           <button v-if="deletedBox" class="btn btn-sm btn-ghost" @click="restoreDeleted">恢复上次内容</button>
-          <button
-            class="btn btn-sm btn-ghost"
-            :title="sketch ? '现在是手绘风：点一下恢复规整线（没选中图形时会把整张板一起压平）' : '现在是规整线：点一下切成手绘风（有选中就只改选中的）'"
-            @click="toggleSketch"
-          >手绘{{ sketch ? '：开' : '：关' }}</button>
           <button class="btn btn-sm btn-ghost" :disabled="!!downloading" @click="exportPng">存图</button>
           <button class="btn btn-sm" :disabled="!!downloading" @click="exportPdf">
             <Icon name="download" :size="12" /> 导出 PDF
@@ -899,13 +860,12 @@ load();
         <button
           class="bv2-menu"
           :class="{ 'is-on': panelOpen }"
-          title="样式：颜色 / 线宽 / 线型 / 透明度 / 图层（Excalidraw 原生面板）"
+          title="菜单：画布背景 / 重置画布 / 帮助（选中的图形点一下 = 样式面板）"
           @pointerdown.stop.prevent
           @mousedown.stop.prevent
           @click.stop="togglePanel"
         >☰</button>
         <button v-if="!drawerOpen" class="bv2-dopen" title="展开素材栏" @click="toggleDrawer">›</button>
-        <button class="bv2-focus" :class="{ 'is-on': focus }" :title="focus ? '退出专注' : '专注：整个窗口都当画布'" @click="toggleFocus">⤢</button>
       </div>
     </div>
   </div>
@@ -937,13 +897,6 @@ load();
   font-size: 14px; line-height: 1; padding: 0 2px;
 }
 .bv2-dtoggle:hover { color: var(--ink-2); }
-.bv2-focus {
-  position: absolute; left: 6px; bottom: 8px; z-index: 7;
-  width: 22px; height: 22px; border: 0; border-radius: 4px;
-  background: #fff; box-shadow: 0 1px 3px rgba(20, 18, 14, 0.12);
-  color: var(--ink-3); cursor: pointer; font-size: 12px; line-height: 1;
-}
-.bv2-focus.is-on { color: var(--accent-ink); }
 .bv2-dopen {
   position: absolute; left: 6px; top: 58px; z-index: 7;
   width: 20px; height: 20px; border: 0; border-radius: 4px;
@@ -977,10 +930,9 @@ load();
   .bv2-saved { display: none; }
 }
 
-/* ---- 画布上只留工具 + 汉堡菜单；素材库 / 缩放撤销 / 提示藏掉 ----
-   汉堡菜单（左上角 ☰）要留着：**原生样式面板**（画布背景 / 描边 / 填充 / 线宽 / 线型 / 透明度 / 图层）在它里面，
-   这是宽窗口下唯一能改颜色的入口（窄窗口另有一条底栏调色板）。 */
-.bv2-canvas :deep(.App-menu_top__left) { display: flex !important; }
+/* ---- 画布上只留工具 + 自己的 ☰；素材库 / 缩放撤销 / 提示藏掉 ----
+   样式面板不用汉堡：选中图形后 Excalidraw 自己弹 .App-menu__left（JS 里钉到卡片左下角），
+   窄窗口则是底部那条 .App-bottom-bar 里的调色板。 */
 .bv2-canvas :deep(.layer-ui__wrapper__top-right),
 .bv2-canvas :deep(.layer-ui__wrapper__footer),
 .bv2-canvas :deep(.HintViewer),
@@ -989,6 +941,13 @@ load();
 /* 工具条浮在卡片左上角（不再占用单独一条） */
 .bv2-canvas :deep(.App-top-bar) { display: flex !important; justify-content: flex-start !important; align-items: flex-start; }
 .bv2-canvas :deep(.App-top-bar > *) { margin-left: 0 !important; }
+/* 选中元素时 Excalidraw 会往工具条左边塞一个 24px 的格子（里面只有已经藏掉的汉堡按钮），
+   工具条被顶右 24px、跟 ☰ 之间裂开一道缝 —— 把这一格压成 0 宽（**别用 display:none**：
+   样式面板 .App-menu__left 是挂在它里面的，藏了父节点面板就再也出不来），工具条始终贴着 ☰。 */
+.bv2-canvas :deep(.App-menu_top__left) {
+  display: flex !important;
+  width: 0 !important; min-width: 0 !important; flex: 0 0 0 !important;
+}
 
 /* 窄一点的时候 Excalidraw 会切成「手机版」UI（容器 < ~730px）：那套会多出
    右边一排「素材库 / 锁 / 手」和左下角的汉堡菜单 —— 全藏掉，只留工具条 */

@@ -609,3 +609,11 @@
 - 解法：`dockPanel()` 用 `position: fixed`，按 `.bv2-canvas` 的 `getBoundingClientRect()` 算 `left = r.left + 8`、`bottom = innerHeight - r.bottom + 8`、`maxHeight = r.height - 16`，钉到卡片左下角。什么时候算：`MutationObserver` 盯 `.bv2-canvas` 子树（面板被 React 挂上来就贴一次）、`sizeWatch` 里卡片尺寸变化时（收起素材栏 / 专注 / 改窗口）、`togglePanel()` 之后。CSS 里留一条 `position:absolute; left:8px; top:54px` 的兜底（万一 observer 没挂上）。
 - 量到的结果（1500×900，卡片 1012×874）：面板卡片内 `[8,160,200,698]`，底边距 16，工具条整排在上面不受影响；1160 宽（手机版 UI）没有这个面板，样式仍在底部 `.App-bottom-bar`。
 - 顺带：`☰` 的开合状态检测放宽成 `.dropdown-menu` / `.App-menu__left` / `.Island.sidebar` 三种都算「开着」。
+
+## 2026-11-15 排版板：删掉 ⤢ 专注 和 手绘开关，修「选中时 ☰ 和工具条裂开」
+
+- 用户要的：① 左下角那颗 `⤢`（扩大/专注）不要了；② 选中元素时 ☰ 和工具条之间会裂开一道 24px 的缝；③「就手绘那个没必要了」。
+- ①③ 直接删：`focus` ref + `toggleFocus()` + `is-board-focus` 的 body class 与 `10-tail.css` 里那两条 `--rail:0 / .rail visibility:hidden`，以及 `sketch` ref + `applySketch()` + `toggleSketch()` + 那颗按钮。右上角现在只剩「标题 / 已保存 / 存图 / 导出 PDF」。`flattenRoughness()`（载入时把老元素的 roughness 压成 0）跟手绘开关无关，保留。
+- ② 的原因：选中元素时 Excalidraw 往工具条左边塞一个 24px 的 `.App-menu_top__left`（里面只有一个我们早就 `display:none` 掉的汉堡按钮），`.shapes-section` 被顶到 left 70，于是跟 left 8 的 ☰ 之间空出一段。量出来的数：无选中 `.App-toolbar [46,8,602,48]`，有选中 `[70,8,602,48]`。
+- 修法：`.App-menu_top__left { width:0; min-width:0; flex:0 0 0 }`。**注意不能 `display:none`** —— 样式面板 `.App-menu__left` 是挂在这个节点里面的，父节点一藏，面板就变成 0×0 再也出不来（这个坑我踩了一次：面板 `[−474,−12,0,0]`、children=1）。
+- 验证：1500×900 选中/不选中 `.shapes-section` 都在 left 46；面板仍钉在卡片内 `[8,168,200,698]`；1160 宽（手机版 UI）工具条贴着 ☰ 跑、样式在底部那条；`check:types` 0 错 / `check` 58 绿 / `build` 通过。
