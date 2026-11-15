@@ -625,3 +625,12 @@
 - 坑：窄窗口（卡片 <730px → 手机版 UI）那个 `.dropdown-menu` 是**整宽下拉**（量到 `offsetWidth = 1160`），按同样公式会被算到 `left:-460`、铺满整个画布。加了一条 `if (w > 320) return;` —— 窄窗口保持原生。
 - `dockAll()`（面板 + 菜单）在 `MutationObserver`、`togglePanel` 之后、`sizeWatch` 卡片尺寸变化时统一调用。
 - 验证：1500 宽菜单 `[804,54,200,340]`（右边缘 1004 ≈ 卡片 1012 − 8），☰ 方块 `[970,8,32,32]`，工具条 `[8,8,602,48]`；1160 宽菜单回到原生 `absolute [8,48,339,217]`；`check:types` 0 错 / `check` 58 绿 / `build` 通过。
+
+## 2026-11-15 教程：每页一套漫游式引导（`?` + 首访自动播 + 设置可重置）
+
+- 用户：「能创建一个教程吗，element 那边好像有一个」，选了「整个应用每页一套」，触发方式要「1 和 3」（首访自动播一次 + 每页角落留个 `?`）。
+- **没用 Element Plus 的 `el-tour`**：装的是 2.14.7，确实有 `tour` / `tour-step`（`target` 吃选择器、内置 @floating-ui 定位、遮罩、上一步/下一步），但默认是 Element 蓝 + 白底大圆角，跟这里的纸白 / 1px 线 / 衬线标题要覆盖一堆内部类，而且按钮文案走 locale（项目一直显式传中文）。自己写 `TourLayer.vue`（约 90 行）反而更短、更贴现有质感。
+- 结构：`src/lib/tours.js` 存文案（`TOURS` 按路由 name 一页一套：home / list / editor / compounds / reagents / screenings / boards / board / trash / settings，`compound`·`screening` 复用父级那套），`liveSteps()` 在打开那一刻过滤掉 target 已经不在页面上的步骤；`src/components/TourLayer.vue` 只负责画（高亮框 + 暗底 + 卡片 + 上一步/下一步/跳过 + ←/→/Esc）；`App.vue` 管时机（首访 0.9s / 画布 1.6s 自动放，右下角 `?` 手动放）。
+- **暗底别用 `box-shadow: 0 0 0 100vmax`**：这招在浏览器里很常见，但 WKWebView 里 3000px 的展开阴影会被裁掉，屏幕上一点暗色都没有（第一版就是这样，量像素才发现：白底 255 变成 219 是后面改成四块 `div` 才对的）。现在是目标框的上/下/左/右各一块 `.tour-dim`，`rgba(28,27,25,.2)`。
+- 看过之后写 uiprefs 的 `tour` 一个键（`{home:1, board:1}`），服务端 `UI_PREF_KEY_RE` 里加了 `tour`；设置 › 界面加「教程」块，一颗「重新看一遍全部教程」= `resetTours()` 清标记，下次进每页又会自动放。右下角那颗 `?` 只在「这一页有教程」时出现，`.noprint`。
+- 验证：`/reagents` 首访自动出「1 / 5 左侧导航」，点下一步 → 2/5 高亮 `.rl-head`、3/5 高亮 `.rl-tools`（ring 尺寸跟着变）；关掉后 `?` 出现；画布页 1.6s 出「1 / 4 素材栏」，高亮素材栏、卡片在右边；1160 宽（手机版）工具条/底部调色板不受影响。`check:types` 0 错 / `check` 58 绿 / `build` 通过。

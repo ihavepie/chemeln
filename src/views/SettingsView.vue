@@ -26,6 +26,7 @@ import {
 import { amountDecimals, setAmountDecimals, setVolumeDecimals, volumeDecimals } from '../lib/reagent.js';
 import { onUiMerged, uiGet, uiSetIfChanged } from '../lib/uiprefs.js';
 import { CARD_STYLES, CARD_RADII, cardPref, setCardStyle, resetCardStyle } from '../lib/cardstyle.js';
+import { resetTours } from '../lib/tours.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickFull, quickList } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
 
@@ -355,6 +356,11 @@ function pickCardRadius(value) {
 function cardReset() {
   card.value = resetCardStyle();
 }
+/** 教程：清掉「已看过」的标记，下次进每一页都会再自动放一遍 */
+function resetTour() {
+  resetTours();
+  toast('已重置：下次进任意一页都会再放一遍教程', 'ok');
+}
 
 /* ---- 二级侧边栏：把设置分成 5 块，一块一块看（用户：「设置这边开始有点复杂了」）----
    编号沿用卡片上那 01–07（模块顺序就按编号排），当前停在哪一块记在 `uiprefs` 的 `setMod`，
@@ -433,6 +439,7 @@ const SET_SEARCH = [
   { m: 'ui', label: '快捷键', kw: 'keyboard shortcut 快捷键' },
   { m: 'ui', label: '书签悬停预览', kw: 'peek 书签 预览' },
   { m: 'ui', label: '切记录时停在同一页', kw: 'page keep 翻页 第2页 续页 切记录 滚轮 动画 推 力度' },
+  { m: 'ui', label: '教程（重新看一遍）', kw: 'tour guide 教程 引导 帮助 help', anchor: 'set-tour' },
   { m: 'page', label: 'A4 上显示哪几块（按记录类型）', kw: 'blocks 版式 块 显示', anchor: 'set-blocks' },
   { m: 'page', label: '块里的功能（计产率 / 核对 / 结果表列）', kw: 'fx 产率 核对 性状 dr ee', anchor: 'set-fx' },
   { m: 'page', label: '反应式 · 箭头上那行条件（自动 / 单行 / 两行）', kw: 'scheme 反应式 条件 格式', anchor: 'set-scheme' },
@@ -1040,6 +1047,17 @@ function setScrollSwitch(v) {
           >{{ r.label }}</button>
           <span class="spacer" />
           <button class="btn btn-sm btn-ghost" @click="cardReset">恢复默认</button>
+        </div>
+      </section>
+
+      <section v-if="mod === 'ui'" id="set-tour" class="card">
+        <div class="card-head"><h2 class="card-title">教程</h2></div>
+        <p class="card-note">
+          每一页都有一套漫游式引导（左边导航、工具条、这一页能点的地方）。第一次进这一页会自动放一遍，看完就不再打扰；平时右下角那个小小的 <b>?</b> 随时能再看。
+        </p>
+        <div class="row" style="gap: 8px; align-items: center">
+          <button class="btn btn-sm" @click="resetTour">重新看一遍全部教程</button>
+          <span style="font-size: 11.5px; color: var(--ink-4)">会把「已看过」的标记清掉</span>
         </div>
       </section>
 
