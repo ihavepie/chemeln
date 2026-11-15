@@ -1268,7 +1268,7 @@ function setScrollSwitch(v) {
         </div>
       </section>
 
-        <p class="version-line">ELN 1.0.2 · 全本机运行 · 数据存自己的盘上 · 构建于 {{ buildAt }}</p>
+        <p class="version-line">ELN 1.1.0 · 全本机运行 · 数据存自己的盘上 · 构建于 {{ buildAt }}</p>
       </div>
     </div>
   </div>
