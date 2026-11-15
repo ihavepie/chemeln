@@ -39,6 +39,36 @@ const groupedOnLoad = ref(0);
 /** ☰ 打开的那一栏（原生菜单 / 样式面板）开着没有，只用来给按钮上个「按下」的样子 */
 const panelOpen = ref(false);
 const hasSel = ref(false);
+/** 把原生样式面板挪到画布卡片的左下角：Excalidraw 默认把它贴在纸的左上角，一开就压住内容。
+    它的 offset parent 是工具条那一层（改不了），所以用 position:fixed 按卡片位置现算。 */
+function dockPanel() {
+  const el = document.querySelector('.bv2-canvas .App-menu__left');
+  const card = el && el.closest('.bv2-canvas');
+  if (!el || !card) return;
+  const r = card.getBoundingClientRect();
+  Object.assign(el.style, {
+    position: 'fixed',
+    left: `${Math.round(r.left + 8)}px`,
+    right: 'auto',
+    top: 'auto',
+    bottom: `${Math.round(window.innerHeight - r.bottom + 8)}px`,
+    maxHeight: `${Math.round(r.height - 16)}px`,
+    overflowY: 'auto',
+    zIndex: '20',
+  });
+}
+let panelWatch = null;
+/** 面板是 React 那边按需挂上来的：盯着它的出现（选中图形就自动出现，点 ☰ 也会） */
+function watchPanel() {
+  if (panelWatch) return;
+  const root = document.querySelector('.bv2-canvas');
+  if (!root) return;
+  panelWatch = new MutationObserver(() => {
+    const el = document.querySelector('.bv2-canvas .App-menu__left');
+    if (el && el.style.position !== 'fixed') dockPanel();
+  });
+  panelWatch.observe(root, { childList: true, subtree: true });
+}
 function togglePanel() {
   // 走 Excalidraw 自己那个汉堡按钮的点击：内部会打开「菜单 + 样式」那一栏，
   // 直接调 toggleSidebar 只会开一个空的库面板。
@@ -46,9 +76,8 @@ function togglePanel() {
   if (!btn) return;
   btn.click();
   setTimeout(() => {
-    // 选中元素时开的是「样式面板」（.App-menu__left），没选时开的是主菜单（另一个 class），
-    // 窄窗口（手机版 UI）是右侧抽屉 .Island.sidebar —— 都算「开着」
-    const q = '.excalidraw .App-menu__left, .excalidraw .dropdown-menu, .excalidraw .Island.sidebar';
+    // 主菜单（.dropdown-menu）和那会儿自动出现的样式面板（.Island.sidebar）都算「开着」
+    const q = '.excalidraw .dropdown-menu, .excalidraw .Island.sidebar';
     panelOpen.value = !!document.querySelector(q);
   }, 60);
 }
@@ -650,8 +679,10 @@ function onReady(a) {
     if (cur !== last) {
       last = cur;
       fitPaper(a);
+      dockPanel(); // 卡片尺寸变了（收起素材栏 / 进专注 / 改窗口），面板跟着重新贴边
     }
   }, 200);
+  watchPanel();
 }
 
 let timer = 0;
@@ -758,6 +789,7 @@ if (focus.value) document.body.classList.add('is-board-focus');
 
 onBeforeUnmount(() => {
   if (sizeWatch) clearInterval(sizeWatch);
+  if (panelWatch) panelWatch.disconnect();
   document.body.classList.remove('is-board-focus');
   window.removeEventListener('blur', unpeek);
   unpeek();
@@ -971,26 +1003,15 @@ load();
 .bv2-canvas :deep(.App-bottom-bar .Island) { width: auto; }
 .bv2-canvas :deep(.App-bottom-bar > *) { pointer-events: auto; }
 .bv2-canvas :deep(.FixedSideContainer_side_top) { top: 8px; left: 46px; right: 8px; bottom: auto; height: auto; }
-/* 原生样式面板（宽窗口下是 .App-menu__left）：Excalidraw 把它挂在工具条容器里、
-   top 从 0 开始算，所以会正好压在工具条上。这里把它钉到卡片左上、往下让一行，
-   工具条保持原位不用动。 */
+/* 原生样式面板（选中图形后自动出现的 .App-menu__left，描边/背景/线宽/透明度/图层…）：
+   它的 offset parent 是工具条那一层，改不了，所以 JS 里用 position:fixed 按卡片位置算到左下角；
+   这里是万一没挂上时的兜底（钉卡片左上、让过工具条那行）。 */
 .bv2-canvas :deep(.App-menu__left) {
-  position: absolute !important;
-  left: 8px !important;
-  right: auto !important;
-  top: 54px !important;
-  z-index: 20 !important;
+  position: absolute;
+  left: 8px;
+  top: 54px;
+  z-index: 20;
   max-height: calc(100% - 62px);
-  overflow-y: auto;
-}
-/* 窄窗口（手机版 UI）下样式面板是右侧抽屉 .Island.sidebar，它的 left 会把它顶到卡片外 */
-.bv2-canvas :deep(.Island.sidebar) {
-  position: absolute !important;
-  left: 8px !important;
-  top: 50px !important;
-  bottom: auto !important;
-  z-index: 20 !important;
-  max-height: calc(100% - 60px);
   overflow-y: auto;
 }
 .bv2-menu { z-index: 21 !important; }

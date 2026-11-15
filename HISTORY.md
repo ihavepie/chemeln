@@ -600,3 +600,12 @@
   `top:54px` 是因为面板开着时它上面还有一行原生搜索框（`Find on canvas`，也在同一容器里），让过去才不叠。
 - 另外两件事：① 只有**选中元素**时 ☰ 开的才是样式面板（`.App-menu__left`）；没选中时开的是主菜单（帮助/重置画布/Excalidraw links/画布背景，另一套 class），它本来就在 ☰ 下面，不会压工具条，于是 ☰ 的开合状态检测要放宽成 `.App-menu__left, .dropdown-menu, .Island.sidebar` 三种都算；② `.is-panel` 那套「面板开时收工具条」的逻辑和 CSS 全删了（面板挪开位置后不需要让）。
 - 验证：5173 + 1500×900 → 面板在卡片左上（卡片内 left 8 / top 54，宽 ~200），工具条整排在原位；1160 宽（手机版 UI）点 ☰ 开的是原生小菜单、样式仍走底部那条；`npm run build` 通过，4780 同步。
+
+## 2026-11-15 排版板：样式面板改钉在卡片左下角
+
+- 用户：「不能放在下面吗」（截图里面板压在 TLC 图和反应式的左上角）。
+- 先把上次的判断纠正过来：**桌面版 UI 里样式面板不需要点 ☰ 才会出现** —— 选中图形后 `.App-menu__left`（class 里还带 `Island`）自己就冒出来；☰ 开的是主菜单（帮助/重置画布/Excalidraw links/画布背景）。上次误把「选中之后冒出来的面板」当成了 ☰ 的产物。
+- 关键是它的定位链：`.Island.App-menu__left` 的 offset parent 是工具条那一层（`.FixedSideContainer_side_top`），所以 `top`/`bottom` 都是相对那一小条算的 —— 纯 CSS 写 `bottom:8px` 会把它顶到工具条右边一个 0 宽的盒子里，屏幕上直接消失（踩过一次：面板不见了、工具条末尾多出一个空盒子）。
+- 解法：`dockPanel()` 用 `position: fixed`，按 `.bv2-canvas` 的 `getBoundingClientRect()` 算 `left = r.left + 8`、`bottom = innerHeight - r.bottom + 8`、`maxHeight = r.height - 16`，钉到卡片左下角。什么时候算：`MutationObserver` 盯 `.bv2-canvas` 子树（面板被 React 挂上来就贴一次）、`sizeWatch` 里卡片尺寸变化时（收起素材栏 / 专注 / 改窗口）、`togglePanel()` 之后。CSS 里留一条 `position:absolute; left:8px; top:54px` 的兜底（万一 observer 没挂上）。
+- 量到的结果（1500×900，卡片 1012×874）：面板卡片内 `[8,160,200,698]`，底边距 16，工具条整排在上面不受影响；1160 宽（手机版 UI）没有这个面板，样式仍在底部 `.App-bottom-bar`。
+- 顺带：`☰` 的开合状态检测放宽成 `.dropdown-menu` / `.App-menu__left` / `.Island.sidebar` 三种都算「开着」。
