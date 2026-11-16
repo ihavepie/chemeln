@@ -639,3 +639,12 @@
 
 - 用户：「先这样吧，作为 1.1 好了」。`package.json` 1.0.0 → **1.1.0**，设置页最底下那行 → `ELN 1.1.0`，README 顶部与 `AGENTS.md` 的「当前版本」跟着改，打 tag `v1.1.0`。
 - 1.1 相对 1.0 的主要内容都在这几轮：排版板换成 Excalidraw 画布之后的收尾（画布卡片化、素材栏缩略图与插入提速、图注跟图绑组、原生样式面板钉左下、☰ 挪到右上）、试剂库/回收站/排版板列表的卡片化与表头拖宽、设置里的卡片质感与外部库链接开关、**每页一套教程**（`?` + 首访自动播）。
+
+## 2026-11-15 tailnet 监听没起来（别的设备连不上）
+
+- 用户：「为什么我其他 tailscale 连接设备没办法登录」。本子**没有登录/账号**这回事，等于「打不开页面」。
+- 证据链：`lsof -nP -iTCP:4780 -sTCP:LISTEN` 只有 `127.0.0.1:4780` 一行；服务启动日志里有 `no current Tailscale IPs; state: Stopped`。说明**服务启动那一刻 Tailscale 是停的**，`tailscale ip -4` 拿不到 100.x 地址 → 那个「只绑 tailnet 地址」的监听根本没建。
+- 原来的写法是在 `listen()` 里试一次 `execFileSync('tailscale', …)`，失败就算了 —— 于是本机一直好好的、别的设备永远连不上，还看不出哪里错。
+- 改法（`server/index.js`）：抽出 `tailnetIp()`（依次试 `tailscale` / `/Applications/Tailscale.app/Contents/MacOS/Tailscale` / homebrew 三个路径），`bindTailnet(port)` 在拿不到地址时**每 20 秒重试**、`extra.on('error')` 兜住（别让未捕获的 error 把服务带走），`watchTailnet()` 每分钟比一次 IP、变了就换绑（Tailscale 重连/换网）。都在主 `server.listen` 回调里启动，定时器 `unref()`。
+- 验证：重启后 `lsof` 有两行（`127.0.0.1:4780` + `100.94.34.39:4780`），日志里出现 `手机（tailnet） → http://100.94.34.39:4780/`，`curl http://100.94.34.39:4780/` 与 `/api/experiments` 都 200；`tailscale status` 里 windows 笔记本是 `active; direct`；macOS 防火墙本来就是关的。
+- 另外提醒过用户：**用 100.x 的 IP，别用 `*.ts.net` 域名**（手机浏览器的安全 DNS 会绕过 MagicDNS）；如果连的是**手机**，≤820px 的宽度只会渲染「扫码看档案」那一页，桌面版记录页本来就不给手机。

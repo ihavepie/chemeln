@@ -5590,6 +5590,95 @@ function scheduleAutoBackup() {
   setInterval(maybeAutoBackup, 3 * 60 * 60 * 1000).unref();
 }
 
+/**
+ * 另外在 Tailscale 网卡地址上听一份（100.64.0.0/10）：
+ * 手机浏览器的安全 DNS(DoH) 会绕过 MagicDNS，解析不了 *.ts.net 域名，
+ * 直接用 100.x 的 IP + 端口就没这个问题，而这个地址只有 tailnet 内能访问；
+ * 也不像 0.0.0.0 那样把同一局域网的机器都放进来。
+ *
+ * **Tailscale 可能比这个服务起得晚**（开机自启、或者用户刚把 Tailscale 打开）：
+ * 那时候 `tailscale ip -4` 会回一句 `no current Tailscale IPs; state: Stopped`，
+ * 拿到空地址。以前只在启动那一下试一次，试不到就永远没有这个监听（其他设备连不上，
+ * 但本机一切正常，很难看出来）—— 所以现在拿不到就每 20 秒再试，拿到就绑上。
+ */
+const TAILSCALE_BIN = [
+  'tailscale',                                         // PATH 里有就用（/usr/local/bin 那个是壳脚本）
+  '/Applications/Tailscale.app/Contents/MacOS/Tailscale', // App Store 版：CLI 在这个包里
+  '/opt/homebrew/bin/tailscale',
+];
+function tailnetIp() {
+  const cp = require('node:child_process');
+  for (const bin of TAILSCALE_BIN) {
+    try {
+      const out = cp.execFileSync(bin, ['ip', '-4'], {
+        encoding: 'utf8',
+        timeout: 3000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const ip = String(out.split('\n')[0] || '').trim();
+      if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return ip;
+    } catch {
+      /* 换下一个候选 */
+    }
+  }
+  return '';
+}
+
+let tailnetServer = null;
+let tailnetBoundIp = '';
+let tailnetTimer = null;
+let tailnetQuiet = 0;   // 连续失败次数，只在前几次打日志
+function bindTailnet(port) {
+  if (tailnetServer) return;
+  const ip = tailnetIp();
+  if (!ip) {
+    tailnetQuiet += 1;
+    if (tailnetQuiet <= 2) {
+      console.log('  tailnet 监听    →  暂时没有（Tailscale 没在跑？）20 秒后再试');
+    }
+    if (tailnetTimer) clearTimeout(tailnetTimer);
+    tailnetTimer = setTimeout(() => bindTailnet(port), 20000);
+    tailnetTimer.unref?.();
+    return;
+  }
+  const extra = http.createServer(server.listeners('request')[0]);
+  extra.on('error', (e) => {
+    // 端口被占 / 地址还没就绪：别让未捕获的 error 把整个服务带走
+    tailnetServer = null;
+    console.log('  tailnet 监听    →  绑定 ' + ip + ' 失败：' + e.message + '（20 秒后再试）');
+    if (tailnetTimer) clearTimeout(tailnetTimer);
+    tailnetTimer = setTimeout(() => bindTailnet(port), 20000);
+    tailnetTimer.unref?.();
+  });
+  extra.listen(port, ip, () => {
+    tailnetServer = extra;
+    tailnetBoundIp = ip;
+    tailnetQuiet = 0;
+    console.log('  手机（tailnet）  →  http://' + ip + ':' + port + '/   ← 不走域名解析，浏览器都能开');
+  });
+}
+
+/**
+ * Tailscale 断开重连（或者换了网络）之后，100.x 的地址可能变；变了就把旧监听换掉，
+ * 不然其他设备拿新地址进来还是连不上。一分钟看一次，几乎不花钱。
+ */
+function watchTailnet() {
+  setInterval(() => {
+    const ip = tailnetIp();
+    if (!tailnetServer) {
+      if (ip) bindTailnet(PORT);
+      return;
+    }
+    if (!ip) return;                    // 一时查不到（正在重连），先留着旧的
+    if (ip === tailnetBoundIp) return;
+    const old = tailnetServer;
+    tailnetServer = null;
+    old.close();
+    console.log('  tailnet 监听    →  地址变了（' + tailnetBoundIp + ' → ' + ip + '），重新绑一份');
+    bindTailnet(PORT);
+  }, 60 * 1000).unref();
+}
+
 function listen(port, attempt = 0) {
   server.once('error', (err) => {
     if (err.code === 'EADDRINUSE' && attempt < 20) {
@@ -5599,29 +5688,11 @@ function listen(port, attempt = 0) {
       process.exit(1);
     }
   });
-  // 另外在 Tailscale 网卡地址上也听一份（100.64.0.0/10）：
-  // 手机浏览器的安全 DNS(DoH) 会绕过 MagicDNS，解析不了 *.ts.net 域名；
-  // 直接用 100.x 的 IP + 端口就没这个问题，而这个地址只有 tailnet 内能访问。
-  // 用 tailscale 自己报的地址，别靠网段猜：局域网的 100.x 也可能落进 100.64/10
-  let tailnetIp = '';
-  try {
-    tailnetIp = String(require('node:child_process')
-      .execFileSync('tailscale', ['ip', '-4'], { encoding: 'utf8', timeout: 3000 })
-      .split('\n')[0] || '').trim();
-  } catch {
-    tailnetIp = '';
-  }
-  if (!/^100\.\d+\.\d+\.\d+$/.test(tailnetIp)) tailnetIp = '';
-  if (tailnetIp) {
-    const extra = http.createServer(server.listeners('request')[0]);
-    extra.listen(port, tailnetIp, () => {
-      console.log('  手机（tailnet）  →  http://' + tailnetIp + ':' + port + '/   ← 不走域名解析，浏览器都能开');
-    });
-  }
-
   server.listen(port, HOST, () => {
     // 真起在哪个端口就记哪个：二维码 base 和 PDF 渲染地址都读 PORT
     PORT = port;
+    bindTailnet(port);
+    watchTailnet();
     const url = `http://${HOST}:${port}`;
     console.log('');
     console.log('  方法学实验记录  →  ' + url);
