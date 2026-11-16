@@ -24,12 +24,19 @@ const tourSteps = ref([]);
 const tourOpen = ref(false);
 let autoTimer = 0;
 
+/** 这一次会话里已经自动放过的（内存里再挡一道：万一标记没写进去，也不会一开就再弹） */
+const playedThisSession = new Set();
+
 /** 只放 target 真的在页面上的那几步（栏目收起 / 画布还没渲染好都会缺） */
 function openTour() {
-  const steps = liveSteps(TOURS[tourKey.value] || []);
+  const key = tourKey.value;
+  const steps = liveSteps(TOURS[key] || []);
   if (!steps.length) return;
   tourSteps.value = steps;
   tourOpen.value = true;
+  // 打开就记「看过了」：关掉页面 / 直接跳走也不会再来一次
+  playedThisSession.add(key);
+  markTourSeen(key);
 }
 
 function onTourClose() {
@@ -40,7 +47,7 @@ function scheduleAutoTour() {
   clearTimeout(autoTimer);
   tourOpen.value = false;
   const key = tourKey.value;
-  if (!key || isPhone.value || tourSeen(key)) return;
+  if (!key || isPhone.value || tourSeen(key) || playedThisSession.has(key)) return;
   // 画布那页要等 Excalidraw 动态 import 完才有工具条，放晚一点；其它页 0.9s 够
   autoTimer = setTimeout(openTour, key === 'board' ? 1600 : 900);
 }

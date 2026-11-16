@@ -52,7 +52,8 @@ const extSites = (name) => {
 const idCache = new Map();
 /** 给模板用的同一份结果（异步解析完就地出现链接） */
 const idsMap = reactive({});
-const SITE_SHORT = { pubchem: 'PubChem', chemicalbook: 'CB', nist: 'NIST', tci: 'TCI', cas: 'CAS' };
+// 试剂名后面那排外部库：一律两位，省地方（完整名字在 title 里）
+const SITE_SHORT = { pubchem: 'PC', chemicalbook: 'CB', nist: 'NI', tci: 'TC', cas: 'CAS' };
 
 async function idsOf(name) {
   if (idCache.has(name)) return idCache.get(name);

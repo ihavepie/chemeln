@@ -245,25 +245,57 @@ export function tourKeyOf(routeName) {
   return BY_ROUTE[String(routeName || '')] || '';
 }
 
+/** uiprefs 里那份（会跟服务器合并、同步到别的设备） */
 function allSeen() {
   const v = uiGet(KEY, {});
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
 
+/**
+ * 另外再记一份**只在本机 localStorage** 的（`eln:tourSeen`）。
+ * 为什么要两份：uiprefs 那份要跟服务器按时间戳合并，如果服务器上是个更早的副本，
+ * 合并之后本机的标记会被盖回去 —— 表现出来就是「每次打开都又放一遍教程」。
+ * 本地这份不参与合并，读到就算看过。
+ */
+const LOCAL = 'eln:tourSeen';
+function localSeen() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LOCAL) || '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
+
 export function tourSeen(key) {
-  return !!allSeen()[key];
+  if (!key) return false;
+  return !!localSeen()[key] || !!allSeen()[key];
 }
 
 export function markTourSeen(key) {
   if (!key) return;
+  const ls = localSeen();
+  if (!ls[key]) {
+    ls[key] = 1;
+    try {
+      localStorage.setItem(LOCAL, JSON.stringify(ls));
+    } catch {
+      /* 隐私模式写不进去就算了，还有 uiprefs 那份 */
+    }
+  }
   const seen = allSeen();
   if (seen[key]) return;
   seen[key] = 1;
   uiSetIfChanged(KEY, seen);
 }
 
-/** 设置里「重新看一遍」：清掉全部标记，下次进页面又会自动放一遍 */
+/** 设置里「重新看一遍」：两份标记都清掉，下次进页面又会自动放一遍 */
 export function resetTours() {
+  try {
+    localStorage.removeItem(LOCAL);
+  } catch {
+    /* 同上 */
+  }
   uiSet(KEY, {});
 }
 
