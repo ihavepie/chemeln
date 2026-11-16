@@ -17,7 +17,7 @@
 - 前端：Vue 3.5 `<script setup>`、vue-router 4（hash 模式）、Element Plus 2.8（zh-CN）、Vite 6，无 TypeScript、无状态管理库（一个 reactive store）。
 - 化学计算：`openchemlib` 9.25.1，**动态 import**，负责 SMILES/MOL → 分子式、MW、结构 SVG。**只给「带基团缩写」的结构另加一份 `indigo-ketcher` 1.46 的 WASM**（`src/lib/indigo.js`，11.8 MB，放 `vendor/indigo/`，按需加载）。
 - 服务端：零依赖 Node CommonJS（`server/index.js` 83 条路由；纯清洗层在 `server/lib/normalize.js`，能单测），内置 `node:sqlite`，端口 4780。
-- 启动：`preview.command`（4780 在跑就复用，再起 5173）、`npm run dev` / `serve`；**`npm run check`** 跑 `test/` 纯逻辑测试（`node --test`，零依赖）；**`npm run check:pages`** 量纸页高度跟 `test/print-baseline.json` 比（护「打印恒 2 页」，要 macOS + 服务在跑）；**`npm run check:types`** 用 tsc 的 `checkJs` 扫 `src/lib/**`（`tsconfig.json` + `src/shims-vue.d.ts`，**只当检查器**）。
+- 启动：`preview.command`（4780 在跑就复用，再起 5173）、`npm run dev` / `serve`；**`npm run check`** 跑 `test/` 纯逻辑测试；**`npm run check:pages`** 量纸页高度跟 `test/print-baseline.json` 比（护「打印恒 2 页」，要 macOS + 服务在跑）；**`npm run check:types`** 用 tsc 的 `checkJs` 扫 `src/lib/**`（`tsconfig.json` + `src/shims-vue.d.ts`，**只当检查器**）。
 - 数据：全部在 `data/` —— `data/eln.db`（SQLite）+ `data/attachments/`（谱图等原始文件）+ `data/compounds/`（化合物文件）。备份 = 整个 `data/` 拷走。
 - **数据备份用 `node scripts/backup.js`**：`VACUUM INTO` 把（含 WAL 的）真数据写成一个自包含单文件，再连 `attachments/`、`compounds/` 一起拷到 `.backups/<日期>/`，默认留 7 份（`--list` 看已有、`--keep N` 改份数）。**别用 `cp data/eln.db` 当备份**——真数据在 `-wal` 里，拷出来是空壳。服务启动后每日自动备一次（`ELN_AUTO_BACKUP=0` 关）；`.backups/` 不进 git。
 - **绝对不能删**：`data/`（用户全部实验记录）、`server/package.json`（内容是 `{"type":"commonjs"}`，删了服务端起不来）、`src/styles/eln.css` 里从 v1 原样搬来的大段规则、`public/`（**现在就是 v2 构建产物，删了 4780 打不开**；旧 v1 在 `.backup/public-v1-*/`）。
