@@ -16,6 +16,7 @@ const ScreeningView = () => import('./views/ScreeningView.vue');
 const SettingsView = () => import('./views/SettingsView.vue');
 const TrashView = () => import('./views/TrashView.vue');
 const ReagentLibView = () => import('./views/ReagentLibView.vue');
+const SpectraView = () => import('./views/SpectraView.vue');
 const BoardsView = () => import('./views/BoardsView.vue');
 const MobileHome = () => import('./components/MobileHome.vue');
 
@@ -41,6 +42,8 @@ export const router = createRouter({
     // 「对照」页已撤（用户：排版板够了），老链接直接送到排版板
     { path: '/compare', redirect: '/boards' },
     { path: '/reagents', name: 'reagents', component: ReagentLibView },
+    // 谱图库：实验附件 + 化合物文件里的谱图类汇总（原始 FID/mnova + 处理后的 PDF/图）
+    { path: '/spectra', name: 'spectra', component: SpectraView },
     { path: '/boards', name: 'boards', component: BoardsView },
     // 排版板 = Excalidraw 那套画布（老 HTML 画布已废弃）
     { path: '/b/:id', name: 'board', component: () => import('./views/BoardV2View.vue') },

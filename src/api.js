@@ -151,6 +151,13 @@ export const api = {
   historyRestore: (entity, id, body) => request(`/api/history/${entity}/${id}/restore`, { method: 'POST', body }),
   upload: (id, formData) => request(`/api/experiments/${id}/attachments`, { method: 'POST', body: formData }),
   uploadPath: (id, body) => request(`/api/experiments/${id}/attachments/path`, { method: 'POST', body }),
+  /* 谱图库：把所有「谱图类」附件（实验的 + 化合物的）拉成一张表 */
+  spectra: (query = {}) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) if (v !== '' && v != null) p.set(k, String(v));
+    const qs = p.toString();
+    return request(`/api/spectra${qs ? `?${qs}` : ''}`);
+  },
   updateAttachment: (id, body) => request(`/api/attachments/${id}`, { method: 'PUT', body }),
   deleteAttachment: (id) => request(`/api/attachments/${id}`, { method: 'DELETE' }),
   // 反应式那张内联 SVG 的缓存（服务端只存不画，删了也不影响记录）

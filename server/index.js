@@ -3147,6 +3147,57 @@ route('GET', '/api/files/:id', async (req, res, params, url) => {
   await serveAttachment(req, res, Number(params.id), url);
 });
 
+/* --- 谱图库：把「谱图类」附件（实验的 + 化合物的）平铺成一张表 ---
+   不新开表：还是 attachments / compound_files 那两条，只是换个查法。
+   kind：raw = 原始数据（FID / mnova 文件夹），proc = 处理后的谱图（PDF / ¹H / ¹³C / 其它 / HRMS / IR），all = 都要。 */
+const SPECTRUM_RAW = ['nmr_raw'];
+const SPECTRUM_PROC = ['nmr_pdf', 'h1', 'c13', 'nmr_other', 'hrms', 'ir'];
+route('GET', '/api/spectra', async (req, res, params, url) => {
+  const kind = str(url.searchParams.get('kind')) || 'all';
+  const kw = str(url.searchParams.get('q')).trim().toLowerCase();
+  const proj = str(url.searchParams.get('project'));
+  const cats = kind === 'raw' ? SPECTRUM_RAW : kind === 'proc' ? SPECTRUM_PROC : [...SPECTRUM_RAW, ...SPECTRUM_PROC];
+  const ph = cats.map(() => '?').join(',');
+  let rows = [];
+  try {
+    rows = db
+      .prepare(
+        `SELECT 'exp' AS src, a.id, a.category, a.original_name AS name, a.size, a.is_dir, a.mime, a.created_at,
+                a.exp_id AS owner_id, e.code AS owner_code,
+                COALESCE(NULLIF(TRIM(e.title), ''), NULLIF(TRIM(e.objective), ''), '') AS owner_title,
+                e.project AS project
+           FROM attachments a JOIN experiments e ON e.id = a.exp_id
+          WHERE a.category IN (${ph})
+         UNION ALL
+         SELECT 'cmp', f.id, f.category, f.original_name, f.size, f.is_dir, f.mime, f.created_at,
+                f.compound_id, c.code,
+                COALESCE(NULLIF(TRIM(c.name), ''), NULLIF(TRIM(c.formula), ''), ''),
+                c.project
+           FROM compound_files f JOIN compounds c ON c.id = f.compound_id
+          WHERE f.category IN (${ph})
+          ORDER BY 8 DESC`
+      )
+      .all(...cats, ...cats);
+  } catch (e) {
+    return fail(res, 500, e.message);
+  }
+  if (proj) rows = rows.filter((r) => (r.project || '') === proj);
+  if (kw) {
+    rows = rows.filter((r) =>
+      `${r.name || ''} ${r.owner_code || ''} ${r.owner_title || ''} ${r.project || ''}`.toLowerCase().includes(kw)
+    );
+  }
+  ok(res, {
+    items: rows.map((r) => ({
+      ...r,
+      // 打开 / 下载走哪条路由：实验附件是 /api/files，化合物文件是 /api/compound-files
+      url: r.src === 'exp' ? `/api/files/${r.id}` : `/api/compound-files/${r.id}`,
+    })),
+    raw: rows.filter((r) => r.category === 'nmr_raw').length,
+    proc: rows.filter((r) => r.category !== 'nmr_raw').length,
+  });
+});
+
 /* --- exports --- */
 route('GET', '/api/experiments/:id/export.md', async (req, res, params, url) => {
   const exp = getExperiment(Number(params.id));

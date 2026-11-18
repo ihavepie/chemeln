@@ -99,6 +99,23 @@ export const TOURS = {
     },
   ],
 
+  /* ---------------- 谱图库 ---------------- */
+  spectra: [
+    NAV,
+    {
+      target: '.sp-head',
+      title: '原始 + 处理后的都在这',
+      text: '「原始数据」是 Bruker FID 文件夹、MestReNova 的 .mnova；「处理后的谱图」是 PDF / ¹H / ¹³C / HRMS / IR。上面可以按文件名、编号、名称搜。',
+      place: 'bottom',
+    },
+    {
+      target: '.sp-card',
+      title: '一行一份谱图',
+      text: '点一行就地打开（图片 / PDF 直接看，FID 文件夹列出里面有什么）；右键能下载、跳到那条记录或化合物、彻底删除。',
+      place: 'top',
+    },
+  ],
+
   /* ---------------- 试剂库 ---------------- */
   reagents: [
     NAV,
@@ -232,6 +249,7 @@ const BY_ROUTE = {
   editor: 'editor',
   compounds: 'compounds',
   compound: 'compounds',
+  spectra: 'spectra',
   reagents: 'reagents',
   screenings: 'screenings',
   screening: 'screenings',

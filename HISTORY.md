@@ -648,3 +648,12 @@
 - 改法（`server/index.js`）：抽出 `tailnetIp()`（依次试 `tailscale` / `/Applications/Tailscale.app/Contents/MacOS/Tailscale` / homebrew 三个路径），`bindTailnet(port)` 在拿不到地址时**每 20 秒重试**、`extra.on('error')` 兜住（别让未捕获的 error 把服务带走），`watchTailnet()` 每分钟比一次 IP、变了就换绑（Tailscale 重连/换网）。都在主 `server.listen` 回调里启动，定时器 `unref()`。
 - 验证：重启后 `lsof` 有两行（`127.0.0.1:4780` + `100.94.34.39:4780`），日志里出现 `手机（tailnet） → http://100.94.34.39:4780/`，`curl http://100.94.34.39:4780/` 与 `/api/experiments` 都 200；`tailscale status` 里 windows 笔记本是 `active; direct`；macOS 防火墙本来就是关的。
 - 另外提醒过用户：**用 100.x 的 IP，别用 `*.ts.net` 域名**（手机浏览器的安全 DNS 会绕过 MagicDNS）；如果连的是**手机**，≤820px 的宽度只会渲染「扫码看档案」那一页，桌面版记录页本来就不给手机。
+
+## 2026-11-16 谱图库（侧栏新开一页：原始数据 + MestReNova 处理后的）
+
+- 用户：「或者可以专门在侧边栏做一个原始数据库吗，然后可以包含原始数据和 mestrenova 处理之后的」。确认了两个口径：**新开一页「谱图库」**（不是只做原始数据一类）、**这一页还要能往里放**（不只是浏览）。
+- 不加表：`attachments` 里本来就有 `nmr_raw`（「原始数据 · FID / mnova」，支持整目录导入）和 `nmr_pdf` / `h1` / `c13` / `nmr_other` / `hrms` / `ir`，`compound_files` 也一样。新接口 `GET /api/spectra?kind=all|raw|proc&q=&project=` 是把这两张表里这些分类的行 `UNION ALL` 出来的（`src` 区分 exp / cmp，附一个 `url` 让前端知道走 `/api/files/:id` 还是 `/api/compound-files/:id`）。
+- 页面 `src/views/SpectraView.vue`（侧栏「谱图库」，位置在化合物库和试剂库之间，图标 `wave`）：筛选胶囊（全部 / 原始数据 / 处理后的，带计数）+ 搜索（文件名 / 编号 / 名称）+ 表格（类型 / 文件 / 归属 / 大小 / 上传时间，表头可拖宽，走 `lib/colresize.js`）。行点开：图片 / PDF / 文本走 `FilePreview` 就地看，`is_dir` 的（FID / mnova 文件夹）弹一个文件清单；右键 = 打开 / 下载 / 去那条记录（或化合物页）/ 彻底删除；空白处右键接管成页面菜单（刷新 / 导入）。
+- 「导入谱图」弹窗：放到「实验记录 / 化合物」→ 选一条（搜索 + 单选列表）→ 选分类（原始数据 / 谱图 PDF / ¹H / ¹³C / 其它核磁 / HRMS / IR）→ 选文件（multipart）或**填本机路径**（目录也行，走原有的 `uploadPath` / `uploadCompoundPath`）。原始数据基本只能用路径导入：浏览器选文件夹会拆成一堆独立文件。
+- 两个坑：① `UNION ALL` 后面按列名 `ORDER BY created_at` 会报 `1st ORDER BY term does not match any column in the result set`，改成按序号 `ORDER BY 8 DESC`；② 表格里 `td` 写成 `display:flex` 就不再是 table-cell，整行内容会错位（名字、归属全掉到下一行）——要 flex 就在 td 里套一层 div。
+- 也加了这套的教程步骤（`TOURS.spectra`，两步）。验证：造了临时实验 / 化合物各挂一个 FID 文件夹 + 一个 PDF，`/api/spectra` 返回 3 行（raw 1 / proc 2）、页面列表正常、导入弹窗正常；验完把临时记录和化合物彻底删掉（回收站也清了），`/api/spectra` 回到 0 行。`check` 58 绿 / `check:types` 0 错 / `build` 通过。

@@ -20,6 +20,7 @@ const nav = computed(() => {
     { key: 'home', to: '/', label: '工作台', ic: 'flask', count: '' },
     { key: 'list', to: '/list', label: '实验记录', ic: 'file', count: b?.totals?.experiments ?? '' },
     { key: 'compounds', to: '/compounds', label: '化合物库', ic: 'molecule', count: b?.compoundCount ?? '' },
+    { key: 'spectra', to: '/spectra', label: '谱图库', ic: 'wave', count: '' },
     { key: 'reagents', to: '/reagents', label: '试剂库', ic: 'flask', count: b?.reagentCount ?? '' },
     { key: 'screenings', to: '/screenings', label: '条件筛选', ic: 'table', count: b?.totals?.groups ?? '' },
     { key: 'boards', to: '/boards', label: '排版板', ic: 'grid', count: '' },
