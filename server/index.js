@@ -954,17 +954,21 @@ function bootstrap(query = {}) {
   const settings = settingsFor(project);
   const onProject = project ? 'AND project = ?' : '';
   const onExp = project ? 'AND e.project = ?' : '';
+  const onScreening = project ? 'AND s.project = ?' : '';
   const pjArgs = project ? [project] : [];
 
   const projects = listProjects();
   const rxnTypes = db
     .prepare("SELECT rxn_type, COUNT(*) AS n FROM experiments WHERE rxn_type <> '' GROUP BY rxn_type ORDER BY n DESC")
     .all();
+  // 筛选表数「这张表有几张」：现在的筛选表是独立的一张表（实验挂在 entries_json 里，
+  // exp_id 常是空的），JOIN experiments 会一条都数不到、工作台那个数字永远是 0。
+  // 所以直接数表，按它自己的 project 过滤（跟 /api/screenings 那个页面的筛法一致）。
   const totals = db
     .prepare(
       `SELECT (SELECT COUNT(*) FROM experiments WHERE 1 = 1 ${onProject}) AS experiments,
               (SELECT COUNT(*) FROM attachments a JOIN experiments e ON e.id = a.exp_id WHERE 1 = 1 ${onExp}) AS attachments,
-              (SELECT COUNT(*) FROM screenings s JOIN experiments e ON e.id = s.exp_id WHERE 1 = 1 ${onExp}) AS screenings`
+              (SELECT COUNT(*) FROM screenings s WHERE 1 = 1 ${onScreening}) AS screenings`
     )
     .get(...pjArgs, ...pjArgs, ...pjArgs);
   // 侧栏那一项的计数现在是「平行组有几摞」，不是老手填筛选表的条数
@@ -1792,7 +1796,8 @@ const route = (method, pattern, handler) => {
 };
 
 /* 拖动诊断：前端每拖一次发几行现场过来，落到 data/drag-debug.log（不进 git，data/ 整体备份时就带走了）。
-   真实浏览器里拖不动、而合成事件测起来又「一切正常」时，靠这几行才能看出卡在哪一步。 */
+   真实浏览器里拖不动、而合成事件测起来又「一切正常」时，靠这几行才能看出卡在哪一步。
+   前端默认不发了（要查时控制台 localStorage.elnDragDebug='1'）；这条路由留着，别删。 */
 route('POST', '/api/debug/drag', async (req, res) => {
   const body = await readJson(req);
   const line = `${new Date().toISOString()} ${JSON.stringify(body)}\n`;

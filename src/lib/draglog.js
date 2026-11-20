@@ -3,11 +3,12 @@
  *
  * 为什么需要它：合成事件在测试里永远「成功」，真鼠标却可能一个 `mousemove` 都传不到页面。
  * 用户拖一次之后，日志里就能看出到底卡在「按下没触发」「没收到移动」「起了拖但没落点」哪一步。
- * 关掉：控制台执行 `localStorage.elnDragDebug = '0'`。
+ * 默认关（拖动是最高频的操作，不该每次都往磁盘写一行、还跟着 data/ 进备份）。
+ * 要查拖动问题时，控制台执行 `localStorage.elnDragDebug = '1'` 再拖一次。
  */
 export function logDrag(payload) {
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.elnDragDebug === '0') return;
+    if (typeof localStorage === 'undefined' || localStorage.elnDragDebug !== '1') return;
     fetch('/api/debug/drag', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

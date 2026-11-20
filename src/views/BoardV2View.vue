@@ -184,11 +184,20 @@ async function rasterBlock(it, key) {
 }
 
 /** 图注就是一行原生 text（能双击直接改），跟在图下面 */
+const CAPTION_FONT = 13;
 function captionSk(text, x, y, w) {
   return [{
     type: 'text', x, y, width: Math.round(w), text: String(text),
-    fontSize: 13, fontFamily: 2, strokeColor: '#4a463f', textAlign: 'left',
+    fontSize: CAPTION_FONT, fontFamily: 2, strokeColor: '#4a463f', textAlign: 'left',
   }];
+}
+
+/**
+ * 图注认领那张图：字号基准 + 当时图多宽都记在 text 的 customData 里。
+ * 有了这两个数，下次图被拉大拉小之后才知道图注该回到几号字。
+ */
+function tagCaption(t, img) {
+  t.customData = { ...(t.customData || {}), capOf: img.id, capFont: t.fontSize, imgW: img.width };
 }
 
 const ctxOf = () => ({ get: (id) => expCache[id] });
@@ -455,18 +464,26 @@ function groupLooseCaptions(els) {
   const texts = live.filter((e) => e.type === 'text');
   let changed = 0;
   for (const t of texts) {
-    if (t.groupIds && t.groupIds.length) continue;
-    const img = imgs.find(
-      (i) =>
-        (!i.groupIds || !i.groupIds.length) &&
-        Math.abs(i.x - t.x) <= 8 &&
-        t.y >= i.y + (i.height || 0) - 4 &&
-        t.y <= i.y + (i.height || 0) + 28
-    );
+    if (t.customData && t.customData.capOf) continue; // 已经认过图的（新拖上来的）不动
+    const under = (i) =>
+      Math.abs(i.x - t.x) <= 8 &&
+      t.y >= i.y + (i.height || 0) - 4 &&
+      t.y <= i.y + (i.height || 0) + 28;
+    // 老板子里「图和图注早就编好组」的：只补个认领（好让 fixCaptions 认得出它是图注）
+    if (t.groupIds && t.groupIds.length) {
+      const mate = imgs.find((i) => (i.groupIds || []).some((g) => t.groupIds.includes(g)) && under(i));
+      if (mate) {
+        tagCaption(t, mate);
+        changed += 1;
+      }
+      continue;
+    }
+    const img = imgs.find((i) => (!i.groupIds || !i.groupIds.length) && under(i));
     if (!img) continue;
     const gid = newGroupId();
     img.groupIds = [gid];
     t.groupIds = [gid];
+    tagCaption(t, img); // 老图注也归到「不跟图缩放」这条规矩里
     changed += 1;
   }
   return changed;
@@ -483,6 +500,9 @@ async function insertSkeletons(sk, group = false) {
   if (group && els.length > 1) {
     const gid = newGroupId();
     for (const e of els) e.groupIds = [gid];
+    // 图注认下图：编组是为了拖着一起走，但字不能跟着图缩（见 fixCaptions）
+    const img = els.find((e) => e.type === 'image');
+    if (img) for (const e of els) if (e.type === 'text') tagCaption(e, img);
   }
   // 新图的二进制必须先塞进 Excalidraw 的文件表，否则元素只是张「破图」占位
   if (fresh.length) exApi.addFiles(fresh.splice(0));
@@ -502,6 +522,74 @@ async function insertSkeletons(sk, group = false) {
     }
   } catch {
     /* 版本差异，忽略 */
+  }
+}
+
+/* ---------------- 图注不跟着图缩 ----------------
+   Excalidraw 的组缩放是「整组按比例拉」——TLC 图和图注编在一组，缩图的时候
+   那行字会被一起缩小（缩到一半就看不清了）。松手之后这里把字号掰回基准、
+   再贴回图下面。图没改尺寸的那种缩放（用户就是想改图注本身）就当新基准记下来。 */
+let captionBusy = false;
+let captionTimer = 0;
+
+/**
+ * 两个触发点：松手那一下立刻掰（onPointerUp），以及场景变化后防抖兜底
+ * （万一某个手势没走 pointerup、或者撤销/键盘改的尺寸）。手势还在进行时先不跑，
+ * 不然会跟 Excalidraw 正在做的缩放互相打架。
+ */
+function scheduleFixCaptions(st) {
+  clearTimeout(captionTimer);
+  if (st && (st.isResizing || st.selectedElementsAreBeingDragged)) return;
+  captionTimer = setTimeout(() => void fixCaptions(), 260);
+}
+
+async function fixCaptions() {
+  if (!exApi || captionBusy) return;
+  const els = exApi.getSceneElements();
+  const byId = new Map(els.map((e) => [e.id, e]));
+  const patched = new Map(); // id → 改过的图注
+  const under = (img) => ({ x: img.x, y: img.y + (img.height || 0) + 4 });
+  for (const e of els) {
+    const cap = e.customData && e.customData.capOf;
+    if (!cap || e.isDeleted || e.type !== 'text') continue;
+    const img = byId.get(cap);
+    if (!img || img.isDeleted || img.type !== 'image') continue;
+    const base = Number(e.customData.capFont) || CAPTION_FONT;
+    const imgW0 = Number(e.customData.imgW) || 0;
+    // 图还是原来那个宽度 → 这次被单独缩放的是图注，把现在这号记成新基准
+    if (Math.abs((img.width || 0) - imgW0) < 0.5) {
+      if (Math.abs(e.fontSize - base) > 0.01) patched.set(e.id, { ...e, customData: { ...e.customData, capFont: e.fontSize } });
+      continue;
+    }
+    const next = {
+      ...e,
+      fontSize: base,
+      customData: { ...e.customData, capFont: base, imgW: img.width },
+    };
+    // 图转过就只改字号、不硬拽位置（旋转后的「正下方」算不准）
+    if (!img.angle) Object.assign(next, under(img));
+    patched.set(e.id, next);
+  }
+  if (!patched.size) return;
+  captionBusy = true;
+  try {
+    const EX = await import('@excalidraw/excalidraw');
+    // 改过字号必须重算宽高，否则文本框还是缩放后那个尺寸，字会被裁 / 撑歪。
+    // 只把这几条图注丢给 restoreElements 量一遍，别整场景过（它顺手会规整箭头）
+    const sized = new Map(
+      EX.restoreElements([...patched.values()], null, { refreshDimensions: true, repairBindings: true }).map((e) => [e.id, e])
+    );
+    const out = els.map((e) => {
+      const p = patched.get(e.id);
+      if (!p) return e;
+      const s = sized.get(e.id);
+      return s ? { ...p, width: s.width, height: s.height } : p;
+    });
+    exApi.updateScene({ elements: out, captureUpdate: 'NEVER' }); // 不进撤销栈：撤销应退回缩放前
+  } catch {
+    /* 版本差异：宁可图注跟着缩，也不能把画布弄挂 */
+  } finally {
+    captionBusy = false;
   }
 }
 
@@ -684,8 +772,15 @@ function onChange(payload) {
   pending = payload;
   const ids = ((payload && payload.appState) || {}).selectedElementIds || {};
   hasSel.value = Object.keys(ids).length > 0;
+  scheduleFixCaptions((payload && payload.appState) || null);
   clearTimeout(timer);
   timer = setTimeout(saveNow, 800);
+}
+
+/** 松手：缩放刚结束，立刻把图注的字号掰回来（别等防抖） */
+function onBoardPointerUp() {
+  clearTimeout(captionTimer);
+  void fixCaptions();
 }
 
 async function saveNow() {
@@ -870,7 +965,7 @@ load();
           <p>这个画布起不来：{{ failed }}</p>
           <p class="bv2-fail-hint">把上面的报错截图发我就能定位。</p>
         </div>
-        <ExcalidrawHost v-else ref="hostEl" :initial="initial" @ready="onReady" @fail="failed = $event" @change="onChange" />
+        <ExcalidrawHost v-else ref="hostEl" :initial="initial" @ready="onReady" @fail="failed = $event" @change="onChange" @pointerup="onBoardPointerUp" />
 
         <!-- 板级操作：浮在卡片右上角 -->
         <div class="bv2-fbar">

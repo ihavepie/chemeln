@@ -16,7 +16,7 @@ const props = defineProps({
   /** 关掉 Excalidraw 自带的一些按钮，跟本子其它地方一致一点 */
   viewMode: { type: Boolean, default: false },
 });
-const emit = defineEmits(['ready', 'change', 'fail']);
+const emit = defineEmits(['ready', 'change', 'fail', 'pointerup']);
 
 const host = ref(null);
 const err = ref('');
@@ -63,6 +63,8 @@ onMounted(async () => {
         onChange: (elements, appState) => {
           emit('change', { elements, appState });
         },
+        // 松手这一下：缩放（八点手柄）刚结束，外面要拿它把图注的字号掰回来
+        onPointerUp: () => emit('pointerup'),
       })
     );
   } catch (e) {

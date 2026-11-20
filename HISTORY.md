@@ -657,3 +657,7 @@
 - 「导入谱图」弹窗：放到「实验记录 / 化合物」→ 选一条（搜索 + 单选列表）→ 选分类（原始数据 / 谱图 PDF / ¹H / ¹³C / 其它核磁 / HRMS / IR）→ 选文件（multipart）或**填本机路径**（目录也行，走原有的 `uploadPath` / `uploadCompoundPath`）。原始数据基本只能用路径导入：浏览器选文件夹会拆成一堆独立文件。
 - 两个坑：① `UNION ALL` 后面按列名 `ORDER BY created_at` 会报 `1st ORDER BY term does not match any column in the result set`，改成按序号 `ORDER BY 8 DESC`；② 表格里 `td` 写成 `display:flex` 就不再是 table-cell，整行内容会错位（名字、归属全掉到下一行）——要 flex 就在 td 里套一层 div。
 - 也加了这套的教程步骤（`TOURS.spectra`，两步）。验证：造了临时实验 / 化合物各挂一个 FID 文件夹 + 一个 PDF，`/api/spectra` 返回 3 行（raw 1 / proc 2）、页面列表正常、导入弹窗正常；验完把临时记录和化合物彻底删掉（回收站也清了），`/api/spectra` 回到 0 行。`check` 58 绿 / `check:types` 0 错 / `build` 通过。
+
+## 细节存档：排版板卡片里的浮层定位（2026-11-20 从 AGENTS.md 下移）
+
+**☰ 在卡片**右上角**（那组「存图 / 导出 PDF」的最后一个方块）＝主菜单（帮助 / 重置画布 / Excalidraw links / 画布背景），`dockMenu()` 用同样办法把它钉到卡片右上、落在 ☰ 下面（宽 >320 的是窄窗口那种整宽下拉，别动）；**样式面板不用点它**：选中图形后 `.App-menu__left`（描边 / 背景 / 线宽 / 线型 / 透明度 / 图层 / 操作）自己冒出来，`dockPanel()` 用 `position:fixed` 按卡片矩形把它钉到**左下角**（offset parent 是工具条那层，`top`/`bottom` 都算不准），`MutationObserver` 盯它出现、`sizeWatch` 里卡片尺寸变了再贴一次；素材库 / 提示 CSS 藏掉，**底部那条（`.App-bottom-bar`）也要留着**——Excalidraw 在窄容器会用「手机版」UI，选中图形后的**调色板 / 线宽 / 线条风格 / 透明度 / 图层**全在那条的 🎨 里（藏了就没有改颜色的入口）。**卡片窄于 ~730px 时 Excalidraw 自动切成「手机版」UI**，会多出右上一排「素材库/锁/手」和底部汉堡条 —— 要额外藏 `.mobile-misc-tools-container` / `.main-menu-trigger`（**但 `.App-bottom-bar` 千万别藏**——窄窗口的样式入口；`.App-menu_top__left` 也**别 `display:none`**（面板挂在里面，藏了面板再也出不来），只能压成 `width:0` —— 选中元素时它多出 24px 会把工具条顶右、跟 ☰ 裂开），并把 `.App-top-bar` 改成 `justify-content:flex-start`。
