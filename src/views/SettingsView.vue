@@ -798,9 +798,9 @@ function setScrollSwitch(v) {
           </h2>
         </div>
         <p class="hint" v-if="store.project">
-          以下各项可按「{{ store.project }}」单独设置，留空则沿用全局值。标题即课题名称，修改后将同步重命名该课题及其名下记录。
+          留空的项沿用全局值。标题即课题名，改了会连带重命名这个课题。
         </p>
-        <p class="hint" v-else>此处为全局默认值。每个课题可单独覆盖：在侧栏切换到该课题后进入本页修改。课题的标题即其名称。</p>
+        <p class="hint" v-else>全局默认值；每个课题可以单独覆盖。</p>
         <div id="set-book-basic" class="grid-2" :class="{ 'mt12': true }">
           <div class="field"><label>{{ store.project ? '标题（= 课题名）' : '标题' }}</label><input class="input" v-model="form.lab_heading" :placeholder="ph.lab_heading" /></div>
           <div class="field"><label>编号前缀</label><input class="input num" v-model="form.code_prefix" :placeholder="ph.code_prefix" /></div>
@@ -810,20 +810,18 @@ function setScrollSwitch(v) {
             <label>手机 / 局域网访问</label>
             <label class="check-row">
               <input type="checkbox" v-model="form.lan_access" />
-              <span>允许同一 Wi-Fi 下的手机打开（监听 0.0.0.0）</span>
+              <span>允许同一 Wi-Fi 下的手机打开</span>
             </label>
             <p class="hint mt8">
-              当前：<b>{{ store.boot?.lanAccess ? '已允许' : '仅本机' }}</b>；本机局域网地址
-              <span class="mono">{{ store.boot?.lanUrl || '（没检测到网卡）' }}</span>。
-              <b>改完要重启服务</b>才生效（<span class="mono">node server/index.js</span>）；只在自己信得过的网络里开。
+              当前 <b>{{ store.boot?.lanAccess ? '已允许' : '仅本机' }}</b> · 本机地址
+              <span class="mono">{{ store.boot?.lanUrl || '（没检测到网卡）' }}</span> · <b>改完要重启服务</b>
             </p>
           </div>
           <div id="set-qr" class="field" style="grid-column: 1/-1">
             <label>瓶子标签的二维码地址</label>
             <input class="input mono" v-model="form.label_base_url" :placeholder="ph.label_base_url" />
             <p class="hint mt8">
-              留空则使用本机局域网地址（当前 <span class="mono">{{ store.boot?.lanUrl || '' }}</span>）。
-              手机扫码要能打开，得先在上面勾上「允许手机 / 局域网访问」并重启服务（默认只听 127.0.0.1）。
+              留空就用上面的本机地址；手机扫码要能打开，得先允许局域网访问并重启。
             </p>
           </div>
         </div>
@@ -840,8 +838,7 @@ function setScrollSwitch(v) {
           <div class="input mono" style="background: #fafaf8; color: var(--ink-2); user-select: all">{{ store.boot?.dataDir }}</div>
         </div>
         <p class="hint mt12">
-          全部记录由 <span class="mono">eln.db</span>（结构化数据）与 <span class="mono">attachments/</span>（谱图等原始文件）组成。
-          将该目录纳入 iCloud 或时间机器的备份范围，即等于自动备份。
+          <span class="mono">eln.db</span> + <span class="mono">attachments/</span> 就是全部；整个目录纳入备份即可。
         </p>
         <div id="set-backup" class="row mt16">
           <button class="btn" @click="openLink('/api/backup')"><Icon name="download" :size="13" /> 下载完整备份 .zip</button>
@@ -859,7 +856,7 @@ function setScrollSwitch(v) {
           <button class="btn btn-sm btn-ghost" @click="newCategory('compound')"><Icon name="plus" :size="11" /> 化合物分类</button>
         </div>
         <p class="hint mt12">
-          分类和化合物都归属一个课题，切到别的课题就看不到了。分类的归属和里面的记录一起走：换课题时，分类里的实验与化合物也一起移过去。
+          分类和化合物都归属一个课题；换课题时里面的记录跟着走。
         </p>
 
         <!-- 共用课题（project = ''）：在「全部课题」下新建的东西落在这里 -->
@@ -1012,20 +1009,18 @@ function setScrollSwitch(v) {
 
       <section v-if="mod === 'ui'" id="set-peek" class="card">
         <div class="card-head"><h2 class="card-title">书签悬停预览</h2></div>
-        <p class="card-note">实验页纸面左边那排平行书签，鼠标停上去会浮一张预览卡。这里决定卡片上显示哪些块（每天都读浏览器里的缓存，同时存进记录本、换浏览器也还在）。</p>
-        <div class="row" style="gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2)">
-          <label v-for="(label, key) in PEEK_LABELS" :key="key" style="display: flex; align-items: center; gap: 6px; cursor: pointer">
+        <p class="card-note">纸边那排平行书签，悬停时浮出的预览卡上显示哪几块。</p>
+        <div class="sw-grid">
+          <label v-for="(label, key) in PEEK_LABELS" :key="key">
+            <span>{{ label }}</span>
             <input type="checkbox" :checked="peekPrefs[key]" @change="setPeekPref(key, $event.target.checked)" />
-            {{ label }}
           </label>
         </div>
       </section>
 
       <section v-if="mod === 'ui'" id="set-reagent-links" class="card">
         <div class="card-head"><h2 class="card-title">试剂库的外部库链接</h2></div>
-        <p class="card-note">
-          试剂库里每个试剂名后面那排 PubChem / CB / NIST / TCI / CAS 链接。常显好找；只在悬停这一行时出现，列表更干净。
-        </p>
+        <p class="card-note">试剂名后面那排外部库链接：常显好找，悬停才出现更干净。</p>
         <div class="row" style="gap: 8px; flex-wrap: wrap">
           <button class="btn btn-sm" :class="{ 'is-on': rlLinks === 'always' }" @click="setRlLinks('always')">常显</button>
           <button class="btn btn-sm" :class="{ 'is-on': rlLinks === 'hover' }" @click="setRlLinks('hover')">悬停才出现</button>
@@ -1034,9 +1029,7 @@ function setScrollSwitch(v) {
 
       <section v-if="mod === 'ui'" id="set-card" class="card">
         <div class="card-head"><h2 class="card-title">卡片</h2></div>
-        <p class="card-note">
-          页面里那些白卡（排版板的画布、试剂库 / 回收站列表…）的质感。改完立刻生效，所有页面一起变。
-        </p>
+        <p class="card-note">页面里那些白卡的质感，改完全站一起变。</p>
         <div class="row" style="gap: 8px; flex-wrap: wrap; margin-bottom: 10px">
           <button
             v-for="s in CARD_STYLES"
@@ -1063,9 +1056,7 @@ function setScrollSwitch(v) {
 
       <section v-if="mod === 'ui'" id="set-boardcap" class="card">
         <div class="card-head"><h2 class="card-title">排版板的图注</h2></div>
-        <p class="card-note">
-          把 TLC 图拖到排版板上时，附件里写的那句图注会一起落下来，并且跟那张图编成一组——拖着图走，图注跟着走。这里决定缩图的时候那行字怎么办：<b>固定字号</b>是只跟着走、不跟着缩（图缩到一半，图注还是那么大、看得清，贴回图下面）；<b>跟着图缩放</b>就是整组一起放大缩小。
-        </p>
+        <p class="card-note">拖到板上的 TLC 图注，缩图时跟不跟着一起缩。</p>
         <div class="row" style="gap: 8px; flex-wrap: wrap">
           <button class="btn btn-sm" :class="{ 'is-on': boardCap === 'fixed' }" @click="setBoardCap('fixed')">固定字号</button>
           <button class="btn btn-sm" :class="{ 'is-on': boardCap === 'scale' }" @click="setBoardCap('scale')">跟着图缩放</button>
@@ -1074,9 +1065,7 @@ function setScrollSwitch(v) {
 
       <section v-if="mod === 'ui'" id="set-tour" class="card">
         <div class="card-head"><h2 class="card-title">教程</h2></div>
-        <p class="card-note">
-          每一页都有一套漫游式引导（左边导航、工具条、这一页能点的地方）。第一次进这一页会自动放一遍，看完就不再打扰；平时右下角那个小小的 <b>?</b> 随时能再看。
-        </p>
+        <p class="card-note">每页第一次进来自动放一遍，右下角 <b>?</b> 随时重看。</p>
         <div class="row" style="gap: 8px; align-items: center">
           <button class="btn btn-sm" @click="resetTour">重新看一遍全部教程</button>
           <span style="font-size: 11.5px; color: var(--ink-4)">会把「已看过」的标记清掉</span>
@@ -1085,9 +1074,7 @@ function setScrollSwitch(v) {
 
       <section v-if="mod === 'ui'" id="set-pagekeep" class="card">
         <div class="card-head"><h2 class="card-title">切换记录</h2></div>
-        <p class="card-note">
-          在纸上翻到第 2 页（或文献 / 附件）时切到另一条实验，是接着看同一页，还是每次都从第 1 页开始。选「接着看」时，那条记录没有这一页（文献 / 附件在「记录页」里关掉了）就自动回第 1 页。
-        </p>
+        <p class="card-note">切到另一条记录时，停在同一页还是回第 1 页。</p>
         <label class="check-row">
           <input type="checkbox" :checked="keepPage" @change="setKeepPage($event.target.checked)" />
           <span>切记录时停在同一页</span>
@@ -1136,7 +1123,7 @@ function setScrollSwitch(v) {
           </span>
         </div>
         <p class="hint mt8">
-          纸面放得下不用滚的时候，竖向滚轮直接算切换；放不下时先滚到底，再往下多滚那一点才切（防误触，一刀切完 460ms 内不重复）。「上 / 下一条」按左栏列表的顺序（含平行实验），到头就停；键盘 ↑↓ 是同一个口径。
+          纸放得下就直接切；放不下先滚到底再多滚一点（防误触）。顺序按左栏列表，到头就停。
         </p>
       </section>
 
@@ -1146,9 +1133,7 @@ function setScrollSwitch(v) {
           <span class="spacer" />
           <button class="btn btn-sm btn-ghost" @click="showAllSheetBlocks()">全部显示</button>
         </div>
-        <p class="card-note">
-          实验记录那张 A4 上要出现哪几块 —— <b>每种记录类型各记一套</b>，打开记录时就按它的类型取那一套。取消勾选的块，页面和打印 / 存 PDF 都不出现（内容不会丢，重新勾上就回来）。
-        </p>
+        <p class="card-note">这一类记录的 A4 上出现哪几块，页面和打印一起变。</p>
         <div class="sheet-kind-row">
           <span class="sheet-kind-lbl">改哪一类</span>
           <span class="sheet-kind-chips">
@@ -1221,7 +1206,7 @@ function setScrollSwitch(v) {
                 {{ TLC_N_LABEL[n] }}
               </button>
             </span>
-            <span class="sheet-fx-sub">一条记录常贴好几块板（0.5 h / 2 h / 过夜、各条件对照）；「不挂」= 结果表不放这一列（第 2 页 TLC 区照旧全列）</span>
+            <span class="sheet-fx-sub">「不挂」= 结果表不放这一列</span>
           </div>
           <div id="set-decimals" class="sheet-fx-row is-static">
             <span class="sheet-fx-name">投料表「用量」小数位 · 质量（g）</span>
@@ -1237,7 +1222,7 @@ function setScrollSwitch(v) {
                 {{ opt.t }}
               </button>
             </span>
-            <span class="sheet-fx-sub">称到的固体按 g 写；固定位数时尾零留着（2.671 → 2.6710）</span>
+            <span class="sheet-fx-sub">固定位数时尾零留着</span>
           </div>
           <div class="sheet-fx-row is-static">
             <span class="sheet-fx-name">投料表「用量」小数位 · 体积（mL / µL）</span>
@@ -1253,7 +1238,7 @@ function setScrollSwitch(v) {
                 {{ opt.t }}
               </button>
             </span>
-            <span class="sheet-fx-sub">液体 / 溶剂行；固定位数只收小数部分，30 mL 不会写成 30.000 mL</span>
+            <span class="sheet-fx-sub">只收小数部分，30 mL 不写成 30.000 mL</span>
           </div>
         </div>
       </section>
@@ -1261,9 +1246,7 @@ function setScrollSwitch(v) {
       <section v-if="mod === 'page'" class="card">
         <div class="card-head"><h2 class="card-title">常用选项</h2></div>
         <p class="card-note">
-          条件行那几个下拉里「＋ 自定义」加的值都在这儿，两边同一份（存在记录本里，跟着 data/ 一起备份）。
-          <b>内置的那几条也能删、也能用 ‹ › 挪位置</b>——动过之后这一行就照你排的顺序来；
-          「恢复默认」回到内置那几条（动过之后才出现）。
+          条件行下拉里「＋ 自定义」加的值都在这里（跟着 data/ 一起备份）。内置的也能删、能用 ‹ › 挪位置。
         </p>
         <div id="set-quick" class="quick-rows">
           <div v-for="f in QUICK_ROWS" :key="f.key" class="quick-row">
