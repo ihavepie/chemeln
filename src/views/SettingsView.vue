@@ -1021,34 +1021,36 @@ function setScrollSwitch(v) {
       <section v-if="mod === 'ui'" id="set-reagent-links" class="card">
         <div class="card-head"><h2 class="card-title">试剂库的外部库链接</h2></div>
         <p class="card-note">试剂名后面那排外部库链接：常显好找，悬停才出现更干净。</p>
-        <div class="row" style="gap: 8px; flex-wrap: wrap">
-          <button class="btn btn-sm" :class="{ 'is-on': rlLinks === 'always' }" @click="setRlLinks('always')">常显</button>
-          <button class="btn btn-sm" :class="{ 'is-on': rlLinks === 'hover' }" @click="setRlLinks('hover')">悬停才出现</button>
+        <div class="seg">
+          <button type="button" :class="{ 'is-on': rlLinks === 'always' }" @click="setRlLinks('always')">常显</button>
+          <button type="button" :class="{ 'is-on': rlLinks === 'hover' }" @click="setRlLinks('hover')">悬停才出现</button>
         </div>
       </section>
 
       <section v-if="mod === 'ui'" id="set-card" class="card">
         <div class="card-head"><h2 class="card-title">卡片</h2></div>
         <p class="card-note">页面里那些白卡的质感，改完全站一起变。</p>
-        <div class="row" style="gap: 8px; flex-wrap: wrap; margin-bottom: 10px">
+        <div class="seg" style="margin-bottom: 10px">
           <button
             v-for="s in CARD_STYLES"
             :key="s.key"
-            class="btn btn-sm"
+            type="button"
             :class="{ 'is-on': card.style === s.key }"
             :title="s.hint"
             @click="pickCardStyle(s.key)"
           >{{ s.label }}</button>
         </div>
-        <div class="row" style="gap: 8px; align-items: center">
-          <span style="font-size: 11.5px; color: var(--ink-4)">圆角</span>
-          <button
-            v-for="r in CARD_RADII"
-            :key="r.value"
-            class="btn btn-sm"
-            :class="{ 'is-on': card.radius === r.value }"
-            @click="pickCardRadius(r.value)"
-          >{{ r.label }}</button>
+        <div class="set-row">
+          <span class="set-row-l">圆角</span>
+          <span class="seg">
+            <button
+              v-for="r in CARD_RADII"
+              :key="r.value"
+              type="button"
+              :class="{ 'is-on': card.radius === r.value }"
+              @click="pickCardRadius(r.value)"
+            >{{ r.label }}</button>
+          </span>
           <span class="spacer" />
           <button class="btn btn-sm btn-ghost" @click="cardReset">恢复默认</button>
         </div>
@@ -1057,9 +1059,9 @@ function setScrollSwitch(v) {
       <section v-if="mod === 'ui'" id="set-boardcap" class="card">
         <div class="card-head"><h2 class="card-title">排版板的图注</h2></div>
         <p class="card-note">拖到板上的 TLC 图注，缩图时跟不跟着一起缩。</p>
-        <div class="row" style="gap: 8px; flex-wrap: wrap">
-          <button class="btn btn-sm" :class="{ 'is-on': boardCap === 'fixed' }" @click="setBoardCap('fixed')">固定字号</button>
-          <button class="btn btn-sm" :class="{ 'is-on': boardCap === 'scale' }" @click="setBoardCap('scale')">跟着图缩放</button>
+        <div class="seg">
+          <button type="button" :class="{ 'is-on': boardCap === 'fixed' }" @click="setBoardCap('fixed')">固定字号</button>
+          <button type="button" :class="{ 'is-on': boardCap === 'scale' }" @click="setBoardCap('scale')">跟着图缩放</button>
         </div>
       </section>
 
@@ -1067,7 +1069,7 @@ function setScrollSwitch(v) {
         <div class="card-head"><h2 class="card-title">教程</h2></div>
         <p class="card-note">每页第一次进来自动放一遍，右下角 <b>?</b> 随时重看。</p>
         <div class="row" style="gap: 8px; align-items: center">
-          <button class="btn btn-sm" @click="resetTour">重新看一遍全部教程</button>
+          <button class="btn btn-sm btn-ghost" @click="resetTour">重新看一遍全部教程</button>
           <span style="font-size: 11.5px; color: var(--ink-4)">会把「已看过」的标记清掉</span>
         </div>
       </section>
@@ -1093,12 +1095,11 @@ function setScrollSwitch(v) {
         </label>
         <div v-if="edgeFlip" class="set-row set-row-indent mt8">
           <span class="set-row-l">纸边那颗箭头的出场</span>
-          <span class="set-row-chips">
+          <span class="seg">
             <button
               v-for="o in EDGE_LOOKS"
               :key="o.key"
               type="button"
-              class="qchip"
               :class="{ 'is-on': edgeLook === o.key }"
               @click="setEdgeLook(o.key)"
             >
@@ -1108,12 +1109,11 @@ function setScrollSwitch(v) {
         </div>
         <div class="set-row mt8">
           <span class="set-row-l">滚轮切一条要滚多少</span>
-          <span class="set-row-chips">
+          <span class="seg">
             <button
               v-for="o in WHEEL_PRESETS"
               :key="o.key"
               type="button"
-              class="qchip"
               :class="{ 'is-on': scrollWheel === o.key }"
               :title="`约 ${o.px}px`"
               @click="setScrollWheel(o.key)"
@@ -1136,12 +1136,11 @@ function setScrollSwitch(v) {
         <p class="card-note">这一类记录的 A4 上出现哪几块，页面和打印一起变。</p>
         <div class="sheet-kind-row">
           <span class="sheet-kind-lbl">改哪一类</span>
-          <span class="sheet-kind-chips">
+          <span class="sheet-kind-chips seg">
             <button
               v-for="k in SHEET_KINDS"
               :key="k.key || 'all'"
               type="button"
-              class="qchip"
               :class="{ 'is-on': editKind === k.key }"
               :title="k.key ? `「${k.label}」这类记录默认显示哪几块` : '没写类型的老记录（通用）'"
               @click="pickSheetKind(k.key)"
@@ -1177,12 +1176,11 @@ function setScrollSwitch(v) {
 
           <div id="set-scheme" class="sheet-fx-row is-static">
             <span class="sheet-fx-name">反应式 · 箭头上那行条件</span>
-            <span class="sheet-fx-chips">
+            <span class="sheet-fx-chips seg">
               <button
                 v-for="o in SCHEME_FMT_OPTS"
                 :key="o.key"
                 type="button"
-                class="qchip"
                 :class="{ 'is-on': sheetSchemeFmt.fmt === o.key }"
                 :title="o.hint || ''"
                 @click="setSchemeFmt(o.key)"
@@ -1194,12 +1192,11 @@ function setScrollSwitch(v) {
           </div>
           <div id="set-tlc-n" class="sheet-fx-row is-static">
             <span class="sheet-fx-name">结果表最右那格 · 挂几张板</span>
-            <span class="sheet-fx-chips">
+            <span class="sheet-fx-chips seg is-mono">
               <button
                 v-for="n in TLC_N_OPTS"
                 :key="n"
                 type="button"
-                class="qchip"
                 :class="{ 'is-on': sheetTlcMax.n === n }"
                 @click="setTlcMax(n)"
               >
@@ -1210,12 +1207,11 @@ function setScrollSwitch(v) {
           </div>
           <div id="set-decimals" class="sheet-fx-row is-static">
             <span class="sheet-fx-name">投料表「用量」小数位 · 质量（g）</span>
-            <span class="sheet-fx-chips">
+            <span class="sheet-fx-chips seg is-mono">
               <button
                 v-for="opt in DECIMAL_OPTS"
                 :key="opt.v"
                 type="button"
-                class="qchip"
                 :class="{ 'is-on': amountDecimals() === opt.v }"
                 @click="pickDecimals('mass', opt.v)"
               >
@@ -1226,12 +1222,11 @@ function setScrollSwitch(v) {
           </div>
           <div class="sheet-fx-row is-static">
             <span class="sheet-fx-name">投料表「用量」小数位 · 体积（mL / µL）</span>
-            <span class="sheet-fx-chips">
+            <span class="sheet-fx-chips seg is-mono">
               <button
                 v-for="opt in DECIMAL_OPTS"
                 :key="opt.v"
                 type="button"
-                class="qchip"
                 :class="{ 'is-on': volumeDecimals() === opt.v }"
                 @click="pickDecimals('vol', opt.v)"
               >

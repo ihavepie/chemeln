@@ -1067,12 +1067,6 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   color: var(--ink-4);
 }
 .sheet-kind-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-.sheet-kind-chips .qchip { color: var(--ink-3); }
-.sheet-kind-chips .qchip.is-on {
-  color: var(--accent-ink);
-  background: #f7f0ea;
-  border-color: rgba(168, 71, 31, 0.32);
-}
 
 /* ---------- 「绑定产物」弹窗 ----------
    三条路各一小节；①里那张结构图直接用算出来的 SVG（不套外框），挑库那栏复用 .recipe-* */
@@ -1375,8 +1369,6 @@ body.is-picker-open .editor { overscroll-behavior: none; }
   padding: 0 6px;
 }
 .sheet-fx-chips { display: inline-flex; gap: 4px; }
-.sheet-fx-chips .qchip { font-size: 10.5px; padding: 1px 8px; }
-.sheet-fx-chips .qchip.is-on { color: var(--accent-ink); border-color: rgba(168, 71, 31, 0.32); background: #f7f0ea; }
 
 /* ── 「挑几条实验」弹窗（ExpPick：建筛选表、接上一步）─────────────────────────
    以前这些行一个样式都没有（纯原生按钮）。照 `.recipe-opt` 的样子来：
@@ -2247,6 +2239,47 @@ body.is-board-dragging { cursor: grabbing; }
 .set-inner .check-row input,
 .set-inner .sheet-blocks label input,
 .set-inner .sheet-fx-row input { order: 3; margin-left: auto; }
+
+/* ---------- 设置页：一组选项 = 一根分段控件 ----------
+   以前一组选项是「一排各自独立的按钮」，`.btn.is-on` 压根没写样式——常显 / 悬停才出现、
+   白卡 / 不要卡、固定字号 / 跟着图缩放 这几组三个看起来一模一样，看不出当前选的是哪个。
+   现在套一根 `.seg` 轨道：一块浅底、几个小项，选中的那颗纸白实底 + 极淡投影 + 深字。 */
+.seg {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #eeece5;
+  box-shadow: inset 0 0 0 1px rgba(28, 27, 25, 0.03);
+  max-width: 100%;
+}
+.seg > button {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 130ms var(--ease), color 130ms var(--ease), box-shadow 130ms var(--ease);
+}
+.seg > button:hover { color: var(--ink); background: rgba(255, 255, 255, 0.65); }
+.seg > button.is-on {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(28, 27, 25, 0.1), inset 0 0 0 1px rgba(28, 27, 25, 0.07);
+}
+/* 数字类的组（小数位 / 挂几张板）用等宽字，位数看齐 */
+.seg.is-mono > button { font-family: var(--mono); font-size: 11px; }
+/* 组只占内容宽；放不下才在组里换行（别把轨道拉满一整行） */
+.set-row .seg { flex: 0 1 auto; }
+/* 行标签固定一档宽：后面那组选项左边缘对齐成一条竖线 */
+.set-row-l { min-width: 118px; }
 
 /* 「书签悬停预览」那 5 个开关：两列小网格（标签最长那条也不折行），别拉成一长条 */
 .sw-grid {
