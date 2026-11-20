@@ -815,6 +815,11 @@ const groups = computed(() => {
 });
 
 const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.owner_name });
+
+/** 谱图都归在谱图库里：从这里跳过去时带上编号，那边直接筛好 */
+function openSpectra() {
+  router.push({ path: '/spectra', query: { q: c.value?.code || '' } });
+}
 </script>
 
 <template>
@@ -963,32 +968,43 @@ const label = () => printCompoundLabel(c.value, { owner: store.boot?.settings?.o
         <div v-if="lookupProps" class="cmp-props noprint">{{ lookupProps }}</div>
 
         <section class="sec sec-tight">
-          <div class="block-head"><span class="lbl">核磁</span><span class="spacer" /><span class="hint noprint">可拖入或 ⌘V 粘贴谱图截图</span></div>
-          <div class="nmr-grid">
-            <div v-for="n in NMR_DEFS" :key="n.key" class="nmr-col">
-              <span class="nmr-tag">{{ n.label }}</span>
-              <div
-                class="nmr-strip"
-                @mouseenter="hovered = n.key"
-                @mouseleave="hovered = ''"
-                @dragover.prevent
-                @drop.prevent="dropTo(n.key, $event)"
-              >
-                <figure v-for="f in spectra(n.key)" :key="f.id" class="spec-shot">
-                  <img :src="`/api/compound-files/${f.id}`" alt="" title="看大图" @click="openFile(f)" />
-                  <button class="tlc-x" title="删除" @click.stop="removeFile(f)"><Icon name="x" :size="11" /></button>
-                </figure>
-                <div
-                  v-if="!spectra(n.key).length"
-                  class="spec-empty"
-                  :title="`粘贴 / 选择 ${n.label} 谱图`"
-                  @click="pickFile(n.key)"
-                >
-                  <span class="plus">+</span>
-                  <span class="cap">谱图</span>
-                </div>
-                <button v-else type="button" class="spec-add" @click="pickFile(n.key)">+ 再加一张</button>
-              </div>
+          <div class="block-head">
+            <span class="lbl">核磁</span>
+            <span class="spacer" />
+            <button type="button" class="mini-link noprint" title="在谱图库里看这个化合物的全部谱图" @click="openSpectra">谱图库 ↗</button>
+            <span class="hint noprint">可拖入或 ⌘V 粘贴截图</span>
+          </div>
+          <!-- 索引式：这里只列「有几张、叫什么」，图本身在谱图库 / 点开才看（铺图会把整页压得很长） -->
+          <div class="nmr-idx">
+            <div
+              v-for="n in NMR_DEFS"
+              :key="n.key"
+              class="nmr-row"
+              @dragover.prevent
+              @drop.prevent="dropTo(n.key, $event)"
+            >
+              <span class="nmr-k">{{ n.label }}</span>
+              <span class="nmr-n mono">{{ spectra(n.key).length || '—' }}</span>
+              <span class="nmr-names">
+                <span v-for="f in spectra(n.key)" :key="f.id" class="nmr-file-wrap">
+                  <button
+                    type="button"
+                    class="nmr-file"
+                    :title="`看大图 · ${fmtSize(f.size)}`"
+                    @click="openFile(f)"
+                  >{{ f.original_name || f.filename }}</button>
+                  <button type="button" class="nmr-x noprint" title="删除" @click.stop="removeFile(f)">
+                    <Icon name="x" :size="9" />
+                  </button>
+                </span>
+                <span v-if="!spectra(n.key).length" class="nmr-none">未上传</span>
+              </span>
+              <button
+                type="button"
+                class="nmr-add noprint"
+                :title="`粘贴 / 选择 ${n.label} 谱图`"
+                @click="pickFile(n.key)"
+              >＋</button>
             </div>
           </div>
         </section>

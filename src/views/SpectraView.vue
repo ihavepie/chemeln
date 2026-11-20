@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import AppModal from '../components/AppModal.vue';
 import FilePreview from '../components/FilePreview.vue';
 import Icon from '../components/Icon.vue';
@@ -21,12 +21,13 @@ import { CATEGORY_LABEL } from '../lib/ui.js';
  * 所以在这一页删掉的，记录页 / 化合物页也跟着没了（它们本来就是同一份）。
  */
 const router = useRouter();
+const route = useRoute();
 
 const items = ref([]);
 const counts = ref({ all: 0, raw: 0, proc: 0 });
 const loading = ref(false);
 const kind = ref('all');   // all | raw | proc
-const q = ref('');
+const q = ref(String(route.query.q || ''));   // 化合物页「谱图库 ↗」跳过来时带着编号，直接筛好
 
 const KINDS = computed(() => [
   { key: 'all', label: '全部', n: counts.value.all },
