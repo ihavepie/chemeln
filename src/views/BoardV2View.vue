@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { toast } from '../lib/feedback.js';
 import { downloadBlob } from '../lib/print.js';
 import { BOARD_CSS, itemHtml } from '../lib/board.js';
+import { uiGet } from '../lib/uiprefs.js';
 
 /** 截图用的样式：跟纸上一样，但**不带** body 那个 0.7498 缩放 */
 const SNAP_CSS = `html, body { margin: 0; padding: 0; background: #fff; }\n${BOARD_CSS}`;
@@ -545,6 +546,8 @@ function scheduleFixCaptions(st) {
 
 async function fixCaptions() {
   if (!exApi || captionBusy) return;
+  // 设置 › 界面 › 排版板的图注：选了「跟着图缩放」就交给 Excalidraw 原生，这里什么都不做
+  if (uiGet('boardCap', 'fixed') !== 'fixed') return;
   const els = exApi.getSceneElements();
   const byId = new Map(els.map((e) => [e.id, e]));
   const patched = new Map(); // id → 改过的图注

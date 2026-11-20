@@ -362,6 +362,15 @@ function resetTour() {
   toast('已重置：下次进任意一页都会再放一遍教程', 'ok');
 }
 
+/* ---- 排版板：图注要不要跟着图缩放 ----
+   `fixed` = 只跟着走、不跟着缩（缩图的时候字还是那个字号，缩到看不清的问题就没了）；
+   `scale` = 跟 Excalidraw 原生一样，整组一起放大缩小。 */
+const boardCap = ref(uiGet('boardCap', 'fixed'));
+function setBoardCap(v) {
+  boardCap.value = v;
+  uiSetIfChanged('boardCap', v);
+}
+
 /* ---- 二级侧边栏：把设置分成 5 块，一块一块看（用户：「设置这边开始有点复杂了」）----
    编号沿用卡片上那 01–07（模块顺序就按编号排），当前停在哪一块记在 `uiprefs` 的 `setMod`，
    下次进来还是那一块。 */
@@ -438,6 +447,7 @@ const SET_SEARCH = [
   { m: 'cats', label: '新建分类 / 拖动排序', kw: 'new category 拖' },
   { m: 'ui', label: '快捷键', kw: 'keyboard shortcut 快捷键' },
   { m: 'ui', label: '书签悬停预览', kw: 'peek 书签 预览' },
+  { m: 'ui', label: '排版板图注（跟着图缩 / 固定字号）', kw: 'board caption 图注 缩放 字号', anchor: 'set-boardcap' },
   { m: 'ui', label: '切记录时停在同一页', kw: 'page keep 翻页 第2页 续页 切记录 滚轮 动画 推 力度' },
   { m: 'ui', label: '教程（重新看一遍）', kw: 'tour guide 教程 引导 帮助 help', anchor: 'set-tour' },
   { m: 'page', label: 'A4 上显示哪几块（按记录类型）', kw: 'blocks 版式 块 显示', anchor: 'set-blocks' },
@@ -462,6 +472,7 @@ const SET_SUBS = {
   ui: [
     { label: '快捷键', anchor: 'set-keys' },
     { label: '书签悬停预览', anchor: 'set-peek' },
+    { label: '排版板图注', anchor: 'set-boardcap' },
     { label: '切记录时停在同一页', anchor: 'set-pagekeep' },
   ],
   page: [
@@ -1047,6 +1058,17 @@ function setScrollSwitch(v) {
           >{{ r.label }}</button>
           <span class="spacer" />
           <button class="btn btn-sm btn-ghost" @click="cardReset">恢复默认</button>
+        </div>
+      </section>
+
+      <section v-if="mod === 'ui'" id="set-boardcap" class="card">
+        <div class="card-head"><h2 class="card-title">排版板的图注</h2></div>
+        <p class="card-note">
+          把 TLC 图拖到排版板上时，附件里写的那句图注会一起落下来，并且跟那张图编成一组——拖着图走，图注跟着走。这里决定缩图的时候那行字怎么办：<b>固定字号</b>是只跟着走、不跟着缩（图缩到一半，图注还是那么大、看得清，贴回图下面）；<b>跟着图缩放</b>就是整组一起放大缩小。
+        </p>
+        <div class="row" style="gap: 8px; flex-wrap: wrap">
+          <button class="btn btn-sm" :class="{ 'is-on': boardCap === 'fixed' }" @click="setBoardCap('fixed')">固定字号</button>
+          <button class="btn btn-sm" :class="{ 'is-on': boardCap === 'scale' }" @click="setBoardCap('scale')">跟着图缩放</button>
         </div>
       </section>
 
