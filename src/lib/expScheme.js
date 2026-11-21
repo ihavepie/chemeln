@@ -68,10 +68,23 @@ export function schemeParts(model, compounds) {
   };
 
   // 箭头上下的条件不写「浓度」（那个数是按投料表折算出来的，常常是个没意义的 M 值，
-  // 化学式上写出来反而干扰）；溶剂 / 温度 / 时间照旧。
+  // 化学式上写出来反而干扰）；**光照 / 气氛 / 装置要写**——光化学这类记录里
+  // 「绿光 520 nm」跟温度一样是条件，以前只有溶剂 / 温度 / 时间，改了光照箭头上没反应（用户报过）。
   // **被标成变量的字段写成占位符**（温度 → `[T]`）：具体取值由每个条件填，跟 `[L]` 一个道理。
   const fv = new Map((model.field_vars || []).map((v) => [String(v.key), String(v.label || v.key)]));
   const fieldText = (key, val) => (fv.has(key) ? `[${fv.get(key)}]` : str(val));
+  /** 条件那一串：溶剂，温度，时间，光照，气氛，装置（空的跳过；顺序按写反应式的习惯） */
+  const condLine = (sol, src) =>
+    [
+      sol,
+      fieldText('temperature', src.temperature),
+      fieldText('duration', src.duration),
+      fieldText('light', src.light),
+      fieldText('atmosphere', src.atmosphere),
+      fieldText('apparatus', src.apparatus),
+    ]
+      .filter(Boolean)
+      .join('，');
 
   const rowsAll = model.reagents || [];
   const stepMeta = Array.isArray(model.steps) ? model.steps : [];
@@ -155,14 +168,14 @@ export function schemeParts(model, compounds) {
       const sol = solvents.join(' + ');
       const text = str(condText);
       // 这一步的条件文字里往往已经写了溶剂（「THF, rt」），别再重复一遍
-      const needSol = sol && !text.toLowerCase().includes(sol.toLowerCase());
-      const own = [str(step.temperature), str(step.duration), str(step.atmosphere)].filter(Boolean).join('，');
+      // 这一步自己的条件（温度 / 时间 / 光照 / 气氛 / 装置）走同一套写法
+      const own = [fieldText('temperature', step.temperature), fieldText('duration', step.duration), fieldText('light', step.light), fieldText('atmosphere', step.atmosphere), fieldText('apparatus', step.apparatus)]
+        .filter(Boolean)
+        .join('，');
       cond = [needSol ? sol : '', text, own].filter(Boolean).join('，');
     } else {
       // 单步：还是记录里那格「溶剂」（投料表的溶剂行是它的镜像，名字对不齐时以这格为准）
-      cond = [str(model.solvent) || solvents.join(' + '), fieldText('temperature', model.temperature), fieldText('duration', model.duration)]
-        .filter(Boolean)
-        .join('，');
+      cond = condLine(str(model.solvent) || solvents.join(' + '), model);
     }
     return {
       reactants,

@@ -338,7 +338,7 @@ ensureColumn('screenings', 'project', "project TEXT NOT NULL DEFAULT ''");
 /* 反应式排版改过就 +1：老缓存里的 SVG 是按旧排版画的，不清掉会一直显示旧图
    （用户报「反应式上的条件超出了」，改了排版却看不到变化，就是缓存没失效）。
    注意：不只是「看着不对」，缓存里那张是真的把字画出了箭头区域。 */
-const SCHEME_LAYOUT_VER = 4;
+const SCHEME_LAYOUT_VER = 5;
 if (Number(getSetting('migr:scheme_layout_ver') || 0) < SCHEME_LAYOUT_VER) {
   try {
     db.exec('DELETE FROM scheme_cache');
