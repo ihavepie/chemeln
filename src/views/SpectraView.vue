@@ -27,7 +27,8 @@ const items = ref([]);
 const counts = ref({ all: 0, raw: 0, proc: 0 });
 const loading = ref(false);
 const kind = ref('all');   // all | raw | proc
-const q = ref(String(route.query.q || ''));   // 化合物页「谱图库 ↗」跳过来时带着编号，直接筛好
+const q = ref(String(route.query.q || ''));
+const peekMeta = ref(null);   // 下载图片时烧进底部的那一行   // 化合物页「谱图库 ↗」跳过来时带着编号，直接筛好
 
 const KINDS = computed(() => [
   { key: 'all', label: '全部', n: counts.value.all },
@@ -101,6 +102,13 @@ async function open(it) {
     return;
   }
   peek.value = { src: it.url, name: it.name };
+  peekMeta.value = {
+    code: it.owner_code || '',
+    cat: CATEGORY_LABEL[it.category] || '',
+    date: it.date || '',
+    project: store.project || '',
+    owner: store.boot?.settings?.owner_name || '',
+  };
 }
 
 function download(it) {
@@ -378,6 +386,7 @@ const whenText = (s) => {
       v-if="peek"
       :src="peek.src"
       :name="peek.name"
+      :meta="peekMeta"
       @close="peek = null"
     />
 

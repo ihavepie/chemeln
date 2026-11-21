@@ -26,6 +26,7 @@ import {
 import { amountDecimals, setAmountDecimals, setVolumeDecimals, volumeDecimals } from '../lib/reagent.js';
 import { onUiMerged, uiGet, uiSetIfChanged } from '../lib/uiprefs.js';
 import { CARD_STYLES, CARD_RADII, cardPref, setCardStyle, resetCardStyle } from '../lib/cardstyle.js';
+import { STAMP_FIELDS, STAMP_DEFAULTS, stampPref } from '../lib/imgstamp.js';
 import { resetTours } from '../lib/tours.js';
 import { loadBoot, setProject, settings, store, allCategories, addCategory, quickFull, quickList } from '../store.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -362,6 +363,23 @@ function resetTour() {
   toast('已重置：下次进任意一页都会再放一遍教程', 'ok');
 }
 
+/* ---- 图片下载：底部那行信息（编号 / 分类 / 展开剂·Rf / 日期…）----
+   存 uiprefs 的 `imgStamp`：`{ on, fields:{...} }`；`lib/imgstamp.js` 读它去烧字。 */
+const stamp = ref(stampPref());
+function writeStamp(next) {
+  stamp.value = next;
+  uiSetIfChanged('imgStamp', { on: next.on, fields: { ...next.fields } });
+}
+function setStampOn(on) {
+  writeStamp({ ...stamp.value, on });
+}
+function setStampField(key, on) {
+  writeStamp({ ...stamp.value, fields: { ...stamp.value.fields, [key]: on } });
+}
+function resetStamp() {
+  writeStamp({ on: STAMP_DEFAULTS.on, fields: { ...STAMP_DEFAULTS.fields } });
+}
+
 /* ---- 排版板：图注要不要跟着图缩放 ----
    `fixed` = 只跟着走、不跟着缩（缩图的时候字还是那个字号，缩到看不清的问题就没了）；
    `scale` = 跟 Excalidraw 原生一样，整组一起放大缩小。 */
@@ -448,6 +466,7 @@ const SET_SEARCH = [
   { m: 'ui', label: '快捷键', kw: 'keyboard shortcut 快捷键' },
   { m: 'ui', label: '书签悬停预览', kw: 'peek 书签 预览' },
   { m: 'ui', label: '排版板图注（跟着图缩 / 固定字号）', kw: 'board caption 图注 缩放 字号', anchor: 'set-boardcap' },
+  { m: 'ui', label: '图片下载的信息条（编号 / 展开剂 / Rf）', kw: 'watermark 水印 信息 下载 图片 tlc 极性 rf', anchor: 'set-imgstamp' },
   { m: 'ui', label: '切记录时停在同一页', kw: 'page keep 翻页 第2页 续页 切记录 滚轮 动画 推 力度' },
   { m: 'ui', label: '教程（重新看一遍）', kw: 'tour guide 教程 引导 帮助 help', anchor: 'set-tour' },
   { m: 'page', label: 'A4 上显示哪几块（按记录类型）', kw: 'blocks 版式 块 显示', anchor: 'set-blocks' },
@@ -473,6 +492,7 @@ const SET_SUBS = {
     { label: '快捷键', anchor: 'set-keys' },
     { label: '书签悬停预览', anchor: 'set-peek' },
     { label: '排版板图注', anchor: 'set-boardcap' },
+    { label: '图片下载的信息条', anchor: 'set-imgstamp' },
     { label: '切记录时停在同一页', anchor: 'set-pagekeep' },
   ],
   page: [
@@ -1062,6 +1082,25 @@ function setScrollSwitch(v) {
         <div class="seg">
           <button type="button" :class="{ 'is-on': boardCap === 'fixed' }" @click="setBoardCap('fixed')">固定字号</button>
           <button type="button" :class="{ 'is-on': boardCap === 'scale' }" @click="setBoardCap('scale')">跟着图缩放</button>
+        </div>
+      </section>
+
+      <section v-if="mod === 'ui'" id="set-imgstamp" class="card">
+        <div class="card-head"><h2 class="card-title">图片下载的信息条</h2></div>
+        <p class="card-note">下载（或存图）时把这几条压在图片底部，存到手机 / 插进汇报也认得出是哪一张。</p>
+        <label class="check-row">
+          <input type="checkbox" :checked="stamp.on" @change="setStampOn($event.target.checked)" />
+          <span>图片下载时在底部加一条信息</span>
+        </label>
+        <div v-if="stamp.on" class="sw-grid" style="margin-top: 10px">
+          <label v-for="f in STAMP_FIELDS" :key="f.key">
+            <span :title="f.hint">{{ f.label }}</span>
+            <input type="checkbox" :checked="stamp.fields[f.key]" @change="setStampField(f.key, $event.target.checked)" />
+          </label>
+        </div>
+        <div class="row" style="gap: 8px; align-items: center; margin-top: 12px">
+          <button class="btn btn-sm btn-ghost" @click="resetStamp">恢复默认</button>
+          <span style="font-size: 11.5px; color: var(--ink-4)">例：SJ-2-14 · TLC 板 · PE:EA = 3:1 · Rf 0.45 · 2026-11-20</span>
         </div>
       </section>
 

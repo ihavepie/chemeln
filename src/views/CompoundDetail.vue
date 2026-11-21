@@ -15,7 +15,7 @@ import { api } from '../api.js';
 import { loadBoot, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
 import { structureInfo, pubchemUrl, describeInfo, LOOKUP_SITES } from '../lib/lookup.js';
-import { CMP_CAT_LABEL, CMP_CAT_ORDER, compoundSourceLabel, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
+import { CATEGORY_LABEL, CMP_CAT_LABEL, CMP_CAT_ORDER, compoundSourceLabel, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { analyzeSmiles, analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
@@ -639,8 +639,18 @@ async function refreshSpace() {
   }
 }
 
+/** 下载图片时烧进底部的那一行：编号 / 分类 / 展开剂·Rf / 日期 / 课题 / 记录人 */
+const previewMeta = computed(() => ({
+  code: c.value?.code || '',
+  cat: CATEGORY_LABEL[preview.value?.cat] || '',
+  tlc: [form.tlc_solvent, form.tlc_rf ? `Rf ${form.tlc_rf}` : ''].filter(Boolean).join(' · '),
+  date: '',
+  project: form.project || '',
+  owner: store.boot?.settings?.owner_name || '',
+}));
+
 function openFile(f) {
-  preview.value = { src: `/api/compound-files/${f.id}`, name: f.original_name || f.filename || '文件' };
+  preview.value = { src: `/api/compound-files/${f.id}`, name: f.original_name || f.filename || '文件', cat: f.category || '' };
 }
 
 function pickFile(category) {
@@ -1169,7 +1179,7 @@ function openSpectra() {
       <input v-model="pathValue" class="input" placeholder="/Users/you/NMR/…/10" style="font-family: var(--mono); font-size: 12px; margin-top: 10px" />
     </AppModal>
 
-    <FilePreview v-if="preview" :src="preview.src" :name="preview.name" @close="preview = null" />
+    <FilePreview v-if="preview" :src="preview.src" :name="preview.name" :meta="previewMeta" @close="preview = null" />
 
     <!-- 常挂着、只切 open：Ketcher 那个包 29 MB，销毁了每次都要重下一遍 -->
     <SketcherModal

@@ -2342,6 +2342,16 @@ const openAttachment = (id) => {
   const a = (exp.value?.attachments || []).find((x) => x.id === id);
   if (!a) return;
   preview.value = { src: `/api/files/${id}`, name: a.original_name || a.filename || '附件', category: a.category || 'tlc' };
+
+/** 图片下载时烧进底部的那一行（字段在设置 › 界面里挑） */
+const previewMeta = computed(() => ({
+  code: exp.value?.code || '',
+  cat: CATEGORY_LABEL[preview.value?.category] || '',
+  tlc: [exp.value?.tlc_solvent, exp.value?.tlc_rf ? `Rf ${exp.value.tlc_rf}` : ''].filter(Boolean).join(' · '),
+  date: exp.value?.date || '',
+  project: exp.value?.project || '',
+  owner: store.boot?.settings?.owner_name || '',
+}));
 };
 </script>
 
@@ -3021,6 +3031,7 @@ const openAttachment = (id) => {
       :name="preview.name"
       :exp-id="exp.id"
       :category="preview.category || 'tlc'"
+      :meta="previewMeta"
       @close="preview = null"
       @saved="refreshAttachments"
     />

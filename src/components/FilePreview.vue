@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import AppModal from './AppModal.vue';
 import { api } from '../api.js';
+import { downloadStamped } from '../lib/imgstamp.js';
 
 /**
  * 附件就地预览：图片直接铺开、PDF 用浏览器自带的阅读器（iframe，Safari 能直接看）、
@@ -19,6 +20,8 @@ const props = defineProps({
   expId: { type: [Number, String], default: null },
   /** 合成图存成哪一类附件（跟着原图：tlc / photo / scheme） */
   category: { type: String, default: 'tlc' },
+  /** 下载时烧进图片底部的那几行（编号 / 分类 / 展开剂·Rf / 日期…，见 `lib/imgstamp.js`） */
+  meta: { type: Object, default: null },
 });
 const emit = defineEmits(['close', 'saved']);
 
@@ -74,7 +77,11 @@ const modalWidth = computed(() => {
 });
 
 const openTab = () => window.open(props.src, '_blank');
-const download = () => window.open(`${props.src}${props.src.includes('?') ? '&' : '?'}download=1`, '_blank');
+/** 图片走「带信息」那条路（设置里关掉了 / 没东西可写就退回原样下载） */
+async function download() {
+  if (kind.value === 'image' && props.meta && (await downloadStamped(props.src, props.name, props.meta))) return;
+  window.open(`${props.src}${props.src.includes('?') ? '&' : '?'}download=1`, '_blank');
+}
 
 /* ---------------- 批注 ---------------- */
 const canAnnot = computed(() => kind.value === 'image' && props.expId != null);
