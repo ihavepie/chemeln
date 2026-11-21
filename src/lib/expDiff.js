@@ -14,7 +14,9 @@ const LIST_VARS = [
   ['concentration', '浓度'],
   ['temperature', '温度'],
   ['duration', '时长'],
+  ['light', '光照'],
   ['atmosphere', '气氛'],
+  ['apparatus', '装置'],
 ];
 /** 记录类型（试反应 / 条件筛选…）。反应类型单独做成一颗胶囊（`.tag.is-rxn`），不再挤在这段文字里 */
 const rxnDesc = (m) => String(m.kind || '').trim();
@@ -82,7 +84,11 @@ function listDiff(base, m) {
       const eqA = String(ra.eq ?? '').trim();
       const eqB = String(rb.eq ?? '').trim();
       const sameEq = eqSame(eqA, eqB) || (!eqA && !eqB);
-      diffs.push(sameEq ? `${nm(ra)} → ${nm(rb)}` : `${nm(ra)} ${eqTxt(eqA)} → ${nm(rb)} ${eqTxt(eqB)}`);
+      // 变量行（`[L]` 这种占位符）：只写占位符——它代表「这一格在筛」，具体哪几个值在条件组里；
+      // 「P(Cy)3 → RuPhos」会被读成「换了配体」，跟「这条记录扫了两种配体」不是一回事
+      const isVar = /^\[.+\]$/.test(String(rb.name || ''));
+      if (isVar) diffs.push(sameEq ? String(rb.name) : `${rb.name} ${eqTxt(eqB)}`);
+      else diffs.push(sameEq ? `${nm(ra)} → ${nm(rb)}` : `${nm(ra)} ${eqTxt(eqA)} → ${nm(rb)} ${eqTxt(eqB)}`);
     }
     for (const [k, r] of added) if (!usedAdd.has(k)) diffs.push(`加 ${nm(r)}${r.eq ? ` ${eqTxt(r.eq)}` : ''}`);
     for (const [k, r] of removed) if (!usedDel.has(k)) diffs.push(`去 ${nm(r)}`);

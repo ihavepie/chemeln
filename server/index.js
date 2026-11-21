@@ -678,7 +678,7 @@ function listExperiments(query) {
     SELECT e.id, e.code, e.title, e.objective, e.date, e.status, e.project, e.rxn_type,
            e.yield_pct, e.dr_ee, e.ee_pct, e.updated_at, e.locked, e.category_id,
            e.product_name, e.product_compound_id, e.product_mass, e.product_mw, e.base_mmol,
-           e.solvent, e.concentration, e.temperature, e.duration, e.atmosphere,
+           e.solvent, e.concentration, e.temperature, e.duration, e.light, e.atmosphere, e.apparatus,
            (SELECT name FROM categories c WHERE c.id = e.category_id) AS category_name,
            (SELECT COUNT(*) FROM attachments a WHERE a.exp_id = e.id) AS attach_count,
            (SELECT COUNT(*) FROM reagents r WHERE r.exp_id = e.id) AS reagent_count,
@@ -697,7 +697,9 @@ function listExperiments(query) {
            (SELECT title FROM exp_groups eg WHERE eg.id = e.group_id) AS group_title,
            (SELECT COUNT(*) FROM experiments g WHERE g.group_id = e.group_id AND e.group_id <> '') AS group_size,
            (SELECT group_concat(x.sig, '|') FROM (
-              SELECT r.role || ':' || r.name || ':' || IFNULL(r.eq, '') || ':' || IFNULL(r.conc, '') || ':' || IFNULL(r.volume_ul, '') AS sig
+              -- 变量行（配体 [L]）用占位符进签名：卡片上才写得出「[L]」，而不是拿第一个值冒充改动
+              SELECT r.role || ':' || CASE WHEN trim(IFNULL(r.variable, '')) <> '' THEN '[' || trim(r.variable) || ']' ELSE r.name END
+                       || ':' || IFNULL(r.eq, '') || ':' || IFNULL(r.conc, '') || ':' || IFNULL(r.volume_ul, '') AS sig
                 FROM reagents r WHERE r.exp_id = e.id ORDER BY r.position, r.id) x) AS reagent_sig,
            -- 卡片墙上的缩略图：优先反应式，其次顺手挑一张图片附件
            (SELECT a.id FROM attachments a
@@ -2534,13 +2536,20 @@ const DIFF_FIELDS = [
   ['addition', '加料'],
 ];
 
-/** 投料表签名：role+名字 → 当量（同名同角色只算一项，方便判断「只是改了当量」） */
+/**
+ * 投料表签名：role+名字 → 当量（同名同角色只算一项，方便判断「只是改了当量」）。
+ *
+ * **变量行（`variable` 有值）一律用占位符当名字**：那条「配体 L」在记录里其实扫了好几个值
+ * （条件组的 Entry 1 / 2），拿第一个值（RuPhos）去比会写出「配体 +RuPhos 20 mol%」——
+ * 意思是「换了配体」，跟「这条记录在筛配体」差得远。卡片小签上写 `[L]` 才不误导（用户点名要的）。
+ */
 function reagentMap(expId) {
   const out = new Map();
   for (const r of db
-    .prepare("SELECT role, name, IFNULL(eq,'') AS eq FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY role, name")
+    .prepare("SELECT role, name, IFNULL(variable,'') AS variable, IFNULL(eq,'') AS eq FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY role, name")
     .all(expId)) {
-    out.set(`${r.role}:${r.name}`, String(r.eq));
+    const name = str(r.variable) ? `[${str(r.variable)}]` : r.name;
+    out.set(`${r.role}:${name}`, String(r.eq));
   }
   return out;
 }
@@ -2575,12 +2584,25 @@ function diffItems(baseRow, baseMap, row, map) {
   // 基准那条的投料表要是没填（老记录只剩溶剂行），拿它比会把整张表都标成「+X」——
   // 那不是改动，跳过投料部分，只比条件字段。
   if ([...baseMap.keys()].some((k) => !k.startsWith('溶剂:'))) {
+    // 变量行（`[L]` 这种占位符）只写占位符本身：它代表「这一格在筛」，具体哪几个值在条件组里；
+    // 同角色那条固定试剂算被它替掉，别再单独写「去掉 P(Cy)3」（用户：「就是变成 [L] 这样」）
+    const eaten = new Set();
     for (const [key, eq] of map) {
       const [role, name] = key.split(':');
-      if (!baseMap.has(key)) out.push(`${role} +${name}${eq ? ` ${eqLabel(eq)}` : ''}`);
-      else if (String(baseMap.get(key)) !== String(eq)) out.push(`${name} ${eqLabel(eq) || '—'}`);
+      const isVar = /^\[.+\]$/.test(name);
+      if (!baseMap.has(key)) {
+        if (isVar) {
+          const victim = [...baseMap.keys()].find((k) => k.startsWith(`${role}:`) && !map.has(k) && !eaten.has(k));
+          if (victim) eaten.add(victim);
+          // 当量跟被替掉那条一样就只写 `[L]`，不一样才带上新当量
+          const sameEq = victim && String(baseMap.get(victim)) === String(eq);
+          out.push(!eq || sameEq ? name : `${name} ${eqLabel(eq)}`);
+          continue;
+        }
+        out.push(`${role} +${name}${eq ? ` ${eqLabel(eq)}` : ''}`);
+      } else if (String(baseMap.get(key)) !== String(eq)) out.push(`${name} ${eqLabel(eq) || '—'}`);
     }
-    for (const [key] of baseMap) if (!map.has(key)) out.push(`去掉 ${key.split(':')[1]}`);
+    for (const [key] of baseMap) if (!map.has(key) && !eaten.has(key)) out.push(`去掉 ${key.split(':')[1]}`);
   }
   // 规模单独算一项：投料表没填全的基准（老记录）跟本条比，唯一能看出来的改动就是用量
   const aMol = baseRow.base_mmol ?? null;
@@ -3275,10 +3297,14 @@ function listGroupTables(project) {
                        FROM experiments e
                       WHERE e.group_id = ?
                       ORDER BY e.id`;
-  const reagentSql = "SELECT role, name, eq, mmol FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id";
+  const reagentSql = "SELECT role, name, variable, eq, mmol FROM reagents WHERE exp_id = ? AND trim(name) <> '' ORDER BY position, id";
   const eg = db.prepare('SELECT kind, title FROM exp_groups WHERE id = ?');
 
-  const mapOf = (m) => new Map((m.reagents || []).map((r) => [`${r.role}:${r.name}`, r.eq == null ? '' : String(r.eq)]));
+  // 变量行用占位符（`[L]`）当名字，跟 `reagentMap()` 一套——不然卡片上会写出「换成 RuPhos」那种假改动
+  const mapOf = (m) =>
+    new Map(
+      (m.reagents || []).map((r) => [`${r.role}:${str(r.variable) ? `[${str(r.variable)}]` : r.name}`, r.eq == null ? '' : String(r.eq)])
+    );
   /** 每条记录算出「相对基准改了什么」；整摞只有重复 / 全是原料的，不进条件筛选 */
   const annotate = (members) => {
     const base = members[0];
