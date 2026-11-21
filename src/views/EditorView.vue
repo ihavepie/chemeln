@@ -618,8 +618,10 @@ watch(
     } catch {
       /* 保存失败已经在状态栏里提示 */
     }
-    moreMenu.value = false;
+    closeMore();
     statusMenu.value = false;
+    rxnMenu.value = false;
+    kindMenu.value = false;
     // 停在同一页切过去（设置里可以关）；那条记录没有这一页（文献 / 附件被关掉）就回第 1 页
     const want = keepPage.value ? Number(page.value) || 1 : 0;
     page.value = want && pageExists(want) ? want : String(route.query.p) === '2' ? 2 : 1;
@@ -691,7 +693,7 @@ onMounted(async () => {
   page.value = String(route.query.p) === '2' ? 2 : 1;
   if (!isPhone.value) await load();
   document.addEventListener('paste', onPaste);
-  document.addEventListener('click', closeMenus);
+  document.addEventListener('click', closeMenus, true);
   document.addEventListener('keydown', onShortcut);
   document.addEventListener('keydown', onPageKey);
   document.addEventListener('keydown', onParallelKey);
@@ -947,7 +949,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize);
   window.removeEventListener('resize', updateRail);
   document.removeEventListener('paste', onPaste);
-  document.removeEventListener('click', closeMenus);
+  document.removeEventListener('click', closeMenus, true);
   document.removeEventListener('keydown', onShortcut);
   document.removeEventListener('keydown', onPageKey);
   document.removeEventListener('keydown', onParallelKey);
@@ -1013,11 +1015,19 @@ async function newCategory() {
   }
 }
 
+/**
+ * 点外面关掉抬头那几个小下拉（类型 / 反应类型 / 状态 / ⋯）。
+ * **监听在捕获阶段**：页签、状态胶囊、保存这些按钮都带 `@click.stop`（它们自己的点击要
+ * 先处理完），冒泡阶段根本轮不到这里 —— 以前点一下别处、下拉还挂着就是这个原因。
+ * 捕获阶段先关，再让按钮干它的事；下拉自己那块（`.xxx-wrap`）里点的不算外面。
+ */
 function closeMenus(e) {
   if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
-  if (!e.target.closest?.('.menu-wrap')) moreMenu.value = false;
-  if (!e.target.closest?.('.status-wrap')) statusMenu.value = false;
-  if (!e.target.closest?.('.rxn-wrap')) rxnMenu.value = false;
+  const t = e.target;
+  if (!t?.closest?.('.menu-wrap')) closeMore();
+  if (!t?.closest?.('.status-wrap')) statusMenu.value = false;
+  if (!t?.closest?.('.rxn-wrap')) rxnMenu.value = false;
+  if (!t?.closest?.('.kind-wrap')) kindMenu.value = false;
 }
 
 function payload() {
