@@ -127,6 +127,27 @@ const kindMenu = ref(false);
 const tlcNotes = computed(() => quickList('tlc_note'));
 const tlcMenu = ref(false);
 const tlcTyped = computed(() => String(fields.tlc_note || '').trim());
+/**
+ * 这一格不再横向铺满：宽度按「当前文字（空的时候按占位字）」量出来，
+ * 小箭头就贴在字后面 —— 以前输入框吃满整行，箭头被推到最右，鼠标要横着跑很远。
+ * 量宽度用一个看不见的镜像我（`.tlc-mirror`，同字体同字号），WebKit 没有 `field-sizing`。
+ */
+const TLC_PH = '展开剂 / 显色方式';
+const tlcMirrorEl = ref(null);
+const tlcBoxW = ref('');
+const tlcMirrorText = computed(() => tlcTyped.value || TLC_PH);
+function sizeTlcBox() {
+  const m = tlcMirrorEl.value;
+  if (!m) return;
+  tlcBoxW.value = `${Math.ceil(m.getBoundingClientRect().width) + 3}px`;
+}
+function setTlcInput(el) {
+  if (el) nextTick(sizeTlcBox);
+}
+watch(
+  [() => fields.tlc_note, () => page.value, () => exp.value?.id, () => sheetPrefs.tlc],
+  () => nextTick(sizeTlcBox)
+);
 function openTlcMenu() {
   tlcMenu.value = !tlcMenu.value;
   if (tlcMenu.value) markPopupOpen();
@@ -3035,12 +3056,16 @@ const previewMeta = computed(() => ({
                 <input
                   class="tlc-note"
                   :class="{ 'is-editing': tlcEditing }"
+                  :style="{ width: tlcBoxW }"
+                  :ref="setTlcInput"
                   v-model="fields.tlc_note"
-                  placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸"
+                  :placeholder="TLC_PH"
+                  title="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸"
                   :disabled="exp.locked"
                   @blur="tlcEditing = false"
                   @keydown.esc="tlcMenu = false; tlcEditing = false"
                 />
+                <span ref="tlcMirrorEl" class="tlc-mirror" aria-hidden="true">{{ tlcMirrorText }}</span>
                 <button
                   type="button"
                   class="tlc-caret"

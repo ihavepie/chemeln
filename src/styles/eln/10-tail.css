@@ -2370,8 +2370,21 @@ body.is-board-dragging { cursor: grabbing; }
 /* 整格都能点：输入框平时不吃鼠标（point-events: none），单击 = 出候选，
    双击 = 聚焦改字（聚焦后 `.is-editing` 再放开）。小箭头也做大了一圈，
    别让「按不到」再出现。 */
-.tlc-note-wrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 0; cursor: pointer; }
-.tlc-note-wrap .tlc-note { pointer-events: none; }
+.tlc-note-wrap { position: relative; flex: 0 1 auto; min-width: 0; max-width: 100%; display: flex; align-items: center; gap: 0; cursor: pointer; }
+/* 量宽度用的镜像我：不在版面里，只借它的字宽 */
+.tlc-note-wrap .tlc-mirror {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  white-space: pre;
+  visibility: hidden;
+  pointer-events: none;
+  font-family: var(--sans);
+  font-size: 11.5px;
+}
+/* 「读图」还是贴在最右 */
+.sec-tlc .block-head .mini-copy { margin-left: auto; }
+.tlc-note-wrap .tlc-note { pointer-events: none; min-width: 0; max-width: 100%; }
 .tlc-note-wrap .tlc-note.is-editing { pointer-events: auto; cursor: text; }
 .tlc-note-wrap .tlc-caret {
   flex: none;
