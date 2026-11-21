@@ -2371,4 +2371,4 @@ body.is-board-dragging { cursor: grabbing; }
 .tlc-note-wrap .tlc-caret { flex: none; color: var(--ink-4); cursor: pointer; }
 .tlc-note-wrap .tlc-caret:hover { color: var(--ink-2); }
 /* 菜单本身用条件行那套 `.qmenu`（胶囊 + ＋自定义），这里只管贴在哪、多宽 */
-.tlc-menu { left: 0; z-index: 70; max-width: 420px; }
+.tlc-menu { top: calc(100% + 1px); left: 0; z-index: 70; max-width: 420px; }
