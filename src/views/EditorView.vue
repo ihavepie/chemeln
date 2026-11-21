@@ -1768,7 +1768,19 @@ async function applyRecipe() {
     }
     return row;
   });
+  // 条件行也要一起搬：温度 / 时间 / 气氛 / 装置 / 光照 以前压根没带过来，
+  // 套完配方反应式底下只剩个溶剂（用户：「套用配方这边为什么是空的」）。
+  // 只填空着的格子——已经手填过的保留（套配方不该把当前记录的条件盖掉）
+  let filled = 0;
+  for (const k of ['temperature', 'duration', 'atmosphere', 'apparatus', 'light']) {
+    if (String(fields[k] ?? '').trim()) continue;
+    const v = String(full[k] ?? '').trim();
+    if (!v) continue;
+    fields[k] = full[k];
+    filled += 1;
+  }
   notify();
+  if (filled) toast(`已套用配方的投料表，顺带填了 ${filled} 个条件格`, 'ok', 2200);
 }
 
 /** 绑定产物：弹窗里三条路（反应式里读 / 库里挑 / 画一个），都落到「product_compound_id + 名称 + MW」 */
