@@ -2916,7 +2916,7 @@ const previewMeta = computed(() => ({
             <div class="op-grid">
               <div class="op-cell">
                 <span class="op-cap">操作</span>
-                <textarea class="sheet-text mono" rows="3" v-autogrow v-model="fields.procedure" :disabled="exp.locked" placeholder="加料、换气、升温、取样…" />
+                <textarea class="sheet-text" rows="3" v-autogrow v-model="fields.procedure" :disabled="exp.locked" placeholder="加料、换气、升温、取样…" />
               </div>
               <label class="op-cell">
                 <span class="op-cap">现象</span>
