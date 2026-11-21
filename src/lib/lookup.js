@@ -100,30 +100,35 @@ export function tciUrl(info = {}) {
 export const LOOKUP_SITES = [
   {
     key: 'pubchem',
+    short: 'PC',
     label: 'PubChem',
     hint: '名称 / CAS / 性质 / 谱图',
     url: (ids) => (ids.cid ? `https://pubchem.ncbi.nlm.nih.gov/compound/${ids.cid}` : pubchemUrl(ids)),
   },
   {
     key: 'chemicalbook',
+    short: 'CB',
     label: 'ChemicalBook',
     hint: '中文化合物资料 / 供应商',
     url: (ids) => chemicalBookUrl({ cas: ids.cas, name: ids.name }),
   },
   {
     key: 'nist',
+    short: 'NI',
     label: 'NIST',
     hint: 'IR / MS 谱图、热力学数据',
     url: (ids) => nistUrl({ cas: ids.cas, name: ids.name }),
   },
   {
     key: 'tci',
+    short: 'TC',
     label: 'TCI',
     hint: '试剂规格 / MSDS / 价格',
     url: (ids) => tciUrl({ cas: ids.cas }),
   },
   {
     key: 'cas',
+    short: 'CAS',
     label: 'CAS',
     hint: '标准名 / 同义词 / CAS 号',
     url: (ids) => casCommonUrl({ cas: ids.cas, name: ids.name }),

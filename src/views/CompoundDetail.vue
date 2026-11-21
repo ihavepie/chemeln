@@ -113,6 +113,18 @@ watch(
   }
 );
 
+/** 空着的长文本块先收成一行「点这里写」——不然一页纸下半截全是空白 */
+const blankOpen = reactive({ procedure: false, notes: false });
+const hasText = (v) => String(v || '').trim().length > 0;
+const procEl = ref(null);
+const notesEl = ref(null);
+function startBlank(key) {
+  blankOpen[key] = true;
+  nextTick(() => (key === 'procedure' ? procEl.value : notesEl.value)?.focus());
+}
+function endBlank(key, value) {
+  if (!hasText(value)) blankOpen[key] = false;
+}
 const cmpPage = ref(1);   // 1 = 档案（结构/性质/合成/说明），2 = 续页（谱图与文件）
 const moreMenu = ref(false);
 const preview = ref(null);   // 附件 / 谱图就地预览（不再甩到新标签页）
@@ -326,6 +338,7 @@ const lookupLinks = computed(() => {
   const used = casOk.value ? `CAS ${casOk.value}` : nameOk.value ? `「${nameOk.value}」` : '结构式';
   return LOOKUP_SITES.map((s) => ({
     key: s.key,
+    short: s.short,      // 左栏只有 148px：显示两位代号（跟试剂库同一套）
     label: s.label,
     href: s.url(ids),
     title: `${s.label}：${s.hint}（按 ${s.key === 'pubchem' && ids.cid ? `CID ${ids.cid}` : used} 查）`,
@@ -900,7 +913,6 @@ function openSpectra() {
             </button>
             <!-- 外部查资料：PubChem（名称 / CAS / 性质 / 谱图）、ChemicalBook（中文资料 / 供应商）、TCI（试剂规格 / MSDS / 价格） -->
             <span class="cmp-lookup-links noprint">
-              <span class="cmp-lookup-cap">外部查询</span>
               <a
                 v-for="s in lookupLinks"
                 :key="s.key"
@@ -908,8 +920,8 @@ function openSpectra() {
                 :href="s.href"
                 target="_blank"
                 rel="noreferrer"
-                :title="s.title"
-              >{{ s.label }} ↗</a>
+                :title="`${s.title}`"
+              >{{ s.short || s.label }}</a>
             </span>
           </div>
           </div>
@@ -975,10 +987,28 @@ function openSpectra() {
 
         <section class="sec">
           <h2 class="sec-title">合成与纯化</h2>
-          <textarea class="sheet-text" rows="3" v-autogrow v-model="form.procedure" placeholder="合成步骤、后处理、柱层析配比、重结晶溶剂" />
+          <textarea
+            v-if="blankOpen.procedure || hasText(form.procedure)"
+            ref="procEl"
+            class="sheet-text"
+            rows="3"
+            v-autogrow
+            v-model="form.procedure"
+            placeholder="合成步骤、后处理、柱层析配比、重结晶溶剂"
+            @blur="endBlank('procedure', form.procedure)"
+          /><p v-else class="sec-blank noprint" @click="startBlank('procedure')">未填写 · 点这里写合成步骤 / 后处理 / 柱层析配比</p>
         </section><section class="sec">
           <h2 class="sec-title">说明</h2>
-          <textarea class="sheet-text" rows="2" v-autogrow v-model="form.notes" placeholder="储存条件、危险性、别名" />
+          <textarea
+            v-if="blankOpen.notes || hasText(form.notes)"
+            ref="notesEl"
+            class="sheet-text"
+            rows="2"
+            v-autogrow
+            v-model="form.notes"
+            placeholder="储存条件、危险性、别名"
+            @blur="endBlank('notes', form.notes)"
+          /><p v-else class="sec-blank noprint" @click="startBlank('notes')">未填写 · 点这里写储存条件 / 危险性 / 别名</p>
         </section><section class="sec sec-tight">
           <div class="block-head"><span class="lbl">标准实验</span></div>
           <div class="linked">

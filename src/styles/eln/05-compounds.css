@@ -365,3 +365,15 @@
   .sheet .step-after-line input.step-after::placeholder { color: #c9c7bf; }
 }
 
+
+/* 化合物页：空着的长文本块（合成与纯化 / 说明）先收成一行，点了才出文本域 ——
+   不然一页纸下半截全是没内容的空框（用户：「还能优化一下页面吗」）。 */
+.sec-blank {
+  margin: 0;
+  padding: 3px 0 1px;
+  font-size: 12px;
+  color: var(--ink-4);
+  cursor: text;
+  transition: color 130ms var(--ease);
+}
+.sec-blank:hover { color: var(--ink-2); }

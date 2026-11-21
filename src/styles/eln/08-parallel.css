@@ -631,13 +631,8 @@
   width: 100%;
 }
 /* 外部查询：左栏只有 148px，一律竖排（横排一换行就参差不齐）；上面一行小标题说明这是干什么的 */
-.cmp-lookup-links { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.cmp-lookup-cap {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--ink-4);
-  margin-top: 2px;
-}
+/* 外部查询：一行两位代号（PC / CB / NI / TC / CAS，跟试剂库同一套），别竖排五行占掉半栏 */
+.cmp-lookup-links { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
 /* 物性（密度 / 沸点 / 闪点 / 溶解度）：贴在表头区块下面单独一行，缩略图那栏放不下 */
 .cmp-props {
   margin: -6px 0 10px;
@@ -665,8 +660,9 @@
 .sk-info a:hover { text-decoration: underline; }
 /* 结构式下面那两个「去外面查」的链接：是动作、不是装饰，所以比说明文字深一档、不换行 */
 .cmp-lookup-link {
-  font-size: 11.5px;
-  color: var(--ink-2);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
   text-decoration: none;
   white-space: nowrap;
   border-bottom: 1px dotted var(--line-2);

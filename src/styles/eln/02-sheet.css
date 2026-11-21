@@ -326,7 +326,7 @@
   color: var(--ink);
   padding: 2px 0;
   outline: none;
-  resize: vertical;
+  resize: none;              /* 高度交给 v-autogrow；右下角那两个斜线角标也别留 */
   min-height: 30px;
   transition: background 140ms var(--ease);
 }

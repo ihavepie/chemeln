@@ -41,7 +41,7 @@ const sitesDraft = ref([]);
 
 // 查不到时给的外部检索入口：内置那几家 + 自己加的
 const extSites = (name) => {
-  const builtin = LOOKUP_SITES.map((s) => ({ label: s.label, href: s.url({ name }) })).filter((s) => s.href);
+  const builtin = LOOKUP_SITES.map((s) => ({ label: s.short || s.label, href: s.url({ name }) })).filter((s) => s.href);
   const mine = customSites.value
     .map((s) => ({ label: s.label, href: String(s.url || '').replace(/\{name\}/g, encodeURIComponent(name)) }))
     .filter((s) => s.href);
@@ -53,7 +53,6 @@ const idCache = new Map();
 /** 给模板用的同一份结果（异步解析完就地出现链接） */
 const idsMap = reactive({});
 // 试剂名后面那排外部库：一律两位，省地方（完整名字在 title 里）
-const SITE_SHORT = { pubchem: 'PC', chemicalbook: 'CB', nist: 'NI', tci: 'TC', cas: 'CAS' };
 
 async function idsOf(name) {
   if (idCache.has(name)) return idCache.get(name);
@@ -73,7 +72,7 @@ async function idsOf(name) {
 function sitesForRow(it) {
   const ids = idsMap[it.name];
   if (!ids) return [];
-  return LOOKUP_SITES.map((s) => ({ key: s.key, label: SITE_SHORT[s.key] || s.label, href: s.url(ids) })).filter((x) => x.href);
+  return LOOKUP_SITES.map((s) => ({ key: s.key, label: s.short || s.label, href: s.url(ids) })).filter((x) => x.href);
 }
 
 /** 后台把当前列表里的试剂逐个解析（限 3 个并发，别把网络打满） */
