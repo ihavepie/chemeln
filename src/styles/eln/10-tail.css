@@ -2367,8 +2367,28 @@ body.is-board-dragging { cursor: grabbing; }
 }
 
 /* TLC 那格「展开剂 / 显色方式」：点空的格子（或右边小箭头）出候选，敲自己的能一键记下 */
-.tlc-note-wrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
-.tlc-note-wrap .tlc-caret { flex: none; color: var(--ink-4); cursor: pointer; }
-.tlc-note-wrap .tlc-caret:hover { color: var(--ink-2); }
+/* 整格都能点：输入框平时不吃鼠标（point-events: none），单击 = 出候选，
+   双击 = 聚焦改字（聚焦后 `.is-editing` 再放开）。小箭头也做大了一圈，
+   别让「按不到」再出现。 */
+.tlc-note-wrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 0; cursor: pointer; }
+.tlc-note-wrap .tlc-note { pointer-events: none; }
+.tlc-note-wrap .tlc-note.is-editing { pointer-events: auto; cursor: text; }
+.tlc-note-wrap .tlc-caret {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  margin: -4px -6px -4px 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 5px;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.tlc-note-wrap .tlc-caret:hover { background: #f2f0ec; color: var(--ink-2); }
+.tlc-note-wrap:hover .tlc-note { color: var(--ink); }
 /* 菜单本身用条件行那套 `.qmenu`（胶囊 + ＋自定义），这里只管贴在哪、多宽 */
 .tlc-menu { top: calc(100% + 1px); left: 0; z-index: 70; max-width: 420px; }

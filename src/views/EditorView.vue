@@ -131,10 +131,42 @@ function openTlcMenu() {
   tlcMenu.value = !tlcMenu.value;
   if (tlcMenu.value) markPopupOpen();
 }
-/** 点这格：空的就出候选（省得每次手敲展开剂），已经有字的就正常放光标进去改 */
-function onTlcClick() {
-  if (!String(fields.tlc_note || '').trim()) openTlcMenu();
-  else markPopupOpen();
+/**
+ * **单击整格 = 出候选，双击 = 直接改字**（跟条件行那几格一个手感）：
+ * 以前只有右边那个小箭头能点，鼠标要横着跑到格子另一头，箭头又小按不准。
+ * 现在输入框平时 `pointer-events: none`，落点算整个 `.tlc-note-wrap`；
+ * 双击才程序化 `focus()` 放光标进去（聚焦后 CSS 再把 pointer-events 放开）。
+ */
+const tlcEditing = ref(false);
+let tlcDownTimer = 0;
+let tlcLastDownAt = 0;
+function onTlcDown(ev) {
+  if (exp.value?.locked) return;
+  // 小箭头 / 已经弹出来的菜单：各有自己的点击，别抢（菜单里的 mousedown 会冒到这里）
+  if (ev.target.closest?.('.tlc-caret, .tlc-menu')) return;
+  const el = ev.currentTarget?.querySelector?.('input');
+  if (!el) return;
+  if (document.activeElement === el) return;   // 已经在打字：正常放光标、选字
+  const now = Date.now();
+  const isDouble = now - tlcLastDownAt < 340;
+  tlcLastDownAt = now;
+  if (isDouble) {
+    clearTimeout(tlcDownTimer);
+    // preventDefault 得在 focus 之前：不然浏览器把这下 mousedown 的默认行为做完
+    // （焦点被挪走）→ 输入框立刻 blur → `.is-editing` 刚加上就被撤掉，光标进不去
+    ev.preventDefault();
+    tlcMenu.value = false;
+    tlcEditing.value = true;
+    el.focus?.();
+    el.select?.();
+    return;
+  }
+  ev.preventDefault();
+  clearTimeout(tlcDownTimer);
+  tlcDownTimer = setTimeout(() => {
+    tlcMenu.value = !tlcMenu.value;
+    if (tlcMenu.value) markPopupOpen();
+  }, 130);
 }
 function pickTlc(v) {
   fields.tlc_note = v;
@@ -2999,16 +3031,24 @@ const previewMeta = computed(() => ({
           <section v-if="sheetPrefs.tlc" class="sec sec-tight sec-tlc">
             <div class="block-head">
               <span class="lbl">TLC</span>
-              <div class="tlc-note-wrap">
+              <div class="tlc-note-wrap" @mousedown.stop="onTlcDown($event)">
                 <input
                   class="tlc-note"
+                  :class="{ 'is-editing': tlcEditing }"
                   v-model="fields.tlc_note"
                   placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸"
                   :disabled="exp.locked"
-                  @click.stop="onTlcClick()"
-                  @keydown.esc="tlcMenu = false"
+                  @blur="tlcEditing = false"
+                  @keydown.esc="tlcMenu = false; tlcEditing = false"
                 />
-                <Icon name="down" :size="10" class="tlc-caret" @click.stop="openTlcMenu()" />
+                <button
+                  type="button"
+                  class="tlc-caret"
+                  title="选常用展开剂（也可以双击格子直接改字）"
+                  @click.stop="openTlcMenu()"
+                >
+                  <Icon name="down" :size="12" />
+                </button>
                 <div v-if="tlcMenu && !exp.locked" class="qmenu cond-menu tlc-menu" @click.stop>
                   <button
                     v-for="t in tlcNotes"
