@@ -168,6 +168,7 @@ export function schemeParts(model, compounds) {
       const sol = solvents.join(' + ');
       const text = str(condText);
       // 这一步的条件文字里往往已经写了溶剂（「THF, rt」），别再重复一遍
+      const needSol = sol && !text.toLowerCase().includes(sol.toLowerCase());
       // 这一步自己的条件（温度 / 时间 / 光照 / 气氛 / 装置）走同一套写法
       const own = [fieldText('temperature', step.temperature), fieldText('duration', step.duration), fieldText('light', step.light), fieldText('atmosphere', step.atmosphere), fieldText('apparatus', step.apparatus)]
         .filter(Boolean)

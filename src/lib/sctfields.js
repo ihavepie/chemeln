@@ -12,7 +12,9 @@ export const SOURCES = [
   { key: 'temperature', label: '温度' },
   { key: 'solvent', label: '溶剂' },
   { key: 'duration', label: '时间' },
+  { key: 'light', label: '光照' },
   { key: 'atmosphere', label: '气氛' },
+  { key: 'apparatus', label: '装置' },
   { key: 'addition', label: '加料' },
   { key: 'reagent', label: '投料（试剂 + 当量）' },
   { key: 'yield', label: '产率' },
@@ -99,7 +101,9 @@ export function autoValue(source, exp, base, cond) {
 const COND_LABEL = {
   temperature: '温度',
   duration: '时间',
+  light: '光照',
   atmosphere: '气氛',
+  apparatus: '装置',
   addition: '加料',
 };
 

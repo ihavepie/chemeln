@@ -2528,7 +2528,9 @@ const DIFF_FIELDS = [
   ['temperature', '温度'],
   ['solvent', '溶剂'],
   ['duration', '时间'],
+  ['light', '光照'],
   ['atmosphere', '气氛'],
+  ['apparatus', '装置'],
   ['addition', '加料'],
 ];
 
@@ -2598,7 +2600,7 @@ function annotateGroupDiff(items) {
   for (const [, members] of groups) {
     const ids = members.map((m) => m.id);
     const rows = db
-      .prepare(`SELECT id, temperature, solvent, duration, atmosphere, addition FROM experiments WHERE id IN (${ids.map(() => '?').join(',')})`)
+      .prepare(`SELECT id, temperature, solvent, duration, light, atmosphere, apparatus, addition FROM experiments WHERE id IN (${ids.map(() => '?').join(',')})`)
       .all(...ids);
     const byId = new Map(rows.map((r) => [r.id, r]));
     const base = members.find((m) => String(m.variant || '').includes('基准')) || members[0];
@@ -3265,7 +3267,8 @@ function listGroupTables(project) {
   const memberSql = `SELECT e.id, e.code, e.title, e.date, e.status, e.kind, e.project,
                             e.yield_pct, e.dr_ee, e.ee_pct, e.no_yield,
                             e.solvent, e.concentration, e.temperature, e.duration,
-                            e.atmosphere, e.addition, e.product_name, e.product_mass,
+                            e.light, e.atmosphere, e.apparatus, e.addition,
+                            e.product_name, e.product_mass,
                             e.base_mmol, e.group_id,
                             (SELECT group_concat(r.name, ' + ') FROM reagents r
                               WHERE r.exp_id = e.id AND r.role = '底物' AND trim(r.name) <> '') AS substrates
@@ -3435,7 +3438,8 @@ route('GET', '/api/screenings/:id', async (req, res, params) => {
   if (!s) return fail(res, 404, '筛选表不存在');
   // 表里只存「选了哪些实验 + 每格手填的文本」；编号 / 条件 / 产率这些一直读记录本身，不会跟记录脱节
   const one = db.prepare(`SELECT e.id, e.code, e.title, e.date, e.status, e.kind, e.yield_pct, e.dr_ee, e.ee_pct,
-                                 e.no_yield, e.solvent, e.temperature, e.duration, e.atmosphere, e.addition,
+                                 e.no_yield, e.solvent, e.temperature, e.duration,
+                                 e.light, e.atmosphere, e.apparatus, e.addition,
                                  e.field_vars_json,
                                  e.product_name, e.product_mass, e.base_mmol,
                                  e.notes, e.conclusion, e.appearance, e.tlc_note,
