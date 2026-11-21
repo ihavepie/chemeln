@@ -2370,17 +2370,5 @@ body.is-board-dragging { cursor: grabbing; }
 .tlc-note-wrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
 .tlc-note-wrap .tlc-caret { flex: none; color: var(--ink-4); cursor: pointer; }
 .tlc-note-wrap .tlc-caret:hover { color: var(--ink-2); }
-.tlc-menu {
-  position: absolute;
-  top: calc(100% + 5px);
-  left: 0;
-  min-width: 190px;
-  max-width: 280px;
-  background: var(--paper);
-  border: 1px solid var(--line-2);
-  border-radius: 7px;
-  padding: 4px;
-  z-index: 70;
-  box-shadow: 0 10px 26px rgba(20, 18, 14, 0.1);
-}
-.tlc-menu .rxn-opt { overflow: hidden; text-overflow: ellipsis; }
+/* 菜单本身用条件行那套 `.qmenu`（胶囊 + ＋自定义），这里只管贴在哪、多宽 */
+.tlc-menu { left: 0; z-index: 70; max-width: 420px; }

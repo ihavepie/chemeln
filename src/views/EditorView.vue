@@ -127,7 +127,6 @@ const kindMenu = ref(false);
 const tlcNotes = computed(() => quickList('tlc_note'));
 const tlcMenu = ref(false);
 const tlcTyped = computed(() => String(fields.tlc_note || '').trim());
-const tlcCanRemember = computed(() => !!tlcTyped.value && !tlcNotes.value.includes(tlcTyped.value));
 function openTlcMenu() {
   tlcMenu.value = !tlcMenu.value;
   if (tlcMenu.value) markPopupOpen();
@@ -137,17 +136,39 @@ function onTlcClick() {
   if (!String(fields.tlc_note || '').trim()) openTlcMenu();
   else markPopupOpen();
 }
-async function rememberTlcNote() {
-  const v = tlcTyped.value;
-  if (!v) return;
-  const next = tlcNotes.value.includes(v) ? tlcNotes.value : [...tlcNotes.value, v];
+function pickTlc(v) {
+  fields.tlc_note = v;
   tlcMenu.value = false;
+  notify();
+}
+/** 「＋ 自定义」：格子里已经有字就直接拿它当默认值，省得再敲一遍 */
+async function addTlc() {
+  const v = await prompt({
+    title: '加一条 TLC 展开剂',
+    placeholder: '比如 PE:EA = 4:1，UV + 磷钼酸',
+    value: tlcTyped.value,
+  });
+  const val = String(v || '').trim();
+  if (!val) return;
   try {
-    await api.saveQuick('tlc_note', next, true);
+    await api.saveQuick('tlc_note', [...new Set([...tlcNotes.value, val])], true);
     await loadBoot();
-    toast(`「${v}」加进 TLC 展开剂候选了`);
+    fields.tlc_note = val;
+    notify();
+    tlcMenu.value = false;
+    toast(`「${val}」加好了，以后点这格就能选`);
   } catch (e) {
     toast(e.message || '没存上', 'err');
+  }
+}
+/** 从常用选项里去掉一条（内置的也能删：存的是整份列表） */
+async function delTlc(v) {
+  try {
+    await api.saveQuick('tlc_note', tlcNotes.value.filter((x) => x !== v), true);
+    await loadBoot();
+    toast(`已经从常用选项里去掉「${v}」`);
+  } catch (e) {
+    toast(e.message || '没删掉', 'err');
   }
 }
 const rxnTypes = computed(() => quickList('rxn_type'));
@@ -2988,27 +3009,25 @@ const previewMeta = computed(() => ({
                   @keydown.esc="tlcMenu = false"
                 />
                 <Icon name="down" :size="10" class="tlc-caret" @click.stop="openTlcMenu()" />
-                <div v-if="tlcMenu && !exp.locked" class="tlc-menu" @click.stop>
+                <div v-if="tlcMenu && !exp.locked" class="qmenu cond-menu tlc-menu" @click.stop>
                   <button
                     v-for="t in tlcNotes"
                     :key="t"
                     type="button"
-                    class="rxn-opt"
-                    :class="{ 'is-on': tlcTyped === t }"
-                    @click="fields.tlc_note = t; tlcMenu = false; notify()"
+                    class="qchip is-own"
+                    :aria-selected="tlcTyped === t"
+                    @click="pickTlc(t)"
                   >
                     {{ t }}
-                  </button>
-                  <button v-if="tlcCanRemember" type="button" class="rxn-opt is-remember" @click="rememberTlcNote()">
-                    ＋ 记下「{{ tlcTyped }}」
+                    <span class="qchip-x" role="button" title="从常用选项里去掉" @click.stop.prevent="delTlc(t)">×</span>
                   </button>
                   <button
-                    v-if="fields.tlc_note"
                     type="button"
-                    class="rxn-opt is-clear"
-                    @click="fields.tlc_note = ''; tlcMenu = false; notify()"
+                    class="qchip is-add"
+                    title="把自己常用的展开剂加进来（跟着记录本一起备份）"
+                    @click.stop="addTlc()"
                   >
-                    清掉
+                    ＋ 自定义
                   </button>
                 </div>
               </div>
