@@ -106,12 +106,14 @@ watch(
     await load();
     const label = c.value?.code || c.value?.name;
     if (label) toast(`已切换到 ${label}`, 'info', 1800);
-    // 换了化合物就当翻到新的一页：滚回顶部
+    // 换了化合物就当翻到新的一页：回第 1 页 + 滚回顶部
+    cmpPage.value = 1;
     await nextTick();
     editorEl.value?.scrollTo({ top: 0 });
   }
 );
 
+const cmpPage = ref(1);   // 1 = 档案（结构/性质/合成/说明），2 = 续页（谱图与文件）
 const moreMenu = ref(false);
 const preview = ref(null);   // 附件 / 谱图就地预览（不再甩到新标签页）
 const sketcherOpen = ref(false);   // 画结构式（Ketcher 画板）
@@ -833,6 +835,10 @@ function openSpectra() {
     <div v-else ref="editorEl" class="editor">
     <div class="editor-bar">
       <span class="mono" style="font-size: 10.5px; color: var(--ink-4); letter-spacing: 0.08em">化合物</span>
+      <div class="page-tabs noprint" role="tablist">
+        <button class="ptab" :aria-selected="cmpPage === 1 ? 'true' : 'false'" title="结构式、性质、合成与纯化、说明" @click="cmpPage = 1">第 1 页 · 档案</button>
+        <button class="ptab" :aria-selected="cmpPage === 2 ? 'true' : 'false'" :title="`核磁 / TLC / 文件（文件 ${files.length} 个）`" @click="cmpPage = 2">第 2 页 · 谱图与文件</button>
+      </div>
       <CatPick
         class="toolbar-cat"
         :value="form.category_id == null || form.category_id === '' ? '' : String(form.category_id)"
@@ -866,7 +872,7 @@ function openSpectra() {
     </div>
 
     <div class="editor-inner">
-      <article class="sheet cmp-sheet">
+      <article v-if="cmpPage === 1" class="sheet cmp-sheet">
         <div class="sheet-runner"><span>化合物档案</span><span>{{ c.code }}</span></div>
 
         <div class="cmp-top">
@@ -967,6 +973,38 @@ function openSpectra() {
         </div>
         <div v-if="lookupProps" class="cmp-props noprint">{{ lookupProps }}</div>
 
+        <section class="sec">
+          <h2 class="sec-title">合成与纯化</h2>
+          <textarea class="sheet-text" rows="3" v-autogrow v-model="form.procedure" placeholder="合成步骤、后处理、柱层析配比、重结晶溶剂" />
+        </section><section class="sec">
+          <h2 class="sec-title">说明</h2>
+          <textarea class="sheet-text" rows="2" v-autogrow v-model="form.notes" placeholder="储存条件、危险性、别名" />
+        </section><section class="sec sec-tight">
+          <div class="block-head"><span class="lbl">标准实验</span></div>
+          <div class="linked">
+            <template v-if="std">
+              <span class="linkish" @click="router.push(`/e/${std.id}`)">{{ std.code }}</span>
+              <span class="hint">{{ std.title || '（未命名实验）' }}{{ std.date ? ` · ${std.date}` : '' }}</span>
+              <button class="btn btn-sm" @click="openStandardPicker">换</button>
+              <button class="mini" title="解除关联" @click="clearStandard"><Icon name="x" :size="10" /></button>
+            </template>
+            <template v-else>
+              <span class="hint">未指定；可关联当初合成该化合物的实验记录</span>
+              <button class="btn btn-sm" @click="openStandardPicker"><Icon name="file" :size="13" /> 选一条实验</button>
+            </template>
+          </div>
+          <div class="block-head" style="margin-top: 18px"><span class="lbl">用在哪些实验</span></div>
+          <div class="linked">
+            <span v-for="e in used" :key="e.id" class="linkish" @click="router.push(`/e/${e.id}`)">
+              {{ e.code }}{{ e.roles?.length ? ` · ${e.roles.join(' / ')}` : '' }}{{ Number(e.id) === Number(c.standard_exp_id) ? ' · 标准' : '' }}
+            </span>
+            <span v-if="!used.length" class="hint">尚未在任何实验中使用</span>
+          </div>
+        </section>
+      </article>
+
+      <article v-else class="sheet cmp-sheet">
+        <div class="sheet-runner"><span>化合物档案 · 谱图与文件</span><span>{{ c.code }}</span></div>
         <section class="sec sec-tight">
           <div class="block-head">
             <span class="lbl">核磁</span>
@@ -1007,9 +1045,7 @@ function openSpectra() {
               >＋</button>
             </div>
           </div>
-        </section>
-
-        <section class="sec sec-tight">
+        </section><section class="sec sec-tight">
           <div class="block-head">
             <span class="lbl">TLC</span>
             <input class="tlc-note" v-model="form.tlc_solvent" placeholder="展开剂，如 PE:EA = 10:1" />
@@ -1032,19 +1068,7 @@ function openSpectra() {
               <span class="cap">粘贴 / 选择</span>
             </div>
           </div>
-        </section>
-
-        <section class="sec">
-          <h2 class="sec-title">合成与纯化</h2>
-          <textarea class="sheet-text" rows="3" v-autogrow v-model="form.procedure" placeholder="合成步骤、后处理、柱层析配比、重结晶溶剂" />
-        </section>
-
-        <section class="sec">
-          <h2 class="sec-title">说明</h2>
-          <textarea class="sheet-text" rows="2" v-autogrow v-model="form.notes" placeholder="储存条件、危险性、别名" />
-        </section>
-
-        <section class="sec sec-att">
+        </section><section class="sec sec-att">
           <h2 class="sec-title">文件<span class="hint">{{ files.length }} 个</span></h2>
           <div class="att-tools noprint">
             <select v-model="cat" class="select">
@@ -1072,29 +1096,6 @@ function openSpectra() {
               </div>
             </div>
             <div v-if="!files.length" class="hint noprint" style="padding: 8px 0">暂无文件。谱图、原始数据与 TLC 照片均可置于此处。</div>
-          </div>
-        </section>
-
-        <section class="sec sec-tight">
-          <div class="block-head"><span class="lbl">标准实验</span></div>
-          <div class="linked">
-            <template v-if="std">
-              <span class="linkish" @click="router.push(`/e/${std.id}`)">{{ std.code }}</span>
-              <span class="hint">{{ std.title || '（未命名实验）' }}{{ std.date ? ` · ${std.date}` : '' }}</span>
-              <button class="btn btn-sm" @click="openStandardPicker">换</button>
-              <button class="mini" title="解除关联" @click="clearStandard"><Icon name="x" :size="10" /></button>
-            </template>
-            <template v-else>
-              <span class="hint">未指定；可关联当初合成该化合物的实验记录</span>
-              <button class="btn btn-sm" @click="openStandardPicker"><Icon name="file" :size="13" /> 选一条实验</button>
-            </template>
-          </div>
-          <div class="block-head" style="margin-top: 18px"><span class="lbl">用在哪些实验</span></div>
-          <div class="linked">
-            <span v-for="e in used" :key="e.id" class="linkish" @click="router.push(`/e/${e.id}`)">
-              {{ e.code }}{{ e.roles?.length ? ` · ${e.roles.join(' / ')}` : '' }}{{ Number(e.id) === Number(c.standard_exp_id) ? ' · 标准' : '' }}
-            </span>
-            <span v-if="!used.length" class="hint">尚未在任何实验中使用</span>
           </div>
         </section>
       </article>
