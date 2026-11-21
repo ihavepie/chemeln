@@ -474,7 +474,7 @@ const SET_SEARCH = [
   { m: 'page', label: '反应式 · 箭头上那行条件（自动 / 单行 / 两行）', kw: 'scheme 反应式 条件 格式', anchor: 'set-scheme' },
   { m: 'page', label: '结果表最右那格 · 挂几张板', kw: 'tlc 板 缩略 几张', anchor: 'set-tlc-n' },
   { m: 'page', label: '投料表「用量」小数位', kw: 'decimal 小数 位 质量 体积', anchor: 'set-decimals' },
-  { m: 'page', label: '常用选项（温度 / 时间 / 气氛 / 装置 / 光照）', kw: 'quick 下拉 候选 温度 时间 气氛 装置 光照', anchor: 'set-quick' },
+  { m: 'page', label: '常用选项（条件行 + 反应类型）', kw: 'quick 下拉 候选 温度 时间 气氛 装置 光照 反应类型 rxn type 改当量 放大 转化', anchor: 'set-quick' },
 ];
 /* 每个模块的**子功能**（用户：「还有就是子功能快速选择」）：当前模块在侧栏里展开这几条，
    点一下就滚到那一节 + 闪一下——不用先切模块再往下翻。只列真有锚点的。 */
@@ -544,11 +544,14 @@ function pickSheetKind(kind) {
    也是同一份数据，所以两边看到的是同一串。内置的那几条在 `lib/ui.js` 的 QUICK 里，
    这里只显示、删不掉（删了代码里还会再来）。 */
 const QUICK_ROWS = [
-  { key: 'temperature', label: '反应温度' },
-  { key: 'duration', label: '时间节点' },
-  { key: 'atmosphere', label: '气氛 / 容器' },
-  { key: 'apparatus', label: '装置 / 器皿' },
-  { key: 'light', label: '光照 / 波长' },
+  { key: 'temperature', label: '反应温度', ph: '比如 45 ℃ / −15 ℃' },
+  { key: 'duration', label: '时间节点', ph: '比如 5 h / 72 h' },
+  { key: 'atmosphere', label: '气氛 / 容器', ph: '比如 Ar 手套箱' },
+  { key: 'apparatus', label: '装置 / 器皿', ph: '比如 50 mL 封管' },
+  { key: 'light', label: '光照 / 波长', ph: '比如 白光 24 h' },
+  // 记录页右上「反应类型」那格的候选（跟上面不同：它不是条件行，是抬头的一格），
+  // 内置就是 lib/kind.js 的 RXN_TYPES，这儿加 / 删 / 挪跟条件行那几行一个玩法
+  { key: 'rxn_type', label: '反应类型', ph: '比如 硼化 / 脱保护 / 开环' },
 ];
 const quickItems = (key) => quickList(key);
 const quickCustomized = (key) => quickFull(key) != null;
@@ -567,7 +570,7 @@ async function saveQuickList(key, items) {
 async function addQuick(f) {
   const v = await prompt({
     title: `加一条「${f.label}」常用选项`,
-    placeholder: '比如 45 ℃ / Ar 手套箱 / 光照 24 h',
+    placeholder: f.ph || '比如 45 ℃ / Ar 手套箱 / 光照 24 h',
     confirmText: '加上',
   });
   const value = String(v || '').trim();
@@ -1280,7 +1283,7 @@ function setScrollSwitch(v) {
       <section v-if="mod === 'page'" class="card">
         <div class="card-head"><h2 class="card-title">常用选项</h2></div>
         <p class="card-note">
-          条件行下拉里「＋ 自定义」加的值都在这里（跟着 data/ 一起备份）。内置的也能删、能用 ‹ › 挪位置。
+          条件行下拉、反应类型那格的候选都在这儿（跟着 data/ 一起备份）。内置的也能删、能用 ‹ › 挪位置。
         </p>
         <div id="set-quick" class="quick-rows">
           <div v-for="f in QUICK_ROWS" :key="f.key" class="quick-row">

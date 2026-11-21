@@ -23,10 +23,10 @@ import ExpPick from '../components/ExpPick.vue';
 import ProductBind from '../components/ProductBind.vue';
 import SyncConflicts from '../components/SyncConflicts.vue';
 import { api } from '../api.js';
-import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, reagentDict } from '../store.js';
+import { loadBoot, loadList, loadCompounds, store, categoriesOfProject, addCategory, compoundDict, quickList, reagentDict } from '../store.js';
 import { STATUSES, STATUS_TONE, isImageName, todayISO } from '../lib/ui.js';
 import { sheetFx, sheetPrefs, sheetTlcMax, sheetSchemeFmt, useSheetBlocks } from '../lib/sheetprefs.js';
-import { KINDS, RXN_TYPES } from '../lib/kind.js';
+import { KINDS } from '../lib/kind.js';
 import { useAutosave } from '../lib/autosave.js';
 import TlcOcr from '../components/TlcOcr.vue';
 import { confirm, confirmLines, prompt, toast } from '../lib/feedback.js';
@@ -121,6 +121,24 @@ const conds = ref([]);
  */
 const KIND_OPTIONS = [{ value: '', label: '通用' }, ...KINDS.map((k) => ({ value: k.key, label: k.key }))];
 const kindMenu = ref(false);
+/** 反应类型候选：设置 › 记录页 › 常用选项 里能自己加 / 删 / 挪（`quick:rxn_type`），
+ *  没改过就是 lib/kind.js 的 RXN_TYPES；这一格照样可以随手敲别的，敲完能一键记进候选。 */
+const rxnTypes = computed(() => quickList('rxn_type'));
+const rxnTyped = computed(() => String(fields.rxn_type || '').trim());
+const rxnCanRemember = computed(() => !!rxnTyped.value && !rxnTypes.value.includes(rxnTyped.value));
+async function rememberRxnType() {
+  const v = rxnTyped.value;
+  if (!v) return;
+  const next = rxnTypes.value.includes(v) ? rxnTypes.value : [...rxnTypes.value, v];
+  rxnMenu.value = false;
+  try {
+    await api.saveQuick('rxn_type', next, true);
+    await loadBoot();
+    toast(`「${v}」加进反应类型候选了`);
+  } catch (e) {
+    toast(e.message || '没存上', 'err');
+  }
+}
 function applyKindBlocks(kind) {
   useSheetBlocks(kind);
 }
@@ -2608,7 +2626,7 @@ const previewMeta = computed(() => ({
                       />
                       <div v-if="rxnMenu && !exp.locked" class="rxn-menu">
                         <button
-                          v-for="t in RXN_TYPES"
+                          v-for="t in rxnTypes"
                           :key="t"
                           type="button"
                           class="rxn-opt"
@@ -2616,6 +2634,15 @@ const previewMeta = computed(() => ({
                           @click="fields.rxn_type = t; rxnMenu = false; notify()"
                         >
                           {{ t }}
+                        </button>
+                        <button
+                          v-if="rxnCanRemember"
+                          type="button"
+                          class="rxn-opt is-remember"
+                          title="把刚敲的这个加进候选（设置里也能加）"
+                          @click="rememberRxnType()"
+                        >
+                          ＋ 记下「{{ rxnTyped }}」
                         </button>
                         <button
                           v-if="fields.rxn_type"

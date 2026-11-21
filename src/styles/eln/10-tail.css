@@ -2354,3 +2354,14 @@ body.is-board-dragging { cursor: grabbing; }
 
 /* 排版板「专注」：导轨列宽归零 + 不可见，整窗都是画布。
    别写 display:none —— grid 会把 workspace 顶进第 1 列（= --rail 那么宽），整页直接白 */
+
+/* 反应类型候选菜单：自己敲进去的那条能一键记进候选（设置页 记录页 › 常用选项 里也能加 / 删 / 挪） */
+.rxn-menu { max-width: 240px; }
+.rxn-menu .rxn-opt { overflow: hidden; text-overflow: ellipsis; }
+.rxn-opt.is-remember {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 5px 5px;
+  color: var(--accent-ink);
+}

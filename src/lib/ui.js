@@ -1,5 +1,7 @@
 /** 一些 v1 里散落的小工具，集中到这里。 */
 
+import { RXN_TYPES } from './kind.js';
+
 export const STATUSES = ['进行中', '已完成', '部分完成', '失败', '重复'];
 
 /** 小签 / 书签这种窄地方用的状态简称 */
@@ -137,6 +139,9 @@ export const QUICK = {
   'f-atmosphere': ['N₂', 'Ar', '空气', '手套箱', 'N₂ 封管', 'N₂ 双排管', 'Ar Schlenk'],
   'f-apparatus': ['圆底烧瓶', '封管', 'Schlenk 管', '耐压瓶', '微波反应器', '光反应器', '连续流', '手套箱内'],
   'f-light': ['365 nm', '395 nm', '蓝光 450 nm', '绿光 520 nm', '白光', '日光灯', '太阳光'],
+  // 反应类型（记录页右上那个小格）的候选：内置那几条在 lib/kind.js 的 RXN_TYPES 里，
+  // 设置页可以自己加 / 删 / 挪，走的是同一套 `quick:rxn_type` / `quickFull:rxn_type`
+  'f-rxn_type': RXN_TYPES,
 };
 
 /** TLC 判断（小反应筛条件时的第一层结果，排在产率前面）：顺序 = 从「反应得好」到「没反应」 */
