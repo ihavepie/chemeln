@@ -26,9 +26,8 @@ export const SHEET_BLOCKS = {
   tlc: 'TLC',
   procedure: '一 · 实验操作与现象',
   workup: '二 · 后处理',
-  characterization: '三 · 表征数据',
-  conclusion: '四 · 讨论与结论',
-  lit: '五 · 文献',
+  conclusion: '三 · 讨论与结论',
+  lit: '文献（第 3 页）',
   attachments: '附件',
 };
 

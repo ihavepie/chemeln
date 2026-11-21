@@ -179,11 +179,6 @@ const amount = (r) => amountText(r) || (num(r.amount_ul) ? `${round(num(r.amount
         </template>
       </dl>
 
-      <div v-if="e.characterization" class="phone-block">
-        <div class="phone-label">表征</div>
-        <p class="phone-text">{{ e.characterization }}</p>
-      </div>
-
       <div class="phone-block">
         <div class="phone-label">拍照 / 上传</div>
         <div class="phone-shoot">

@@ -2262,11 +2262,6 @@ const condFixed = computed(() => {
   return fixed;
 });
 
-const chips = ['¹H NMR', '¹³C NMR', '¹⁹F NMR', 'δ ', 's', 'd', 'dd', 't', 'q', 'm', 'br s', 'J = ', 'Hz', 'CDCl₃', 'DMSO-d₆', 'HRMS (ESI)', 'IR (neat)', 'Rf', '[α]D'];
-function insertChip(text) {
-  fields.characterization = `${fields.characterization || ''}${text}`;
-  notify();
-}
 
 const meta = computed(() => exp.value || {});
 /** 已有课题：课题格子的小下拉用 */
@@ -2970,15 +2965,8 @@ const previewMeta = computed(() => ({
               :on-delete="async (id) => { await api.deleteAttachment(id); await refreshAttachments(); }"
             />
           </section>
-          <section v-if="sheetPrefs.characterization" class="sec">
-            <h2 class="sec-title"><span class="num">三</span>表征数据</h2>
-            <textarea class="sheet-text mono" rows="4" v-autogrow v-model="fields.characterization" :disabled="exp.locked" />
-            <div class="chips noprint">
-              <button v-for="c in chips" :key="c" class="chip" type="button" @click="insertChip(c)">{{ c }}</button>
-            </div>
-          </section>
           <section v-if="sheetPrefs.conclusion" class="sec">
-            <h2 class="sec-title"><span class="num">四</span>讨论与结论</h2>
+            <h2 class="sec-title"><span class="num">三</span>讨论与结论</h2>
             <textarea class="sheet-text" rows="2" v-autogrow v-model="fields.conclusion" :disabled="exp.locked" placeholder="本组条件的结论与下一轮拟考察的变量" />
           </section>
 
