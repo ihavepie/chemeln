@@ -123,6 +123,33 @@ const KIND_OPTIONS = [{ value: '', label: '通用' }, ...KINDS.map((k) => ({ val
 const kindMenu = ref(false);
 /** 反应类型候选：设置 › 记录页 › 常用选项 里能自己加 / 删 / 挪（`quick:rxn_type`），
  *  没改过就是 lib/kind.js 的 RXN_TYPES；这一格照样可以随手敲别的，敲完能一键记进候选。 */
+/** TLC 那格的展开剂候选（设置 › 记录页 › 常用选项 里能自己加 / 删 / 挪） */
+const tlcNotes = computed(() => quickList('tlc_note'));
+const tlcMenu = ref(false);
+const tlcTyped = computed(() => String(fields.tlc_note || '').trim());
+const tlcCanRemember = computed(() => !!tlcTyped.value && !tlcNotes.value.includes(tlcTyped.value));
+function openTlcMenu() {
+  tlcMenu.value = !tlcMenu.value;
+  if (tlcMenu.value) markPopupOpen();
+}
+/** 点这格：空的就出候选（省得每次手敲展开剂），已经有字的就正常放光标进去改 */
+function onTlcClick() {
+  if (!String(fields.tlc_note || '').trim()) openTlcMenu();
+  else markPopupOpen();
+}
+async function rememberTlcNote() {
+  const v = tlcTyped.value;
+  if (!v) return;
+  const next = tlcNotes.value.includes(v) ? tlcNotes.value : [...tlcNotes.value, v];
+  tlcMenu.value = false;
+  try {
+    await api.saveQuick('tlc_note', next, true);
+    await loadBoot();
+    toast(`「${v}」加进 TLC 展开剂候选了`);
+  } catch (e) {
+    toast(e.message || '没存上', 'err');
+  }
+}
 const rxnTypes = computed(() => quickList('rxn_type'));
 const rxnTyped = computed(() => String(fields.rxn_type || '').trim());
 const rxnCanRemember = computed(() => !!rxnTyped.value && !rxnTypes.value.includes(rxnTyped.value));
@@ -622,6 +649,7 @@ watch(
     statusMenu.value = false;
     rxnMenu.value = false;
     kindMenu.value = false;
+    tlcMenu.value = false;
     // 停在同一页切过去（设置里可以关）；那条记录没有这一页（文献 / 附件被关掉）就回第 1 页
     const want = keepPage.value ? Number(page.value) || 1 : 0;
     page.value = want && pageExists(want) ? want : String(route.query.p) === '2' ? 2 : 1;
@@ -1028,6 +1056,7 @@ function closeMenus(e) {
   if (!t?.closest?.('.status-wrap')) statusMenu.value = false;
   if (!t?.closest?.('.rxn-wrap')) rxnMenu.value = false;
   if (!t?.closest?.('.kind-wrap')) kindMenu.value = false;
+  if (!t?.closest?.('.tlc-note-wrap')) tlcMenu.value = false;
 }
 
 function payload() {
@@ -2949,7 +2978,40 @@ const previewMeta = computed(() => ({
           <section v-if="sheetPrefs.tlc" class="sec sec-tight sec-tlc">
             <div class="block-head">
               <span class="lbl">TLC</span>
-              <input class="tlc-note" v-model="fields.tlc_note" placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸" :disabled="exp.locked" />
+              <div class="tlc-note-wrap">
+                <input
+                  class="tlc-note"
+                  v-model="fields.tlc_note"
+                  placeholder="展开剂 / 显色方式，如 PE:EA = 10:1，UV + 磷钼酸"
+                  :disabled="exp.locked"
+                  @click.stop="onTlcClick()"
+                  @keydown.esc="tlcMenu = false"
+                />
+                <Icon name="down" :size="10" class="tlc-caret" @click.stop="openTlcMenu()" />
+                <div v-if="tlcMenu && !exp.locked" class="tlc-menu" @click.stop>
+                  <button
+                    v-for="t in tlcNotes"
+                    :key="t"
+                    type="button"
+                    class="rxn-opt"
+                    :class="{ 'is-on': tlcTyped === t }"
+                    @click="fields.tlc_note = t; tlcMenu = false; notify()"
+                  >
+                    {{ t }}
+                  </button>
+                  <button v-if="tlcCanRemember" type="button" class="rxn-opt is-remember" @click="rememberTlcNote()">
+                    ＋ 记下「{{ tlcTyped }}」
+                  </button>
+                  <button
+                    v-if="fields.tlc_note"
+                    type="button"
+                    class="rxn-opt is-clear"
+                    @click="fields.tlc_note = ''; tlcMenu = false; notify()"
+                  >
+                    清掉
+                  </button>
+                </div>
+              </div>
               <TlcOcr :shots="tlcShots" scope="attachment" @pick="applyTlcOcr" />
             </div>
             <TlcStrip

@@ -2031,7 +2031,7 @@ route('PUT', '/api/uiprefs', async (req, res) => {
 });
 
 /* --- 「常用选项」：条件行那几个小下拉里，用户可以自己加（存 settings，跟着数据一起备份） --- */
-const QUICK_FIELDS = new Set(['temperature', 'duration', 'atmosphere', 'apparatus', 'light', 'solvent', 'concentration', 'rxn_type']);
+const QUICK_FIELDS = new Set(['temperature', 'duration', 'atmosphere', 'apparatus', 'light', 'solvent', 'concentration', 'rxn_type', 'tlc_note']);
 
 route('PUT', '/api/quick', async (req, res) => {
   const body = await readJson(req);

@@ -552,6 +552,7 @@ const QUICK_ROWS = [
   // 记录页右上「反应类型」那格的候选（跟上面不同：它不是条件行，是抬头的一格），
   // 内置就是 lib/kind.js 的 RXN_TYPES，这儿加 / 删 / 挪跟条件行那几行一个玩法
   { key: 'rxn_type', label: '反应类型', ph: '比如 硼化 / 脱保护 / 开环' },
+  { key: 'tlc_note', label: 'TLC 展开剂', ph: '比如 PE:EA = 4:1，UV + 磷钼酸' },
 ];
 const quickItems = (key) => quickList(key);
 const quickCustomized = (key) => quickFull(key) != null;

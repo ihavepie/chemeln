@@ -2365,3 +2365,22 @@ body.is-board-dragging { cursor: grabbing; }
   border-radius: 0 0 5px 5px;
   color: var(--accent-ink);
 }
+
+/* TLC 那格「展开剂 / 显色方式」：点空的格子（或右边小箭头）出候选，敲自己的能一键记下 */
+.tlc-note-wrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
+.tlc-note-wrap .tlc-caret { flex: none; color: var(--ink-4); cursor: pointer; }
+.tlc-note-wrap .tlc-caret:hover { color: var(--ink-2); }
+.tlc-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 190px;
+  max-width: 280px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  padding: 4px;
+  z-index: 70;
+  box-shadow: 0 10px 26px rgba(20, 18, 14, 0.1);
+}
+.tlc-menu .rxn-opt { overflow: hidden; text-overflow: ellipsis; }

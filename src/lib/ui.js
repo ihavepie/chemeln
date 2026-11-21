@@ -142,6 +142,20 @@ export const QUICK = {
   // 反应类型（记录页右上那个小格）的候选：内置那几条在 lib/kind.js 的 RXN_TYPES 里，
   // 设置页可以自己加 / 删 / 挪，走的是同一套 `quick:rxn_type` / `quickFull:rxn_type`
   'f-rxn_type': RXN_TYPES,
+  // TLC 那格「展开剂 / 显色方式」的候选：只放常见的展开剂本身，显色方式自己往后敲
+  // （存 `quick:tlc_note` / `quickFull:tlc_note`，设置页常用选项里能自己加 / 删 / 挪）
+  'f-tlc_note': [
+    'PE:EA = 10:1',
+    'PE:EA = 5:1',
+    'PE:EA = 3:1',
+    'PE:EA = 2:1',
+    'PE:EA = 1:1',
+    'PE:Et₂O = 4:1',
+    'DCM:MeOH = 20:1',
+    'DCM:MeOH = 10:1',
+    'EA:MeOH = 10:1',
+    '纯 PE',
+  ],
 };
 
 /** TLC 判断（小反应筛条件时的第一层结果，排在产率前面）：顺序 = 从「反应得好」到「没反应」 */
