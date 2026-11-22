@@ -29,7 +29,7 @@ cp start.command start.bat "$STAGE"/
 [ "$OS" = "darwin" ] && rm -f "$STAGE/start.bat.offer"
 
 # package.json 也带上：万一以后要再 build / 看版本
-cp package.json "$STAGE"/
+cp package.json LICENSE "$STAGE"/
 
 cat > "$STAGE/启动说明.txt" <<'TXT'
 方法学实验记录 —— 绿色包
