@@ -887,11 +887,14 @@ function updateEdgeBox() {
   const top = Math.max(e.top, 0);
   const height = Math.max(0, Math.min(e.bottom, window.innerHeight) - top);
   const gap = 6;
-  const lw = Math.max(0, Math.round(r.left - e.left - gap));
-  const rw = Math.max(0, Math.round(e.right - r.right - gap));
+  // 热区**不铺满整条空白**：只留贴着纸面的 72px 一条（窗口宽的时候左边空白能有
+  // 两百多 px，整条都算热区的话鼠标随便飘过去就冒箭头、一抖就翻页，用户说「热区太大」）。
+  const maxW = 72;
+  const lw = Math.min(maxW, Math.max(0, Math.round(r.left - e.left - gap)));
+  const rw = Math.min(maxW, Math.max(0, Math.round(e.right - r.right - gap)));
   // 缝太窄就别放热区（点了也容易点歪）：16px 起算
-  edgeBox.left = lw >= 16 ? { left: `${Math.round(e.left)}px`, top: `${Math.round(top)}px`, height: `${Math.round(height)}px`, width: `${lw}px` } : {};
-  edgeBox.right = rw >= 16 ? { right: `${Math.round(window.innerWidth - e.right)}px`, top: `${Math.round(top)}px`, height: `${Math.round(height)}px`, width: `${rw}px` } : {};
+  edgeBox.left = lw >= 16 ? { left: `${Math.round(r.left - gap - lw)}px`, top: `${Math.round(top)}px`, height: `${Math.round(height)}px`, width: `${lw}px` } : {};
+  edgeBox.right = rw >= 16 ? { right: `${Math.round(window.innerWidth - r.right - gap - rw)}px`, top: `${Math.round(top)}px`, height: `${Math.round(height)}px`, width: `${rw}px` } : {};
 }
 
 /** 「换记录时播「推」的动画」（设置页 04，`pageAnim`，默认开） */
