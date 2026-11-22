@@ -887,9 +887,10 @@ function updateEdgeBox() {
   const top = Math.max(e.top, 0);
   const height = Math.max(0, Math.min(e.bottom, window.innerHeight) - top);
   const gap = 6;
-  // 热区**不铺满整条空白**：只留贴着纸面的 72px 一条（窗口宽的时候左边空白能有
-  // 两百多 px，整条都算热区的话鼠标随便飘过去就冒箭头、一抖就翻页，用户说「热区太大」）。
-  const maxW = 72;
+  // 热区**不铺满整条空白**：只留贴着纸面的 100px 一条（窗口宽的时候左边空白能有
+  // 两百多 px，整条都算热区的话鼠标随便飘过去就冒箭头、一抖就翻页，用户说「热区太大」；
+  // 72px 又嫌小，调到 100）。
+  const maxW = 100;
   const lw = Math.min(maxW, Math.max(0, Math.round(r.left - e.left - gap)));
   const rw = Math.min(maxW, Math.max(0, Math.round(e.right - r.right - gap)));
   // 缝太窄就别放热区（点了也容易点歪）：16px 起算
