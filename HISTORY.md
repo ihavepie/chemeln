@@ -670,5 +670,6 @@
   坑：openchemlib 的 `setFragment(true)` 一定要加，不然子结构匹配不上；查询用 `/api/compounds`、`/api/reagents` 而不是 `store.compounds`（后者可能被当前筛选/课题收窄）。
 - **结构式里「HO / NH2」贴着键头（羟基看着挤）**（用户：卡片上「这个羟基有点挤压」）。
   真因：这类结构是从**画板（Ketcher）**存的图，Ketcher 用 Indigo 渲染，Indigo 会给字母标签让位、**把挨着标签那根键截掉约 0.26 根键长**（实测 C–O 画出来只有 0.74），卡片上一缩就显得挤。
-  改：`CompoundDetail.applySketched()` 选图时看 molfile 里**有没有缩写**——有（Ts / Bn / OMe…，Indigo 才认得超原子）就照旧用画板那张；没有就改用 `analyzeStructureText(smiles)` 那张（openchemlib 重排 + `canonicalOrientation`，标签和键长都是等距的）。
-  已有的老图：化合物页 `⋯ › 整理结构式（重排）`（`tidyStructure()`）走同一条路，重画一张即可；这次顺手把 D-「3-phenylprop-2-yn-1-ol」那张重画了（旧文件 243 → 新 244）。
+  **第一版走错了一次**：那时让「没有缩写的结构」改用 openchemlib 重排那张，结果用户发现**自己画的结构被重新摆了**（方向都变了）——用户说「为什么会重置我的结构」。**画板里画成什么样就得存什么样**，这条不能破。
+  最终改法：新增 `src/lib/labelbond.js` 的 `spreadLabelBonds(svg)`，**只动 SVG、不动布局**——把明显偏短的键（< 中位键长 0.8，实测那根 C–O 只有 0.74）朝标签那头补到 0.9，同一原子的几个字母**一起往外挪**同样的距离（缝不变），再按挪出去的量把 `viewBox` / `width` / `height` 撑开，标签才不会被裁。`CompoundDetail.applySketched()` 存图前过一遍这个函数，其余照旧（照样存画板那张）。
+  坑：阈值别用 0.85——芳香环里那条**内线本来就只有 0.84 根键长**，会把它也当成截过的键、把环补歪。
