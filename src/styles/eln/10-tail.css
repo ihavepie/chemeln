@@ -2405,3 +2405,75 @@ body.is-board-dragging { cursor: grabbing; }
 .tlc-note-wrap:hover .tlc-note { color: var(--ink); }
 /* 菜单本身用条件行那套 `.qmenu`（胶囊 + ＋自定义），这里只管贴在哪、多宽 */
 .tlc-menu { top: calc(100% + 1px); left: 0; z-index: 70; max-width: 420px; }
+
+/* 「按结构找」弹窗：一行输入 + 三段命中（名字 / 化合物库 / 试剂库按分子量） */
+.sf { display: flex; flex-direction: column; gap: 10px; }
+.sf-row { display: flex; align-items: center; gap: 6px; }
+.sf-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+}
+.sf-input:focus { outline: none; border-color: var(--ink-4); }
+.sf-btn {
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.sf-btn:hover { border-color: var(--ink-4); color: var(--ink); }
+.sf-btn.is-primary { border-color: var(--accent); color: var(--accent); }
+.sf-btn:disabled { opacity: 0.5; cursor: default; }
+.sf-err { margin: 0; font-size: 11.5px; color: var(--bad); }
+.sf-sec-head {
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.sf-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sf-name-t { font-family: var(--serif); font-size: 15px; color: var(--ink); }
+.sf-mini {
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--paper);
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.sf-mini:hover { border-color: var(--ink-4); color: var(--ink-2); }
+.sf-mini.is-primary { border-color: rgba(168, 71, 31, 0.35); color: var(--accent-ink); }
+.sf-meta { margin: 0; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.sf-none { margin: 0; font-size: 11.5px; color: var(--ink-4); }
+.sf-hits { display: flex; flex-direction: column; gap: 4px; }
+.sf-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  padding: 5px 2px;
+  text-align: left;
+  cursor: pointer;
+}
+.sf-hit:hover { background: #faf8f4; }
+.sf-hit-code { flex: none; width: 78px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+.sf-hit-name { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-hit-meta { flex: none; font-family: var(--mono); font-size: 10.5px; color: var(--ink-4); }

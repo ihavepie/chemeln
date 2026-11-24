@@ -11,7 +11,7 @@
 - **4780 = 正式运行的那套**：`public/` 里是 `vite build` 产物（`index.html` + `assets/`），由 `start.command` 起的服务直接发出去。
 - **5173 = 开发预览**：`preview.command` / `npm run dev` 起的 Vite，直接读 `src/`、改完热更新。**改动先在这看效果**，确认后 `npm run build` 写进 `public/`。
 - `vite.config.js` 的 `build.outDir` 已经是 **`public`**（不再有 `dist/`）。**改完源码记得 build 一次**，否则 4780 上还是旧构建。
-- **打包**：路由全懒加载；Element Plus **只引 Dialog / MessageBox / Notification 的样式**（别引 `element-plus/dist/index.css`＝整套主题）；入口 chunk 261 KB / CSS 251 KB，`openchemlib` 1.1 MB 按需。
+- **打包**：路由全懒加载；Element Plus **只引 Dialog / MessageBox / Notification 的样式**（别引 `element-plus/dist/index.css`＝整套主题）；`openchemlib` 1.1 MB 按需。
 
 ## 3. 技术栈 / 启动 / 数据
 - 前端：Vue 3.5 `<script setup>`、vue-router 4（hash 模式）、Element Plus 2.8（zh-CN）、Vite 6，无 TypeScript、无状态管理库（一个 reactive store）。
@@ -118,7 +118,7 @@
 ## 6. 当前进度
 
 > 更早轮次在 **`HISTORY.md`**；本文件有 **64 KB 注入上限**，最近几轮留下面，再早的往下搬。加新内容前先看体积。
-- **最近几轮**：明细在 HISTORY；**排版板＝自由画布**（A4 绝对定位，摆块 + TLC + 文字，导 PDF）；**「对照」页已撤**（对比就摆一张板）；**结果块最右一列挂 TLC 板图缩略**（小反应先看板子；判断/选择性两行已删，数据列还在）；筛选表**别改回无衬线 / 满页宽**；**变量 = 投料表续篇**（`#vars` 槽 + 虚线）；候选名下拉 `CondCand.vue`；导出有「一页汇报卡（PDF）」。
+- **最近几轮**：明细在 HISTORY；**排版板＝自由画布**（A4 绝对定位，摆块 + TLC + 文字，导 PDF）；**「对照」页已撤**（对比就摆一张板）；**结果块最右一列挂 TLC 板图缩略**（小反应先看板子；判断/选择性两行已删，数据列还在）；筛选表**别改回无衬线 / 满页宽**；**变量 = 投料表续篇**（`#vars` 槽 + 虚线）；候选名下拉 `CondCand.vue`；导出有「一页汇报卡（PDF）」；按结构找 `StructFind.vue`。
 - **分支**：`main`（`try/record-kind` 已并回去，历史见 HISTORY）。
 - **已完成**：v2 全功能已进 `public/`（4780 跑的就是它）；清单在 `HISTORY.md`。
 - **半成品**：本地结构图片识别只讨论过没做；非 macOS 上「存成 PDF」不可用（要 swift/WebKit）。

@@ -214,6 +214,7 @@ async function editNumber(it, field) {
 }
 import DocGrip from '../components/DocGrip.vue';
 import AppModal from '../components/AppModal.vue';
+import StructFind from '../components/StructFind.vue';
 
 /**
  * 试剂库 = 「用过的试剂」的完整版。
@@ -224,6 +225,8 @@ const items = ref([]);
 const route = useRoute();
 // 从投料表的「核对 → 去试剂库」跳过来时 ?q=试剂名，直接筛到那一个
 const q = ref(String(route.query.q || ''));
+/** 「按结构找」弹窗：记不住名字时画结构，查到名字再填进搜索框 */
+const structOpen = ref(false);
 const loading = ref(true);
 
 const shown = computed(() => {
@@ -439,6 +442,7 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
             {{ allRun ? `核对中 ${allDone}${pendingCount ? ` / ${allDone + pendingCount}` : ''}` : pendingCount ? `全部核对（${pendingCount}）` : missCount ? `重查查不到的（${missCount}）` : '都核对过了' }}
           </button>
           <button type="button" class="rl-allcheck rl-sites-btn" @click="openSites">检索站点</button>
+          <button type="button" class="rl-allcheck rl-sites-btn" title="画得出结构、记不住名字时用" @click="structOpen = true">按结构</button>
           <input v-model="q" class="rl-search" placeholder="搜试剂名 / 角色…" spellcheck="false" />
         </div>
       </header>
@@ -457,6 +461,8 @@ const ulPer = (it) => (it.per_mmol_ul == null ? '' : `${it.per_mmol_ul} µL`);
           <Icon name="plus" :size="12" /> 加一个站点
         </button>
       </AppModal>
+
+      <StructFind :model-value="structOpen" @update:model-value="structOpen = $event" @fill="(name) => (q = name)" />
 
       <div v-if="loading" class="rl-empty">读取中…</div>
       <div v-else-if="!items.length" class="rl-empty">
