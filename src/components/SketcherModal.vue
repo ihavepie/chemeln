@@ -6,7 +6,6 @@ import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../
 import { spreadAbbrevBonds, spreadRxnAbbrevBonds } from '../lib/abbrevspread.js';
 import { chemdrawLabels, chemdrawLabelsExact, scaleGlyphLabels } from '../lib/chemdraw.js';
 import { indigoSvg } from '../lib/indigo.js';
-import { ketcherSettings } from '../lib/style.js';
 
 /**
  * 画结构式：弹窗里嵌 Ketcher（`/vendor/ketcher/index.html`，由 vendor-build/ketcher 打包而来，
@@ -47,13 +46,9 @@ async function syncBoard() {
   const a = api();
   if (!a || !a.ready()) return false;
   loading.value = false;
-  // 把「文档设置」（data/style.json）推给画板：只影响画板里看到的样子。
-  // **出图不靠它**（Ketcher standalone 的 generateImage 会把字号 / 上色 / 线宽丢掉，见 pick()）
-  try {
-    a.applyStyle?.(ketcherSettings());
-  } catch {
-    /* 老版本的 vendor/ketcher 没有这个方法，忽略 */
-  }
+  // 画板不再套 data/style.json 的文档设置：这个版本的 Ketcher `setSettings` 不生效
+  // （`getSettings()` 回 null），推过去只会让画板跟存图的观感脱节。画板保持它自己的默认，
+  // 观感由出图那条（Indigo + 换字层）负责，见 lib/style.js 的注释。
   try {
     if (props.initial) await a.set(props.initial);
     else await a.clear();

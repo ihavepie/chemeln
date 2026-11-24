@@ -83,13 +83,15 @@ async function waitForSize() {
   return false
 }
 
-/* **文档设置**（ChemDraw 里叫 Document Settings）：键长 / 键粗 / 字号 / 字体 / 上色 / 芳环画法，
-   真值在 `data/style.json`，由父页面（`SketcherModal`）调 `sketcherApi.applyStyle(style)` 推过来，
-   见 `src/lib/style.js` 的 `ketcherSettings()`。
+/* **文档设置**（ChemDraw 里叫 Document Settings）：键长 / 键粗 / 字号 / 字体 / 上色 / 芳环画法。
 
-   **这里只影响画板里看到的样子**。出图不走画板：Ketcher standalone 版的 `generateImage` 只把
-   `outputFormat / backgroundColor / bondThickness` 传给 Indigo，字号 / 上色 / 线宽会被丢掉，
-   所以结构图现在由主项目自己的 `indigoSvg` 渲染（同一份 style 参数）。 */
+   ⚠ **这套东西在这个版本上是摆设**：`ketcher.setSettings()` 调了不报错，但 `getSettings()` 回 null，
+   画布的字号始终 13px、线宽始终 1px（对 39.9px 的键长 = 0.23 / 2.5%，即 Indigo 默认比例）。
+   而且它只作用于「之后新解析的原子」，老结构不会重排观感。
+
+   所以：**画板保持 Ketcher 自己的默认**（别再在 onInit / 弹窗里调 applyStyle），
+   结构图的观感由数据驱动的出图那条负责——`data/style.json` + `src/lib/indigo.js` +
+   `src/lib/chemdraw.js`。留着这套 API 只是给以后换 Ketcher 版本时再试。 */
 const DOC_BASE = {
   bondSpacing: 18,
   hashSpacing: 2.5,
@@ -257,7 +259,9 @@ function App() {
       onInit={(ketcher) => {
         window.ketcher = ketcher
         window.__ketcherReady = true
-        applyStyle(null)
+        // **不要在这里套文档设置**：实测这个版本的 `setSettings` 改了不生效（`getSettings()` 回 null），
+        // 只会让画板里那套观感跟存图脱节（用户反馈「画板里有点奇怪、出来反而好看」）。
+        // 画板保持 Ketcher 自己的默认；出图的观感由 data/style.json 管（Indigo + 换字层那条）。
         pickBondTool()
       }}
     />
