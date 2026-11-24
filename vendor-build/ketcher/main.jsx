@@ -115,6 +115,34 @@ window.sketcherApi = {
       return (await blob.text()) || ''
     } catch { return '' }
   },
+  /** **画布原样导出**：把画布里那块 <svg> 直接序列化出来（跟 Ketcher 自带的
+      「导出 SVG」同一套做法：只留 .drawn-structures，去掉选区框 / 动态元素，
+      再按它的外框算 viewBox）。存下来的图＝画板上看到的那张，标签是真文字。 */
+  canvasSvg: (margin = 10) => {
+    try {
+      const drawn = document.querySelector('.drawn-structures')
+      const canvas = drawn && drawn.closest('svg')
+      if (!canvas || !drawn) return ''
+      const r = drawn.getBoundingClientRect()
+      if (!r.width || !r.height) return ''
+      const pad = 10 + margin
+      const x = r.x - 50 - pad
+      const y = r.y - 54 - pad
+      const w = r.width + pad * 2
+      const h = r.height + pad * 2
+      const clone = canvas.cloneNode(true)
+      clone.querySelector('#rectangle-selection-area')?.remove()
+      clone.querySelectorAll('.dynamic-element').forEach((e) => e.remove())
+      clone.querySelectorAll('text').forEach((e) => e.setAttribute('cursor', 'default'))
+      clone.querySelectorAll('rect[cursor="text"]').forEach((e) => e.removeAttribute('cursor'))
+      clone.querySelectorAll('g[opacity]').forEach((e) => e.removeAttribute('opacity'))
+      const inner = clone.innerHTML.replace(/\bcursor:\s*pointer;\s*/g, '')
+      if (!inner || !inner.includes('<')) return ''
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(w)}" height="${Math.round(h)}" viewBox="${x} ${y} ${w} ${h}">${inner}</svg>`
+    } catch {
+      return ''
+    }
+  },
   set: async (text) => {
     await waitForSize()
     // **载入前先把缩放打回 100%**：Ketcher 的 `zoomAccordingContent` 只会缩、不会放大
