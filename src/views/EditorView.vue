@@ -40,6 +40,7 @@ import { exportSnapshotBundle, exportSnapshotHtml, exportSnapshotPng } from '../
 import { peekPrefs } from '../lib/peek.js';
 import { onUiMerged, uiGet } from '../lib/uiprefs.js';
 import { composeChainSvg } from '../lib/scheme.js';
+import { styleSig } from '../lib/style.js';
 import { analyzeSmiles, svgToFile } from '../lib/chem.js';
 
 const route = useRoute();
@@ -1503,6 +1504,8 @@ const liveSigShown = ref('');
 const SCHEME_SIG_VERSION = 'v13';  // 改了出图规则就加一，让旧缓存失效（v13：多步记录按步分段；v12：箭头上只排一行）
 const liveSig = computed(() =>
   SCHEME_SIG_VERSION +
+  // 结构式样式的指纹（data/style.json）：样式一改，缓存里那张旧参数的图就对不上了 → 重画
+  `|${styleSig()}` +
   JSON.stringify({
     sf: sheetSchemeFmt.fmt,
     // 变量（投料行的占位符 + 字段变量）也要进 sig：标了变量箭头就写 [L]/[T]，缓存得跟着失效

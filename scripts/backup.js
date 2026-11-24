@@ -149,6 +149,10 @@ for (const sub of ['attachments', 'compounds']) {
   }
 }
 
+// 结构式「文档设置」（data/style.json）：不含数据，但换机器后没它结构图观感就回到默认
+const styleFile = path.join(DATA, 'style.json');
+if (fs.existsSync(styleFile)) fs.cpSync(styleFile, path.join(outDir, 'style.json'));
+
 // 立刻回读校验：备份能不能独立打开、记录数对不对
 const got = counts(outDb);
 log(`备份  ${outDb}`);

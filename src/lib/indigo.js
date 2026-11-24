@@ -7,6 +7,7 @@
  * WASM 11 MB，只在真要画缩写结构时动态加载；wasm 文件放 `vendor/indigo/`（不进 git，
  * 由 `scripts/copy-indigo.sh` 从 node_modules 拷过去），走服务端现成的 `/vendor/*` 路由。
  */
+import { indigoOptions } from './style.js';
 
 let loading = null;
 
@@ -57,23 +58,12 @@ function fitMolfile(data) {
 export const INDIGO_BOND_UNITS = 100;
 
 /**
- * Indigo 的线宽档位：这个数 / 30 = 「一根键的线宽」。
- * openchemlib 画出来的比例是 stroke 1.44px / 键长 24px ≈ 0.06，对应这里就是 1.8 ——
- * 两边线条一样粗（2.3 太粗，用户说过「目前太粗了」）。
+ * 线宽 / 字号的档位都**不再写在这里**：它们由 `data/style.json` 决定（用户可改的「文档设置」），
+ * 换算在 `src/lib/style.js` 的 `indigoOptions()`。以前这里有 1.8 / 4.2 / 56 / 69 四个常量，
+ * 同一件事有四种说法，还出过「按 /100 换算、实际是 /30，线粗多画 3.4 倍」的事故。
+ *
+ * 记住这条换算：**线宽参数 / 30 = 占键长的比例**，**字号参数 / 100 = 占键长的比例**。
  */
-export const INDIGO_LINE_WIDTH = '1.8';
-
-/**
- * **ACS Document 1996**（用户：「化学式和结构式都用这个格式」）：
- * 键长 14.4 pt / 线粗 0.6 pt / 标签 10 pt Arial / 原子不上色。
- * Indigo 这边一根键 = 100 单位，所以：
- *   线宽 = 0.6 / 14.4 * 100 ≈ 4.2；字号 = 10 / 14.4 * 100 ≈ 69。
- */
-export const ACS_BOND_LINE_WIDTH = '4.2';
-export const ACS_FONT_SIZE = '69';
-
-/** 字号（跟一根键 100 单位同一坐标系，56 ≈ 键长的 0.56，openchemlib 是 14/24≈0.58） */
-export const INDIGO_FONT_SIZE = '56';
 
 /**
  * 结构式图的「一根键画多少像素」：openchemlib 自己出图固定是 24 px/键（实测），
@@ -108,23 +98,48 @@ export async function indigoLayout(molfile) {
   return laid;
 }
 
+/**
+ * 芳香键（molfile 里 bond type 4）→ Kekulé 交替单双键。
+ *
+ * 为什么要有：Ketcher 画板显示的是 Kekulé，而 Indigo 直接渲芳香键会画成环内圈；
+ * 存的时候如果 mol 里留的是 type 4，「画板一个样、存下来另一个样」。
+ * `style.aromaticStyle === 'circle'` 时就是想要圈，那就不转。
+ */
+function kekulize(M, mol) {
+  const s = String(mol || '');
+  if (indigoOptions().aromaticStyle === 'circle') return s;
+  const lines = s.replace(/\r/g, '').split('\n');
+  const counts = lines[3] || '';
+  const na = Number(counts.slice(0, 3)) || 0;
+  const nb = Number(counts.slice(3, 6)) || 0;
+  if (!na || !nb) return s;
+  const types = lines.slice(4 + na, 4 + na + nb).map((l) => (l || '').slice(6, 9).trim());
+  if (!types.includes('4')) return s;
+  try {
+    // **第二个参数是输出格式**（跟 layout / dearomatize 一样，缺了会报 Cannot pass non-string）
+    const out = String(M.dearomatize(s, 'molfile', new M.MapStringString()) || '');
+    return /V2000|V3000/.test(out) ? out : s;
+  } catch {
+    return s;
+  }
+}
+
 /** MOL / RXN → SVG 字符串（走 molfile 而不是 SMILES，缩写的超原子才带得进去） */
 export async function indigoSvg(data) {
   const s = fitMolfile(data);
   if (!s) throw new Error('没有结构');
   const M = await moduleIndigo();
+  const st = indigoOptions();
   const opts = new M.MapStringString();
   opts.set('render-output-format', 'svg');
-  opts.set('render-coloring', 'true');
-  // 线宽：Indigo 默认 1（= 一根键的 1/30），跟 openchemlib 画出来的线比明显偏细。
-  // openchemlib 的 stroke-width 1.44 / 键长 18.6 ≈ 0.077，对应的就是 2.3 —— 两边线条粗细才对得上
-  opts.set('render-bond-line-width', INDIGO_LINE_WIDTH);
-  // 字（原子标签 / 缩写标签）的大小：Indigo 一根键 = 100 单位，openchemlib 那边是「一根键 24 px、字号 14 px」，
-  // 换算成同一比例 ≈ 58，取 56 看着最接近（用户说原来的缩写字太小、跟键不搭）。
-  // **必须连单位一起设**：只给 render-font-size 会被当成 0，标签整个消失（踩过）
+  // 原子要不要按元素上色：ACS 原样是全黑，这里由 style.json 的 atomColoring 决定
+  opts.set('render-coloring', st.coloring);
+  // 线宽 / 字号：都在 style.json 里定（换算见 lib/style.js）。**字号必须连单位一起设**，
+  // 只给 render-font-size 会被当成 0、标签整个消失（踩过）
+  opts.set('render-bond-line-width', st.lineWidth);
   opts.set('render-font-size-unit', 'px');
-  opts.set('render-font-size', INDIGO_FONT_SIZE);
-  const raw = String(M.render(s, opts) || '');
+  opts.set('render-font-size', st.fontSize);
+  const raw = String(M.render(kekulize(M, s), opts) || '');
   const svg = raw.includes('<svg') ? raw : utf8FromBase64(raw);
   if (!svg.includes('<svg')) throw new Error('Indigo 没画出图');
   return samePxScale(svg);

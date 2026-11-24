@@ -83,12 +83,27 @@ async function waitForSize() {
   return false
 }
 
-/* **ACS Document 1996**（ChemDraw 里那个“Apply Document Settings from → ACS Document 1996”）：
-   键长 14.4 pt、键粗 0.6 pt、标签 10 pt Arial、原子不上色（黑）、芳环画成 Kekulé 交替双键。
-   这两个地方都要跟着它走：① 画板上看到的；② `generateImage` 出 SVG 时把这份 settings 一起
-   交给 Indigo（Ketcher 的 `generateImage` 会把 `serverSettings` 和传进去的 options 合并）。 */
-const ACS_1996 = {
-  atomColoring: false,
+/* **文档设置**（ChemDraw 里叫 Document Settings）：键长 / 键粗 / 字号 / 字体 / 上色 / 芳环画法，
+   真值在 `data/style.json`，由父页面（`SketcherModal`）调 `sketcherApi.applyStyle(style)` 推过来，
+   见 `src/lib/style.js` 的 `ketcherSettings()`。
+
+   **这里只影响画板里看到的样子**。出图不走画板：Ketcher standalone 版的 `generateImage` 只把
+   `outputFormat / backgroundColor / bondThickness` 传给 Indigo，字号 / 上色 / 线宽会被丢掉，
+   所以结构图现在由主项目自己的 `indigoSvg` 渲染（同一份 style 参数）。 */
+const DOC_BASE = {
+  bondSpacing: 18,
+  hashSpacing: 2.5,
+  hashSpacingUnit: 'pt',
+  reactionComponentMarginSize: 1.6,
+  reactionComponentMarginSizeUnit: 'pt',
+  imageResolution: 600,
+  carbonExplicitly: false,
+  showHydrogenLabels: 'Terminal and Hetero',
+}
+
+/* 首次渲染用的兜底（跟 data/style.json 的默认值一致）；父页面 ready 之后会推真正那份过来 */
+const DOC_DEFAULT = {
+  atomColoring: true,
   font: 'Arial',
   fontsz: 10,
   fontszUnit: 'pt',
@@ -98,25 +113,36 @@ const ACS_1996 = {
   bondLengthUnit: 'pt',
   bondThickness: 0.6,
   bondThicknessUnit: 'pt',
-  bondSpacing: 18,
   stereoBondWidth: 2,
   stereoBondWidthUnit: 'pt',
-  hashSpacing: 2.5,
-  hashSpacingUnit: 'pt',
-  reactionComponentMarginSize: 1.6,
-  reactionComponentMarginSizeUnit: 'pt',
-  imageResolution: 600,
   aromaticCircle: false,
-  carbonExplicitly: false,
-  showHydrogenLabels: 'Terminal and Hetero',
 }
 
-function applyAcs() {
+const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d)
+
+function applyStyle(style) {
+  const s = style && typeof style === 'object' ? style : {}
+  const settings = {
+    ...DOC_BASE,
+    atomColoring: s.atomColoring !== false && s.atomColoring !== 'false',
+    font: String(s.font || DOC_DEFAULT.font),
+    fontsz: num(s.fontsz ?? s.labelSize, DOC_DEFAULT.fontsz),
+    fontszUnit: 'pt',
+    fontszsub: num(s.fontsz ?? s.labelSize, DOC_DEFAULT.fontszsub),
+    fontszsubUnit: 'pt',
+    bondLength: num(s.bondLength, DOC_DEFAULT.bondLength),
+    bondLengthUnit: 'pt',
+    bondThickness: num(s.bondThickness, DOC_DEFAULT.bondThickness),
+    bondThicknessUnit: 'pt',
+    stereoBondWidth: num(s.stereoBondWidth, DOC_DEFAULT.stereoBondWidth),
+    stereoBondWidthUnit: 'pt',
+    aromaticCircle: s.aromaticCircle === true || s.aromaticStyle === 'circle',
+  }
   try {
-    window.ketcher?.setSettings?.(ACS_1996)
+    window.ketcher?.setSettings?.(settings)
     return true
   } catch (err) {
-    window.__acsErr = String((err && err.message) || err)
+    window.__styleErr = String((err && err.message) || err)
     return false
   }
 }
@@ -126,8 +152,10 @@ window.sketcherApi = {
   /** 切回单键工具（载入结构后 Ketcher 有时会退回框选） */
   bond: () => pickBondTool(),
   ready: () => window.__ketcherReady,
-  /** 重新套一遍 ACS 1996 文档设置（换页面 / 设置被冲掉时用） */
-  acs: () => applyAcs(),
+  /** 套一遍文档设置（父页面在 ready 之后推 data/style.json 那份过来） */
+  applyStyle,
+  /** 重新套一遍默认的文档设置（设置被冲掉时用） */
+  resetStyle: () => applyStyle(null),
   settings: () => {
     try {
       return window.ketcher?.getSettings?.() || null
@@ -229,7 +257,7 @@ function App() {
       onInit={(ketcher) => {
         window.ketcher = ketcher
         window.__ketcherReady = true
-        applyAcs()
+        applyStyle(null)
         pickBondTool()
       }}
     />

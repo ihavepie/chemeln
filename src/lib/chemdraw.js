@@ -13,11 +13,14 @@
  * 归属靠**字符数唯一匹配**，左右锚点靠**最近的键端点**（纯几何）。哪一步不踏实就原样返回。
  */
 
+import { labelRatio, strokeRatio } from './style.js';
+
 /** ChemDraw 那套：无衬线优先 */
 const FONT = 'Helvetica, Arial, sans-serif';
 
-/** 标签**字高** / 键长。Indigo 原本 0.233，0.32 用了一轮用户说还小，改成 0.40（≈字体 22px/键 40px） */
-const LABEL_RATIO = 0.4;
+/** 标签**字高** / 键长 —— 由 `data/style.json` 换算（ACS = 10pt/14.4pt × 0.717 ≈ 0.498）。
+ *  以前这里写死 0.4（「用了一轮用户说还小」的产物），现在字号是用户可改的文档设置。 */
+const labelRatioNow = () => labelRatio();
 
 /** 键长（px）：Ketcher 出图一根键 40px（就是 matrix 里的 a） */
 const BOND_PX = 40;
@@ -74,7 +77,7 @@ function isBlackFill(fill) {
  * @param {number} ratio 标签字高 / 键长
  * @returns {string} 换过标签的 SVG；拿不准时原样返回
  */
-export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
+export function chemdrawLabels(svg, mol, ratio = labelRatioNow()) {
   const src = String(svg || '');
   if (!src.includes('<svg') || !src.includes('<use')) return src;
   const mat = src.match(/transform="matrix\(([^)]+)\)"/);
@@ -261,7 +264,7 @@ export function chemdrawLabels(svg, mol, ratio = LABEL_RATIO) {
 }
 
 /**
- * 统一「显示尺度 + 线宽」：一个键固定 24px、线宽 0.06×键长。
+ * 统一「显示尺度 + 线宽」：一个键固定 24px、线宽按 `data/style.json` 的线粗/键长（ACS ≈ 0.0417）。
  * 为什么必须在这里做：卡片是按图片的**原始 px 尺寸**显示的，新存的图如果 px 跟着
  * Indigo 的 bond（40/100…）走，卡片里就会大小不一、线宽也不一样（用户截过图）。
  * 和 scripts/normalize-style.py 是同一套规则，只不过这里是「存之前」就做好。
@@ -273,8 +276,9 @@ function normalizeScale(svg, bond) {
   let out = svg.replace(/<svg[^>]*>/, (tag) =>
     tag.replace(/width="[\d.]+(?:px)?"/, `width="${Math.round(vb[2] * ppu)}"`)
        .replace(/height="[\d.]+(?:px)?"/, `height="${Math.round(vb[3] * ppu)}"`));
-  // Indigo 的 stroke-width 在 matrix 之前，所以要写成「0.06 个局部键长」
-  out = out.replace(/stroke-width="[\d.]+"/g, 'stroke-width="0.06"');
+  // Indigo 的 stroke-width 在 matrix 之前，所以要写成「占一根键的比例」（ACS = 0.6/14.4 ≈ 0.0417）。
+  // **以前这里写死 0.06**：Indigo 那边按 ACS 出了图，过这一层又被掰回 6%，等于白改（踩过）。
+  out = out.replace(/stroke-width="[\d.]+"/g, `stroke-width="${strokeRatio()}"`);
   return out;
 }
 
@@ -341,12 +345,12 @@ function fitCanvas(svg, mainSize, subSize) {
  *
  * 为什么需要：换文字那条路要么全对要么原样返回；一旦返回原样，新存的图就是 Indigo
  * 自带的小字（0.23 键长），在一面墙里和别的小图对不上——用户会直接看到「这张字小了」。
- * 这里退一步：保留 Indigo 的字形，只把它们按 `LABEL_RATIO` 放大（几何原样，不改化学）。
+ * 这里退一步：保留 Indigo 的字形，只把它们按 `labelRatio()` 放大（几何原样，不改化学）。
  *
  * 与 `src/../scripts/normalize-labels.py` 同一套思路：同一个标签的若干 `<use>` 一起缩放，
  * 缩放中心挑「放大后与键线留白最大」的那个点，单字原子标绕原子（键端）原地放大。
  */
-export function scaleGlyphLabels(svg, ratio = LABEL_RATIO) {
+export function scaleGlyphLabels(svg, ratio = labelRatioNow()) {
   const src = stripLabelWrappers(String(svg || ''));
   if (!src.includes('<svg') || !src.includes('xlink:href="#glyph')) return src;
   const mat = src.match(/transform="matrix\(([^)]+)\)"/);
@@ -637,7 +641,7 @@ function glyphGroups(svg) {
  * molfile → 已经把缩写换成无衬线 `<text>` 的 SVG；认不准时返回 ''（调用方自己退回）。
  * 只在「结构里有缩写（M  SMT）」时才有意义。
  */
-export async function chemdrawLabelsExact(mol, indigoSvg, ratio = LABEL_RATIO) {
+export async function chemdrawLabelsExact(mol, indigoSvg, ratio = labelRatioNow()) {
   const smts = smtList(mol);
   if (!smts.length) return '';
 

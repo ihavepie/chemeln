@@ -12,6 +12,8 @@ const https = require('node:https');
 
 const store = require('./db');
 const qr = require('./qr');
+// 结构式「文档设置」（data/style.json）：读 / 写 / 校验 / 指纹，纯文件 + 一次试渲，不碰别的表
+const styleStore = require('./style');
 const { experimentToMarkdown, screeningToMarkdown, screeningToCsv, CELL_CATEGORY } = require('./export');
 
 const { db, DATA_DIR, ATTACH_DIR, COMPOUND_DIR, allSettings, getSetting, setSetting, nextCode, logEvent, logEdit, historyFor, variantKey } = store;
@@ -1071,6 +1073,8 @@ function bootstrap(query = {}) {
     settings,
     // 全局那套（设置页在课题里编辑时，拿它当占位符）
     settingsGlobal: allSettings(),
+    // 结构式怎么画（data/style.json）：三个 pt 数 + 开关，前端 src/lib/style.js 负责换算
+    style: styleStore.readStyle().style,
     projectOverrides: projectOverrides(project),
     projects,
     currentProject: project,
@@ -1822,6 +1826,25 @@ route('POST', '/api/debug/drag', async (req, res) => {
 route('GET', '/api/bootstrap', async (req, res, params, url) =>
   ok(res, bootstrap({ project: url.searchParams.get('project') || '' }))
 );
+
+/* 结构式「文档设置」（`data/style.json`）：结构图怎么画的唯一真值，见 server/style.js */
+route('GET', '/api/style', async (req, res) => {
+  const { style, warnings } = styleStore.readStyle();
+  ok(res, { style, defaults: styleStore.STYLE_DEFAULTS, warnings, hash: styleStore.styleHash(style) });
+});
+
+route('PUT', '/api/style', async (req, res) => {
+  const body = await readJson(req);
+  const raw = body && typeof body.style === 'object' && body.style ? body.style : body;
+  const { style, warnings } = styleStore.normalizeStyle(raw);
+  // 先体检再落盘：这个渲染器对坏参数不报错、只会把图画歪，所以必须真渲一张量一下
+  const check = await styleStore.checkStyle(style);
+  if (!check.ok) return fail(res, 400, check.reason);
+  styleStore.writeStyle(style);
+  const hash = styleStore.styleHash(style);
+  const cleared = styleStore.syncSchemeCache(hash);
+  ok(res, { style, hash, warnings: check.skipped ? [...warnings, check.skipped] : warnings, schemeCacheCleared: cleared });
+});
 
 /* 课题：清单 / 新建（可带编号前缀）/ 删掉空课题 */
 route('GET', '/api/projects', async (req, res) => ok(res, { items: listProjects() }));
@@ -5779,6 +5802,16 @@ function listen(port, attempt = 0) {
     PORT = port;
     bindTailnet(port);
     watchTailnet();
+    // 结构式样式改过（手改 style.json 也算）就清掉反应式缓存：缓存里那张是按旧参数画的
+    try {
+      const { style, warnings } = styleStore.readStyle();
+      for (const w of warnings) console.log('  style.json      →  ' + w);
+      if (styleStore.syncSchemeCache(styleStore.styleHash(style))) {
+        console.log('  结构式样式变了  →  已清反应式缓存（下次打开重画）');
+      }
+    } catch (e) {
+      console.log('  style.json      →  读不了：' + String(e.message).slice(0, 80));
+    }
     const url = `http://${HOST}:${port}`;
     console.log('');
     console.log('  方法学实验记录  →  ' + url);

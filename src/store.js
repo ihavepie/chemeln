@@ -1,3 +1,4 @@
+import { setStyle } from './lib/style.js';
 import { reactive } from 'vue';
 import { api } from './api.js';
 import { onUiMerged, uiGet, uiMerge, uiSetIfChanged } from './lib/uiprefs.js';
@@ -103,6 +104,8 @@ export async function loadBoot() {
   const boot = await api.bootstrap(store.project);
   if (seq !== bootSeq) return store.boot;          // 期间又拉过一次，这份作废
   store.boot = boot;
+  // 结构式怎么画（data/style.json）：结构图 / 反应式 / 画板三处都从这一份读数
+  setStyle(boot.style);
   // 页面设置：开机先跟数据库对一次（两边按 key 的时间戳合并，谁新用谁的）
   uiMerge(boot.uiPrefs);
   // 课题被删了/改了名：清单里已经没有它，就退回「全部课题」，别卡在一个空空间里

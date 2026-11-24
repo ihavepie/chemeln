@@ -6,6 +6,7 @@ import { structureInfo, chemicalBookUrl, describeInfo, describeProps } from '../
 import { spreadAbbrevBonds, spreadRxnAbbrevBonds } from '../lib/abbrevspread.js';
 import { chemdrawLabels, chemdrawLabelsExact, scaleGlyphLabels } from '../lib/chemdraw.js';
 import { indigoSvg } from '../lib/indigo.js';
+import { ketcherSettings } from '../lib/style.js';
 
 /**
  * 画结构式：弹窗里嵌 Ketcher（`/vendor/ketcher/index.html`，由 vendor-build/ketcher 打包而来，
@@ -46,6 +47,13 @@ async function syncBoard() {
   const a = api();
   if (!a || !a.ready()) return false;
   loading.value = false;
+  // 把「文档设置」（data/style.json）推给画板：只影响画板里看到的样子。
+  // **出图不靠它**（Ketcher standalone 的 generateImage 会把字号 / 上色 / 线宽丢掉，见 pick()）
+  try {
+    a.applyStyle?.(ketcherSettings());
+  } catch {
+    /* 老版本的 vendor/ketcher 没有这个方法，忽略 */
+  }
   try {
     if (props.initial) await a.set(props.initial);
     else await a.clear();
@@ -118,14 +126,19 @@ async function pick() {
   // 把附着原子往外挪 0.3 个键长正好补回来。挪的是 2D 坐标，化学一点没变；
   // 出图和存底稿都用挪过的这份，画板里再打开看到的间距跟存档图也一致。
   mol = spreadAbbrevBonds(mol);
+  // **出图不用 Ketcher 的 `generateImage`**：它（standalone 那版）只把 outputFormat /
+  // backgroundColor / bondThickness 交给 Indigo，`render-coloring`（上色）、`render-font-size`
+  // （字号）、`render-bond-line-width`（线宽）全被丢掉——于是「画板改了观感、存下来还是
+  // Indigo 默认值」。这里直接调自己的 `indigoSvg`，跟 `data/style.json` 同一份参数，
+  // 出图 = 演示里那套，跟画板上看到的也是一套（这也是用户要的「画什么出什么」里「样式」那一半）。
   let svg = '';
   try {
-    svg = await a.image(mol || smiles);
+    svg = await indigoSvg(mol || smiles);
   } catch {
     svg = '';
   }
-  // 观感往 ChemDraw 靠：Indigo 那张图的标签是它自带的衬线矢量字形、还偏小，
-  // 这里把标签换回真正的文字（无衬线、字号调到 0.32 键长，见 lib/chemdraw.js）。
+  // 观感往 ChemDraw 靠：Indigo 那张图的标签是它自带的矢量字形（缩写标签还偏小），
+  // 这里把标签换回真正的文字（无衬线、字高按 style.json 换算，见 lib/chemdraw.js）。
   // 没有缩写标签 / 认不准的图它会原样返回，不会把图弄坏。
   if (svg && svg.includes('<svg')) {
     // 先把缩写换成真正的无衬线文字：一条一条单独渲一遍去定位，比按坐标猜稳得多
