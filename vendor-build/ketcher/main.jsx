@@ -83,11 +83,58 @@ async function waitForSize() {
   return false
 }
 
+/* **ACS Document 1996**（ChemDraw 里那个“Apply Document Settings from → ACS Document 1996”）：
+   键长 14.4 pt、键粗 0.6 pt、标签 10 pt Arial、原子不上色（黑）、芳环画成 Kekulé 交替双键。
+   这两个地方都要跟着它走：① 画板上看到的；② `generateImage` 出 SVG 时把这份 settings 一起
+   交给 Indigo（Ketcher 的 `generateImage` 会把 `serverSettings` 和传进去的 options 合并）。 */
+const ACS_1996 = {
+  atomColoring: false,
+  font: 'Arial',
+  fontsz: 10,
+  fontszUnit: 'pt',
+  fontszsub: 10,
+  fontszsubUnit: 'pt',
+  bondLength: 14.4,
+  bondLengthUnit: 'pt',
+  bondThickness: 0.6,
+  bondThicknessUnit: 'pt',
+  bondSpacing: 18,
+  stereoBondWidth: 2,
+  stereoBondWidthUnit: 'pt',
+  hashSpacing: 2.5,
+  hashSpacingUnit: 'pt',
+  reactionComponentMarginSize: 1.6,
+  reactionComponentMarginSizeUnit: 'pt',
+  imageResolution: 600,
+  aromaticCircle: false,
+  carbonExplicitly: false,
+  showHydrogenLabels: 'Terminal and Hetero',
+}
+
+function applyAcs() {
+  try {
+    window.ketcher?.setSettings?.(ACS_1996)
+    return true
+  } catch (err) {
+    window.__acsErr = String((err && err.message) || err)
+    return false
+  }
+}
+
 window.__ketcherReady = false
 window.sketcherApi = {
   /** 切回单键工具（载入结构后 Ketcher 有时会退回框选） */
   bond: () => pickBondTool(),
   ready: () => window.__ketcherReady,
+  /** 重新套一遍 ACS 1996 文档设置（换页面 / 设置被冲掉时用） */
+  acs: () => applyAcs(),
+  settings: () => {
+    try {
+      return window.ketcher?.getSettings?.() || null
+    } catch {
+      return null
+    }
+  },
   /** 整理一下：Indigo 重新算一遍 2D 坐标（画得歪的键、挤在一起的环都会摆正） */
   layout: async () => {
     try {
@@ -182,6 +229,7 @@ function App() {
       onInit={(ketcher) => {
         window.ketcher = ketcher
         window.__ketcherReady = true
+        applyAcs()
         pickBondTool()
       }}
     />

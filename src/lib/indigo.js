@@ -63,6 +63,15 @@ export const INDIGO_BOND_UNITS = 100;
  */
 export const INDIGO_LINE_WIDTH = '1.8';
 
+/**
+ * **ACS Document 1996**（用户：「化学式和结构式都用这个格式」）：
+ * 键长 14.4 pt / 线粗 0.6 pt / 标签 10 pt Arial / 原子不上色。
+ * Indigo 这边一根键 = 100 单位，所以：
+ *   线宽 = 0.6 / 14.4 * 100 ≈ 4.2；字号 = 10 / 14.4 * 100 ≈ 69。
+ */
+export const ACS_BOND_LINE_WIDTH = '4.2';
+export const ACS_FONT_SIZE = '69';
+
 /** 字号（跟一根键 100 单位同一坐标系，56 ≈ 键长的 0.56，openchemlib 是 14/24≈0.58） */
 export const INDIGO_FONT_SIZE = '56';
 
