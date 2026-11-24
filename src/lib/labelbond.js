@@ -19,6 +19,9 @@ const NEAR = 0.6;
 const GROUP = 0.85;
 /** 补到中位键长的多少 */
 const FILL = 0.9;
+/** 标签比键**再多挪一点**（补键只是把长度补回来，缝不变；这里再把缝拉开一点）。
+ *  小尺寸显示时 2px 的缝会糊成一处，看着就像字和键黏在一起 */
+const GAP = 0.12;
 
 const toNum = (s) => Number(s);
 const round = (n, k = 1e4) => Math.round(n * k) / k;
@@ -31,6 +34,29 @@ function parseMatrix(s) {
   return v;
 }
 const apply = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+/** 从 (x0,y0) 沿单位方向 (ux,uy) 走，多远会进到矩形 [x0r,y0r,x1r,y1r]；不进返回 Infinity */
+function rayBox(x, y, ux, uy, r) {
+  let tmin = -Infinity;
+  let tmax = Infinity;
+  const axes = [
+    [x, ux, r[0], r[2]],
+    [y, uy, r[1], r[3]],
+  ];
+  for (const [o, u, lo, hi] of axes) {
+    if (Math.abs(u) < 1e-9) {
+      if (o < lo || o > hi) return Infinity;
+      continue;
+    }
+    let t1 = (lo - o) / u;
+    let t2 = (hi - o) / u;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return Infinity;
+  }
+  return tmin > 0 ? tmin : tmax > 0 ? 0 : Infinity;
+}
+
 const median = (arr) => {
   if (!arr.length) return 0;
   const s = [...arr].sort((a, b) => a - b);
@@ -92,6 +118,7 @@ function scan(svg, boxes) {
       y: Y,
       S,
       pos: [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2],
+      rect: [Math.min(p1[0], p2[0]), Math.min(p1[1], p2[1]), Math.max(p1[0], p2[0]), Math.max(p1[1], p2[1])],
     });
   }
   return { bonds, labels };
@@ -145,7 +172,33 @@ export function spreadLabelBonds(svg) {
     const dl = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1;
     const ux = (to[0] - from[0]) / dl;
     const uy = (to[1] - from[1]) / dl;
-    const add = Math.max(0, med * FILL - o.L);
+    // 这颗标签（可能两个字母）的外框：把挨得近的几个合起来
+    const near = labels.filter((l) => Math.hypot(l.pos[0] - to[0], l.pos[1] - to[1]) <= med * GROUP);
+    const box = near.length
+      ? near.reduce(
+          (a, l) => [
+            Math.min(a[0], l.rect[0]),
+            Math.min(a[1], l.rect[1]),
+            Math.max(a[2], l.rect[2]),
+            Math.max(a[3], l.rect[3]),
+          ],
+          [Infinity, Infinity, -Infinity, -Infinity]
+        )
+      : null;
+    if (!box) continue;
+
+    const gapPx = med * GAP;                 // 字和线之间要留的缝
+    const shift = gapPx;                     // 标签再往外退这么多（缝变大）
+    const rect = [box[0] - shift * ux, box[1] - shift * uy, box[2] - shift * ux, box[3] - shift * uy];
+    // 从 `from` 顺着键的方向走，多远会碰到标签外框（各边留 gapPx）
+    const tEnter = rayBox(from[0], from[1], ux, uy, [
+      Math.min(rect[0], rect[2]) - gapPx,
+      Math.min(rect[1], rect[3]) - gapPx,
+      Math.max(rect[0], rect[2]) + gapPx,
+      Math.max(rect[1], rect[3]) + gapPx,
+    ]);
+    const target = Number.isFinite(tEnter) ? Math.min(med * FILL, tEnter) : med * FILL;
+    const add = Math.max(0, target - o.L);
     if (add < 1) continue;
 
     // ① 键补长（换回原子坐标系再拼 d）
@@ -167,8 +220,9 @@ export function spreadLabelBonds(svg) {
     for (const l of labels) {
       if (moved.has(l.at)) continue;
       if (Math.hypot(l.pos[0] - to[0], l.pos[1] - to[1]) > med * GROUP) continue;
-      const dx = ux * add;
-      const dy = uy * add;
+      // 标签固定往外退 `gapPx`：键补长以后缝不会变成 0，字也不会跟线黏在一起
+      const dx = ux * shift;
+      const dy = uy * shift;
       edits.push({
         at: l.at,
         len: l.len,
@@ -184,12 +238,46 @@ export function spreadLabelBonds(svg) {
     }
   }
 
+  // ④ 一个字上有两个字母（HO / NH / Cl…）时，Indigo 把它们排得很紧，
+  //    缩到卡片大小会糊成一团：按左右顺序各推开一点（横排文字，只动 x）
+  const used = new Set();
+  for (const a of labels) {
+    if (used.has(a.at)) continue;
+    const group = labels.filter(
+      (b) => Math.abs(b.pos[1] - a.pos[1]) < med * 0.35 && Math.abs(b.pos[0] - a.pos[0]) < med * 0.45
+    );
+    if (group.length < 2) continue;
+    group.sort((x, y) => x.pos[0] - y.pos[0]);
+    const step = med * 0.09;
+    group.forEach((g, i) => {
+      if (used.has(g.at)) return;
+      used.add(g.at);
+      const dx = (i - (group.length - 1) / 2) * step;
+      if (!dx) return;
+      edits.push({
+        at: g.at,
+        len: g.len,
+        txt: g.raw.replace(/\bx="[-\d.]+"/, `x="${round(g.x + dx / g.S)}"`),
+      });
+      left = Math.max(left, dx < 0 ? -dx : 0);
+      right = Math.max(right, dx > 0 ? dx : 0);
+    });
+  }
+
   if (!edits.length) return src;
   let out = src;
   for (const e of edits.sort((a, b) => b.at - a.at)) out = out.slice(0, e.at) + e.txt + out.slice(e.at + e.len);
 
-  // ③ 挪出去的标签别被画布裁掉：viewBox 和 width/height 一起撑开
+  // ③ 挪出去的标签别被画布裁掉：viewBox 和 width/height 一起撑开。
+  //    四边再各留 3% 的白，字才不会顶在画布边上（缩到卡片大小时顶边看着也像「挤」）
   const vb = out.match(/viewBox="([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)"/);
+  if (vb) {
+    const pad = Math.max(3, Math.min(toNum(vb[3]), toNum(vb[4])) * 0.03);
+    left += pad;
+    right += pad;
+    top += pad;
+    bottom += pad;
+  }
   if (vb && (left || right || top || bottom)) {
     const x = toNum(vb[1]);
     const y = toNum(vb[2]);
