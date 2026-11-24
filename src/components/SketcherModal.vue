@@ -108,8 +108,6 @@ async function pick() {
   // Ketcher 的接口是异步的（导出要过一遍 Indigo），等它算完再取
   const smiles = String((await a.getSmiles()) || '').trim();
   if (!smiles) return toast('画板上还是空的', 'warn');
-  // **图直接用 Ketcher 自己渲的**（用户点名要画板里那张）：用户手画的缩写也在 MOL 里，
-  // 所以优先拿 molfile 去过 Indigo，拿不到才退回 SMILES
   let mol = '';
   try {
     mol = String((await a.getMol?.()) || '');
