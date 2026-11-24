@@ -118,6 +118,8 @@ function scan(svg, boxes) {
       y: Y,
       S,
       pos: [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2],
+      dx: 0,
+      dy: 0,
       rect: [Math.min(p1[0], p2[0]), Math.min(p1[1], p2[1]), Math.max(p1[0], p2[0]), Math.max(p1[1], p2[1])],
     });
   }
@@ -188,15 +190,20 @@ export function spreadLabelBonds(svg) {
     if (!box) continue;
 
     const gapPx = med * GAP;                 // 字和线之间要留的缝
-    const shift = gapPx;                     // 标签再往外退这么多（缝变大）
-    const rect = [box[0] - shift * ux, box[1] - shift * uy, box[2] - shift * ux, box[3] - shift * uy];
-    // 从 `from` 顺着键的方向走，多远会碰到标签外框（各边留 gapPx）
-    const tEnter = rayBox(from[0], from[1], ux, uy, [
-      Math.min(rect[0], rect[2]) - gapPx,
-      Math.min(rect[1], rect[3]) - gapPx,
-      Math.max(rect[0], rect[2]) + gapPx,
-      Math.max(rect[1], rect[3]) + gapPx,
-    ]);
+    // (ux, uy) 是「从键的这头指向标签那头」，所以往外退就是 **加**，写反了会把框往里挪、
+    // 算出「没有空间」直接跳过（踩过：标签动了、键一点没补）
+    const enterAt = (shift) =>
+      rayBox(from[0], from[1], ux, uy, [
+        Math.min(box[0] + shift * ux, box[2] + shift * ux) - gapPx,
+        Math.min(box[1] + shift * uy, box[3] + shift * uy) - gapPx,
+        Math.max(box[0] + shift * ux, box[2] + shift * ux) + gapPx,
+        Math.max(box[1] + shift * uy, box[3] + shift * uy) + gapPx,
+      ]);
+    // 标签该退多远：至少留出 gapPx 的缝；要是不够让键补到 FILL 根键长，就再多退一点。
+    // （只退 gapPx 的话，键会被「缝」吃掉，长度还是短 —— 上一版就是这样没效果）
+    // 退多少：正好抵掉「键比 FILL 短的那截」，再额外留半条缝；退太多标签会跟键脱开
+    const shift = Math.max(gapPx, med * FILL - o.L + gapPx * 0.5);
+    const tEnter = enterAt(shift);
     const target = Number.isFinite(tEnter) ? Math.min(med * FILL, tEnter) : med * FILL;
     const add = Math.max(0, target - o.L);
     if (add < 1) continue;
@@ -220,16 +227,11 @@ export function spreadLabelBonds(svg) {
     for (const l of labels) {
       if (moved.has(l.at)) continue;
       if (Math.hypot(l.pos[0] - to[0], l.pos[1] - to[1]) > med * GROUP) continue;
-      // 标签固定往外退 `gapPx`：键补长以后缝不会变成 0，字也不会跟线黏在一起
+      // 标签往外退 `shift`（键补长以后缝不会变成 0）
       const dx = ux * shift;
       const dy = uy * shift;
-      edits.push({
-        at: l.at,
-        len: l.len,
-        txt: l.raw
-          .replace(/\bx="[-\d.]+"/, `x="${round(l.x + dx / l.S)}"`)
-          .replace(/\by="[-\d.]+"/, `y="${round(l.y + dy / l.S)}"`),
-      });
+      l.dx += dx;
+      l.dy += dy;
       moved.add(l.at);
       left = Math.max(left, dx < 0 ? -dx : 0);
       right = Math.max(right, dx > 0 ? dx : 0);
@@ -254,13 +256,21 @@ export function spreadLabelBonds(svg) {
       used.add(g.at);
       const dx = (i - (group.length - 1) / 2) * step;
       if (!dx) return;
-      edits.push({
-        at: g.at,
-        len: g.len,
-        txt: g.raw.replace(/\bx="[-\d.]+"/, `x="${round(g.x + dx / g.S)}"`),
-      });
+      g.dx += dx;                       // 记在标签上，最后和「往外退」一起写成一条 edit
+      g.pos[0] += dx;
       left = Math.max(left, dx < 0 ? -dx : 0);
       right = Math.max(right, dx > 0 ? dx : 0);
+    });
+  }
+
+  for (const l of labels) {
+    if (!l.dx && !l.dy) continue;
+    edits.push({
+      at: l.at,
+      len: l.len,
+      txt: l.raw
+        .replace(/\bx="[-\d.]+"/, `x="${round(l.x + (l.dx || 0) / l.S)}"`)
+        .replace(/\by="[-\d.]+"/, `y="${round(l.y + (l.dy || 0) / l.S)}"`),
     });
   }
 
