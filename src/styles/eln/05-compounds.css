@@ -75,6 +75,51 @@
 /* 两格宽：性状这种「一句话」的，独占一行太浪费（用户嫌太长） */
 .c-field.half { grid-column: span 2; }
 
+/* 「来源」格：可以手选（空 = 跟随来源记录）。做成跟输入框同样式的按钮 + 自绘菜单，
+   别用原生 select（用户讨厌那种控件）。 */
+.src-wrap { position: relative; }
+.c-src {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  padding: 5px 6px;
+  cursor: pointer;
+  transition: background 130ms, border-color 130ms;
+}
+.c-src:hover { background: #f8f7f2; }
+.c-src.empty { color: var(--ink-4); }
+.src-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(28, 27, 25, 0.1);
+  padding: 4px;
+}
+.src-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink-2, var(--ink));
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.src-opt:hover { background: #f4f2ee; }
+.src-opt.on { color: var(--accent); }
+
 .c-field > span {
   font-family: var(--mono);
   font-size: 9px;

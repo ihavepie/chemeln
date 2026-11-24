@@ -15,7 +15,7 @@ import { api } from '../api.js';
 import { loadBoot, loadCompounds, store, categoriesOfProject, addCategory } from '../store.js';
 import { printCompoundLabel } from '../lib/label.js';
 import { structureInfo, pubchemUrl, describeInfo, LOOKUP_SITES } from '../lib/lookup.js';
-import { CATEGORY_LABEL, CMP_CAT_LABEL, CMP_CAT_ORDER, compoundSourceLabel, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
+import { CATEGORY_LABEL, CMP_CAT_LABEL, CMP_CAT_ORDER, compoundSourceLabel, SOURCE_MANUAL, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
 import { analyzeSmiles, analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
@@ -41,13 +41,23 @@ const pathModal = ref(false);
 const pathValue = ref('');
 const cat = ref('auto');
 
-// 化合物的「来源」（类型不再手选）：来源记录 → 记录类型；没有来源记录就看老类型是不是「试剂」
+// 化合物的「来源」：可以手选（form.source_label），空着就按来源记录的 kind 自动算
 const sourceLabel = computed(() =>
-  compoundSourceLabel({ source_kind: c.value?.standardExp?.kind || '', kind: c.value?.kind || form.kind })
+  compoundSourceLabel({
+    source_label: form.source_label || '',
+    source_kind: c.value?.standardExp?.kind || '',
+    kind: c.value?.kind || form.kind,
+  })
 );
+/** 来源下拉开着没有；选了手选值就存进 form，服务端跟着保存 */
+const srcOpen = ref(false);
+function pickSource(v) {
+  form.source_label = v;
+  srcOpen.value = false;
+}
 
 const form = reactive({
-  code: '', name: '', kind: '底物', category_id: '', project: '', formula: '', mw: '', cas: '', appearance: '', mp: '', smiles: '',
+  code: '', name: '', kind: '底物', source_label: '', category_id: '', project: '', formula: '', mw: '', cas: '', appearance: '', mp: '', smiles: '',
   // 画板那版的 molfile（带坐标）：再打开画板时拿它当底，Ketcher 就不会重排一遍
   mol: '',
   hrms: '', ir: '', rotation: '',
@@ -135,6 +145,7 @@ const historyOpen = ref(false);
 function closeMenus(e) {
   if (ignoreOutsideClick()) return;   // 刚打开的那一下不算「点外面」
   if (!e.target.closest?.('.menu-wrap')) moreMenu.value = false;
+  if (!e.target.closest?.('.src-wrap')) srcOpen.value = false;
 }
 
 /** 窄屏（手机）走只读精简页，桌面版式完全不渲染 */
@@ -158,7 +169,7 @@ onBeforeUnmount(() => {
 const payload = () => ({ ...form });
 
 /** 中栏列表 / 卡片墙读的是 store.compounds，改完名字得就地改掉那一份，不然要刷新页面才变 */
-const LIST_FIELDS = ['code', 'name', 'kind', 'formula', 'mw', 'cas', 'tlc_rf', 'project', 'category_id', 'category_name'];
+const LIST_FIELDS = ['code', 'name', 'kind', 'source_label', 'formula', 'mw', 'cas', 'tlc_rf', 'project', 'category_id', 'category_name'];
 
 function patchListRow(updated) {
   const row = (store.compounds || []).find((x) => String(x.id) === String(updated.id));
@@ -947,7 +958,21 @@ function openSpectra() {
             <label class="c-field wide"><span>名称</span><input v-model="form.name" placeholder="4-甲基苯甲醛" /></label>
             <label class="c-field">
               <span>来源</span>
-              <span class="c-src" :title="'这条化合物从哪条记录来的：原料产物 / 小反应产物 / 筛选产物 / 扩展产物'">{{ sourceLabel || '—' }}</span>
+              <div class="src-wrap">
+                <button type="button" class="c-src" :class="{ empty: !sourceLabel }" @click.stop="srcOpen = !srcOpen">
+                  {{ sourceLabel || '未指定' }}
+                </button>
+                <div v-if="srcOpen" class="src-menu" @click.stop>
+                  <button
+                    v-for="o in SOURCE_MANUAL"
+                    :key="o.v"
+                    type="button"
+                    class="src-opt"
+                    :class="{ on: String(form.source_label || '') === o.v }"
+                    @click="pickSource(o.v)"
+                  >{{ o.label }}</button>
+                </div>
+              </div>
             </label>
             <label class="c-field">
               <span>课题</span>

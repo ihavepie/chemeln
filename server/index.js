@@ -1303,7 +1303,7 @@ function pipeFile(res, file) {
 const COMPOUND_COLUMNS = [
   'code', 'name', 'kind', 'formula', 'mw', 'cas', 'appearance', 'mp', 'smiles', 'mol',
   'nmr_h1', 'nmr_c13', 'nmr_other', 'hrms', 'ir', 'rotation', 'tlc_solvent', 'tlc_rf', 'procedure', 'notes',
-  'standard_exp_id', 'category_id', 'project',
+  'standard_exp_id', 'category_id', 'project', 'source_label',
 ];
 
 function normalizeCompound(input) {
@@ -1421,7 +1421,7 @@ function listCompounds(query) {
     params.push(Number(query.category));
   }
   const sql = `
-    SELECT c.id, c.code, c.name, c.kind, c.formula, c.mw, c.tlc_rf, c.appearance, c.updated_at,
+    SELECT c.id, c.code, c.name, c.kind, c.source_label, c.formula, c.mw, c.tlc_rf, c.appearance, c.updated_at,
            c.standard_exp_id, c.category_id,
            -- smiles 一起回去：反应式 ↔ 投料表互认（按结构对化合物）要靠它，详情页那一路是另一条查询
            c.smiles,

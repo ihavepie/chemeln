@@ -10,6 +10,14 @@
 - 验证：`check` 58 绿 / `check:types` 0 错 / `build` 通过；`GET/PUT /api/style` 正常（同样的值不回清缓存、改字号清缓存、野字段只提示）；拿真代码路径（`style.js` + `chemdraw.js` + 本地 Indigo）重渲 3 个化合物，跟演示图逐项对过（stroke 0.0417、text 数一致、字号 70.2 vs 69.8），肉眼比对 `.cache/acs-test/verify.png` 一模一样；记录页在 WKWebView 里 `check:pages` 无回归（#206 第 1 页 1078→1079；第 2 页 +125px 是 11-14 那份基线本来就旧，已用「暂存改动 → 旧代码重测」确认与本次无关）；`vendor/ketcher` 重建后 49 MB、`applyStyle` 在包里。
 
 
+## 2026-11-24 化合物「来源」改成可手选（原来只能按来源记录自动算）
+
+- 用户：「这个试剂类型应该是可以改的吧，不知道哪次改动把这个锁住了」。其实不是 bug：那轮「化合物的类型没必要按类型分类」把「类型」撤了，这一格改名「来源」并由 `compoundSourceLabel()` 只读推算（来源记录的 `kind` → 原料产物 / 小反应产物 / 筛选产物 / 扩展产物；没有来源记录且老类型是「试剂」就显示「试剂」）。他看到的 C = 「原料产物」，是因为反查到的来源记录 `SJ-2-1` 的 kind 是「原料」。
+- 改法：加一列 `compounds.source_label`（`ensureColumn` 增量迁移，空串 = 跟随来源记录），**没有复用 `kind`**——`kind` 还被 `ReagentTable` 的 `KIND_TO_ROLE` 用来定投料组分，塞来源值会把这个映射搞乱。
+- `compoundSourceLabel()` 现在手选优先（`source_label`），其次来源记录，最后老 `kind==='试剂'`；`SOURCE_MANUAL` 给出 6 项（跟随来源记录 / 原料产物 / 小反应产物 / 筛选产物 / 扩展产物 / 试剂）。
+- 化合物页那一格从只读 span 换成按钮 + 自绘菜单（`.c-src` / `.src-menu` / `.src-opt`，样式进 `05-compounds.css`）；点外面关（`closeMenus` 里加 `.src-wrap` 判断）。`payload()` 是 `{...form}`，所以 form 加 `source_label` 后自动跟着保存；`/api/compounds` 列表 SQL 也带上这一列。
+- 验证：`check` 58 绿 / `check:types` 0 错 / `build` 通过；`PUT /api/compounds/72 {source_label:'条件筛选'}` 落库正常、清空后回到自动；页面截图（`#/c/72`）版式正常、「来源」显示「原料产物」。菜单的展开没法用 `jsrun` 验（它是同步求值、Vue 的 nextTick 在求值返回后才跑），只核对了构建产物里有「跟随来源记录」文案。
+
 ## 2026-11-24 抓画板（路线 A）试了一轮回退；确认画板设置是摆设；字号定 8.5
 
 - 起因：用户觉得换字层「Bn 这类缩写有点加粗」（缩写是 Helvetica 文字、杂原子还是 Indigo 字形，两套字），想让全图统一成一种字。做法上先试了「直接抓 Ketcher 画布」——画板里的标签本来就是 Arial `<text>`，天然一套字。

@@ -437,6 +437,8 @@ ensureColumn('compounds', 'rotation', "rotation TEXT NOT NULL DEFAULT ''");
 // 画板那版的 molfile（带真实坐标）：重新打开画板时喂给它，才不会又被重排一遍。
 // 只存 SMILES 的话 Ketcher / Indigo 会按自己的算法重新摆一次，用户画的样子就没了。
 ensureColumn('compounds', 'mol', "mol TEXT NOT NULL DEFAULT ''");
+// 化合物「来源」的手选值（空 = 跟随来源记录自动算，见 lib/ui.js 的 compoundSourceLabel）
+ensureColumn('compounds', 'source_label', "source_label TEXT NOT NULL DEFAULT ''");
 
 // 反应式缓存要跟着「结构改过没有」失效：sig 只由投料表字段拼出来，用户回画板改了产物结构
 // （尤其是加了 / 去了缩写标签）以后 sig 不变，缓存里那张图还会被贴出来，看着就是「莫名其妙变了」。

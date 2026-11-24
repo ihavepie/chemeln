@@ -66,8 +66,21 @@ export const SOURCE_LABEL = {
   条件筛选: '筛选产物',
   底物扩展: '扩展产物',
 };
+/** 「来源」可以手选（存 `compounds.source_label`）；空串 = 跟随来源记录自动算 */
+export const SOURCE_MANUAL = [
+  { v: '', label: '跟随来源记录' },
+  { v: '原料', label: '原料产物' },
+  { v: '试反应', label: '小反应产物' },
+  { v: '条件筛选', label: '筛选产物' },
+  { v: '底物扩展', label: '扩展产物' },
+  { v: '试剂', label: '试剂' },
+];
+export const sourceManualLabel = (v) => SOURCE_MANUAL.find((o) => o.v === String(v || ''))?.label || '';
 export const compoundSourceLabel = (c) => {
   if (!c) return '';
+  // 手选优先：选了就按选的显示
+  const own = String(c.source_label || '').trim();
+  if (own) return SOURCE_LABEL[own] || own;
   const k = String(c.source_kind || (c.standardExp && c.standardExp.kind) || '').trim();
   if (k) return SOURCE_LABEL[k] || `${k}产物`;
   if (String(c.kind || '').trim() === '试剂') return '试剂';
