@@ -668,3 +668,7 @@
   ③ **试剂库**：`reagent_lib` 只存名字 / MW / 密度，**没有结构**，所以只能拿查回来的 MW 按 ±0.6 缩范围，点一条把那个试剂名填进搜索框。
   验证：`C1C(OC)(OC)CC1C(=O)OC` → methyl 3,3-dimethoxycyclobutane-1-carboxylate（C8H14O4 · 174.19 · CAS 98231-07-3），完全一致命中 A、片段命中 B-Cr；`C1COCCO1` → 1,4-dioxane，试剂库命中 dioxane（88.11）。
   坑：openchemlib 的 `setFragment(true)` 一定要加，不然子结构匹配不上；查询用 `/api/compounds`、`/api/reagents` 而不是 `store.compounds`（后者可能被当前筛选/课题收窄）。
+- **结构式里「HO / NH2」贴着键头（羟基看着挤）**（用户：卡片上「这个羟基有点挤压」）。
+  真因：这类结构是从**画板（Ketcher）**存的图，Ketcher 用 Indigo 渲染，Indigo 会给字母标签让位、**把挨着标签那根键截掉约 0.26 根键长**（实测 C–O 画出来只有 0.74），卡片上一缩就显得挤。
+  改：`CompoundDetail.applySketched()` 选图时看 molfile 里**有没有缩写**——有（Ts / Bn / OMe…，Indigo 才认得超原子）就照旧用画板那张；没有就改用 `analyzeStructureText(smiles)` 那张（openchemlib 重排 + `canonicalOrientation`，标签和键长都是等距的）。
+  已有的老图：化合物页 `⋯ › 整理结构式（重排）`（`tidyStructure()`）走同一条路，重画一张即可；这次顺手把 D-「3-phenylprop-2-yn-1-ol」那张重画了（旧文件 243 → 新 244）。

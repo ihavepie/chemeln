@@ -18,7 +18,7 @@ import { structureInfo, pubchemUrl, describeInfo, LOOKUP_SITES } from '../lib/lo
 import { CATEGORY_LABEL, CMP_CAT_LABEL, CMP_CAT_ORDER, compoundSourceLabel, fmtSize, guessCmpCategory, isImageName } from '../lib/ui.js';
 import { useAutosave } from '../lib/autosave.js';
 import { applyNumeric } from '../lib/numinput.js';
-import { analyzeSmiles, analyzeStructureText, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
+import { analyzeSmiles, analyzeStructureText, hasAbbrev, looksLikeMolfile, looksLikeSmiles, svgToFile } from '../lib/chem.js';
 import { indigoSvg } from '../lib/indigo.js';
 import { chemdrawLabels, chemdrawLabelsExact, scaleGlyphLabels } from '../lib/chemdraw.js';
 import { confirm, prompt, toast } from '../lib/feedback.js';
@@ -454,8 +454,13 @@ async function applySketched({ smiles, mol, svg: padSvg, info: sketchedInfo }) {
     }
   }
 
+  // 图用哪张：**带缩写（Ts / Bn / OMe…）的留画板那张**（Indigo 才认得超原子）；
+  // 纯普通结构的用 openchemlib 重排那张——Indigo 画到「HO / NH2」这种字母标签时，
+  // 贴着标签那根键会被截短一截（实测 0.74 根键长），卡片上看就是羟基「挤」在键头上。
+  const keepBoard = hasAbbrev(String(mol || ''));
+  const pickSvg = (keepBoard && padSvg) || info.svg;
   const fd = new FormData();
-  fd.append('file', svgToFile(padSvg || info.svg), '结构式.svg');
+  fd.append('file', svgToFile(pickSvg), '结构式.svg');
   fd.append('category', 'structure');
   await api.uploadCompoundFile(c.value.id, fd);
   await reload();
