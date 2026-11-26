@@ -10,6 +10,15 @@
 - 验证：`check` 58 绿 / `check:types` 0 错 / `build` 通过；`GET/PUT /api/style` 正常（同样的值不回清缓存、改字号清缓存、野字段只提示）；拿真代码路径（`style.js` + `chemdraw.js` + 本地 Indigo）重渲 3 个化合物，跟演示图逐项对过（stroke 0.0417、text 数一致、字号 70.2 vs 69.8），肉眼比对 `.cache/acs-test/verify.png` 一模一样；记录页在 WKWebView 里 `check:pages` 无回归（#206 第 1 页 1078→1079；第 2 页 +125px 是 11-14 那份基线本来就旧，已用「暂存改动 → 旧代码重测」确认与本次无关）；`vendor/ketcher` 重建后 49 MB、`applyStyle` 在包里。
 
 
+## 2026-11-24 巡检：13 条路由 / 12 个接口 / 课题与分类层级
+
+- 用户：「都检查一下，不希望出现哪个功能虽然有，但是打不开的情况」。
+- **路由巡检**（jsrun 在 WKWebView 里逐条打开，查渲染痕迹和报错文本）：`#/`、`#/list`、`#/compounds`、`#/spectra`、`#/reagents`、`#/screenings`、`#/boards`、`#/trash`、`#/settings`、`#/e/121`、`#/c/72`、`#/s/22`、`#/b/16` —— 全部渲染、`Cannot read / is not a function / Failed to fetch` 一个都没有；入口按钮都在（新建化合物 / 批量标签 / 视图切换 / 按结构 / 导入谱图 / 恢复·彻底删除 / 画结构式 / 页签 / 三方导出）。
+- **接口巡检**：`/api/{bootstrap,experiments,compounds,reagents,spectra,groups,screenings,trash,boards,style,categories,projects}` 全 200。
+- **课题/分类层级**（把 `setMod` 临时置成 `cats` 再读 DOM，读完还原成 `page`）：共用课题「0 条 · 1 个 / 未分类 1 个」；氨基环丁酮类（前缀 SJ-2）「9 条 · 10 个」，实验分类 方法学 4 条、原料合成 5 条，化合物分类 标准底物合成 7 个、扩底物 1 个，未分类 2 个。跟库里的 count 逐项对得上。
+- **数据一致性**：实验/化合物引用到的分类 **没有一处** scope 或课题对不上（`c.scope<>'experiment' OR c.project<>e.project` 这类查询都返回空）。未分类化合物 3 个（`1`、`2` 在项目里，`3` 在共用课题——它就是跨课题引用那条，见上一条记录）。
+- **自动化验不了的三处**（jsrun 是同步求值，Vue 的 nextTick / fetch 都在它返回之后才跑）：投料表结构卡弹层、化合物页「来源」下拉、设置页模块折叠。这三处只能手点确认。
+- 顺手清掉：`data/drag-debug.log`（探针用的临时文件）、`setMod` 已还原。
 ## 2026-11-24 投料表结构卡：化合物不在当前课题时按 id 补拉（「单击单元格没显示」）
 
 - 用户报两件事：①从化合物库加的化合物「为什么会重绘」；②投料表里单击单元格（试剂名格）没弹结构卡，之前有。
