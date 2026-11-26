@@ -1514,20 +1514,9 @@ function onDrop(ev) {
                   @keydown="onKeydown($event, r, 'name')"
                   @blur="onNameBlur(r)"
                 />
-                <!-- 挂了库里的化合物时，给一颗明确的「看结构卡」按钮：以前只能点名字格，可那格被
-                     input 占满、点 input 又被挡（见 onNameCellClick），等于这个卡根本打不开（用户报过） -->
-                <button
-                  v-if="r.compound_id"
-                  type="button"
-                  class="name-fig"
-                  :class="{ on: preview.open && preview.row === r }"
-                  title="看这个化合物的结构卡"
-                  @click.stop="pinPreview(r)"
-                >
-                  <Icon name="molecule" :size="12" />
-                </button>
-                <!-- 「从化合物库选一个」以前藏在双击里：点一下名字框、再点一下（想挪光标）就会被当成双击弹出来，
-                     现在给一颗明确的小按钮，双击不再触发任何弹窗 -->
+                <!-- 「从化合物库选一个」藏在右边那颗六边形小按钮里（`.name-browse`）。
+                     看结构卡 = **双击名字格**（`onNameCellDblClick`）；别再往这一格加小按钮，
+                     它跟 PubChem 那颗（`.rcheck`）会撞位置（用户圈出来要求移除，2026-11-24）。 -->
                 <button
                   v-if="!locked && !r.compound_id"
                   type="button"

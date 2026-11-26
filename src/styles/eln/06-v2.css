@@ -665,23 +665,6 @@
 
 /* ---------- 投料表里选化合物 / 看结构式 ---------- */
 .sheet .rtable td.name-cell { position: relative; }
-/* 名字格里那颗「看结构」的小按钮：跟放大镜同一排、不占正文宽度 */
-.sheet .rtable .name-fig {
-  position: absolute;
-  right: 22px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: none;
-  background: none;
-  color: var(--ink-4);
-  padding: 2px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  transition: color 130ms, background 130ms;
-}
-.sheet .rtable .name-fig:hover,
-.sheet .rtable .name-fig.on { color: var(--accent); background: var(--accent-soft); }
 
 /* 输名字时的候选：带结构缩略图，最多 8 条 */
 .sheet .rtable .cmp-pick {

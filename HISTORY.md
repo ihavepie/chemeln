@@ -10,6 +10,11 @@
 - 验证：`check` 58 绿 / `check:types` 0 错 / `build` 通过；`GET/PUT /api/style` 正常（同样的值不回清缓存、改字号清缓存、野字段只提示）；拿真代码路径（`style.js` + `chemdraw.js` + 本地 Indigo）重渲 3 个化合物，跟演示图逐项对过（stroke 0.0417、text 数一致、字号 70.2 vs 69.8），肉眼比对 `.cache/acs-test/verify.png` 一模一样；记录页在 WKWebView 里 `check:pages` 无回归（#206 第 1 页 1078→1079；第 2 页 +125px 是 11-14 那份基线本来就旧，已用「暂存改动 → 旧代码重测」确认与本次无关）；`vendor/ketcher` 重建后 49 MB、`applyStyle` 在包里。
 
 
+## 2026-11-24 撤掉名字格那颗「看结构」小按钮（跟 PubChem 那颗撞位置）
+
+- 用户圈着投料表「试剂」格右侧那两颗小圆标说「这个小按钮还是移除吧」。那是我上一轮加的 `.name-fig`（看结构卡）——它按 `right: 22px` 定位，跟本来就有的 `.rcheck`（按名字去 PubChem 查）**重叠**，看着像同一个按钮冒出两份。
+- 处理：删掉 `.name-fig`（模板 + 那 18 行 CSS），入口回到**双击名字格**（`onNameCellDblClick`，选中的问题上一轮已修）；注释里写明「别再往这一格加小按钮，会跟 `.rcheck` 撞」。
+- 验证：`#/e/121` 上 `.name-fig` 数量 0，投料表 10 行正常、右侧仍只有原来的六边形「从化合物库选一个」和 hover 才出的放大镜；`check` 58 绿、build 通过、页面截图无错位。
 ## 2026-11-24 双击弹结构卡不再顺手选中文字；把跨课题的那个化合物挪回课题里
 
 - 用户截图指出：双击名字格弹卡的同时把「苯基溴丙炔」这个词选中了。原因是在 `<input>` 上双击浏览器默认会选词；处理成 `onNameCellDblClick()`：先把 input 的光标折叠到末尾（`setSelectionRange(len, len)`），再 `window.getSelection().removeAllRanges()`，然后才 `pinPreview(r)`。
