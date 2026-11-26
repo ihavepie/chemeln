@@ -214,10 +214,25 @@ function unlinkCompound(r) {
 }
 
 /** 点一下那一格才显示结构：不跟随鼠标，不会扫过就乱弹 */
-function pinPreview(r) {
-  if (!r.compound_id || !cmpById(r.compound_id)) {
+async function pinPreview(r) {
+  if (!r.compound_id) {
     unpinPreview();          // 点到没挂库的行：把上一张结构卡收掉
     return;
+  }
+  // `compoundDict` 是**按当前课题过滤**的（共用课题 / 别的课题的化合物不在里面）。
+  // 记录里挂别课题的化合物很常见，查不到就按 id 补拉一次，否则结构卡永远弹不出来（用户报过）。
+  if (!cmpById(r.compound_id)) {
+    try {
+      const c = await api.compound(r.compound_id);
+      if (!c || !c.id) {
+        unpinPreview();
+        return;
+      }
+      mergeCompounds([c]);
+    } catch {
+      unpinPreview();
+      return;
+    }
   }
   // 记的是「哪一行」而不是「哪个化合物」——两行挂同一个化合物时只弹一行
   markPopupOpen();
