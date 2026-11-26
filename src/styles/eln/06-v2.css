@@ -776,6 +776,15 @@
 }
 
 .sheet .rtable .cmp-pop-meta b { color: var(--ink); font-weight: 600; }
+/* 外部试剂那张卡右下角的来源标记 */
+.sheet .rtable .cmp-pop-src.warn { color: var(--accent); }
+.sheet .rtable .cmp-pop-src {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+}
 .sheet .rtable .cmp-pop-meta .mono { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
 
 /* 试剂名称列取中等宽度：太窄放不下常用名，太宽又浪费（数字列会被挤） */

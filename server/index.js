@@ -4798,13 +4798,30 @@ const pubchemCids = async (kind, value) => {
 };
 
 /** 一次完整查询；查不到返回 { found:false } */
+/** 实验室缩写 → PubChem 认得的名字。只放「按缩写查会失败或查错」的那几个（实测过的）。 */
+const LAB_ALIAS = {
+  dcm: 'dichloromethane',
+  tsnh2: '4-toluenesulfonamide',
+  'ts-nh2': '4-toluenesulfonamide',
+  lda: 'lithium diisopropylamide',
+  lah: 'lithium aluminium hydride',
+  tmeda: 'tetramethylethylenediamine',
+  dipea: 'N,N-diisopropylethylamine',
+  nbs: 'N-bromosuccinimide',
+  aibn: 'azobisisobutyronitrile',
+  hfip: 'hexafluoroisopropanol',
+  dibal: 'diisobutylaluminium hydride',
+  'dibal-h': 'diisobutylaluminium hydride',
+};
+
 async function pubchemLookup(kind, value) {
   const cids = await pubchemCids(kind, value);
   if (!cids.length) return { found: false, query: value };
   const cid = cids[0];
   // 三个请求互不依赖，一起发：不然一次查询要串行等 3 秒（用户会问「快吗」）
   const [table, syn, props] = await Promise.all([
-    fetchJson(`${PUBCHEM}/compound/cid/${cid}/property/IUPACName,MolecularFormula,MolecularWeight,InChIKey/JSON`),
+    // CanonicalSMILES 一起要：前端要按 SMILES 在本地画结构（外部试剂没有库里的 molfiles）
+    fetchJson(`${PUBCHEM}/compound/cid/${cid}/property/IUPACName,MolecularFormula,MolecularWeight,InChIKey,CanonicalSMILES/JSON`),
     fetchJson(`${PUBCHEM}/compound/cid/${cid}/synonyms/JSON`).catch(() => null),
     pubchemProps(cid),
   ]);
@@ -4825,6 +4842,8 @@ async function pubchemLookup(kind, value) {
     formula: str(p.MolecularFormula),
     mw: p.MolecularWeight ? String(p.MolecularWeight) : '',
     inchikey: str(p.InChIKey),
+    // PubChem 把 CanonicalSMILES 这个别名在响应里叫 **ConnectivitySMILES**（实测），别只认前者
+    smiles: str(p.ConnectivitySMILES || p.CanonicalSMILES || p.SMILES || ''),
     cas,
     props,
     url: `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`,
@@ -4996,7 +5015,9 @@ async function lookupInfo(kind, value, { force = false } = {}) {
     try {
       const raw = JSON.parse(await fsp.readFile(file, 'utf8'));
       if (raw && raw.info) {
-        if (Date.now() - (raw.at || 0) < LOOKUP_TTL) return { info: raw.info, cached: true };
+        // 老缓存里没有 smiles（前端要靠它在本地画结构）→ 当成过期，重新查一次
+        const needsSmiles = kind === 'name' && !raw.info.smiles;
+        if (!needsSmiles && Date.now() - (raw.at || 0) < LOOKUP_TTL) return { info: raw.info, cached: true };
         stale = raw.info;
       }
     } catch {
@@ -5023,6 +5044,23 @@ async function lookupInfo(kind, value, { force = false } = {}) {
   }
   if (!info) return { info: null, stale, netErr };
   if (!info.found && stale) return { info: stale, cached: true, stale: true };
+  /* 结构式（前端要靠它本地画「外部试剂」的结构）：按名字查时，命中 OPSIN / Wikidata 的那条
+     往往没有 SMILES（中文名尤其），再拿 inchikey / 解出来的英文名去 PubChem 补一次。 */
+  if (kind === 'name' && info.found && !info.smiles) {
+    const alias = LAB_ALIAS[String(value).trim().toLowerCase()] || '';
+    for (const [k, v] of [['inchikey', info.inchikey], ['name', info.name], ['name', value], ['name', alias]]) {
+      if (!v) continue;
+      try {
+        const more = await withTimeout(pubchemLookup(k, v), 7000);
+        if (more && more.found && more.smiles) {
+          info = { ...more, ...info, smiles: more.smiles, formula: info.formula || more.formula, mw: info.mw || more.mw };
+          break;
+        }
+      } catch {
+        /* 这个兜底不通就算了，卡片会写「查到了但没拿到结构式」 */
+      }
+    }
+  }
   try {
     await fsp.mkdir(LOOKUP_DIR, { recursive: true });
     await fsp.writeFile(file, JSON.stringify({ at: Date.now(), info }), 'utf8');

@@ -33,6 +33,21 @@ const roleMenuFor = ref(-1);
 const cmpInfo = ref(new Map());
 const picker = reactive({ open: false, row: null, items: [], index: 0, q: '', updatedAt: 0 });
 const preview = reactive({ open: false, row: null, pinned: false });
+/* 没挂库里化合物、但想看看它长什么样的行（LDA / BnBr / THF 这些）：双击名字格时按名字去
+   PubChem 查 SMILES，再用 lib/chem.js 在本地画一张。查过的不再重复查（内存缓存）。 */
+const extPreview = reactive({ row: null, loading: false, info: null, svg: '', error: '' });
+const extCache = new Map();
+
+/** 查回来的 MW 跟这一行填的差超过 5% 就不算可信（名字查结构最常踩的就是撞同义词） */
+const extMwMismatch = (r) => {
+  const got = Number(extPreview.info && extPreview.info.mw);
+  const want = Number(r && r.mw);
+  if (!got || !want) return false;
+  return Math.abs(got - want) > want * 0.05;
+};
+
+const svgDataUri = (svg) =>
+  `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(String(svg || ''))))}`;
 
 /* 双击「试剂」格：弹窗里搜化合物库（比长下拉好翻） */
 const browse = reactive({ open: false, row: null, q: '', items: [], index: 0, updatedAt: 0 });
@@ -260,7 +275,47 @@ function onNameCellDblClick(r, ev) {
   } catch {
     /* 同上 */
   }
-  pinPreview(r)
+  if (r.compound_id) pinPreview(r);
+  else pinExternalPreview(r);
+}
+
+/**
+ * 没挂库里化合物的行（LDA / BnBr / THF…）：按名字联网查一次，拿到 SMILES 就在本地画结构。
+ * 为什么不用 PubChem 那张图：那张是它的排版、跟本项目的观感两套；用 SMILES 本地画更统一。
+ */
+async function pinExternalPreview(r) {
+  const name = String(r.name || '').trim();
+  if (!name) {
+    unpinPreview();
+    return;
+  }
+  markPopupOpen();
+  preview.row = r;
+  preview.pinned = true;
+  preview.open = true;
+  extPreview.row = r;
+  const key = name.toLowerCase();
+  const hit = extCache.get(key);
+  if (hit) {
+    Object.assign(extPreview, hit);
+    return;
+  }
+  Object.assign(extPreview, { loading: true, info: null, svg: '', error: '' });
+  try {
+    const info = await api.lookup({ q: name });
+    let svg = '';
+    if (info && info.smiles) {
+      const parsed = await analyzeSmiles(info.smiles);
+      svg = (parsed && parsed.svg) || '';
+    }
+    const got = { loading: false, info, svg, error: svg ? '' : info && info.found ? '查到了，但没拿到结构式' : '没查到（要联网）' };
+    extCache.set(key, got);
+    if (extPreview.row === r) Object.assign(extPreview, got);
+  } catch (e) {
+    const got = { loading: false, info: null, svg: '', error: '查不到（' + String(e.message || e).slice(0, 40) + '）' };
+    extCache.set(key, got);
+    if (extPreview.row === r) Object.assign(extPreview, got);
+  }
 }
 
 /** 点这一格才显示结构卡；点在输入框、按钮、已经弹出的卡上不算（以前点进名字框也会弹一张，把下面的行挡住） */
@@ -273,6 +328,11 @@ function unpinPreview() {
   preview.pinned = false;
   preview.open = false;
   preview.row = null;
+  extPreview.row = null;
+  extPreview.loading = false;
+  extPreview.info = null;
+  extPreview.svg = '';
+  extPreview.error = '';
 }
 const roleMenuUp = ref(false);
 const dragOrd = ref(null);
@@ -1566,6 +1626,33 @@ function onDrop(ev) {
                       <button v-if="!locked" type="button" class="cmp-pop-unlink" title="解绑这个化合物，行留着" @click.stop="unlinkCompound(r)">
                         移除
                       </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 外部试剂的结构（按名字联网查 SMILES → 本地画）：LDA / BnBr 这种没挂库的 -->
+                <div
+                  v-if="preview.open && preview.row === r && extPreview.row === r"
+                  class="cmp-pop is-pinned"
+                >
+                  <button type="button" class="cmp-pop-x" title="关闭" @click.stop="unpinPreview">
+                    <Icon name="x" :size="11" />
+                  </button>
+                  <div class="cmp-pop-fig">
+                    <img v-if="extPreview.svg" :src="svgDataUri(extPreview.svg)" alt="" />
+                    <span v-else class="hint">{{ extPreview.loading ? '查结构中…' : extPreview.error || '没有结构' }}</span>
+                  </div>
+                  <div class="cmp-pop-meta">
+                    <b>{{ r.name || '—' }}</b>
+                    <span>{{ (extPreview.info && (extPreview.info.name || extPreview.info.formula)) || '（外部数据库）' }}</span>
+                    <div class="cmp-pop-line">
+                      <span class="mono">
+                        {{ (extPreview.info && extPreview.info.formula) || '' }}
+                        <template v-if="extPreview.info && extPreview.info.mw">· MW {{ extPreview.info.mw }}</template>
+                      </span>
+                      <span class="cmp-pop-src" :class="{ warn: extMwMismatch(r) }">
+                        {{ extMwMismatch(r) ? `小心：MW 对不上（这行 ${r.mw}）` : 'PubChem' }}
+                      </span>
                     </div>
                   </div>
                 </div>

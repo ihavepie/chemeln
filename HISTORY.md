@@ -10,6 +10,14 @@
 - 验证：`check` 58 绿 / `check:types` 0 错 / `build` 通过；`GET/PUT /api/style` 正常（同样的值不回清缓存、改字号清缓存、野字段只提示）；拿真代码路径（`style.js` + `chemdraw.js` + 本地 Indigo）重渲 3 个化合物，跟演示图逐项对过（stroke 0.0417、text 数一致、字号 70.2 vs 69.8），肉眼比对 `.cache/acs-test/verify.png` 一模一样；记录页在 WKWebView 里 `check:pages` 无回归（#206 第 1 页 1078→1079；第 2 页 +125px 是 11-14 那份基线本来就旧，已用「暂存改动 → 旧代码重测」确认与本次无关）；`vendor/ketcher` 重建后 49 MB、`applyStyle` 在包里。
 
 
+## 2026-11-24 外部试剂（没挂库的）双击也能看结构：按名字查 SMILES → 本地画
+
+- 用户指着投料表里 LDA / BnBr / THF 那几行：「从外部抓取的试剂能显示结构式」。这些行没有 `compound_id`（不在化合物库），原来双击什么都不出。
+- 做法：`/api/lookup` 的 PubChem 结果里补了 `smiles`（**坑：PubChem 在属性响应里把 CanonicalSMILES 这个别名写成 `ConnectivitySMILES`**，只认前者永远拿不到）；命中 OPSIN / Wikidata 的那些（中文名尤其）没有 SMILES，加了兜底链 inchikey → 解出来的英文名 → 原值 → **常用缩写别名表 `LAB_ALIAS`**（dcm / lda / lah / tsnh2 / tmeda / dipea / nbs / aibn / hfip / dibal…，只放实测查不到或查错的）。老缓存里没有 smiles 的按「过期」处理、自动重查一次。
+- 前端：`pinExternalPreview()` 双击时按名字查一次 → 用 `lib/chem.js` 的 `analyzeSmiles()` **在本地画**（不用 PubChem 那张图，观感两套），查过的进内存缓存；卡片右下角标 `PubChem`。
+- **防查错**：名字查结构最容易撞同义词表里的别的化合物（实测 `RuPhos` 会命中一个分子量 456 的磷酸硫酯）。所以卡片会拿查回来的 MW 跟这一行填的 MW 比，差超 5% 就在角上写「小心：MW 对不上（这行 xxx）」，`RuPhos` 的别名也从表里删了。
+- 实测覆盖率（这套数据里真实出现过的非库试剂）：HFIP / dioxane / P(Cy)3 / DMF / Cs2CO3 / TsCl / LAH / Et3N / DMAP / BnBr / THF / DCM / LDA 都拿到了 SMILES；`TsNH2` 仍空（Wikidata 只有中文名、PubChem 不认这个缩写），卡片会写「查到了，但没拿到结构式」。
+- 验证：`check` 58 绿 / `check:types` 0 错 / build 通过 / 首页 200。**双击弹卡本身仍无法自动验**（jsrun 同步求值），需手点。
 ## 2026-11-24 撤掉名字格那颗「看结构」小按钮（跟 PubChem 那颗撞位置）
 
 - 用户圈着投料表「试剂」格右侧那两颗小圆标说「这个小按钮还是移除吧」。那是我上一轮加的 `.name-fig`（看结构卡）——它按 `right: 22px` 定位，跟本来就有的 `.rcheck`（按名字去 PubChem 查）**重叠**，看着像同一个按钮冒出两份。
