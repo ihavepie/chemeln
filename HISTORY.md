@@ -10,6 +10,18 @@
 - 验证：`check` 58 绿 / `check:types` 0 错 / `build` 通过；`GET/PUT /api/style` 正常（同样的值不回清缓存、改字号清缓存、野字段只提示）；拿真代码路径（`style.js` + `chemdraw.js` + 本地 Indigo）重渲 3 个化合物，跟演示图逐项对过（stroke 0.0417、text 数一致、字号 70.2 vs 69.8），肉眼比对 `.cache/acs-test/verify.png` 一模一样；记录页在 WKWebView 里 `check:pages` 无回归（#206 第 1 页 1078→1079；第 2 页 +125px 是 11-14 那份基线本来就旧，已用「暂存改动 → 旧代码重测」确认与本次无关）；`vendor/ketcher` 重建后 49 MB、`applyStyle` 在包里。
 
 
+## 2026-11-24 投料表结构卡：补一颗明确入口（原来根本点不开）
+
+- 用户：「单元格那边单击或者双击还是出不来那个弹窗」。查了代码，确实**打不开**，不是偶发：
+  `onNameCellClick()` 里 `if (ev.target.closest('input, button, .cmp-pop, .cmp-pick')) return` ——
+  而名字格里就是一颗铺满的 `<input>`，点在哪儿都命中 input → 直接 return；加上 `.cmp-pop` 还带着
+  `pointer-events: none`（卡里的「×」和「移除」也就点不动），等于这个结构卡只有代码路径、没有可用入口。
+  （模板里那句「鼠标移上来就显示」是旧注释，hover 早就没人接了。）
+- 改法：①名字格加一颗 `.name-fig` 小按钮（只在 `r.compound_id` 有值时出现，图标 `molecule`，hover/选中变强调色），
+  点了 `pinPreview(r)`；②`@dblclick.stop="pinPreview(r)"` 也认双击；③去掉 `.cmp-pop` 的 `pointer-events: none`，
+  卡里的「×」「移除」才点得动，点外面收卡的逻辑（`ev.target.closest('.cmp-pop')`）也才生效。
+- 验证：`#/e/121` 上 `.name-fig` 渲染 2 颗（正好是挂了化合物的 Sub 59 / Sub 51 两行），title「看这个化合物的结构卡」；
+  `check` 58 绿、build 通过。**弹卡本身还是没法自动验**（jsrun 同步求值，Vue 的 nextTick 在它之后才跑），需要手点。
 ## 2026-11-24 巡检：13 条路由 / 12 个接口 / 课题与分类层级
 
 - 用户：「都检查一下，不希望出现哪个功能虽然有，但是打不开的情况」。
