@@ -241,6 +241,28 @@ async function pinPreview(r) {
   preview.open = true;
 }
 
+/**
+ * 双击名字格 = 弹结构卡。但在 `<input>` 上双击浏览器会顺手选中一个词（看着像整行被选中了），
+ * 所以先把光标折叠到末尾、再清一次 window 选中，才弹卡。
+ */
+function onNameCellDblClick(r, ev) {
+  const el = ev.target
+  try {
+    if (el && el.tagName === 'INPUT' && typeof el.setSelectionRange === 'function') {
+      const end = String(el.value || '').length
+      el.setSelectionRange(end, end)
+    }
+  } catch {
+    /* 不是文本控件就算了 */
+  }
+  try {
+    window.getSelection?.()?.removeAllRanges?.()
+  } catch {
+    /* 同上 */
+  }
+  pinPreview(r)
+}
+
 /** 点这一格才显示结构卡；点在输入框、按钮、已经弹出的卡上不算（以前点进名字框也会弹一张，把下面的行挡住） */
 function onNameCellClick(r, ev) {
   if (ev.target.closest?.('input, button, .cmp-pop, .cmp-pick')) return;
@@ -1478,7 +1500,7 @@ function onDrop(ev) {
                 </div>
 
               </td>
-              <td class="name-cell" @click="onNameCellClick(r, $event)" @dblclick.stop="pinPreview(r)">
+              <td class="name-cell" @click="onNameCellClick(r, $event)" @dblclick.stop="onNameCellDblClick(r, $event)">
                 <input
                   data-f="name"
                   :value="r.name"
